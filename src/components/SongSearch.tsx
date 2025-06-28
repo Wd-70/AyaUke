@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Song } from '@/types';
 import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -10,21 +10,46 @@ interface SongSearchProps {
   onFilteredSongs: (songs: Song[]) => void;
 }
 
+// Debounce hook for performance
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  React.useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  const languages = Array.from(new Set(songs.map(song => song.language))).filter(Boolean);
+  // Debounce search term to reduce filtering frequency
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  const filterSongs = () => {
+  const languages = useMemo(() => 
+    Array.from(new Set(songs.map(song => song.language))).filter(Boolean),
+    [songs]
+  );
+
+  // Memoized filter function for performance
+  const filteredSongs = useMemo(() => {
     let filtered = songs;
 
-    if (searchTerm) {
+    if (debouncedSearchTerm) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(song =>
-        song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        song.artist.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        song.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+        song.title.toLowerCase().includes(searchLower) ||
+        song.artist.toLowerCase().includes(searchLower) ||
+        song.tags?.some(tag => tag.toLowerCase().includes(searchLower))
       );
     }
 
@@ -32,20 +57,20 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
       filtered = filtered.filter(song => song.language === selectedLanguage);
     }
 
-    onFilteredSongs(filtered);
-  };
+    return filtered;
+  }, [songs, debouncedSearchTerm, selectedLanguage]);
 
-  const clearFilters = () => {
+  // Update filtered songs when filteredSongs changes
+  React.useEffect(() => {
+    onFilteredSongs(filteredSongs);
+  }, [filteredSongs, onFilteredSongs]);
+
+  const clearFilters = useCallback(() => {
     setSearchTerm('');
     setSelectedLanguage('');
-    onFilteredSongs(songs);
-  };
+  }, []);
 
   const hasActiveFilters = searchTerm || selectedLanguage;
-
-  React.useEffect(() => {
-    filterSongs();
-  }, [searchTerm, selectedLanguage]);
 
   return (
     <div className="mb-8">

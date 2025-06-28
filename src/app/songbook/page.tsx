@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Song } from '@/types';
 import { fetchSongsFromSheet, getErrorMessage } from '@/lib/googleSheets';
@@ -10,11 +10,68 @@ import SongCard from '@/components/SongCard';
 import { MusicalNoteIcon } from '@heroicons/react/24/outline';
 // import { ThemeProvider } from '@/contexts/ThemeContext';
 
+// 청크 렌더링을 위한 훅
+function useChunkedRender(items: Song[], chunkSize: number = 20) {
+  const [visibleCount, setVisibleCount] = useState(chunkSize);
+  
+  // 새로운 검색 결과일 때 리셋
+  useEffect(() => {
+    if (items.length <= chunkSize) {
+      setVisibleCount(items.length);
+    } else {
+      setVisibleCount(chunkSize);
+    }
+  }, [items.length, chunkSize]);
+  
+  // 스크롤 감지해서 더 로드
+  useEffect(() => {
+    if (visibleCount >= items.length) return;
+    
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset;
+      const windowHeight = window.innerHeight;
+      const docHeight = document.documentElement.scrollHeight;
+      
+      if (scrollTop + windowHeight >= docHeight - 1000) {
+        setVisibleCount(prev => Math.min(prev + chunkSize, items.length));
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [visibleCount, items.length, chunkSize]);
+  
+  return items.slice(0, visibleCount);
+}
+
 export default function SongbookPage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [filteredSongs, setFilteredSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // 청크 렌더링으로 성능 최적화
+  const visibleSongs = useChunkedRender(filteredSongs, 24);
+
+  // 스크롤 위치 감지
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.pageYOffset;
+      setShowScrollTop(scrollTop > 400);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // 맨 위로 스크롤
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  };
 
   useEffect(() => {
     const loadSongs = async () => {
@@ -145,6 +202,12 @@ export default function SongbookPage() {
               <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
               <span>검색된 곡: {filteredSongs.length}곡</span>
             </div>
+            {visibleSongs.length < filteredSongs.length && (
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-light-purple dark:bg-dark-purple rounded-full"></div>
+                <span>표시 중: {visibleSongs.length}곡</span>
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -159,23 +222,39 @@ export default function SongbookPage() {
 
         {/* Songs grid */}
         {filteredSongs.length > 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-          >
-            {filteredSongs.map((song, index) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {visibleSongs.map((song, index) => (
               <motion.div
                 key={song.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "0px 0px -20% 0px" }}
+                transition={{ 
+                  duration: 0.3, 
+                  delay: Math.min(index % 8, 6) * 0.03,
+                  ease: "easeOut"
+                }}
               >
                 <SongCard song={song} onPlay={handleSongPlay} />
               </motion.div>
             ))}
-          </motion.div>
+            
+            {/* 로딩 더보기 인디케이터 */}
+            {visibleSongs.length < filteredSongs.length && (
+              <div className="col-span-full flex justify-center py-8">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-center gap-2 text-light-text/60 dark:text-dark-text/60"
+                >
+                  <div className="w-4 h-4 border-2 border-light-accent/30 dark:border-dark-accent/30 
+                                  border-t-light-accent dark:border-t-dark-accent rounded-full animate-spin"></div>
+                  <span>더 많은 노래 로딩 중...</span>
+                </motion.div>
+              </div>
+            )}
+          </div>
         ) : (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -253,6 +332,31 @@ export default function SongbookPage() {
           </main>
         </>
       )}
+
+      {/* 맨 위로 플로팅 버튼 */}
+      <motion.button
+        onClick={scrollToTop}
+        initial={{ opacity: 0, scale: 0 }}
+        animate={{ 
+          opacity: showScrollTop ? 1 : 0, 
+          scale: showScrollTop ? 1 : 0 
+        }}
+        transition={{ duration: 0.3, ease: "easeOut" }}
+        className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary 
+                   text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300
+                   flex items-center justify-center group"
+        aria-label="맨 위로 가기"
+      >
+        <svg 
+          className="w-6 h-6 transform group-hover:-translate-y-0.5 transition-transform duration-200" 
+          fill="none" 
+          viewBox="0 0 24 24" 
+          stroke="currentColor" 
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+        </svg>
+      </motion.button>
     </div>
   );
 }
