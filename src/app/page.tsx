@@ -14,7 +14,7 @@ export default function Home() {
                         rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
       </div>
 
-      <Navigation />
+      <Navigation currentPath="/" />
       
       <main className="relative z-10">
         <HeroSection />

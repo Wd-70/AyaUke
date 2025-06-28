@@ -65,10 +65,11 @@ export default function SongbookPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-light-background dark:bg-dark-background">
-        <Navigation />
+  return (
+    <div className="min-h-screen bg-light-background dark:bg-dark-background">
+      <Navigation currentPath="/songbook" />
+      
+      {loading && (
         <div className="pt-16 flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 border-4 border-light-accent/20 dark:border-dark-accent/20 
@@ -76,56 +77,23 @@ export default function SongbookPage() {
             <p className="text-light-text/70 dark:text-dark-text/70">노래책을 불러오는 중...</p>
           </div>
         </div>
-      </div>
-    );
-  }
+      )}
 
-  if (error) {
-    const errorInfo = getErrorMessage(error);
-    return (
-      <div className="min-h-screen bg-light-background dark:bg-dark-background">
-        <Navigation />
-        
-        {/* Background decoration */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-20 w-96 h-96 bg-light-accent/5 dark:bg-dark-accent/5 
-                          rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
-          <div className="absolute top-40 right-20 w-96 h-96 bg-light-secondary/5 dark:bg-dark-secondary/5 
-                          rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
-        </div>
-
-        <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-center"
-          >
-            <div className="w-24 h-24 mx-auto mb-8 bg-light-primary/20 dark:bg-dark-primary/20 
-                           rounded-full flex items-center justify-center">
-              <MusicalNoteIcon className="w-12 h-12 text-light-text/40 dark:text-dark-text/40" />
-            </div>
-            
-            <h1 className="text-4xl sm:text-5xl font-bold font-display mb-4">
-              <span className="gradient-text">{errorInfo.title}</span>
-            </h1>
-            
-            <p className="text-xl text-light-text/70 dark:text-dark-text/70 mb-4">
-              {errorInfo.message}
-            </p>
-            
-            <div className="mb-8 p-6 bg-light-primary/10 dark:bg-dark-primary/10 
-                           border border-light-primary/20 dark:border-dark-primary/20 
-                           rounded-xl backdrop-blur-sm">
-              <p className="text-light-text/80 dark:text-dark-text/80 mb-4">
-                <strong>해결 방법:</strong>
+      {error && (
+        <div className="pt-16">
+          <Navigation currentPath="/songbook" />
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="w-24 h-24 mx-auto mb-8 bg-light-primary/20 dark:bg-dark-primary/20 
+                             rounded-full flex items-center justify-center">
+                <MusicalNoteIcon className="w-12 h-12 text-light-text/40 dark:text-dark-text/40" />
+              </div>
+              <h2 className="text-2xl font-bold text-light-text dark:text-dark-text mb-4">
+                오류가 발생했습니다
+              </h2>
+              <p className="text-light-text/70 dark:text-dark-text/70 mb-4">
+                노래책을 불러오는 중 문제가 발생했습니다.
               </p>
-              <p className="text-light-text/70 dark:text-dark-text/70">
-                {errorInfo.suggestion}
-              </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button
                 onClick={retryLoading}
                 className="px-6 py-3 bg-gradient-to-r from-light-accent to-light-purple 
@@ -134,48 +102,24 @@ export default function SongbookPage() {
               >
                 다시 시도
               </button>
-              
-              <a
-                href="/"
-                className="px-6 py-3 bg-light-primary/20 dark:bg-dark-primary/20 
-                         text-light-text dark:text-dark-text rounded-lg 
-                         hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 
-                         transition-all duration-200 font-medium"
-              >
-                홈으로 돌아가기
-              </a>
             </div>
+          </div>
+        </div>
+      )}
 
-            {error.message === 'MISSING_API_KEY' && (
-              <div className="mt-8 text-sm text-light-text/60 dark:text-dark-text/60">
-                <p>
-                  개발자라면 <code className="px-2 py-1 bg-light-primary/20 dark:bg-dark-primary/20 rounded">
-                    GOOGLE_SHEETS_SETUP.md
-                  </code> 파일을 확인해보세요.
-                </p>
-              </div>
-            )}
-          </motion.div>
-        </main>
-      </div>
-    );
-  }
+      {!loading && !error && (
+        <>
+          {/* Background decoration */}
+          <div className="fixed inset-0 overflow-hidden pointer-events-none">
+            <div className="absolute top-20 left-20 w-96 h-96 bg-light-accent/5 dark:bg-dark-accent/5 
+                            rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
+            <div className="absolute top-40 right-20 w-96 h-96 bg-light-secondary/5 dark:bg-dark-secondary/5 
+                            rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
+            <div className="absolute -bottom-8 left-1/2 w-96 h-96 bg-light-purple/5 dark:bg-dark-purple/5 
+                            rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+          </div>
 
-  return (
-    <div className="min-h-screen bg-light-background dark:bg-dark-background">
-      <Navigation />
-      
-      {/* Background decoration */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-20 w-96 h-96 bg-light-accent/5 dark:bg-dark-accent/5 
-                        rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-light-secondary/5 dark:bg-dark-secondary/5 
-                        rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
-        <div className="absolute -bottom-8 left-1/2 w-96 h-96 bg-light-purple/5 dark:bg-dark-purple/5 
-                        rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
-      </div>
-
-      <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+          <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -306,7 +250,9 @@ export default function SongbookPage() {
           </div>
           </motion.div>
         )}
-      </main>
+          </main>
+        </>
+      )}
     </div>
   );
 }
