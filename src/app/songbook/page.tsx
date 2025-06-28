@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Song } from '@/types';
 import { fetchSongsFromSheet, getErrorMessage } from '@/lib/googleSheets';
-// import Navigation from '@/components/Navigation';
+import Navigation from '@/components/Navigation';
 import SongSearch from '@/components/SongSearch';
 import SongCard from '@/components/SongCard';
 import { MusicalNoteIcon } from '@heroicons/react/24/outline';
@@ -68,38 +68,7 @@ export default function SongbookPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-light-background dark:bg-dark-background">
-        {/* Simple Navigation */}
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold">
-                  A
-                </div>
-                <span className="text-xl font-bold text-light-text dark:text-dark-text">AyaUke</span>
-              </div>
-              <div className="flex items-center space-x-8">
-                <a href="/" className="text-light-text dark:text-dark-text hover:text-purple-600">홈</a>
-                <a href="/songbook" className="text-light-text dark:text-dark-text hover:text-purple-600">노래책</a>
-                <button 
-                  onClick={() => {
-                    const isDark = document.documentElement.classList.contains('dark');
-                    if (isDark) {
-                      document.documentElement.classList.remove('dark');
-                      localStorage.setItem('theme', 'light');
-                    } else {
-                      document.documentElement.classList.add('dark');
-                      localStorage.setItem('theme', 'dark');
-                    }
-                  }}
-                  className="p-2 rounded-full bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800"
-                >
-                  🌙
-                </button>
-              </div>
-            </div>
-          </div>
-        </nav>
+        <Navigation />
         <div className="pt-16 flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 border-4 border-light-accent/20 dark:border-dark-accent/20 
@@ -115,38 +84,7 @@ export default function SongbookPage() {
     const errorInfo = getErrorMessage(error);
     return (
       <div className="min-h-screen bg-light-background dark:bg-dark-background">
-        {/* Simple Navigation */}
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold">
-                  A
-                </div>
-                <span className="text-xl font-bold text-light-text dark:text-dark-text">AyaUke</span>
-              </div>
-              <div className="flex items-center space-x-8">
-                <a href="/" className="text-light-text dark:text-dark-text hover:text-purple-600">홈</a>
-                <a href="/songbook" className="text-light-text dark:text-dark-text hover:text-purple-600">노래책</a>
-                <button 
-                  onClick={() => {
-                    const isDark = document.documentElement.classList.contains('dark');
-                    if (isDark) {
-                      document.documentElement.classList.remove('dark');
-                      localStorage.setItem('theme', 'light');
-                    } else {
-                      document.documentElement.classList.add('dark');
-                      localStorage.setItem('theme', 'dark');
-                    }
-                  }}
-                  className="p-2 rounded-full bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800"
-                >
-                  🌙
-                </button>
-              </div>
-            </div>
-          </div>
-        </nav>
+        <Navigation />
         
         {/* Background decoration */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -225,38 +163,7 @@ export default function SongbookPage() {
 
   return (
     <div className="min-h-screen bg-light-background dark:bg-dark-background">
-      {/* Simple Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold">
-                A
-              </div>
-              <span className="text-xl font-bold text-light-text dark:text-dark-text">AyaUke</span>
-            </div>
-            <div className="flex items-center space-x-8">
-              <a href="/" className="text-light-text dark:text-dark-text hover:text-purple-600">홈</a>
-              <a href="/songbook" className="text-light-text dark:text-dark-text hover:text-purple-600">노래책</a>
-              <button 
-                onClick={() => {
-                  const isDark = document.documentElement.classList.contains('dark');
-                  if (isDark) {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                  } else {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                  }
-                }}
-                className="p-2 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30"
-              >
-                🌙
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Navigation />
       
       {/* Background decoration */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
