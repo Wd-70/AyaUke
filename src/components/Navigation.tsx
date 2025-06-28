@@ -5,24 +5,29 @@ interface NavigationProps {
 }
 
 export default function Navigation({ currentPath = '/' }: NavigationProps) {
-  console.log('Current path from props:', currentPath);
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-light-primary/20 dark:border-dark-primary/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex items-center space-x-2 group cursor-pointer">
-            <div className="w-8 h-8 bg-gradient-to-br from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary rounded-lg flex items-center justify-center text-white font-bold group-hover:scale-105 transition-transform duration-200">
-              A
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary bg-clip-text text-transparent">AyaUke</span>
+        <div className="flex items-center h-16">
+          {/* Left side - Logo */}
+          <div className="flex-1">
+            <Link href="/" className="flex items-center space-x-2 group cursor-pointer">
+              <div className="w-10 h-10 bg-gradient-to-br from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary rounded-lg flex items-center justify-center p-1 group-hover:scale-105 transition-transform duration-200">
+                <img 
+                  src="/honeyz.png" 
+                  alt="HONEYZ Logo" 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary bg-clip-text text-transparent">AyaUke</span>
+            </Link>
           </div>
           
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          {/* Center - Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-8 flex-1 justify-center flex-row">
             <Link 
               href="/" 
-              className={`px-3 py-2 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 ${
+              className={`px-3 py-2 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap ${
                 currentPath === '/' 
                   ? 'text-light-accent dark:text-dark-primary' 
                   : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary'
@@ -32,7 +37,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
             </Link>
             <Link 
               href="/songbook" 
-              className={`px-3 py-2 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 ${
+              className={`px-3 py-2 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap ${
                 currentPath === '/songbook' 
                   ? 'text-light-accent dark:text-dark-primary' 
                   : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary'
@@ -40,28 +45,28 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
             >
               노래책
             </Link>
-            <Link 
+            {/* <Link 
               href="#" 
-              className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:-translate-y-0.5 transition-all duration-200"
+              className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
             >
               스케줄
             </Link>
             <Link 
               href="#" 
-              className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:-translate-y-0.5 transition-all duration-200"
+              className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
             >
               다시보기
             </Link>
             <Link 
               href="#" 
-              className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:-translate-y-0.5 transition-all duration-200"
+              className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
             >
               게임
-            </Link>
+            </Link> */}
           </div>
 
-          {/* Controls */}
-          <div className="flex items-center space-x-4">
+          {/* Right side - Controls */}
+          <div className="flex items-center justify-end flex-1">
             <div 
               className="relative p-2 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-all duration-300 group cursor-pointer"
               data-theme-toggle

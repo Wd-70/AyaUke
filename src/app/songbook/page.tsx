@@ -134,7 +134,7 @@ export default function SongbookPage() {
             </h1>
           </div>
           <p className="text-xl text-light-text/70 dark:text-dark-text/70 mb-6">
-            아야가 부른 노래들을 모아둔 특별한 공간입니다TE
+            아야가 부르는 노래들을 모아둔 특별한 공간입니다
           </p>
           <div className="flex items-center justify-center gap-6 text-sm text-light-text/60 dark:text-dark-text/60">
             <div className="flex items-center gap-2">
