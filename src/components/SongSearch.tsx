@@ -4,6 +4,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Song } from '@/types';
 import { MagnifyingGlassIcon, FunnelIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { isTextMatch } from '@/lib/searchUtils';
 
 interface SongSearchProps {
   songs: Song[];
@@ -40,17 +41,17 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
     [songs]
   );
 
-  // Memoized filter function for performance
+  // Memoized filter function for performance with enhanced Korean search
   const filteredSongs = useMemo(() => {
     let filtered = songs;
 
     if (debouncedSearchTerm) {
-      const searchLower = debouncedSearchTerm.toLowerCase();
-      filtered = filtered.filter(song =>
-        song.title.toLowerCase().includes(searchLower) ||
-        song.artist.toLowerCase().includes(searchLower) ||
-        song.tags?.some(tag => tag.toLowerCase().includes(searchLower))
-      );
+      filtered = filtered.filter(song => {
+        // 제목, 아티스트, 태그에서 향상된 검색
+        return isTextMatch(debouncedSearchTerm, song.title) ||
+               isTextMatch(debouncedSearchTerm, song.artist) ||
+               song.tags?.some(tag => isTextMatch(debouncedSearchTerm, tag));
+      });
     }
 
     if (selectedLanguage) {
@@ -81,7 +82,7 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
         </div>
         <input
           type="text"
-          placeholder="노래 제목, 아티스트, 태그로 검색..."
+          placeholder="노래 제목, 아티스트, 태그로 검색... (ㄱㄷ → 기도, 악도 → 악동뮤지션, 고 → 과자, 수우 → 호랑수월가)"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="block w-full pl-10 pr-12 py-3 border border-light-primary/20 dark:border-dark-primary/20 
