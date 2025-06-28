@@ -82,7 +82,7 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
         </div>
         <input
           type="text"
-          placeholder="노래 제목, 아티스트, 태그로 검색... (ㄱㄷ → 기도, 악도 → 악동뮤지션, 고 → 과자, 수우 → 호랑수월가)"
+          placeholder="노래 제목, 아티스트, 태그로 검색... (ㄱㄷ → 기도, 악도 → 악동뮤지션, thflfmfEkfk → 고양이소리)"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="block w-full pl-10 pr-12 py-3 border border-light-primary/20 dark:border-dark-primary/20 

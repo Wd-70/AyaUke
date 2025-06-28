@@ -53,6 +53,169 @@ const ENG_TO_KOR_MAP: Record<string, string> = {
 };
 
 /**
+ * 자모음을 완성형 한글로 조합
+ */
+function combineHangulJamo(jamos: string): string {
+  let result = '';
+  let i = 0;
+  
+  while (i < jamos.length) {
+    const char = jamos[i];
+    
+    // 초성인지 확인
+    const chosungIndex = CHOSUNG.indexOf(char);
+    if (chosungIndex !== -1) {
+      let chosung = char;
+      let jungsung = '';
+      let jongsung = '';
+      
+      // 다음 글자가 중성인지 확인
+      if (i + 1 < jamos.length) {
+        const nextChar = jamos[i + 1];
+        const jungsungIndex = JUNGSUNG.indexOf(nextChar);
+        if (jungsungIndex !== -1) {
+          jungsung = nextChar;
+          i++; // 중성 소비
+          
+          // 그 다음 글자가 종성인지 확인
+          if (i + 1 < jamos.length) {
+            const thirdChar = jamos[i + 1];
+            const jongsungIndex = JONGSUNG.indexOf(thirdChar);
+            if (jongsungIndex !== -1 && thirdChar !== '') {
+              jongsung = thirdChar;
+              i++; // 종성 소비
+            }
+          }
+          
+          // 완성형 한글 생성
+          const chosungIdx = CHOSUNG.indexOf(chosung);
+          const jungsungIdx = JUNGSUNG.indexOf(jungsung);
+          const jongsungIdx = JONGSUNG.indexOf(jongsung);
+          
+          if (chosungIdx !== -1 && jungsungIdx !== -1 && jongsungIdx !== -1) {
+            const code = 0xAC00 + (chosungIdx * 21 * 28) + (jungsungIdx * 28) + jongsungIdx;
+            result += String.fromCharCode(code);
+          } else {
+            result += chosung + jungsung + jongsung;
+          }
+        } else {
+          result += char;
+        }
+      } else {
+        result += char;
+      }
+    } else {
+      result += char;
+    }
+    i++;
+  }
+  
+  return result;
+}
+
+/**
+ * 영어 텍스트를 한글로 변환 (한영 전환 실수 대응)
+ */
+export function convertEngToKor(text: string): string {
+  let result = '';
+  let i = 0;
+  
+  while (i < text.length) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+    
+    // 2글자 조합 확인 (복합 모음용)
+    if (nextChar) {
+      const twoChar = char + nextChar;
+      if (twoChar === 'hk') { result += 'ㅘ'; i += 2; continue; }
+      if (twoChar === 'ho') { result += 'ㅙ'; i += 2; continue; }
+      if (twoChar === 'hl') { result += 'ㅚ'; i += 2; continue; }
+      if (twoChar === 'nj') { result += 'ㅝ'; i += 2; continue; }
+      if (twoChar === 'np') { result += 'ㅞ'; i += 2; continue; }
+      if (twoChar === 'nl') { result += 'ㅟ'; i += 2; continue; }
+      if (twoChar === 'ml') { result += 'ㅢ'; i += 2; continue; }
+    }
+    
+    // 1글자 변환
+    const korChar = ENG_TO_KOR_MAP[char];
+    if (korChar) {
+      result += korChar;
+    } else {
+      result += char; // 변환할 수 없는 문자는 그대로
+    }
+    i++;
+  }
+  
+  // 자모음을 완성형 한글로 조합
+  return combineHangulJamo(result);
+}
+
+/**
+ * 한글 텍스트를 영어로 변환 (완성형 한글을 자모음으로 분해해서 변환)
+ */
+export function convertKorToEng(text: string): string {
+  let result = '';
+  
+  for (const char of text) {
+    // 완성형 한글인 경우 분해해서 변환
+    const decomposed = decomposeHangul(char);
+    if (decomposed) {
+      const engChosung = KOR_TO_ENG_MAP[decomposed.chosung] || '';
+      const engJungsung = KOR_TO_ENG_MAP[decomposed.jungsung] || '';
+      const engJongsung = decomposed.jongsung ? (KOR_TO_ENG_MAP[decomposed.jongsung] || '') : '';
+      result += engChosung + engJungsung + engJongsung;
+    } else {
+      // 자음/모음인 경우 직접 변환
+      const engChar = KOR_TO_ENG_MAP[char];
+      if (engChar) {
+        result += engChar;
+      } else {
+        result += char; // 변환할 수 없는 문자는 그대로
+      }
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * 영어 오타를 위한 단순 변환 (완성형 조합 없이)
+ */
+export function convertEngToKorSimple(text: string): string {
+  let result = '';
+  let i = 0;
+  
+  while (i < text.length) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+    
+    // 2글자 조합 확인 (복합 모음용)
+    if (nextChar) {
+      const twoChar = char + nextChar;
+      if (twoChar === 'hk') { result += 'ㅘ'; i += 2; continue; }
+      if (twoChar === 'ho') { result += 'ㅙ'; i += 2; continue; }
+      if (twoChar === 'hl') { result += 'ㅚ'; i += 2; continue; }
+      if (twoChar === 'nj') { result += 'ㅝ'; i += 2; continue; }
+      if (twoChar === 'np') { result += 'ㅞ'; i += 2; continue; }
+      if (twoChar === 'nl') { result += 'ㅟ'; i += 2; continue; }
+      if (twoChar === 'ml') { result += 'ㅢ'; i += 2; continue; }
+    }
+    
+    // 1글자 변환
+    const korChar = ENG_TO_KOR_MAP[char];
+    if (korChar) {
+      result += korChar;
+    } else {
+      result += char; // 변환할 수 없는 문자는 그대로
+    }
+    i++;
+  }
+  
+  // 완성형 조합 없이 자모음 그대로 반환
+  return result;
+}
+
+/**
  * 검색 중성이 타겟 중성과 매칭되는지 확인 (키보드 입력 순서 기반)
  */
 function isJungsungMatch(searchJungsung: string, targetJungsung: string): boolean {
@@ -250,16 +413,54 @@ export function isEnglishMatch(searchTerm: string, targetText: string): boolean 
 }
 
 /**
- * 통합 검색 함수
+ * 통합 검색 함수 (한영 변환 지원)
  */
 export function isTextMatch(searchTerm: string, targetText: string): boolean {
   if (!searchTerm || !targetText) return false;
   
-  // 한글이 포함된 경우 한글 검색 로직 사용
+  // 1. 원본 텍스트로 검색
   if (/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(searchTerm)) {
-    return isKoreanMatch(searchTerm, targetText);
+    // 한글 검색
+    if (isKoreanMatch(searchTerm, targetText)) return true;
+  } else {
+    // 영문 검색
+    if (isEnglishMatch(searchTerm, targetText)) return true;
   }
   
-  // 영문/숫자의 경우 일반 검색
-  return isEnglishMatch(searchTerm, targetText);
+  // 2. 한영 변환해서 검색
+  try {
+    // 영어로 입력된 경우 → 한글로 변환해서 검색 (단순 매칭)
+    if (/^[a-zA-Z]+$/.test(searchTerm)) {
+      const convertedToKorSimple = convertEngToKorSimple(searchTerm);
+      if (convertedToKorSimple !== searchTerm) {
+        // 타겟 텍스트를 영어로 변환해서 단순 비교
+        const targetConvertedToEng = convertKorToEng(targetText);
+        if (isEnglishMatch(searchTerm, targetConvertedToEng)) {
+          return true;
+        }
+      }
+    }
+    
+    // 한글로 입력된 경우 → 영어로 변환해서 검색  
+    if (/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(searchTerm)) {
+      const convertedToEng = convertKorToEng(searchTerm);
+      if (convertedToEng !== searchTerm) {
+        // 타겟 텍스트도 한글이면 영어로 변환해서 비교
+        if (/[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(targetText)) {
+          const targetConvertedToEng = convertKorToEng(targetText);
+          if (isEnglishMatch(convertedToEng, targetConvertedToEng)) {
+            return true;
+          }
+        }
+        // 타겟이 영어면 직접 비교
+        if (isEnglishMatch(convertedToEng, targetText)) {
+          return true;
+        }
+      }
+    }
+  } catch (error) {
+    // 변환 실패 시 무시하고 원본 검색 결과 사용
+  }
+  
+  return false;
 }
