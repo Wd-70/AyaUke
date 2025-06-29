@@ -69,12 +69,20 @@ async function fetchRawSongsFromSheet(): Promise<Song[]> {
 
 async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
   try {
+    console.log('🔌 MongoDB 연결 시도 중...');
+    
     // 서버사이드에서는 직접 MongoDB 모델 사용
     const dbConnect = (await import('./mongodb')).default;
     const SongbookDetail = (await import('../models/SongDetail')).default;
     
+    console.log('📦 MongoDB 모듈 로드 완료');
+    
     await dbConnect();
+    console.log('✅ MongoDB 연결 성공');
+    
+    console.log('📊 MongoDB에서 데이터 조회 중...');
     const songDetails = await SongbookDetail.find({}).sort({ updatedAt: -1 }).lean();
+    console.log(`📋 MongoDB에서 ${songDetails.length}곡 조회 완료`);
     
     // Mongoose 문서를 일반 객체로 변환
     return songDetails.map(doc => ({
@@ -97,7 +105,20 @@ async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
       updatedAt: doc.updatedAt,
     }));
   } catch (error) {
-    console.warn('MongoDB에서 데이터를 가져올 수 없습니다:', error);
+    console.error('❌ MongoDB 오류 발생:', error);
+    console.error('스택 트레이스:', error instanceof Error ? error.stack : 'Unknown error');
+    
+    // 에러 타입별로 상세한 로깅
+    if (error instanceof Error) {
+      if (error.message.includes('ENOTFOUND') || error.message.includes('connection')) {
+        console.error('🔌 MongoDB 연결 실패 - 네트워크 또는 MongoDB URI 확인 필요');
+      } else if (error.message.includes('Authentication')) {
+        console.error('🔐 MongoDB 인증 실패 - 사용자명/비밀번호 확인 필요');
+      } else if (error.message.includes('timeout')) {
+        console.error('⏱️ MongoDB 연결 타임아웃');
+      }
+    }
+    
     return []; // MongoDB 오류 시 빈 배열 반환
   }
 }

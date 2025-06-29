@@ -28,7 +28,6 @@ const SongDetailSchema: Schema = new Schema({
   title: {
     type: String,
     required: true,
-    unique: true,
     trim: true,
   },
   artist: {
@@ -107,7 +106,7 @@ const SongDetailSchema: Schema = new Schema({
   timestamps: true,
 });
 
-SongDetailSchema.index({ title: 1 });
+SongDetailSchema.index({ title: 1 }, { unique: true });
 SongDetailSchema.index({ isFavorite: -1 });
 SongDetailSchema.index({ sungCount: -1 });
 SongDetailSchema.index({ lastSungDate: -1 });
