@@ -5,6 +5,7 @@ import { Song } from '@/types';
 import Navigation from '@/components/Navigation';
 import SongSearch from '@/components/SongSearch';
 import SongCard from '@/components/SongCard';
+import Footer from '@/components/Footer';
 import { MusicalNoteIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 
@@ -284,6 +285,8 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" />
         </svg>
       </motion.button>
+      
+      <Footer />
     </div>
   );
 }

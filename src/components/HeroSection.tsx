@@ -104,6 +104,23 @@ export default function HeroSection() {
               <span>(Twitter)</span>
             </div>
           </a>
+          
+          <a
+            href="https://cafe.naver.com/projectiofficial"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group relative overflow-hidden px-6 py-3 bg-white/10 dark:bg-gray-800/50 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 rounded-xl text-gray-700 dark:text-gray-300 font-medium hover:text-white hover:border-light-accent dark:hover:border-dark-primary transition-all duration-300 hover:shadow-purple-glow dark:hover:shadow-pink-glow"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <div className="relative flex items-center gap-2">
+              <img 
+                src="/navercafe2.png" 
+                alt="네이버 카페" 
+                className="w-5 h-5 object-contain rounded"
+              />
+              <span>팬카페</span>
+            </div>
+          </a>
         </div>
 
         {/* 메인 CTA - 더 임팩트 있는 디자인 */}
