@@ -11,6 +11,33 @@ export interface Song {
   dateAdded?: string;
 }
 
+export interface MRLink {
+  url: string;
+  skipSeconds?: number;
+  label?: string;
+  duration?: string;
+}
+
+export interface SongDetail {
+  title: string;
+  artist: string;
+  titleAlias?: string;
+  artistAlias?: string;
+  language?: string;
+  lyrics?: string;
+  searchTags?: string[];
+  sungCount?: number;
+  lastSungDate?: string;
+  keyAdjustment?: number;
+  isFavorite?: boolean;
+  mrLinks?: MRLink[];
+  selectedMRIndex?: number;
+  playlists?: string[];
+  personalNotes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface StreamInfo {
   isLive: boolean;
   title?: string;
