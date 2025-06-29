@@ -21,14 +21,9 @@ export const metadata: Metadata = {
   authors: [{ name: "AyaUke" }],
   creator: "AyaUke",
   icons: {
-    icon: [
-      { url: "/honeyz_pink.png", sizes: "any", type: "image/png" },
-      { url: "/honeyz_pink.png", sizes: "16x16", type: "image/png" },
-      { url: "/honeyz_pink.png", sizes: "32x32", type: "image/png" },
-      { url: "/honeyz_pink.png", sizes: "96x96", type: "image/png" },
-    ],
-    apple: "/honeyz_pink.png",
-    shortcut: "/honeyz_pink.png",
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png",
   },
   openGraph: {
     title: "아야 AyaUke - HONEYZ 버튜버",
