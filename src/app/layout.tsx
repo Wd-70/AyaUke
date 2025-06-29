@@ -15,8 +15,8 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "아야 AyaUke - HONEYZ 버튜버",
-  description: "HONEYZ의 따뜻한 목소리, 게임과 노래를 사랑하는 버튜버 아야 AyaUke의 공식 웹사이트입니다.",
+  title: "아야 AyaUke - HONEYZ 버튜버 팬페이지",
+  description: "허니즈의 메인보컬이자 생활애교가 흘러넘치는 치지직의 분내담당 아야의 팬이 만든 페이지입니다. 노래책과 활동 정보를 제공합니다.",
   keywords: ["아야", "AyaUke", "HONEYZ", "버튜버", "VTuber", "노래방송", "게임방송"],
   authors: [{ name: "AyaUke" }],
   creator: "AyaUke",
@@ -26,8 +26,8 @@ export const metadata: Metadata = {
     apple: "/favicon.png",
   },
   openGraph: {
-    title: "아야 AyaUke - HONEYZ 버튜버",
-    description: "HONEYZ의 따뜻한 목소리, 게임과 노래를 사랑하는 버튜버",
+    title: "아야 AyaUke - HONEYZ 버튜버 팬페이지",
+    description: "허니즈의 메인보컬이자 생활애교가 흘러넘치는 치지직의 분내담당 아야의 팬페이지",
     type: "website",
     locale: "ko_KR",
     images: [

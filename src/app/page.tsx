@@ -1,5 +1,6 @@
 import Navigation from '@/components/Navigation';
 import HeroSection from '@/components/HeroSection';
+import RecentVideos from '@/components/RecentVideos';
 
 export default function Home() {
   return (
@@ -29,8 +30,9 @@ export default function Home() {
                 </span>
               </h2>
               <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-                HONEYZ 소속의 따뜻한 목소리를 가진 버튜버 아야입니다. 
-                게임과 노래를 사랑하며, 시청자분들과 함께하는 즐거운 방송을 만들어가고 있어요.
+                시청자와의 소통을 소중히 여기는 허니즈의 막내! 
+                생활애교가 자연스럽게 흘러나오는 치지직의 분내담당! 
+                노래할 때는 완전히 다른 모습을 보여주는 허니즈의 메인보컬!
               </p>
             </div>
             
@@ -43,7 +45,8 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">노래방송</h3>
                 <p className="text-gray-600 dark:text-gray-300">
-                  다양한 장르의 노래를 부르며 시청자들과 함께 즐기는 노래방송
+                  J-pop을 즐겨 부르며 폭발적인 가창력을 느낄 수 있어요. 
+                  노래를 좋아한다면 지나칠 수 없죠!
                 </p>
               </div>
               
@@ -55,7 +58,8 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">게임방송</h3>
                 <p className="text-gray-600 dark:text-gray-300">
-                  재미있는 게임들을 플레이하며 웃음이 끊이지 않는 게임방송
+                  로지컬은 좀 부족해도 피지컬은 최상! 
+                  (등장인물을 자주 죽이는 건 비밀)
                 </p>
               </div>
               
@@ -67,87 +71,28 @@ export default function Home() {
                 </div>
                 <h3 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">저스트채팅</h3>
                 <p className="text-gray-600 dark:text-gray-300">
-                  시청자들과 소통하며 편안한 분위기의 수다 방송
+                  시청자와의 소통을 소중히 여기는 아야와 함께 
+                  재미있는 대화를 나눠보세요.
                 </p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Recent Streams Section */}
-        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50/50 dark:bg-gray-900/50">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-4xl sm:text-5xl font-bold mb-6">
-                <span className="bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary bg-clip-text text-transparent">
-                  최근 방송
-                </span>
-              </h2>
-              <p className="text-xl text-gray-600 dark:text-gray-300">
-                아야의 최근 방송 하이라이트를 확인해보세요
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2">
-                <div className="aspect-video bg-gradient-to-br from-light-accent/20 to-light-purple/20 dark:from-dark-primary/20 dark:to-dark-secondary/20 flex items-center justify-center">
-                  <svg className="w-16 h-16 text-light-accent dark:text-dark-primary" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                  </svg>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">노래방송 하이라이트</h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4">감성적인 발라드부터 신나는 댄스곡까지</p>
-                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                    <span>2일 전</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2">
-                <div className="aspect-video bg-gradient-to-br from-light-accent/20 to-light-purple/20 dark:from-dark-primary/20 dark:to-dark-secondary/20 flex items-center justify-center">
-                  <svg className="w-16 h-16 text-light-accent dark:text-dark-primary" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M15.5 12c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5.67 1.5 1.5 1.5 1.5-.67 1.5-1.5zm4-3c0-.83-.67-1.5-1.5-1.5S16.5 8.17 16.5 9s.67 1.5 1.5 1.5S19.5 9.83 19.5 9zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8 0-1.12.23-2.18.65-3.15L8 10.4v.6c0 .55.45 1 1 1h1v1c0 .55.45 1 1 1h1v1h2c.55 0 1-.45 1-1v-1.59l2.35-2.35C17.77 9.82 18 10.88 18 12c0 3.31-2.69 6-6 6z"/>
-                  </svg>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">게임방송 모음</h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4">재미있는 게임 플레이 모음집</p>
-                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                    <span>4일 전</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-2">
-                <div className="aspect-video bg-gradient-to-br from-light-accent/20 to-light-purple/20 dark:from-dark-primary/20 dark:to-dark-secondary/20 flex items-center justify-center">
-                  <svg className="w-16 h-16 text-light-accent dark:text-dark-primary" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M20 2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h4l4 4 4-4h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
-                  </svg>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-xl font-bold mb-2 text-gray-900 dark:text-white">저스트채팅</h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4">시청자들과의 즐거운 수다시간</p>
-                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                    <span>1주 전</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+        {/* Recent Videos Section */}
+        <RecentVideos />
 
         {/* Community Section */}
         <section className="py-20 px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-4xl sm:text-5xl font-bold mb-8">
               <span className="bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary bg-clip-text text-transparent">
-                함께해요!
+                방송 시청하기
               </span>
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-12">
-              아야와 함께 즐거운 방송을 만들어가요. 
-              언제든지 방송에 놀러와주세요!
+              아야는 당신을 기다리고 있어요.
+              방송에서 만나요!
             </p>
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center">
@@ -162,7 +107,7 @@ export default function Home() {
                   alt="Chzzk" 
                   className="w-6 h-6 object-contain"
                 />
-                <span>치지직에서 만나요</span>
+                <span>치지직에서 시청하기</span>
               </a>
               
               <a

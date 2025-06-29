@@ -49,7 +49,7 @@ export default function HeroSection() {
             <span className="text-gray-900 dark:text-white"> AyaUke</span>
           </h1>
           <p className="text-xl sm:text-2xl text-gray-600 dark:text-gray-300 mb-6 font-medium">
-            HONEYZ의 따뜻한 목소리, 게임과 노래를 사랑하는 버튜버
+            허니즈의 메인보컬, 생활애교가 흘러넘치는 치지직의 분내담당
           </p>
           <div className="flex flex-wrap justify-center gap-2 text-sm text-gray-600 dark:text-gray-300">
             <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900 rounded-full">노래방송</span>
