@@ -102,29 +102,44 @@ async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
   }
 }
 
+// 제목을 정규화하는 함수 (대소문자, 띄어쓰기 무시)
+function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/\s+/g, '') // 모든 공백 제거
+    .trim();
+}
+
 function mergeSongData(sheetSongs: Song[], songDetails: SongDetail[]): Song[] {
-  // MongoDB 데이터를 title 기준으로 맵 생성
+  // MongoDB 데이터를 정규화된 title로 맵 생성
   const detailsMap = new Map<string, SongDetail>();
+  const normalizedToOriginalMap = new Map<string, string>(); // 디버깅용
+  
   songDetails.forEach(detail => {
-    detailsMap.set(detail.title, detail);
+    const normalizedTitle = normalizeTitle(detail.title);
+    detailsMap.set(normalizedTitle, detail);
+    normalizedToOriginalMap.set(normalizedTitle, detail.title);
   });
 
   console.log('🔍 병합 디버깅:', {
     sheetSongs: sheetSongs.length,
     mongoSongs: songDetails.length,
-    mongoTitles: Array.from(detailsMap.keys()).slice(0, 5) // 처음 5개만 샘플 출력
+    mongoTitles: Array.from(normalizedToOriginalMap.values()).slice(0, 5) // 처음 5개만 샘플 출력
   });
 
   // 구글시트 데이터에 MongoDB 데이터 병합
   return sheetSongs.map(song => {
-    const detail = detailsMap.get(song.title);
+    const normalizedSheetTitle = normalizeTitle(song.title);
+    const detail = detailsMap.get(normalizedSheetTitle);
     
     // 디버깅: 몇 개 샘플만 출력
     if (song.id === 'song-75' || song.id === 'song-1' || song.id === 'song-10') {
       console.log(`🔍 "${song.title}" 매칭 결과:`, {
         found: !!detail,
         mongoTitle: detail?.title,
-        sheetTitle: song.title
+        sheetTitle: song.title,
+        normalizedSheet: normalizedSheetTitle,
+        normalizedMongo: detail ? normalizeTitle(detail.title) : 'N/A'
       });
     }
     

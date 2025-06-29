@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function SimpleNavigation() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
@@ -13,12 +15,12 @@ export default function SimpleNavigation() {
 
           {/* Navigation */}
           <div className="flex items-center space-x-8">
-            <a href="/" className="text-gray-700 hover:text-purple-600">
+            <Link href="/" className="text-gray-700 hover:text-purple-600">
               홈
-            </a>
-            <a href="/songbook" className="text-gray-700 hover:text-purple-600">
+            </Link>
+            <Link href="/songbook" className="text-gray-700 hover:text-purple-600">
               노래책
-            </a>
+            </Link>
           </div>
         </div>
       </div>

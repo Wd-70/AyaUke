@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
 import SongbookDetail from '@/models/SongDetail';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
     await dbConnect();
     
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         results.push({
           _id: song._id,
-          error: error.message,
+          error: error instanceof Error ? error.message : 'Unknown error',
           success: false
         });
       }

@@ -1,14 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { songDetailApi } from '@/lib/songDetailApi';
-import { SongDetail, MRLink } from '@/types';
+import { SongDetail } from '@/types';
 import { fetchSongsFromSheet } from '@/lib/googleSheets';
 
 export default function TestDBPage() {
+  // 개발 환경이 아니면 접근 차단
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production') {
+      window.location.href = '/';
+    }
+  }, []);
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  const [testData, setTestData] = useState<Partial<SongDetail>>({
+  const [testData] = useState<Partial<SongDetail>>({
     title: '좋은 날',
     artist: '아이유',
     titleAlias: 'Good Day',
@@ -37,19 +43,19 @@ export default function TestDBPage() {
     personalNotes: '키가 높아서 -2키로 부르기'
   });
 
-  const logResult = (operation: string, data: any) => {
+  const logResult = (operation: string, data: unknown) => {
     const timestamp = new Date().toLocaleTimeString();
     const resultText = `[${timestamp}] ${operation}:\n${JSON.stringify(data, null, 2)}\n\n`;
     setResult(prev => resultText + prev);
   };
 
-  const handleTest = async (operation: string, testFn: () => Promise<any>) => {
+  const handleTest = async (operation: string, testFn: () => Promise<unknown>) => {
     setLoading(true);
     try {
       const result = await testFn();
       logResult(`✅ ${operation} SUCCESS`, result);
     } catch (error) {
-      logResult(`❌ ${operation} ERROR`, { error: error.message });
+      logResult(`❌ ${operation} ERROR`, { error: error instanceof Error ? error.message : String(error) });
     }
     setLoading(false);
   };
@@ -146,7 +152,7 @@ export default function TestDBPage() {
         const result = await songDetailApi.createSongDetail(bulkData[i]);
         results.push({ index: i + 1, success: true, title: result.title });
       } catch (error) {
-        results.push({ index: i + 1, success: false, error: error.message });
+        results.push({ index: i + 1, success: false, error: error instanceof Error ? error.message : String(error) });
       }
     }
     
@@ -171,7 +177,7 @@ export default function TestDBPage() {
         await songDetailApi.deleteSongDetail(song.title);
         results.push({ title: song.title, success: true });
       } catch (error) {
-        results.push({ title: song.title, success: false, error: error.message });
+        results.push({ title: song.title, success: false, error: error instanceof Error ? error.message : String(error) });
       }
     }
     
@@ -292,7 +298,7 @@ export default function TestDBPage() {
             success: false, 
             title: song.title,
             artist: song.artist,
-            error: error.message 
+            error: error instanceof Error ? error.message : String(error) 
           });
         }
       }
@@ -313,7 +319,7 @@ export default function TestDBPage() {
     } catch (error) {
       return {
         status: 'error',
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         suggestion: '구글시트 API 키와 권한을 확인해주세요.'
       };
     }
@@ -330,7 +336,7 @@ export default function TestDBPage() {
         artists: [...new Set(sheetSongs.map(s => s.artist))].slice(0, 10)
       };
     } catch (error) {
-      throw new Error(`구글시트 읽기 실패: ${error.message}`);
+      throw new Error(`구글시트 읽기 실패: ${error instanceof Error ? error.message : String(error)}`);
     }
   });
 

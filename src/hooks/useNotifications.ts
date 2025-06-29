@@ -25,7 +25,7 @@ export function useNotifications() {
     if (!settings.soundEnabled) return;
 
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       
       // Create a pleasant notification sound
       const oscillator = audioContext.createOscillator();
@@ -49,7 +49,7 @@ export function useNotifications() {
     }
   }, [settings.soundEnabled, settings.volume]);
 
-  const showStreamNotification = useCallback((streamInfo: any) => {
+  const showStreamNotification = useCallback((streamInfo: { title?: string }) => {
     if (!settings.streamNotifications) return;
 
     playNotificationSound();

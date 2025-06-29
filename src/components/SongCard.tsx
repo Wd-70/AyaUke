@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Song } from '@/types';
 import { MusicalNoteIcon, PlayIcon, LinkIcon, XMarkIcon } from '@heroicons/react/24/outline';

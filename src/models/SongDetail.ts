@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { SongDetail, MRLink } from '@/types';
+import { SongDetail } from '@/types';
 
 export interface ISongDetail extends SongDetail, Document {}
 
@@ -86,9 +86,9 @@ const SongDetailSchema: Schema = new Schema({
     default: 0,
     min: 0,
     validate: {
-      validator: function(v: number) {
+      validator: function(this: ISongDetail, v: number) {
         if (v === undefined || v === null) return true;
-        const mrLinks = (this as any).mrLinks;
+        const mrLinks = this.mrLinks;
         if (!mrLinks || mrLinks.length === 0) return true;
         return v < mrLinks.length;
       },

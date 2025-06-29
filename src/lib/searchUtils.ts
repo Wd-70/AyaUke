@@ -65,7 +65,7 @@ function combineHangulJamo(jamos: string): string {
     // 초성인지 확인
     const chosungIndex = CHOSUNG.indexOf(char);
     if (chosungIndex !== -1) {
-      let chosung = char;
+      const chosung = char;
       let jungsung = '';
       let jongsung = '';
       
@@ -363,14 +363,6 @@ function isChosungOnly(text: string): boolean {
   return /^[ㄱ-ㅎ]+$/.test(text);
 }
 
-/**
- * 검색어에 초성과 완성형 글자가 섞여있는지 확인
- */
-function hasMixedChosungAndComplete(text: string): boolean {
-  const hasChosung = /[ㄱ-ㅎ]/.test(text);
-  const hasComplete = /[가-힣]/.test(text);
-  return hasChosung && hasComplete;
-}
 
 /**
  * 한글 검색어가 타겟 텍스트와 매칭되는지 확인
@@ -458,7 +450,7 @@ export function isTextMatch(searchTerm: string, targetText: string): boolean {
         }
       }
     }
-  } catch (error) {
+  } catch {
     // 변환 실패 시 무시하고 원본 검색 결과 사용
   }
   
