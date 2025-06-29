@@ -159,19 +159,41 @@ export default function RecentVideos() {
           ))}
         </div>
         
-        {/* 더보기 링크 */}
+        {/* 더보기 링크들 */}
         <div className="text-center mt-12">
-          <a
-            href="https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc/videos"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/30 dark:border-gray-700/30 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-white/20 dark:hover:bg-gray-800/70 transition-all duration-300"
-          >
-            <span>모든 다시보기 보기</span>
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-          </a>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a
+              href="https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc/videos"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary text-white font-medium rounded-xl hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+            >
+              <img 
+                src="/chzzk Icon_02.png" 
+                alt="Chzzk" 
+                className="w-4 h-4 object-contain"
+              />
+              <span>치지직 다시보기</span>
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </a>
+            
+            <a
+              href="https://www.youtube.com/@AyaUke_Archive/videos"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-white/10 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/30 dark:border-gray-700/30 text-gray-700 dark:text-gray-300 font-medium rounded-xl hover:bg-white/20 dark:hover:bg-gray-800/70 hover:-translate-y-1 transition-all duration-300"
+            >
+              <svg className="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+              </svg>
+              <span>다시보기 채널</span>
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </a>
+          </div>
         </div>
       </div>
     </section>

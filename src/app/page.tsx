@@ -98,7 +98,7 @@ export default function Home() {
             
             <div className="flex flex-col sm:flex-row gap-6 justify-center">
               <a
-                href="https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc"
+                href="https://chzzk.naver.com/live/abe8aa82baf3d3ef54ad8468ee73e7fc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary text-white font-bold text-lg rounded-2xl shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
@@ -120,7 +120,7 @@ export default function Home() {
                 <svg className="w-6 h-6 text-red-500" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                 </svg>
-                <span>유튜브 구독하기</span>
+                <span>유튜브 영상 보기</span>
               </a>
             </div>
           </div>

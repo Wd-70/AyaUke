@@ -249,7 +249,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
                 일본어 노래
               </div>
             </div>
-            <div className="text-center p-6 bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm 
+            {/* <div className="text-center p-6 bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm 
                             rounded-xl border border-light-primary/20 dark:border-dark-primary/20">
               <div className="text-2xl font-bold gradient-text mb-1">
                 {initialSongs.filter(song => song.tags?.includes('Original')).length}
@@ -257,7 +257,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
               <div className="text-sm text-light-text/70 dark:text-dark-text/70">
                 오리지널 곡
               </div>
-            </div>
+            </div> */}
           </motion.div>
         )}
       </main>
