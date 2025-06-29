@@ -9,6 +9,19 @@ export interface Song {
   difficulty?: string;
   tags?: string[];
   dateAdded?: string;
+  
+  // MongoDB에서 가져온 추가 데이터 (선택사항)
+  titleAlias?: string;
+  artistAlias?: string;
+  searchTags?: string[];
+  sungCount?: number;
+  lastSungDate?: string;
+  keyAdjustment?: number;
+  isFavorite?: boolean;
+  mrLinksDetailed?: MRLink[];
+  selectedMRIndex?: number;
+  playlists?: string[];
+  personalNotes?: string;
 }
 
 export interface MRLink {

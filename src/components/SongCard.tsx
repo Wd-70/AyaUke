@@ -34,6 +34,58 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
   };
 
   const handleCardClick = () => {
+    // 곡 데이터를 콘솔에 출력
+    console.group(`🎵 ${song.title} - ${song.artist}`);
+    console.log('📋 기본 정보:', {
+      title: song.title,
+      artist: song.artist,
+      language: song.language,
+      id: song.id
+    });
+    
+    if (song.titleAlias || song.artistAlias) {
+      console.log('🏷️ 별칭 정보:', {
+        titleAlias: song.titleAlias,
+        artistAlias: song.artistAlias
+      });
+    }
+    
+    if (song.sungCount !== undefined || song.lastSungDate || song.isFavorite !== undefined) {
+      console.log('📊 활동 정보:', {
+        sungCount: song.sungCount,
+        lastSungDate: song.lastSungDate,
+        isFavorite: song.isFavorite,
+        keyAdjustment: song.keyAdjustment
+      });
+    }
+    
+    if (song.mrLinks?.length || song.mrLinksDetailed?.length) {
+      console.log('🎤 MR 정보:', {
+        basicMRLinks: song.mrLinks,
+        detailedMRLinks: song.mrLinksDetailed,
+        selectedMRIndex: song.selectedMRIndex
+      });
+    }
+    
+    if (song.playlists?.length || song.searchTags?.length) {
+      console.log('🏷️ 태그/플레이리스트:', {
+        tags: song.tags,
+        searchTags: song.searchTags,
+        playlists: song.playlists
+      });
+    }
+    
+    if (song.lyrics) {
+      console.log('📝 가사:', song.lyrics.substring(0, 100) + (song.lyrics.length > 100 ? '...' : ''));
+    }
+    
+    if (song.personalNotes) {
+      console.log('📝 개인 메모:', song.personalNotes);
+    }
+    
+    console.log('🔍 전체 객체:', song);
+    console.groupEnd();
+    
     setIsExpanded(!isExpanded);
   };
 
