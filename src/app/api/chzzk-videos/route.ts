@@ -24,7 +24,16 @@ export async function GET() {
     }
 
     // API 데이터를 우리 형식으로 변환
-    const videos = apiData.content.data.map((video: any, index: number) => {
+    interface ChzzkVideo {
+      videoTitle: string;
+      thumbnailImageUrl: string;
+      duration: number;
+      publishDate: string;
+      readCount: number;
+      videoNo: number;
+    }
+    
+    const videos = apiData.content.data.map((video: ChzzkVideo, index: number) => {
       // 시간을 분:초 형식으로 변환
       const formatDuration = (seconds: number) => {
         const hours = Math.floor(seconds / 3600);

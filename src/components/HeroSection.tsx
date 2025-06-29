@@ -1,17 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
 
 export default function HeroSection() {
-  // 이미지 조절을 위한 상태 (개발용)
-  const [imageSettings, setImageSettings] = useState({
+  // 이미지 조절을 위한 상태 (개발용) - 완료되어 고정값 사용
+  const imageSettings = {
     scale: 111, // 확대 (%)
     x: -6, // 가로 이동 (px)
     y: 1, // 세로 이동 (px)
-  });
-
-  const isDevelopment = process.env.NODE_ENV === 'development';
+  };
   return (
     <section className="relative h-[900px] flex items-center justify-center overflow-hidden pt-24 pb-16">
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
