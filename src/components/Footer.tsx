@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export default function Footer() {
   return (
     <footer className="bg-gray-50/80 dark:bg-gray-900/80 backdrop-blur-sm border-t border-gray-200/50 dark:border-gray-700/50">
@@ -26,12 +28,12 @@ export default function Footer() {
               바로가기
             </h3>
             <div className="space-y-2">
-              <a href="/" className="block text-sm text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-primary transition-colors duration-200">
+              <Link href="/" className="block text-sm text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-primary transition-colors duration-200">
                 홈
-              </a>
-              <a href="/songbook" className="block text-sm text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-primary transition-colors duration-200">
+              </Link>
+              <Link href="/songbook" className="block text-sm text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-primary transition-colors duration-200">
                 노래책
-              </a>
+              </Link>
               <a 
                 href="https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc" 
                 target="_blank" 
