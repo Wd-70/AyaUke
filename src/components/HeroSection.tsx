@@ -1,6 +1,17 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 
 export default function HeroSection() {
+  // 이미지 조절을 위한 상태 (개발용)
+  const [imageSettings, setImageSettings] = useState({
+    scale: 111, // 확대 (%)
+    x: -6, // 가로 이동 (px)
+    y: 1, // 세로 이동 (px)
+  });
+
+  const isDevelopment = process.env.NODE_ENV === 'development';
   return (
     <section className="relative h-[900px] flex items-center justify-center overflow-hidden pt-24 pb-16">
       <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -18,9 +29,13 @@ export default function HeroSection() {
               />
               {/* Dark mode image */}
               <img 
-                src="/profile2.png" 
+                src="/profile2-large.png" 
                 alt="아야 AyaUke 프로필" 
                 className="w-full h-full object-cover hidden dark:block"
+                style={{
+                  transform: `scale(${imageSettings.scale / 100}) translate(${imageSettings.x}px, ${imageSettings.y}px)`,
+                  transformOrigin: 'center center'
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent"></div>
             </div>
@@ -112,6 +127,64 @@ export default function HeroSection() {
             </div>
           </Link>
         </div>
+
+        {/* 개발 환경 전용 이미지 조절 패널 - 완료되어 주석처리 */}
+        {/* {isDevelopment && (
+          <div className="fixed bottom-4 right-4 bg-black/80 text-white p-4 rounded-lg z-50 backdrop-blur">
+            <h3 className="text-sm font-bold mb-3">🎨 다크모드 이미지 조절</h3>
+            
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block mb-1">확대 ({imageSettings.scale}%)</label>
+                <input
+                  type="range"
+                  min="100"
+                  max="200"
+                  value={imageSettings.scale}
+                  onChange={(e) => setImageSettings(prev => ({ ...prev, scale: Number(e.target.value) }))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="block mb-1">가로 이동 ({imageSettings.x}px)</label>
+                <input
+                  type="range"
+                  min="-50"
+                  max="50"
+                  value={imageSettings.x}
+                  onChange={(e) => setImageSettings(prev => ({ ...prev, x: Number(e.target.value) }))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div>
+                <label className="block mb-1">세로 이동 ({imageSettings.y}px)</label>
+                <input
+                  type="range"
+                  min="-50"
+                  max="50"
+                  value={imageSettings.y}
+                  onChange={(e) => setImageSettings(prev => ({ ...prev, y: Number(e.target.value) }))}
+                  className="w-full"
+                />
+              </div>
+              
+              <button
+                onClick={() => setImageSettings({ scale: 111, x: -6, y: 1 })}
+                className="w-full bg-purple-600 hover:bg-purple-700 py-1 px-2 rounded text-xs"
+              >
+                초기화
+              </button>
+              
+              <div className="bg-gray-800 p-2 rounded text-xs font-mono">
+                <div>scale: {imageSettings.scale}</div>
+                <div>x: {imageSettings.x}</div>
+                <div>y: {imageSettings.y}</div>
+              </div>
+            </div>
+          </div>
+        )} */}
 
       </div>
     </section>

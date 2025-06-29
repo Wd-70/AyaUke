@@ -11,7 +11,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
         <div className="flex items-center h-16">
           {/* Left side - Logo */}
           <div className="flex-1">
-            <Link href="/" className="flex items-center space-x-2 group cursor-pointer">
+            <Link href="/" className="inline-flex items-center space-x-2 group cursor-pointer">
               <div className="w-10 h-10 bg-gradient-to-br from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary rounded-lg flex items-center justify-center p-1 group-hover:scale-105 transition-transform duration-200">
                 <img 
                   src="/honeyz.png" 
