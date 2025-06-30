@@ -1,10 +1,14 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 
 interface NavigationProps {
   currentPath?: string;
 }
 
 export default function Navigation({ currentPath = '/' }: NavigationProps) {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-light-primary/20 dark:border-dark-primary/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -66,7 +70,23 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
           </div>
 
           {/* Right side - Controls */}
-          <div className="flex items-center justify-end flex-1">
+          <div className="flex items-center justify-end flex-1 space-x-2">
+            {/* Mobile menu button */}
+            <button 
+              className="md:hidden p-2 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-all duration-300"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              aria-label="Toggle mobile menu"
+            >
+              <svg className="w-6 h-6 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                {isMobileMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
+            
+            {/* Theme toggle */}
             <div 
               className="relative p-2 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-all duration-300 group cursor-pointer"
               data-theme-toggle
@@ -101,6 +121,37 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
             </div>
           </div>
         </div>
+        
+        {/* Mobile Navigation Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden border-t border-light-primary/20 dark:border-dark-primary/20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md">
+            <div className="px-4 py-2 space-y-1">
+              <Link 
+                href="/" 
+                className={`block px-3 py-2 text-base font-medium rounded-lg transition-all duration-200 ${
+                  currentPath === '/' 
+                    ? 'text-light-accent dark:text-dark-primary bg-light-primary/10 dark:bg-dark-primary/10' 
+                    : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                홈
+              </Link>
+              <Link 
+                href="/songbook" 
+                className={`block px-3 py-2 text-base font-medium rounded-lg transition-all duration-200 ${
+                  currentPath === '/songbook' 
+                    ? 'text-light-accent dark:text-dark-primary bg-light-primary/10 dark:bg-dark-primary/10' 
+                    : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                노래책
+              </Link>
+              {/* 향후 메뉴 추가 시 여기에 */}
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );
