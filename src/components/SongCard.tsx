@@ -8,13 +8,9 @@ import { HeartIcon } from '@heroicons/react/24/solid';
 import YouTube from 'react-youtube';
 
 // YouTube 플레이어 타입 정의
-declare global {
-  namespace YT {
-    interface Player {
-      playVideo(): void;
-      pauseVideo(): void;
-    }
-  }
+interface YouTubePlayer {
+  playVideo(): void;
+  pauseVideo(): void;
 }
 
 interface SongCardProps {
@@ -27,7 +23,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
-  const [youtubePlayer, setYoutubePlayer] = useState<YT.Player | null>(null);
+  const [youtubePlayer, setYoutubePlayer] = useState<YouTubePlayer | null>(null);
 
   const languageColors = {
     Korean: 'bg-blue-500',
@@ -115,7 +111,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
     }
   };
 
-  const onYouTubeReady = (event: { target: YT.Player }) => {
+  const onYouTubeReady = (event: { target: YouTubePlayer }) => {
     setYoutubePlayer(event.target);
     // 자동 재생 방지
     event.target.pauseVideo();
