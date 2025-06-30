@@ -67,8 +67,9 @@ const SongDetailSchema: Schema = new Schema({
   },
   keyAdjustment: {
     type: Number,
+    default: null,
     validate: {
-      validator: function(v: number) {
+      validator: function(v: number | null) {
         if (v === undefined || v === null) return true;
         return v >= -12 && v <= 12;
       },
@@ -101,6 +102,23 @@ const SongDetailSchema: Schema = new Schema({
   personalNotes: {
     type: String,
     trim: true,
+  },
+  imageUrl: {
+    type: String,
+    trim: true,
+    validate: {
+      validator: function(v: string) {
+        if (!v) return true; // 빈 값은 허용
+        // URL 형식 검증
+        try {
+          new URL(v);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      message: '올바른 URL 형식을 입력해주세요.'
+    }
   },
 }, {
   timestamps: true,

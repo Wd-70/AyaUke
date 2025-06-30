@@ -16,12 +16,13 @@ export interface Song {
   searchTags?: string[];
   sungCount?: number;
   lastSungDate?: string;
-  keyAdjustment?: number;
+  keyAdjustment?: number | null;
   isFavorite?: boolean;
   mrLinksDetailed?: MRLink[];
   selectedMRIndex?: number;
   playlists?: string[];
   personalNotes?: string;
+  imageUrl?: string;
 }
 
 export interface MRLink {
@@ -41,12 +42,13 @@ export interface SongDetail {
   searchTags?: string[];
   sungCount?: number;
   lastSungDate?: string;
-  keyAdjustment?: number;
+  keyAdjustment?: number | null;
   isFavorite?: boolean;
   mrLinks?: MRLink[];
   selectedMRIndex?: number;
   playlists?: string[];
   personalNotes?: string;
+  imageUrl?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
