@@ -463,74 +463,81 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                 style={{ backgroundImage: `url(${song.imageUrl})` }}
               />
               
-              {/* 가독성을 위한 오버레이 */}
-              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors duration-300" />
+              {/* 라이트/다크모드별 오버레이 */}
+              <div className="absolute inset-0 bg-white/30 dark:bg-black/20 
+                              group-hover:bg-white/25 dark:group-hover:bg-black/15 
+                              transition-colors duration-300" />
               
-              {/* 하단 그라데이션 강화 */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+              {/* 하단 그라데이션 */}
+              <div className="absolute inset-0 bg-gradient-to-t 
+                              from-white/60 via-white/15 to-transparent
+                              dark:from-black/50 dark:via-black/10 dark:to-transparent" />
 
-              <div className="relative p-6 h-full flex flex-col justify-between">
-                {/* 상단 - 언어 태그와 하트 */}
-                <div className="flex items-start justify-between">
-                  <div className="flex flex-wrap gap-2">
-                    {song.language && (
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium text-white 
-                                       ${languageColors[song.language as keyof typeof languageColors] || 'bg-gray-500'}`}>
-                        {song.language}
-                      </span>
-                    )}
+              <div className="relative p-6 bg-white/20 dark:bg-gray-900/20 backdrop-blur-[1px] h-full">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <h3 className="text-lg font-semibold text-light-text dark:text-dark-text 
+                                     line-clamp-1 group-hover:text-light-accent dark:group-hover:text-dark-accent 
+                                     transition-colors duration-300 flex-1">
+                        {displayTitle}
+                      </h3>
+                      {formatKeyAdjustment(song.keyAdjustment) && (
+                        <span className="px-2 py-1 text-xs font-medium rounded-md 
+                                       bg-yellow-100 dark:bg-yellow-900 
+                                       text-yellow-800 dark:text-yellow-200 flex-shrink-0">
+                          {formatKeyAdjustment(song.keyAdjustment)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-light-text/70 dark:text-dark-text/70 mb-3">
+                      {displayArtist}
+                    </p>
                   </div>
                   <button
                     onClick={handleLike}
-                    className="p-2 rounded-full bg-black/30 hover:bg-black/50 
+                    className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
                                transition-colors duration-200"
                   >
                     <HeartIcon 
                       className={`w-5 h-5 transition-colors duration-200 
                                  ${isLiked 
                                    ? 'text-red-500 fill-current' 
-                                   : 'text-white/70 hover:text-red-400'}`}
+                                   : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
                     />
                   </button>
                 </div>
 
-                {/* 하단 - 곡 정보 */}
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-lg font-semibold text-white line-clamp-1 flex-1">
-                      {displayTitle}
-                    </h3>
-                    {formatKeyAdjustment(song.keyAdjustment) && (
-                      <span className="px-2 py-1 text-xs font-medium rounded-md 
-                                     bg-yellow-500/80 text-yellow-100 flex-shrink-0">
-                        {formatKeyAdjustment(song.keyAdjustment)}
-                      </span>
-                    )}
-                  </div>
-                  
-                  <p className="text-sm text-white/80 line-clamp-1 mb-2">
-                    {displayArtist}
-                  </p>
+                {/* Language tag */}
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {song.language && (
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium text-white 
+                                     ${languageColors[song.language as keyof typeof languageColors] || 'bg-gray-500'}`}>
+                      {song.language}
+                    </span>
+                  )}
+                </div>
 
-                  {/* MR 검색 버튼 */}
-                  <div className="pb-2">
-                    <button
-                      onClick={handlePlay}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 
-                               bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white 
-                               rounded-lg hover:shadow-lg transform hover:scale-105 
-                               transition-all duration-200 font-medium"
-                    >
-                      <MagnifyingGlassIcon className="w-4 h-4" />
-                      <span>MR 검색</span>
-                    </button>
-                  </div>
+                {/* MR 검색 버튼 */}
+                <div className="mt-auto pt-1 pb-2">
+                  <button
+                    onClick={handlePlay}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 
+                             bg-gradient-to-r from-light-accent to-light-purple 
+                             dark:from-dark-accent dark:to-dark-purple text-white 
+                             rounded-lg hover:shadow-lg transform hover:scale-105 
+                             transition-all duration-200 font-medium"
+                  >
+                    <MagnifyingGlassIcon className="w-4 h-4" />
+                    <span>MR 검색</span>
+                  </button>
                 </div>
               </div>
 
               {/* Hover effect border */}
               <div className="absolute inset-0 rounded-xl border-2 border-transparent 
-                              group-hover:border-white/30 
+                              group-hover:border-light-accent/20 dark:group-hover:border-dark-accent/20 
                               transition-colors duration-300 pointer-events-none"></div>
             </>
           ) : (

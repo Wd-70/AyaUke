@@ -101,6 +101,7 @@ async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
       selectedMRIndex: doc.selectedMRIndex,
       playlists: doc.playlists,
       personalNotes: doc.personalNotes,
+      imageUrl: doc.imageUrl,      // 누락된 imageUrl 추가
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
     }));
@@ -190,6 +191,7 @@ function mergeSongData(sheetSongs: Song[], songDetails: SongDetail[]): Song[] {
       selectedMRIndex: detail.selectedMRIndex,
       playlists: detail.playlists,
       personalNotes: detail.personalNotes,
+      imageUrl: detail.imageUrl,   // 누락된 imageUrl 추가
       dateAdded: song.dateAdded,
     };
   });
