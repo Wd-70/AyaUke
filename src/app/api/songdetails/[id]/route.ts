@@ -3,13 +3,10 @@ import SongDetailModel from '@/models/SongDetail';
 import connectDB from '@/lib/mongodb';
 import mongoose from 'mongoose';
 
-interface Params {
-  params: {
-    id: string;
-  };
-}
-
-export async function GET(request: NextRequest, { params }: Params) {
+export async function GET(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     await connectDB();
     const { id } = await params;
@@ -44,7 +41,10 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 }
 
-export async function PUT(request: NextRequest, { params }: Params) {
+export async function PUT(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     await connectDB();
     const { id } = await params;
@@ -107,7 +107,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: Params) {
+export async function DELETE(
+  request: NextRequest, 
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     await connectDB();
     const { id } = await params;
