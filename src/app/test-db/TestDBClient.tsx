@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { songDetailApi } from '@/lib/songDetailApi';
+// import { songDetailApi } from '@/lib/songDetailApi';
 import { SongDetail } from '@/types';
 import { MagnifyingGlassIcon, PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
 
@@ -155,7 +155,7 @@ export default function TestDBClient() {
   const bulkUpdateSongs = async () => {
     if (selectedSongs.size === 0) return;
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (bulkUpdateData.language) updateData.language = bulkUpdateData.language;
     if (bulkUpdateData.keyAdjustment !== '') {
       updateData.keyAdjustment = bulkUpdateData.keyAdjustment === 'null' 

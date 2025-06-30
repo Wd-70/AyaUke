@@ -81,11 +81,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
       message: '곡이 성공적으로 수정되었습니다.'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('곡 수정 오류:', error);
     
     // 중복 제목 에러 처리
-    if (error.code === 11000) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
       return NextResponse.json(
         {
           success: false,
@@ -100,7 +100,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       {
         success: false,
         error: '곡 수정 중 오류가 발생했습니다.',
-        details: error.message
+        details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );

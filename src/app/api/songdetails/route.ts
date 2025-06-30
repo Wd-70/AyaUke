@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
 
     // 검색 조건 설정
-    const query: any = {};
+    const query: Record<string, unknown> = {};
     if (search) {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
@@ -72,11 +72,11 @@ export async function POST(request: NextRequest) {
       message: '곡이 성공적으로 추가되었습니다.'
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('곡 추가 오류:', error);
     
     // 중복 제목 에러 처리
-    if (error.code === 11000) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
       return NextResponse.json(
         {
           success: false,
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error: '곡 추가 중 오류가 발생했습니다.',
-        details: error.message
+        details: error instanceof Error ? error.message : 'Unknown error'
       },
       { status: 500 }
     );

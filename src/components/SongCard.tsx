@@ -7,6 +7,16 @@ import { MusicalNoteIcon, PlayIcon, PauseIcon, LinkIcon, XMarkIcon, VideoCameraI
 import { HeartIcon } from '@heroicons/react/24/solid';
 import YouTube from 'react-youtube';
 
+// YouTube 플레이어 타입 정의
+declare global {
+  namespace YT {
+    interface Player {
+      playVideo(): void;
+      pauseVideo(): void;
+    }
+  }
+}
+
 interface SongCardProps {
   song: Song;
   onPlay?: (song: Song) => void;
@@ -17,7 +27,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
-  const [youtubePlayer, setYoutubePlayer] = useState<any>(null);
+  const [youtubePlayer, setYoutubePlayer] = useState<YT.Player | null>(null);
 
   const languageColors = {
     Korean: 'bg-blue-500',
@@ -105,7 +115,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
     }
   };
 
-  const onYouTubeReady = (event: any) => {
+  const onYouTubeReady = (event: { target: YT.Player }) => {
     setYoutubePlayer(event.target);
     // 자동 재생 방지
     event.target.pauseVideo();
@@ -113,7 +123,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
     setIsPlaying(false);
   };
 
-  const onYouTubeStateChange = (event: any) => {
+  const onYouTubeStateChange = (event: { data: number }) => {
     // YouTube 플레이어 상태와 동기화
     // -1: 시작되지 않음, 0: 종료, 1: 재생 중, 2: 일시정지, 3: 버퍼링, 5: 동영상 신호
     const playerState = event.data;
