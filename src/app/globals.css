@@ -32,6 +32,8 @@ body {
   color: var(--foreground);
   font-family: 'Inter', system-ui, sans-serif;
   line-height: 1.6;
+  position: relative;
+  overflow-x: hidden;
 }
 
 .glass-effect {

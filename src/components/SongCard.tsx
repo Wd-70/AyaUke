@@ -240,7 +240,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                     </span>
                   )}
                 </div>
-                <p className="text-lg md:text-xl text-light-text/70 dark:text-dark-text/70 mb-2">
+                <p className="text-lg md:text-xl text-light-text/70 dark:text-dark-text/70 mb-2 line-clamp-1">
                   {displayArtist}
                 </p>
               </div>
@@ -497,7 +497,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-light-text/70 dark:text-dark-text/70 mb-3">
+                    <p className="text-sm text-light-text/70 dark:text-dark-text/70 mb-3 line-clamp-1">
                       {displayArtist}
                     </p>
                   </div>
@@ -572,7 +572,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-light-text/70 dark:text-dark-text/70 mb-3">
+                    <p className="text-sm text-light-text/70 dark:text-dark-text/70 mb-3 line-clamp-1">
                       {displayArtist}
                     </p>
                   </div>

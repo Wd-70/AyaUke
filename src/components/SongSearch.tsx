@@ -47,10 +47,11 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
 
     if (debouncedSearchTerm) {
       filtered = filtered.filter(song => {
-        // 제목, 아티스트, 태그에서 향상된 검색
+        // 제목, 아티스트, 기존 태그, 검색 태그에서 향상된 검색
         return isTextMatch(debouncedSearchTerm, song.title) ||
                isTextMatch(debouncedSearchTerm, song.artist) ||
-               song.tags?.some(tag => isTextMatch(debouncedSearchTerm, tag));
+               song.tags?.some((tag: string) => isTextMatch(debouncedSearchTerm, tag)) ||
+               song.searchTags?.some((tag: string) => isTextMatch(debouncedSearchTerm, tag));
       });
     }
 
@@ -74,7 +75,11 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
   const hasActiveFilters = searchTerm || selectedLanguage;
 
   return (
-    <div className="mb-8">
+    <div className="sticky top-16 z-[100] mb-8 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md 
+                    border-b border-light-primary/20 dark:border-dark-primary/20 
+                    py-4 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 
+                    shadow-sm"
+         style={{ position: 'sticky', top: '64px' }}>
       {/* Search bar */}
       <div className="relative mb-4">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -82,7 +87,7 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
         </div>
         <input
           type="text"
-          placeholder="노래 제목, 아티스트, 태그로 검색... (띄어쓰기 무관, 초성검색, 한/영 오타 허용)"
+          placeholder="노래 제목, 아티스트, 검색태그로 검색... (띄어쓰기 무관, 초성검색, 한/영 오타 허용)"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="block w-full pl-10 pr-12 py-3 border border-light-primary/20 dark:border-dark-primary/20 

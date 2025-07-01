@@ -100,7 +100,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   };
 
   return (
-    <div className="min-h-screen bg-light-background dark:bg-dark-background">
+    <div className="min-h-screen bg-light-background dark:bg-dark-background overflow-visible">
       <Navigation currentPath="/songbook" />
       
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -112,7 +112,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
                         rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
       </div>
 
-      <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-visible">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -261,6 +261,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
           </motion.div>
         )}
       </main>
+
 
       <motion.button
         onClick={scrollToTop}
