@@ -219,7 +219,6 @@ function parseSheetData(values: string[][]): Song[] {
   
   // 헤더가 있으면 첫 번째 행을 건너뛰고, 없으면 모든 행을 데이터로 처리
   const dataRows = hasRealHeader ? values.slice(1) : values;
-  const headers = hasRealHeader ? firstRow : [];
 
   console.log('🔍 구글시트 헤더 분석:', {
     firstRow: firstRow,
