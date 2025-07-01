@@ -94,7 +94,7 @@ export default function Footer() {
         <div className="mt-8 pt-8 border-t border-gray-200/50 dark:border-gray-700/50">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <div className="text-sm text-gray-500 dark:text-gray-400 text-center md:text-left">
-              <div>© 2024 AyaUke Fan Page • 비공식 팬 페이지</div>
+              <div>© 2025 AyaUke Fan Page • 비공식 팬 페이지</div>
               <div className="text-xs mt-1">Developed by Wd-70</div>
             </div>
             <div className="flex items-center space-x-4 text-xs text-gray-400 dark:text-gray-500">
