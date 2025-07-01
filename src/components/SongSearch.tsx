@@ -75,11 +75,9 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
   const hasActiveFilters = searchTerm || selectedLanguage;
 
   return (
-    <div className="sticky top-16 z-[100] mb-8 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md 
+    <div className="sticky top-16 z-20 mb-8 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md 
                     border-b border-light-primary/20 dark:border-dark-primary/20 
-                    py-4 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 
-                    shadow-sm"
-         style={{ position: 'sticky', top: '64px' }}>
+                    py-4 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
       {/* Search bar */}
       <div className="relative mb-4">
         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

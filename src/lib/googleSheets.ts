@@ -198,15 +198,14 @@ function mergeSongData(sheetSongs: Song[], songDetails: SongDetail[]): Song[] {
 }
 
 function parseSheetData(values: string[][]): Song[] {
-  if (!values || values.length < 2) return [];
+  if (!values || values.length < 1) return [];
 
-  const headers = values[0].map(h => h.toLowerCase().trim());
-  const rows = values.slice(1);
-
+  const firstRow = values[0].map(h => h.toLowerCase().trim());
+  
   // 헤더에서 각 컬럼의 인덱스를 찾습니다
   const getColumnIndex = (possibleNames: string[]) => {
     for (const name of possibleNames) {
-      const index = headers.findIndex(h => h.includes(name));
+      const index = firstRow.findIndex(h => h.includes(name));
       if (index !== -1) return index;
     }
     return -1;
@@ -215,26 +214,36 @@ function parseSheetData(values: string[][]): Song[] {
   const titleIndex = getColumnIndex(['제목', 'title', '곡명', '노래']); // 제목 컬럼
   const artistIndex = getColumnIndex(['아티스트', 'artist', '가수', '원곡자']); // 아티스트 컬럼
 
-  console.log('🔍 구글시트 컬럼 구조:', {
-    headers: headers,
+  // 헤더가 감지되었는지 확인 - 실제 헤더 텍스트가 있으면 헤더로 간주
+  const hasRealHeader = titleIndex !== -1 || artistIndex !== -1;
+  
+  // 헤더가 있으면 첫 번째 행을 건너뛰고, 없으면 모든 행을 데이터로 처리
+  const dataRows = hasRealHeader ? values.slice(1) : values;
+  const headers = hasRealHeader ? firstRow : [];
+
+  console.log('🔍 구글시트 헤더 분석:', {
+    firstRow: firstRow,
+    hasRealHeader: hasRealHeader,
     titleIndex: titleIndex,
     artistIndex: artistIndex,
+    totalRows: values.length,
+    dataRows: dataRows.length
   });
 
-  console.log('🔍 첫 번째 데이터 행 샘플:', rows[0]);
+  console.log('🔍 첫 번째 데이터 행 샘플:', dataRows[0]);
 
-  return rows
+  return dataRows
     .filter(row => row.length > 0 && (row[titleIndex] || row[0])) // 빈 행 제외
     .map((row, index) => {
       // 컬럼이 제대로 감지되지 않은 경우 기본 순서 사용
       let title, artist;
       
-      if (titleIndex !== -1 && artistIndex !== -1) {
-        // 컬럼이 제대로 감지된 경우
+      if (hasRealHeader && titleIndex !== -1 && artistIndex !== -1) {
+        // 헤더가 있고 컬럼이 제대로 감지된 경우
         title = row[titleIndex] || 'Unknown Title';
         artist = row[artistIndex] || 'Unknown Artist';
       } else {
-        // 컬럼 감지 실패 시 실제 구글시트 구조: 첫 번째 컬럼=아티스트, 두 번째 컬럼=제목
+        // 헤더가 없거나 컬럼 감지 실패 시 실제 구글시트 구조: 첫 번째 컬럼=아티스트, 두 번째 컬럼=제목
         artist = row[0] || 'Unknown Artist';  // 첫 번째 컬럼 = 아티스트  
         title = row[1] || 'Unknown Title';    // 두 번째 컬럼 = 제목
       }

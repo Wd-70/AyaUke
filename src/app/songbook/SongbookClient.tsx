@@ -100,7 +100,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   };
 
   return (
-    <div className="min-h-screen bg-light-background dark:bg-dark-background overflow-visible">
+    <div className="min-h-screen bg-light-background dark:bg-dark-background">
       <Navigation currentPath="/songbook" />
       
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
@@ -112,7 +112,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
                         rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
       </div>
 
-      <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto overflow-visible">
+      <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -146,13 +146,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
           </div>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-        >
-          <SongSearch songs={initialSongs} onFilteredSongs={setFilteredSongs} />
-        </motion.div>
+        <SongSearch songs={initialSongs} onFilteredSongs={setFilteredSongs} />
 
         {filteredSongs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
