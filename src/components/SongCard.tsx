@@ -246,14 +246,6 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleCardClick}
-                  className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
-                             transition-colors duration-200"
-                  title="닫기"
-                >
-                  <XMarkIcon className="w-5 h-5 text-red-500" />
-                </button>
-                <button
                   onClick={handleLike}
                   className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
                              transition-colors duration-200"
@@ -264,6 +256,14 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                                  ? 'text-red-500 fill-current' 
                                  : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
                   />
+                </button>
+                <button
+                  onClick={handleCardClick}
+                  className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
+                             transition-colors duration-200"
+                  title="닫기"
+                >
+                  <XMarkIcon className="w-5 h-5 text-red-500" />
                 </button>
               </div>
             </div>
