@@ -1,5 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// YouTube API 응답 타입 정의
+interface YouTubeVideoItem {
+  id: {
+    videoId: string;
+  };
+  snippet: {
+    title: string;
+    channelTitle: string;
+    description: string;
+    publishedAt: string;
+    thumbnails: {
+      default?: { url: string };
+      medium?: { url: string };
+    };
+  };
+}
+
+interface YouTubeSearchResponse {
+  items: YouTubeVideoItem[];
+  error?: {
+    message: string;
+    errors?: Array<{ reason: string }>;
+  };
+}
+
 // YouTube API 키 관리 클래스
 class YouTubeAPIKeyManager {
   private keys: string[] = [];
@@ -113,7 +138,7 @@ export async function POST(request: NextRequest) {
       `order=relevance`;
 
     const response = await fetch(url);
-    const data = await response.json();
+    const data = await response.json() as YouTubeSearchResponse;
 
     if (data.error) {
       console.error('YouTube API 오류:', data.error);
@@ -136,7 +161,7 @@ export async function POST(request: NextRequest) {
             `order=relevance`;
 
           const retryResponse = await fetch(retryUrl);
-          const retryData = await retryResponse.json();
+          const retryData = await retryResponse.json() as YouTubeSearchResponse;
           
           if (retryData.error) {
             return NextResponse.json({
@@ -172,7 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 검색 결과를 사용하기 쉬운 형태로 변환
-    const results = data.items.map((video: any) => ({
+    const results = data.items.map((video: YouTubeVideoItem) => ({
       videoId: video.id.videoId,
       title: video.snippet.title,
       url: `https://www.youtube.com/watch?v=${video.id.videoId}`,

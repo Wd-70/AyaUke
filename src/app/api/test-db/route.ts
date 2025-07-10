@@ -8,7 +8,7 @@ const BACKUP_COLLECTIONS = ['backups', 'backup_logs'];
 interface BackupDocument {
   name: string;
   timestamp: Date;
-  collections: Record<string, any[]>;
+  collections: Record<string, unknown[]>;
   metadata: {
     totalDocuments: number;
     totalCollections: number;
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         !BACKUP_COLLECTIONS.includes(col.name)
       ) || [];
 
-      const backupData: Record<string, any[]> = {};
+      const backupData: Record<string, unknown[]> = {};
       let totalDocuments = 0;
 
       // 각 컬렉션의 모든 데이터 백업
@@ -167,6 +167,7 @@ export async function POST(request: NextRequest) {
 
       // 각 컬렉션 복원
       for (const [collectionName, documents] of Object.entries(backup.collections)) {
+        const typedDocuments = documents as mongoose.mongo.OptionalId<mongoose.mongo.Document>[];
         try {
           const collection = db?.collection(collectionName);
           
@@ -174,14 +175,14 @@ export async function POST(request: NextRequest) {
           await collection?.deleteMany({});
           
           // 백업 데이터 삽입
-          if (documents.length > 0) {
-            await collection?.insertMany(documents);
+          if (typedDocuments.length > 0) {
+            await collection?.insertMany(typedDocuments);
           }
 
           restoreResults.push({
             collection: collectionName,
             success: true,
-            restoredCount: documents.length
+            restoredCount: typedDocuments.length
           });
 
         } catch (error) {

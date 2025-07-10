@@ -9,6 +9,37 @@ interface SongWithId extends SongDetail {
   _id: string;
 }
 
+interface YouTubeSearchResult {
+  url: string;
+  title: string;
+  videoId: string;
+  thumbnail?: string;
+  channelTitle?: string;
+  description?: string;
+  publishedAt?: string;
+}
+
+interface BackupMetadata {
+  totalDocuments: number;
+  totalCollections: number;
+  version: string;
+}
+
+interface BackupDocument {
+  name: string;
+  timestamp: string;
+  metadata?: BackupMetadata;
+}
+
+interface CollectionStats {
+  totalDocuments: number;
+  totalCollections: number;
+  collections: Array<{
+    name: string;
+    count: number;
+  }>;
+}
+
 export default function TestDBClient() {
   const [songs, setSongs] = useState<SongWithId[]>([]);
   const [filteredSongs, setFilteredSongs] = useState<SongWithId[]>([]);
@@ -33,10 +64,10 @@ export default function TestDBClient() {
   });
 
   // 백업 관리 상태
-  const [backups, setBackups] = useState<any[]>([]);
+  const [backups, setBackups] = useState<BackupDocument[]>([]);
   const [backupLoading, setBackupLoading] = useState(false);
   const [showBackupSection, setShowBackupSection] = useState(false);
-  const [collectionStats, setCollectionStats] = useState<any>(null);
+  const [collectionStats, setCollectionStats] = useState<CollectionStats | null>(null);
   const [backupName, setBackupName] = useState('');
 
   // MR 링크 자동 추가 상태
@@ -78,7 +109,7 @@ export default function TestDBClient() {
         setBackupName(generateDefaultBackupName());
       }
     }
-  }, [showBackupSection]);
+  }, [showBackupSection, backupName]);
 
   // 기본 백업명 생성 함수
   const generateDefaultBackupName = () => {
@@ -250,7 +281,7 @@ export default function TestDBClient() {
   };
 
   // 개별 곡에 MR 링크 추가
-  const addMRLinkToSong = async (song: SongWithId, mrResult: any) => {
+  const addMRLinkToSong = async (song: SongWithId, mrResult: YouTubeSearchResult) => {
     try {
       const newMRLink = {
         url: mrResult.url,
@@ -975,7 +1006,7 @@ export default function TestDBClient() {
             <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">ℹ️ 작업 정보 및 제한사항</h4>
             <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
               <li>• MR 링크가 없는 곡에 대해서만 YouTube에서 자동 검색하여 추가합니다.</li>
-              <li>• 검색 쿼리: "{`{곡제목} {아티스트} karaoke MR`}" 형식으로 검색합니다.</li>
+              <li>• 검색 쿼리: &quot;{`{곡제목} {아티스트} karaoke MR`}&quot; 형식으로 검색합니다.</li>
               <li>• <strong>YouTube API 할당량 제한: 하루 10,000 유닛 (검색 1회 = 100 유닛)</strong></li>
               <li>• <strong>최대 100곡까지 처리 가능</strong> (할당량 한도 내에서)</li>
               <li>• 할당량 초과 시 작업이 자동 중단되며, 매일 자정(PST)에 리셋됩니다.</li>
