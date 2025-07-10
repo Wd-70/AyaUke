@@ -9,6 +9,7 @@ export interface Song {
   difficulty?: string;
   tags?: string[];
   dateAdded?: string;
+  source?: 'sheet' | 'mongodb' | 'merged'; // 데이터 소스 추가
   
   // MongoDB에서 가져온 추가 데이터 (선택사항)
   titleAlias?: string;

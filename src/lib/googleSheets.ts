@@ -136,6 +136,7 @@ function mergeSongData(sheetSongs: Song[], songDetails: SongDetail[]): Song[] {
   // MongoDB 데이터를 정규화된 title로 맵 생성
   const detailsMap = new Map<string, SongDetail>();
   const normalizedToOriginalMap = new Map<string, string>(); // 디버깅용
+  const usedMongoSongs = new Set<string>(); // 이미 매칭된 MongoDB 곡들 추적
   
   songDetails.forEach(detail => {
     const normalizedTitle = normalizeTitle(detail.title);
@@ -149,8 +150,8 @@ function mergeSongData(sheetSongs: Song[], songDetails: SongDetail[]): Song[] {
     mongoTitles: Array.from(normalizedToOriginalMap.values()).slice(0, 5) // 처음 5개만 샘플 출력
   });
 
-  // 구글시트 데이터에 MongoDB 데이터 병합
-  return sheetSongs.map(song => {
+  // 1. 구글시트 데이터에 MongoDB 데이터 병합
+  const mergedSheetSongs = sheetSongs.map(song => {
     const normalizedSheetTitle = normalizeTitle(song.title);
     const detail = detailsMap.get(normalizedSheetTitle);
     
@@ -167,8 +168,11 @@ function mergeSongData(sheetSongs: Song[], songDetails: SongDetail[]): Song[] {
     
     if (!detail) {
       // MongoDB에 데이터가 없는 경우 구글시트 기본 데이터만 반환
-      return song;
+      return { ...song, source: 'sheet' as const };
     }
+
+    // 매칭된 MongoDB 곡 표시
+    usedMongoSongs.add(normalizedSheetTitle);
 
     // MongoDB 데이터를 우선하되, title/artist만 구글시트 값 사용
     return {
@@ -176,6 +180,7 @@ function mergeSongData(sheetSongs: Song[], songDetails: SongDetail[]): Song[] {
       id: song.id,
       title: song.title,           // 구글시트 우선
       artist: song.artist,         // 구글시트 우선
+      source: 'merged' as const,   // 병합된 데이터
       
       // MongoDB 데이터 우선 사용
       language: detail.language || song.language,
@@ -192,9 +197,56 @@ function mergeSongData(sheetSongs: Song[], songDetails: SongDetail[]): Song[] {
       playlists: detail.playlists,
       personalNotes: detail.personalNotes,
       imageUrl: detail.imageUrl,   // 누락된 imageUrl 추가
-      dateAdded: song.dateAdded,
+      dateAdded: detail.createdAt ? detail.createdAt.toISOString().split('T')[0] : song.dateAdded, // MongoDB 생성일 우선 사용
     };
   });
+
+  // 2. MongoDB 전용 곡들 추가 (구글시트에 없는 곡들)
+  const mongoOnlySongs: Song[] = [];
+  let mongoOnlyCounter = 1;
+  
+  songDetails.forEach(detail => {
+    const normalizedTitle = normalizeTitle(detail.title);
+    
+    // 구글시트에 매칭되지 않은 MongoDB 곡들만 추가
+    if (!usedMongoSongs.has(normalizedTitle)) {
+      mongoOnlySongs.push({
+        id: `mongo-${mongoOnlyCounter}`, // MongoDB 전용 ID 생성
+        title: detail.title,
+        artist: detail.artist,
+        language: detail.language || '미설정',
+        source: 'mongodb' as const,
+        
+        // MongoDB 데이터 사용
+        lyrics: detail.lyrics || '',
+        titleAlias: detail.titleAlias,
+        artistAlias: detail.artistAlias,
+        searchTags: detail.searchTags,
+        sungCount: detail.sungCount,
+        lastSungDate: detail.lastSungDate,
+        keyAdjustment: detail.keyAdjustment,
+        isFavorite: detail.isFavorite,
+        mrLinksDetailed: detail.mrLinks,
+        selectedMRIndex: detail.selectedMRIndex,
+        playlists: detail.playlists,
+        personalNotes: detail.personalNotes,
+        imageUrl: detail.imageUrl,
+        dateAdded: detail.createdAt ? detail.createdAt.toISOString().split('T')[0] : new Date().toISOString().split('T')[0], // MongoDB 생성일 사용
+      });
+      mongoOnlyCounter++;
+    }
+  });
+
+  const finalSongs = [...mergedSheetSongs, ...mongoOnlySongs];
+  
+  console.log('🔍 최종 병합 결과:', {
+    totalSongs: finalSongs.length,
+    sheetOnly: finalSongs.filter(s => s.source === 'sheet').length,
+    merged: finalSongs.filter(s => s.source === 'merged').length,
+    mongoOnly: finalSongs.filter(s => s.source === 'mongodb').length,
+  });
+
+  return finalSongs;
 }
 
 function parseSheetData(values: string[][]): Song[] {
@@ -261,6 +313,7 @@ function parseSheetData(values: string[][]): Song[] {
         artist: artist.trim(),
         language: 'Korean', // 기본값, MongoDB에서 덮어씀
         dateAdded: new Date().toISOString().split('T')[0], // 기본값
+        source: 'sheet' as const, // 구글시트 데이터 표시
       };
       return song;
     });

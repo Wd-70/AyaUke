@@ -32,6 +32,18 @@ export default function TestDBClient() {
     lastSungDate: ''
   });
 
+  // 백업 관리 상태
+  const [backups, setBackups] = useState<any[]>([]);
+  const [backupLoading, setBackupLoading] = useState(false);
+  const [showBackupSection, setShowBackupSection] = useState(false);
+  const [collectionStats, setCollectionStats] = useState<any>(null);
+  const [backupName, setBackupName] = useState('');
+
+  // MR 링크 자동 추가 상태
+  const [bulkMRLoading, setBulkMRLoading] = useState(false);
+  const [bulkMRProgress, setBulkMRProgress] = useState({ current: 0, total: 0 });
+  const [showBulkMRSection, setShowBulkMRSection] = useState(false);
+
   // 곡 목록 로드
   const loadSongs = async () => {
     setLoading(true);
@@ -55,6 +67,291 @@ export default function TestDBClient() {
   useEffect(() => {
     loadSongs();
   }, []);
+
+  // 백업 섹션이 열릴 때 백업 관련 데이터 로드
+  useEffect(() => {
+    if (showBackupSection) {
+      loadBackups();
+      loadCollectionStats();
+      // 기본 백업명 설정 (백업명이 비어있을 때만)
+      if (!backupName.trim()) {
+        setBackupName(generateDefaultBackupName());
+      }
+    }
+  }, [showBackupSection]);
+
+  // 기본 백업명 생성 함수
+  const generateDefaultBackupName = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `backup_${year}${month}${day}_${hours}${minutes}`;
+  };
+
+  // 백업 목록 로드
+  const loadBackups = async () => {
+    try {
+      const response = await fetch('/api/test-db?action=list-backups');
+      if (response.ok) {
+        const data = await response.json();
+        setBackups(data.backups || []);
+      }
+    } catch (error) {
+      console.error('백업 목록 로드 실패:', error);
+    }
+  };
+
+  // 컬렉션 현황 로드
+  const loadCollectionStats = async () => {
+    try {
+      const response = await fetch('/api/test-db?action=list-collections');
+      if (response.ok) {
+        const data = await response.json();
+        setCollectionStats(data);
+      }
+    } catch (error) {
+      console.error('컬렉션 현황 로드 실패:', error);
+    }
+  };
+
+  // 백업 생성
+  const createBackup = async () => {
+    if (!backupName.trim()) {
+      alert('백업명을 입력해주세요.');
+      return;
+    }
+
+    setBackupLoading(true);
+    try {
+      const response = await fetch('/api/test-db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'backup',
+          backupName: backupName.trim()
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert('백업이 성공적으로 생성되었습니다.');
+        // 새로운 기본 백업명 생성
+        setBackupName(generateDefaultBackupName());
+        await loadBackups();
+        await loadCollectionStats();
+      } else {
+        alert(`백업 생성 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('백업 생성 오류:', error);
+      alert('백업 생성 중 오류가 발생했습니다.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  // 백업 복원
+  const restoreBackup = async (backupName: string) => {
+    const confirmMessage = `"${backupName}" 백업으로 복원하시겠습니까?\n\n⚠️ 경고: 현재 모든 데이터가 삭제되고 백업 시점의 데이터로 완전히 대체됩니다.\n이 작업은 되돌릴 수 없습니다.`;
+    
+    if (!confirm(confirmMessage)) return;
+
+    setBackupLoading(true);
+    try {
+      const response = await fetch('/api/test-db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'restore',
+          backupName: backupName
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert('백업 복원이 완료되었습니다. 페이지를 새로고침합니다.');
+        window.location.reload();
+      } else {
+        alert(`백업 복원 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('백업 복원 오류:', error);
+      alert('백업 복원 중 오류가 발생했습니다.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  // 백업 삭제
+  const deleteBackup = async (backupName: string) => {
+    if (!confirm(`"${backupName}" 백업을 삭제하시겠습니까?`)) return;
+
+    try {
+      const response = await fetch('/api/test-db', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete-backup',
+          backupName: backupName
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert('백업이 삭제되었습니다.');
+        await loadBackups();
+      } else {
+        alert(`백업 삭제 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('백업 삭제 오류:', error);
+      alert('백업 삭제 중 오류가 발생했습니다.');
+    }
+  };
+
+  // YouTube에서 MR 링크 검색
+  const searchMRFromYouTube = async (title: string, artist: string) => {
+    try {
+      const response = await fetch('/api/youtube-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, artist })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        // 키 통계 정보 로깅
+        if (result.keyStats) {
+          console.log(`🔑 API 키 상태: ${result.keyStats.availableKeys}/${result.keyStats.totalKeys} 사용 가능`);
+        }
+        return result.selectedResult; // 첫 번째 검색 결과 반환
+      } else {
+        console.error('YouTube 검색 실패:', result.error);
+        
+        // 키 통계 정보 표시
+        if (result.keyStats) {
+          console.log(`🔑 API 키 상태: ${result.keyStats.availableKeys}/${result.keyStats.totalKeys} 사용 가능`);
+        }
+        
+        // 할당량 초과 감지 (모든 키가 초과된 경우)
+        if (result.error && (result.error.includes('quota') || result.error.includes('할당량'))) {
+          return 'QUOTA_EXCEEDED';
+        }
+        
+        return null;
+      }
+    } catch (error) {
+      console.error('YouTube 검색 오류:', error);
+      return null;
+    }
+  };
+
+  // 개별 곡에 MR 링크 추가
+  const addMRLinkToSong = async (song: SongWithId, mrResult: any) => {
+    try {
+      const newMRLink = {
+        url: mrResult.url,
+        skipSeconds: 0,
+        label: `Auto-added: ${mrResult.title.substring(0, 30)}...`,
+        duration: ''
+      };
+
+      const response = await fetch(`/api/songdetails/${song._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mrLinks: [...(song.mrLinks || []), newMRLink]
+        })
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('MR 링크 추가 오류:', error);
+      return false;
+    }
+  };
+
+  // 전체 곡에 MR 링크 일괄 추가
+  const bulkAddMRLinks = async () => {
+    // MR 링크가 없는 곡들 필터링
+    const songsWithoutMR = filteredSongs.filter(song => 
+      !song.mrLinks || song.mrLinks.length === 0
+    );
+
+    if (songsWithoutMR.length === 0) {
+      alert('MR 링크가 없는 곡이 없습니다.');
+      return;
+    }
+
+    const confirmMessage = `MR 링크가 없는 ${songsWithoutMR.length}곡에 대해 자동으로 YouTube에서 MR 링크를 검색하여 추가하시겠습니까?\n\n⚠️ 주의사항:\n• YouTube API 할당량: 하루 10,000 유닛 (검색 1회 = 100 유닛)\n• 다중 API 키 시스템으로 할당량 초과 시 자동으로 다음 키로 전환됩니다\n• 모든 키의 할당량이 초과되면 작업이 중단됩니다\n• 콘솔에서 실시간 키 상태를 확인할 수 있습니다`;
+    
+    if (!confirm(confirmMessage)) return;
+
+    setBulkMRLoading(true);
+    setBulkMRProgress({ current: 0, total: songsWithoutMR.length });
+
+    let successCount = 0;
+    let errorCount = 0;
+    let quotaExceeded = false;
+
+    for (let i = 0; i < songsWithoutMR.length; i++) {
+      const song = songsWithoutMR[i];
+      setBulkMRProgress({ current: i + 1, total: songsWithoutMR.length });
+
+      try {
+        const title = song.titleAlias || song.title;
+        const artist = song.artistAlias || song.artist;
+        
+        console.log(`[${i + 1}/${songsWithoutMR.length}] 처리 중: "${title}" by ${artist}`);
+
+        const mrResult = await searchMRFromYouTube(title, artist);
+        
+        if (mrResult === 'QUOTA_EXCEEDED') {
+          quotaExceeded = true;
+          console.log('⚠️ YouTube API 할당량 초과');
+          break;
+        }
+        
+        if (mrResult) {
+          const success = await addMRLinkToSong(song, mrResult);
+          if (success) {
+            successCount++;
+            console.log(`✅ 성공: ${mrResult.url}`);
+          } else {
+            errorCount++;
+            console.log(`❌ 저장 실패`);
+          }
+        } else {
+          errorCount++;
+          console.log(`❌ 검색 결과 없음`);
+        }
+
+        // API 호출 제한을 위한 딜레이
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+      } catch (error) {
+        errorCount++;
+        console.error(`처리 중 오류:`, error);
+      }
+    }
+
+    setBulkMRLoading(false);
+    setBulkMRProgress({ current: 0, total: 0 });
+    
+    let message = `MR 링크 일괄 추가 ${quotaExceeded ? '중단' : '완료'}!\n✅ 성공: ${successCount}곡\n❌ 실패: ${errorCount}곡`;
+    
+    if (quotaExceeded) {
+      message += `\n\n⚠️ 모든 YouTube API 키의 할당량이 초과되어 작업이 중단되었습니다.\n• 할당량은 매일 자정(PST)에 리셋됩니다\n• 추가 API 키를 다른 Google 계정으로 생성하여 환경변수에 추가할 수 있습니다\n• 성공한 ${successCount}곡의 MR 링크는 저장되었습니다\n• 콘솔에서 상세한 키 상태를 확인하세요`;
+    }
+    
+    alert(message);
+    
+    // 데이터 새로고침
+    await loadSongs();
+  };
 
   // 검색 필터링
   useEffect(() => {
@@ -259,15 +556,31 @@ export default function TestDBClient() {
             />
           </div>
 
-          {/* 새 곡 추가 버튼 */}
-          <button
-            onClick={() => openModal('create')}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 
-                       text-white font-medium rounded-lg transition-colors duration-200"
-          >
-            <PlusIcon className="h-5 w-5" />
-            새 곡 추가
-          </button>
+          {/* 액션 버튼들 */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowBackupSection(!showBackupSection)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 
+                         text-white font-medium rounded-lg transition-colors duration-200"
+            >
+              📂 백업 관리
+            </button>
+            <button
+              onClick={() => setShowBulkMRSection(!showBulkMRSection)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 
+                         text-white font-medium rounded-lg transition-colors duration-200"
+            >
+              🎵 MR 링크 자동 추가
+            </button>
+            <button
+              onClick={() => openModal('create')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 
+                         text-white font-medium rounded-lg transition-colors duration-200"
+            >
+              <PlusIcon className="h-5 w-5" />
+              새 곡 추가
+            </button>
+          </div>
         </div>
 
         {/* 일괄 작업 컨트롤 */}
@@ -462,6 +775,214 @@ export default function TestDBClient() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* 백업 관리 섹션 */}
+        {showBackupSection && (
+          <div className="mb-6 p-6 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-700">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-purple-900 dark:text-purple-100">📂 데이터베이스 백업 관리</h2>
+              <button
+                onClick={() => setShowBackupSection(false)}
+                className="text-purple-600 hover:text-purple-800 dark:text-purple-300 dark:hover:text-purple-100"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 현재 DB 상태 */}
+            {collectionStats && (
+              <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border">
+                <h3 className="font-medium text-gray-900 dark:text-white mb-2">📊 현재 데이터베이스 상태</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{collectionStats.totalCollections}</div>
+                    <div className="text-blue-700 dark:text-blue-300">컬렉션 수</div>
+                  </div>
+                  <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">{collectionStats.totalDocuments.toLocaleString()}</div>
+                    <div className="text-green-700 dark:text-green-300">총 문서 수</div>
+                  </div>
+                  <div className="text-center p-3 bg-orange-50 dark:bg-orange-900/20 rounded">
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{backups.length}</div>
+                    <div className="text-orange-700 dark:text-orange-300">백업 개수</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 새 백업 생성 */}
+            <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border">
+              <h3 className="font-medium text-gray-900 dark:text-white mb-3">🆕 새 백업 생성</h3>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={backupName}
+                  onChange={(e) => setBackupName(e.target.value)}
+                  placeholder="백업명 입력 (예: before_mr_update_2024)"
+                  className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                             bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  disabled={backupLoading}
+                />
+                <button
+                  onClick={createBackup}
+                  disabled={backupLoading || !backupName.trim()}
+                  className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed
+                             text-white font-medium rounded-lg transition-colors duration-200"
+                >
+                  {backupLoading ? '⏳ 생성 중...' : '💾 백업 생성'}
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                💡 백업은 현재 모든 컬렉션의 데이터를 포함합니다. (백업용 컬렉션 제외)
+              </p>
+            </div>
+
+            {/* 백업 목록 */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg border">
+              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="font-medium text-gray-900 dark:text-white">📋 백업 목록</h3>
+              </div>
+              
+              {backups.length === 0 ? (
+                <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                  📭 저장된 백업이 없습니다.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {backups.map((backup, index) => (
+                    <div key={index} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              📦 {backup.name}
+                            </span>
+                            <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
+                              {backup.metadata?.totalCollections || 0}개 컬렉션
+                            </span>
+                            <span className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded">
+                              {backup.metadata?.totalDocuments?.toLocaleString() || 0}개 문서
+                            </span>
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            📅 {new Date(backup.timestamp).toLocaleString('ko-KR')}
+                          </div>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            onClick={() => restoreBackup(backup.name)}
+                            disabled={backupLoading}
+                            className="px-3 py-1 bg-orange-600 hover:bg-orange-700 disabled:opacity-50
+                                       text-white text-sm rounded transition-colors duration-200"
+                          >
+                            🔄 복원
+                          </button>
+                          <button
+                            onClick={() => deleteBackup(backup.name)}
+                            disabled={backupLoading}
+                            className="px-3 py-1 bg-red-600 hover:bg-red-700 disabled:opacity-50
+                                       text-white text-sm rounded transition-colors duration-200"
+                          >
+                            🗑️ 삭제
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 주의사항 */}
+            <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+              <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">⚠️ 주의사항</h4>
+              <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+                <li>• 백업 복원 시 현재 모든 데이터가 삭제되고 백업 시점의 데이터로 완전히 대체됩니다.</li>
+                <li>• 복원 작업은 되돌릴 수 없으니 신중히 진행해주세요.</li>
+                <li>• 백업용 컬렉션 (backups, backup_logs)은 백업/복원 대상에서 자동 제외됩니다.</li>
+                <li>• 대량 작업(MR 링크 업데이트 등) 전에는 반드시 백업을 생성하세요.</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {/* MR 링크 일괄 추가 섹션 */}
+        {showBulkMRSection && (
+          <div className="mb-6 p-6 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-green-900 dark:text-green-100">🎵 MR 링크 자동 추가</h2>
+            </div>
+
+          {/* 현재 상태 표시 */}
+          <div className="mb-4 p-4 bg-white dark:bg-gray-800 rounded-lg border">
+            <h3 className="font-medium text-gray-900 dark:text-white mb-2">📊 현재 MR 링크 현황</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {filteredSongs.filter(song => song.mrLinks && song.mrLinks.length > 0).length}
+                </div>
+                <div className="text-blue-700 dark:text-blue-300">MR 링크 있음</div>
+              </div>
+              <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded">
+                <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                  {filteredSongs.filter(song => !song.mrLinks || song.mrLinks.length === 0).length}
+                </div>
+                <div className="text-red-700 dark:text-red-300">MR 링크 없음</div>
+              </div>
+              <div className="text-center p-3 bg-gray-50 dark:bg-gray-900/20 rounded">
+                <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
+                  {filteredSongs.length}
+                </div>
+                <div className="text-gray-700 dark:text-gray-300">총 곡 수</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 일괄 추가 버튼 */}
+          <div className="flex gap-3 items-center">
+            <button
+              onClick={bulkAddMRLinks}
+              disabled={bulkMRLoading || filteredSongs.filter(song => !song.mrLinks || song.mrLinks.length === 0).length === 0}
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed
+                         text-white font-medium rounded-lg transition-colors duration-200 flex items-center gap-2"
+            >
+              {bulkMRLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  처리 중... ({bulkMRProgress.current}/{bulkMRProgress.total})
+                </>
+              ) : (
+                <>
+                  🔍 MR 링크 없는 곡에 자동 추가
+                </>
+              )}
+            </button>
+            
+            {bulkMRLoading && (
+              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div 
+                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(bulkMRProgress.current / bulkMRProgress.total) * 100}%` }}
+                ></div>
+              </div>
+            )}
+          </div>
+
+          {/* 설명 및 주의사항 */}
+          <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg">
+            <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">ℹ️ 작업 정보 및 제한사항</h4>
+            <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-1">
+              <li>• MR 링크가 없는 곡에 대해서만 YouTube에서 자동 검색하여 추가합니다.</li>
+              <li>• 검색 쿼리: "{`{곡제목} {아티스트} karaoke MR`}" 형식으로 검색합니다.</li>
+              <li>• <strong>YouTube API 할당량 제한: 하루 10,000 유닛 (검색 1회 = 100 유닛)</strong></li>
+              <li>• <strong>최대 100곡까지 처리 가능</strong> (할당량 한도 내에서)</li>
+              <li>• 할당량 초과 시 작업이 자동 중단되며, 매일 자정(PST)에 리셋됩니다.</li>
+              <li>• 각 곡마다 0.2초씩 딜레이를 두어 API 제한을 방지합니다.</li>
+              <li>• 작업 전 백업을 생성하는 것을 <strong>강력히 권장</strong>합니다.</li>
+            </ul>
+          </div>
           </div>
         )}
 
@@ -1148,13 +1669,43 @@ export default function TestDBClient() {
                   MR 링크
                 </label>
                 {modalMode !== 'view' && (
-                  <button
-                    type="button"
-                    onClick={addMRLink}
-                    className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm"
-                  >
-                    MR 링크 추가
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!formData.title || !formData.artist) {
+                          alert('곡 제목과 아티스트를 먼저 입력해주세요.');
+                          return;
+                        }
+                        
+                        const mrResult = await searchMRFromYouTube(formData.title, formData.artist);
+                        if (mrResult) {
+                          setFormData(prev => ({
+                            ...prev,
+                            mrLinks: [...prev.mrLinks, {
+                              url: mrResult.url,
+                              skipSeconds: 0,
+                              label: `Auto-found: ${mrResult.title.substring(0, 30)}...`,
+                              duration: ''
+                            }]
+                          }));
+                          alert(`MR 링크를 찾았습니다!\n제목: ${mrResult.title}`);
+                        } else {
+                          alert('검색 결과를 찾을 수 없습니다.');
+                        }
+                      }}
+                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
+                    >
+                      🔍 자동 검색
+                    </button>
+                    <button
+                      type="button"
+                      onClick={addMRLink}
+                      className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm"
+                    >
+                      MR 링크 추가
+                    </button>
+                  </div>
                 )}
               </div>
               
