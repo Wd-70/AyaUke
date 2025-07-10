@@ -343,7 +343,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                       <span>가사 보기</span>
                     </button>
                   </div>
-                  <div className="flex-1 w-full min-h-0 aspect-video" style={{ maxHeight: 'calc(100vh - 30rem)' }}>
+                  <div className="flex-1 w-full min-h-0 aspect-video" style={{ maxHeight: 'calc(100vh - 40rem)' }}>
                     <YouTube
                       videoId={youtubeMR.videoId}
                       opts={{
@@ -393,7 +393,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                   )}
                 </div>
                 {song.lyrics ? (
-                  <div className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg flex-1 overflow-y-auto min-h-0" style={{ maxHeight: 'calc(100vh - 30rem)' }}>
+                  <div className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg flex-1 overflow-y-auto min-h-0" style={{ maxHeight: 'calc(100vh - 40rem)' }}>
                     {song.lyrics}
                   </div>
                 ) : (
