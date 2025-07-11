@@ -24,6 +24,8 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [youtubePlayer, setYoutubePlayer] = useState<YouTubePlayer | null>(null);
+  const [playerPosition, setPlayerPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
+  const [isXLScreen, setIsXLScreen] = useState(false);
 
   const languageColors = {
     Korean: 'bg-blue-500',
@@ -174,6 +176,58 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
     e.stopPropagation();
   };
 
+  // 화면 크기에 따라 플레이어 위치 계산 (다이얼로그 기준)
+  useEffect(() => {
+    if (!isExpanded || !youtubeMR) return;
+
+    const updatePlayerPosition = () => {
+      const xlScreen = window.innerWidth >= 1280;
+      setIsXLScreen(xlScreen);
+      
+      const dialogContainer = document.querySelector('.youtube-dialog-container');
+      let targetContainer = null;
+      
+      if (xlScreen) {
+        targetContainer = document.getElementById('xl-player-target');
+      } else if (showVideo) {
+        targetContainer = document.getElementById('mobile-player-target');
+      }
+
+      if (targetContainer && dialogContainer) {
+        const dialogRect = dialogContainer.getBoundingClientRect();
+        const targetRect = targetContainer.getBoundingClientRect();
+        
+        // 다이얼로그 기준 상대 위치 계산
+        const relativeTop = targetRect.top - dialogRect.top;
+        const relativeLeft = targetRect.left - dialogRect.left;
+        
+        setPlayerPosition(prev => {
+          // 값이 실제로 변경된 경우에만 업데이트 (1px 허용 오차)
+          if (Math.abs(prev.top - relativeTop) > 1 || Math.abs(prev.left - relativeLeft) > 1 || 
+              Math.abs(prev.width - targetRect.width) > 1 || Math.abs(prev.height - targetRect.height) > 1) {
+            return {
+              top: relativeTop,
+              left: relativeLeft,
+              width: targetRect.width,
+              height: targetRect.height
+            };
+          }
+          return prev;
+        });
+      }
+    };
+
+    // DOM 렌더링 완료 후 위치 계산
+    const timeoutId = setTimeout(updatePlayerPosition, 50);
+    window.addEventListener('resize', updatePlayerPosition);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', updatePlayerPosition);
+    };
+  }, [isExpanded, youtubeMR, showVideo]);
+
+
   const handleCardClick = () => {
     // 곡 데이터를 콘솔에 출력
     console.group(`🎵 ${song.title} - ${song.artist}`);
@@ -255,7 +309,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                      w-[90vw] max-w-7xl h-[calc(100vh-6rem)] overflow-hidden
                      bg-white dark:bg-gray-900 backdrop-blur-sm 
                      rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
-                     shadow-2xl transform -translate-x-1/2"
+                     shadow-2xl transform -translate-x-1/2 youtube-dialog-container"
           style={{ overscrollBehavior: 'contain' }}
           onWheel={handleScrollPreventPropagation}
         >
@@ -371,43 +425,21 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                 </div>
               )}
 
-              {/* 큰 화면에서의 영상/가사 섹션 */}
-              <div className="hidden xl:flex flex-col flex-1 gap-6">
-                {/* YouTube 영상 영역 */}
+              {/* 큰 화면에서의 영상 섹션 - 플레이어 대상 영역 */}
+              <div className="hidden xl:flex flex-col flex-1 gap-6 min-h-0">
                 {youtubeMR && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     transition={{ duration: 0.3, delay: 0.1 }}
-                    className="p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20"
+                    className="p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
                   >
                     <div className="flex items-center gap-3 mb-4">
                       <VideoCameraIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
                       <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">MR 영상</h4>
                     </div>
-                    <div className="aspect-video w-full">
-                      <YouTube
-                        videoId={youtubeMR.videoId}
-                        opts={{
-                          height: '100%',
-                          width: '100%',
-                          playerVars: {
-                            autoplay: 0,
-                            start: youtubeMR.skipSeconds || 0,
-                            controls: 1,
-                            disablekb: 0,
-                            enablejsapi: 1,
-                            fs: 1,
-                            modestbranding: 1,
-                            rel: 0,
-                            showinfo: 0,
-                            iv_load_policy: 3,
-                          },
-                        }}
-                        onReady={onYouTubeReady}
-                        onStateChange={onYouTubeStateChange}
-                        className="w-full h-full"
-                      />
+                    <div id="xl-player-target" className="aspect-video w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      {/* 플레이어가 여기에 CSS로 배치됨 */}
                     </div>
                   </motion.div>
                 )}
@@ -440,29 +472,8 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                         <span>가사 보기</span>
                       </button>
                     </div>
-                    <div className="flex-1 w-full min-h-0 aspect-video">
-                      <YouTube
-                        videoId={youtubeMR.videoId}
-                        opts={{
-                          height: '100%',
-                          width: '100%',
-                          playerVars: {
-                            autoplay: 0,
-                            start: youtubeMR.skipSeconds || 0,
-                            controls: 1,
-                            disablekb: 0,
-                            enablejsapi: 1,
-                            fs: 1,
-                            modestbranding: 1,
-                            rel: 0,
-                            showinfo: 0,
-                            iv_load_policy: 3,
-                          },
-                        }}
-                        onReady={onYouTubeReady}
-                        onStateChange={onYouTubeStateChange}
-                        className="w-full h-full"
-                      />
+                    <div id="mobile-player-target" className="flex-1 w-full min-h-0 aspect-video bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      {/* 플레이어가 여기에 CSS로 배치됨 */}
                     </div>
                   </div>
                 )}
@@ -585,6 +596,43 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
               )}
             </div>
           </div>
+
+          {/* 단일 YouTube 플레이어 - Absolute 위치로 이동 */}
+          {youtubeMR && (
+            <div
+              className="absolute z-50 pointer-events-auto"
+              style={{
+                top: playerPosition.top,
+                left: playerPosition.left,
+                width: playerPosition.width,
+                height: playerPosition.height,
+                display: (isXLScreen || showVideo) ? 'block' : 'none'
+              }}
+            >
+              <YouTube
+                videoId={youtubeMR.videoId}
+                opts={{
+                  height: '100%',
+                  width: '100%',
+                  playerVars: {
+                    autoplay: 0,
+                    start: youtubeMR.skipSeconds || 0,
+                    controls: 1,
+                    disablekb: 0,
+                    enablejsapi: 1,
+                    fs: 1,
+                    modestbranding: 1,
+                    rel: 0,
+                    showinfo: 0,
+                    iv_load_policy: 3,
+                  },
+                }}
+                onReady={onYouTubeReady}
+                onStateChange={onYouTubeStateChange}
+                className="w-full h-full rounded-lg"
+              />
+            </div>
+          )}
         </motion.div>
       )}
       
