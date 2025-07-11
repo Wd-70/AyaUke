@@ -77,9 +77,14 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
   const handlePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    // 노래 카드의 버튼은 항상 MR 검색 기능만 실행
-    if (onPlay) {
-      onPlay(song);
+    if (youtubeMR) {
+      // MR 링크가 있으면 새 창에서 열기
+      window.open(youtubeMR.fullUrl, '_blank');
+    } else {
+      // MR 링크가 없으면 검색 기능 실행
+      if (onPlay) {
+        onPlay(song);
+      }
     }
   };
 
@@ -712,7 +717,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                   )}
                 </div>
 
-                {/* MR 검색 버튼 */}
+                {/* MR 버튼 - 링크 유무에 따라 다르게 표시 */}
                 <div className="mt-auto pt-1 pb-2">
                   <button
                     onClick={handlePlay}
@@ -722,8 +727,17 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                              rounded-lg hover:shadow-lg transform hover:scale-105 
                              transition-all duration-200 font-medium"
                   >
-                    <MagnifyingGlassIcon className="w-4 h-4" />
-                    <span>MR 검색</span>
+                    {youtubeMR ? (
+                      <>
+                        <ArrowTopRightOnSquareIcon className="w-4 h-4" />
+                        <span>MR 열기</span>
+                      </>
+                    ) : (
+                      <>
+                        <MagnifyingGlassIcon className="w-4 h-4" />
+                        <span>MR 검색</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -788,7 +802,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                 </div>
 
 
-                {/* MR 검색 버튼 */}
+                {/* MR 버튼 - 링크 유무에 따라 다르게 표시 */}
                 <div className="mt-auto pt-1 pb-2">
                   <button
                     onClick={handlePlay}
@@ -798,8 +812,17 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                              rounded-lg hover:shadow-lg transform hover:scale-105 
                              transition-all duration-200 font-medium"
                   >
-                    <MagnifyingGlassIcon className="w-4 h-4" />
-                    <span>MR 검색</span>
+                    {youtubeMR ? (
+                      <>
+                        <ArrowTopRightOnSquareIcon className="w-4 h-4" />
+                        <span>MR 열기</span>
+                      </>
+                    ) : (
+                      <>
+                        <MagnifyingGlassIcon className="w-4 h-4" />
+                        <span>MR 검색</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
