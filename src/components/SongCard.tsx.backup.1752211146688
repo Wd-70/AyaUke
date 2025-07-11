@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Song } from '@/types';
 import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
@@ -150,30 +150,6 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
     setIsLiked(!isLiked);
   };
 
-  // 다이얼로그 열릴 때 body 스크롤 비활성화
-  useEffect(() => {
-    if (isExpanded) {
-      // body 스크롤 비활성화
-      document.body.style.overflow = 'hidden';
-      document.body.style.paddingRight = '0px'; // 스크롤바 공간 보정
-    } else {
-      // body 스크롤 복원
-      document.body.style.overflow = '';
-      document.body.style.paddingRight = '';
-    }
-
-    // 컴포넌트 언마운트 시 정리
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.paddingRight = '';
-    };
-  }, [isExpanded]);
-
-  // 스크롤 이벤트 전파 방지 핸들러 (다중 이벤트 처리)
-  const handleScrollPreventPropagation = (e: React.WheelEvent) => {
-    e.stopPropagation();
-  };
-
   const handleCardClick = () => {
     // 곡 데이터를 콘솔에 출력
     console.group(`🎵 ${song.title} - ${song.artist}`);
@@ -252,32 +228,27 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
           exit={{ opacity: 0, scale: 0.9, x: '-50%', y: '-10%' }}
           transition={{ duration: 0.3 }}
           className="fixed top-20 left-1/2 z-40 
-                     w-[90vw] max-w-7xl h-[calc(100vh-6rem)] overflow-hidden
+                     w-[90vw] max-w-7xl h-[calc(100vh-6rem)] overflow-y-auto
                      bg-white dark:bg-gray-900 backdrop-blur-sm 
                      rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
                      shadow-2xl transform -translate-x-1/2"
-          style={{ overscrollBehavior: 'contain' }}
-          onWheel={handleScrollPreventPropagation}
         >
           {/* Background gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-light-accent/5 to-light-purple/5 
                           dark:from-dark-accent/5 dark:to-dark-purple/5 rounded-xl"></div>
 
-          <div className="relative p-4 sm:p-6 xl:p-8 flex flex-col xl:flex-row h-full gap-4 sm:gap-6 xl:gap-8">
+          <div className="relative p-8 flex flex-col xl:flex-row min-h-full gap-8">
             {/* 왼쪽: 가사 전용 영역 (XL 이상에서만) */}
-            <div className="hidden xl:flex xl:w-1/2 flex-col min-h-0">
+            <div className="hidden xl:flex xl:w-1/2 flex-col">
               <div className="flex items-center gap-3 mb-4">
                 <MusicalNoteIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
                 <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">가사</h4>
               </div>
-              <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
+              <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col">
                 {song.lyrics ? (
                   <div 
-                    className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
-                    style={{ 
-                      overscrollBehavior: 'contain' 
-                    }}
-                    onWheel={handleScrollPreventPropagation}
+                    className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1"
+                    style={{ maxHeight: 'calc(100vh - 18rem)' }}
                   >
                     {song.lyrics}
                   </div>
@@ -292,12 +263,12 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
             </div>
 
             {/* 오른쪽: 모든 다른 요소들 */}
-            <div className="flex-1 xl:w-1/2 flex flex-col min-h-0">
+            <div className="flex-1 xl:w-1/2 flex flex-col">
               {/* Header */}
-              <div className="flex items-start justify-between mb-3 sm:mb-4">
+              <div className="flex items-start justify-between mb-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                    <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold text-light-text dark:text-dark-text 
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-2xl md:text-3xl font-semibold text-light-text dark:text-dark-text 
                                    text-light-accent dark:text-dark-accent">
                       {displayTitle}
                     </h3>
@@ -309,8 +280,8 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 sm:gap-2 flex-wrap mb-1 sm:mb-2">
-                    <p className="text-base sm:text-lg md:text-xl text-light-text/70 dark:text-dark-text/70 line-clamp-1">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <p className="text-lg md:text-xl text-light-text/70 dark:text-dark-text/70 line-clamp-1">
                       {displayArtist}
                     </p>
                     {song.language && (
@@ -357,7 +328,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
 
               {/* Legacy Tags (if exists) */}
               {song.tags && song.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-2 sm:mb-4">
+                <div className="flex flex-wrap gap-1 mb-4">
                   {song.tags.map((tag, index) => (
                     <span
                       key={index}
@@ -418,14 +389,14 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 transition={{ duration: 0.3, delay: 0.1 }}
-                className="xl:hidden p-4 sm:p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 relative flex flex-col flex-1 min-h-0"
+                className="xl:hidden flex-1 mb-8 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 relative flex flex-col"
               >
                 {/* YouTube 플레이어 - MR 링크가 있으면 항상 로드하되 visibility로 제어 */}
                 {youtubeMR && (
-                  <div className={`${showVideo ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
-                    <div className="flex items-center justify-between mb-3 sm:mb-4">
-                      <h4 className="text-lg sm:text-xl font-semibold text-light-text dark:text-dark-text flex items-center gap-2 sm:gap-3">
-                        <VideoCameraIcon className="w-5 h-5 sm:w-6 sm:h-6 text-light-accent dark:text-dark-accent" />
+                  <div className={`${showVideo ? 'flex' : 'hidden'} flex-col flex-1`}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-xl font-semibold text-light-text dark:text-dark-text flex items-center gap-3">
+                        <VideoCameraIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
                         MR 영상
                       </h4>
                       <button
@@ -440,7 +411,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                         <span>가사 보기</span>
                       </button>
                     </div>
-                    <div className="flex-1 w-full min-h-0 aspect-video">
+                    <div className="flex-1 w-full min-h-0 aspect-video" style={{ maxHeight: 'calc(100vh - 30rem)' }}>
                       <YouTube
                         videoId={youtubeMR.videoId}
                         opts={{
@@ -468,10 +439,10 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                 )}
 
                 {/* 가사 섹션 - 작은 화면에서만 표시 */}
-                <div className={`${!showVideo ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
-                  <div className="flex items-center justify-between mb-3 sm:mb-4">
-                    <h4 className="text-lg sm:text-xl font-semibold text-light-text dark:text-dark-text flex items-center gap-2 sm:gap-3">
-                      <MusicalNoteIcon className="w-5 h-5 sm:w-6 sm:h-6 text-light-accent dark:text-dark-accent" />
+                <div className={`${!showVideo ? 'flex' : 'hidden'} flex-col flex-1`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-xl font-semibold text-light-text dark:text-dark-text flex items-center gap-3">
+                      <MusicalNoteIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
                       가사
                     </h4>
                     {youtubeMR && (
@@ -489,13 +460,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                     )}
                   </div>
                   {song.lyrics ? (
-                    <div 
-                      className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg flex-1 overflow-y-auto min-h-0" 
-                      style={{ 
-                        overscrollBehavior: 'contain' 
-                      }}
-                      onWheel={handleScrollPreventPropagation}
-                    >
+                    <div className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg flex-1 overflow-y-auto min-h-0" style={{ maxHeight: 'calc(100vh - 30rem)' }}>
                       {song.lyrics}
                     </div>
                   ) : (
@@ -509,14 +474,14 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
               </motion.div>
 
               {/* Action buttons */}
-              <div className="flex items-center gap-2 sm:gap-3 flex-wrap mt-3 sm:mt-4">
+              <div className="flex items-center gap-3 flex-wrap mt-6">
                 {youtubeMR ? (
                   // MR 링크가 있을 때 - 3개 버튼으로 분리
                   <>
                     {/* 재생/일시정지 버튼 */}
                     <button
                       onClick={handleModalPlay}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-base
                                bg-gradient-to-r from-light-accent to-light-purple 
                                dark:from-dark-accent dark:to-dark-purple text-white 
                                rounded-lg hover:shadow-lg transform hover:scale-105 
@@ -538,7 +503,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                     {/* MR 검색 버튼 */}
                     <button
                       onClick={handleMRSearch}
-                      className="px-3 sm:px-4 py-2 sm:py-3 rounded-lg bg-light-primary/20 dark:bg-dark-primary/20 
+                      className="px-4 py-3 rounded-lg bg-light-primary/20 dark:bg-dark-primary/20 
                                hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 
                                transition-colors duration-200 text-light-text dark:text-dark-text
                                flex items-center gap-2"
@@ -551,7 +516,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                     {/* 새 창에서 열기 버튼 */}
                     <button
                       onClick={handleOpenInNewTab}
-                      className="px-3 sm:px-4 py-2 sm:py-3 rounded-lg bg-light-primary/20 dark:bg-dark-primary/20 
+                      className="px-4 py-3 rounded-lg bg-light-primary/20 dark:bg-dark-primary/20 
                                hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 
                                transition-colors duration-200 text-light-text dark:text-dark-text
                                flex items-center gap-2"
@@ -565,7 +530,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                   // MR 링크가 없을 때 - 기존 검색 버튼
                   <button
                     onClick={handleModalPlay}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg
+                    className="flex-1 flex items-center justify-center gap-2 px-6 py-3 text-lg
                              bg-gradient-to-r from-light-accent to-light-purple 
                              dark:from-dark-accent dark:to-dark-purple text-white 
                              rounded-lg hover:shadow-lg transform hover:scale-105 
@@ -579,7 +544,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
 
               {/* Date added */}
               {song.dateAdded && (
-                <div className="mt-3 sm:mt-4 text-sm text-light-text/50 dark:text-dark-text/50">
+                <div className="mt-4 text-sm text-light-text/50 dark:text-dark-text/50">
                   추가일: {new Date(song.dateAdded).toLocaleDateString('ko-KR')}
                 </div>
               )}
