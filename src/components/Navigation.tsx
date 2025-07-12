@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react';
+import { UserIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 interface NavigationProps {
   currentPath?: string;
@@ -71,6 +73,8 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
 
           {/* Right side - Controls */}
           <div className="flex items-center justify-end flex-1 space-x-2">
+            {/* Auth Controls */}
+            <AuthControls />
             {/* Mobile menu button */}
             <button 
               className="md:hidden p-2 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-all duration-300"
@@ -188,5 +192,121 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
         )}
       </div>
     </nav>
+  );
+}
+
+function AuthControls() {
+  const { data: session, status, update } = useSession();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // 에러 상태 처리
+  if (status === 'unauthenticated' || status === 'loading') {
+    return (
+      <>
+        {status === 'loading' ? (
+          <div className="w-8 h-8 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 animate-pulse" />
+        ) : (
+          <Link
+            href="/auth/signin"
+            className="hidden md:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-light-accent to-light-secondary hover:from-light-secondary hover:to-light-accent dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent text-white text-sm font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+          >
+            <UserIcon className="w-4 h-4" />
+            <span>로그인</span>
+          </Link>
+        )}
+      </>
+    )
+  }
+
+  if (!session) {
+    return null
+  }
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        className="flex items-center space-x-2 p-2 rounded-lg bg-light-primary/10 dark:bg-dark-primary/10 hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 transition-all duration-300"
+      >
+        {session.user.image ? (
+          <img
+            src={session.user.image}
+            alt={session.user.name || 'Profile'}
+            className="w-8 h-8 rounded-full"
+          />
+        ) : (
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-light-accent to-light-secondary dark:from-dark-accent dark:to-dark-secondary flex items-center justify-center">
+            <UserIcon className="w-4 h-4 text-white" />
+          </div>
+        )}
+        <div className="hidden md:block text-left">
+          <div className="text-sm font-medium text-gray-900 dark:text-white">
+            {session.user.channelName || session.user.name}
+          </div>
+          {session.user.isAdmin && (
+            <div className="text-xs text-light-accent dark:text-dark-primary font-medium">
+              {session.user.adminRole || '관리자'}
+            </div>
+          )}
+        </div>
+        <ChevronDownIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+      </button>
+
+      {isDropdownOpen && (
+        <div className="absolute right-0 mt-2 w-56 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-lg border border-light-primary/20 dark:border-dark-primary/20 py-1 z-50">
+          <div className="px-4 py-2 border-b border-light-primary/10 dark:border-dark-primary/10">
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              {session.user.channelName || session.user.name}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              치지직 ID: {session.user.channelId || '미확인'}
+            </div>
+            {session.user.isAdmin && (
+              <div className="text-xs text-light-accent dark:text-dark-primary font-medium mt-1">
+                ✨ {session.user.adminRole || '관리자'}
+              </div>
+            )}
+          </div>
+          
+          {session.user.isAdmin && (
+            <>
+              <Link
+                href="/admin"
+                className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors duration-200"
+                onClick={() => setIsDropdownOpen(false)}
+              >
+                관리자 대시보드
+              </Link>
+              <Link
+                href="/admin/songs"
+                className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors duration-200"
+                onClick={() => setIsDropdownOpen(false)}
+              >
+                노래 관리
+              </Link>
+              <div className="border-t border-light-primary/10 dark:border-dark-primary/10 my-1" />
+            </>
+          )}
+          
+          <Link
+            href="/profile"
+            className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors duration-200"
+            onClick={() => setIsDropdownOpen(false)}
+          >
+            내 프로필
+          </Link>
+          
+          <button
+            onClick={() => {
+              setIsDropdownOpen(false);
+              signOut();
+            }}
+            className="block w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
+          >
+            로그아웃
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

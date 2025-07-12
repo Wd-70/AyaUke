@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npm run lint)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "WebFetch(domain:chzzk.gitbook.io)",
+      "mcp__context7__resolve-library-id",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl:*)",
+      "WebFetch(domain:developers.naver.com)",
+      "Bash(node:*)"
     ],
     "deny": []
   }
