@@ -1,70 +1,61 @@
-import { fetchSongsFromSheet, getErrorMessage } from '@/lib/googleSheets';
 import SongbookClient from './SongbookClient';
 import { Song } from '@/types';
 import { unstable_cache } from 'next/cache';
 import { Metadata } from 'next';
+import { fetchRawSongsFromSheet, fetchSongDetailsFromMongo, mergeSongsData, getErrorMessage } from '@/lib/googleSheets';
 
 export const metadata: Metadata = {
   title: "아야 AyaUke - 노래책",
   description: "아야가 부르는 노래들을 모아둔 특별한 공간입니다. J-pop부터 K-pop까지 다양한 장르의 노래를 확인해보세요.",
 };
 
-// 구글시트 데이터만 캐싱 (60초 - 정적 데이터)
+// 구글시트만 60초 캐싱
 const getCachedSheetSongs = unstable_cache(
   async () => {
-    const { fetchRawSongsFromSheet } = await import('@/lib/googleSheets');
-    return await fetchRawSongsFromSheet();
+    const timestamp = new Date().toISOString();
+    console.log(`📊 [${timestamp}] 구글시트 캐시 갱신 중...`);
+    const result = await fetchRawSongsFromSheet();
+    console.log(`📊 [${timestamp}] 구글시트 캐시 갱신 완료: ${result.length}곡`);
+    return result;
   },
-  ['sheet-songs'],
+  ['sheet-only-v1'],
   {
-    revalidate: 60,
+    revalidate: 60, // 구글시트는 60초 캐싱
     tags: ['sheet-data']
   }
 );
 
-// MongoDB 데이터만 캐싱 (10초 - 동적 데이터)
-const getCachedMongoSongs = unstable_cache(
-  async () => {
-    const { fetchSongDetailsFromMongo } = await import('@/lib/googleSheets');
-    return await fetchSongDetailsFromMongo();
-  },
-  ['mongo-songs'],
-  {
-    revalidate: 10,
-    tags: ['mongo-data']
+// MongoDB는 실시간, 캐싱 없음
+async function getSongs(): Promise<{ songs: Song[]; error: string | null }> {
+  try {
+    const timestamp = new Date().toISOString();
+    console.log(`🚀 [${timestamp}] 노래책 데이터 로딩 중...`);
+    
+    // 1. 구글시트 (60초 캐시 사용)
+    const sheetSongs = await getCachedSheetSongs();
+    
+    // 2. MongoDB (실시간 조회)
+    console.log(`🗄️ [${timestamp}] MongoDB 실시간 조회 중...`);
+    const mongoDetails = await fetchSongDetailsFromMongo();
+    console.log(`🗄️ [${timestamp}] MongoDB 조회 완료: ${mongoDetails.length}곡`);
+    
+    // 3. 데이터 병합
+    console.log(`🔄 [${timestamp}] 데이터 병합 중...`);
+    const mergedSongs = mergeSongsData(sheetSongs, mongoDetails);
+    console.log(`✅ [${timestamp}] 병합 완료: ${mergedSongs.length}곡`);
+    
+    return { songs: mergedSongs, error: null };
+  } catch (e) {
+    const errorInfo = getErrorMessage(e as Error);
+    return { songs: [], error: errorInfo.message };
   }
-);
-
-// 최종 머지된 데이터 캐싱 (10초 - MongoDB 업데이트 주기에 맞춤)
-const getCachedMergedSongs = unstable_cache(
-  async (): Promise<{ songs: Song[]; error: string | null }> => {
-    try {
-      const [sheetSongs, mongoDetails] = await Promise.all([
-        getCachedSheetSongs(),
-        getCachedMongoSongs()
-      ]);
-      
-      const { mergeSongsData } = await import('@/lib/googleSheets');
-      const mergedSongs = mergeSongsData(sheetSongs, mongoDetails);
-      
-      return { songs: mergedSongs, error: null };
-    } catch (e) {
-      const errorInfo = getErrorMessage(e as Error);
-      return { songs: [], error: errorInfo.message };
-    }
-  },
-  ['merged-songbook-data'],
-  {
-    revalidate: 10, // MongoDB 업데이트 주기에 맞춤
-    tags: ['merged-songbook']
-  }
-);
+}
 
 export default async function SongbookPage() {
-  const { songs, error } = await getCachedMergedSongs();
+  const { songs, error } = await getSongs();
   return <SongbookClient songs={songs} error={error} />;
 }
 
-// 페이지 캐싱 설정: 10초마다 재검증 (MongoDB 업데이트 주기에 맞춤)
-export const revalidate = 10;
+// 페이지 캐싱 비활성화 (MongoDB 실시간 조회)
+export const revalidate = 0;
 
