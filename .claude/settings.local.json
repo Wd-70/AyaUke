@@ -9,7 +9,10 @@
       "WebFetch(domain:github.com)",
       "Bash(curl:*)",
       "WebFetch(domain:developers.naver.com)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

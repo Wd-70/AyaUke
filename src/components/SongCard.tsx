@@ -6,6 +6,7 @@ import { Song } from '@/types';
 import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import { HeartIcon } from '@heroicons/react/24/solid';
 import YouTube from 'react-youtube';
+import { useLike } from '@/hooks/useLikes';
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -19,7 +20,7 @@ interface SongCardProps {
 }
 
 export default function SongCard({ song, onPlay }: SongCardProps) {
-  const [isLiked, setIsLiked] = useState(false);
+  const { liked, isLoading: likeLoading, error: likeError, toggleLike } = useLike(song.id);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
@@ -152,9 +153,9 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
     setShowVideo(!showVideo);
   };
 
-  const handleLike = (e: React.MouseEvent) => {
+  const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsLiked(!isLiked);
+    await toggleLike();
   };
 
   // 다이얼로그 열릴 때 body 스크롤 비활성화
@@ -393,14 +394,18 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleLike}
+                    disabled={likeLoading}
                     className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                               transition-colors duration-200"
+                               transition-colors duration-200 disabled:opacity-50"
+                    title={liked ? '좋아요 취소' : '좋아요'}
                   >
                     <HeartIcon 
-                      className={`w-5 h-5 transition-colors duration-200 
-                                 ${isLiked 
-                                   ? 'text-red-500 fill-current' 
-                                   : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
+                      className={`w-5 h-5 transition-all duration-200 
+                                 ${likeLoading 
+                                   ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
+                                   : liked 
+                                     ? 'text-red-500 fill-current' 
+                                     : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
                     />
                   </button>
                   <button
@@ -695,14 +700,18 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                   </div>
                   <button
                     onClick={handleLike}
+                    disabled={likeLoading}
                     className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                               transition-colors duration-200"
+                               transition-colors duration-200 disabled:opacity-50"
+                    title={liked ? '좋아요 취소' : '좋아요'}
                   >
                     <HeartIcon 
-                      className={`w-5 h-5 transition-colors duration-200 
-                                 ${isLiked 
-                                   ? 'text-red-500 fill-current' 
-                                   : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
+                      className={`w-5 h-5 transition-all duration-200 
+                                 ${likeLoading 
+                                   ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
+                                   : liked 
+                                     ? 'text-red-500 fill-current' 
+                                     : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
                     />
                   </button>
                 </div>
@@ -779,14 +788,18 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                   </div>
                   <button
                     onClick={handleLike}
+                    disabled={likeLoading}
                     className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                               transition-colors duration-200"
+                               transition-colors duration-200 disabled:opacity-50"
+                    title={liked ? '좋아요 취소' : '좋아요'}
                   >
                     <HeartIcon 
-                      className={`w-5 h-5 transition-colors duration-200 
-                                 ${isLiked 
-                                   ? 'text-red-500 fill-current' 
-                                   : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
+                      className={`w-5 h-5 transition-all duration-200 
+                                 ${likeLoading 
+                                   ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
+                                   : liked 
+                                     ? 'text-red-500 fill-current' 
+                                     : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
                     />
                   </button>
                 </div>

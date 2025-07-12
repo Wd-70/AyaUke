@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { motion } from "framer-motion"
 import UserDebugInfo from "@/components/UserDebugInfo"
+import ManualCookieSetup from "@/components/ManualCookieSetup"
+import AutoCookieDetector from "@/components/AutoCookieDetector"
+import ChzzkLoginGuide from "@/components/ChzzkLoginGuide"
+import ChzzkAPITester from "@/components/ChzzkAPITester"
 
 export default function AdminDashboard() {
   const { data: session, status } = useSession()
@@ -161,6 +165,18 @@ export default function AdminDashboard() {
           </div>
         </motion.div>
 
+        {/* 치지직 로그인 가이드 */}
+        <ChzzkLoginGuide />
+        
+        {/* 자동 쿠키 감지 컴포넌트 */}
+        <AutoCookieDetector />
+        
+        {/* 수동 쿠키 설정 컴포넌트 */}
+        <ManualCookieSetup />
+        
+        {/* 치지직 API 테스터 */}
+        <ChzzkAPITester />
+        
         {/* 디버그 정보 컴포넌트 */}
         <UserDebugInfo />
       </div>

@@ -8,6 +8,7 @@ import SongCard from '@/components/SongCard';
 import Footer from '@/components/Footer';
 import { MusicalNoteIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
+import { useBulkLikes } from '@/hooks/useLikes';
 
 function useChunkedRender(items: Song[], chunkSize: number = 20) {
   const [visibleCount, setVisibleCount] = useState(chunkSize);
@@ -48,8 +49,31 @@ interface SongbookClientProps {
 export default function SongbookClient({ songs: initialSongs, error: serverError }: SongbookClientProps) {
   const [filteredSongs, setFilteredSongs] = useState<Song[]>(initialSongs);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const { loadLikes } = useBulkLikes();
 
   const visibleSongs = useChunkedRender(filteredSongs, 24);
+
+  // 초기 좋아요 데이터 로딩 (우선순위 높음)
+  useEffect(() => {
+    if (filteredSongs.length > 0) {
+      const initialSongIds = filteredSongs.slice(0, 24).map(song => song.id);
+      console.log('🚀 초기 24곡 좋아요 로딩 시작');
+      loadLikes(initialSongIds, 'high').then(() => {
+        console.log('✅ 초기 24곡 좋아요 로딩 완료');
+        
+        // 초기 로딩 완료 후 나머지 곡들 로딩 (우선순위 낮음)
+        if (filteredSongs.length > 24) {
+          const remainingSongIds = filteredSongs.slice(24).map(song => song.id);
+          console.log('🔄 나머지 곡 좋아요 로딩 시작');
+          loadLikes(remainingSongIds, 'low').then(() => {
+            console.log('✅ 모든 곡 좋아요 로딩 완료');
+          });
+        }
+      });
+    }
+  }, [filteredSongs.length, loadLikes]); // 필터된 곡 수와 loadLikes 함수에 의존
+
+  // 주석: 중복 로딩 방지를 위해 제거됨 - 초기 로딩에서 모든 곡 처리
 
   useEffect(() => {
     const handleScroll = () => {

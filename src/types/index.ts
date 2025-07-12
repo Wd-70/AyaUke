@@ -1,5 +1,6 @@
 export interface Song {
-  id: string;
+  id: string;                              // MongoDB ObjectId (메인 ID)
+  sheetId?: string;                        // 구글시트 원본 ID (병합된 데이터의 경우)
   title: string;
   artist: string;
   language: string;
@@ -18,10 +19,8 @@ export interface Song {
   sungCount?: number;
   lastSungDate?: string;
   keyAdjustment?: number | null;
-  isFavorite?: boolean;
   mrLinksDetailed?: MRLink[];
   selectedMRIndex?: number;
-  playlists?: string[];
   personalNotes?: string;
   imageUrl?: string;
 }
@@ -34,6 +33,7 @@ export interface MRLink {
 }
 
 export interface SongDetail {
+  _id?: string;                            // MongoDB ObjectId
   title: string;
   artist: string;
   titleAlias?: string;
@@ -44,10 +44,8 @@ export interface SongDetail {
   sungCount?: number;
   lastSungDate?: string;
   keyAdjustment?: number | null;
-  isFavorite?: boolean;
   mrLinks?: MRLink[];
   selectedMRIndex?: number;
-  playlists?: string[];
   personalNotes?: string;
   imageUrl?: string;
   createdAt?: Date;

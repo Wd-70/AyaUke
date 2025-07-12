@@ -76,10 +76,6 @@ const SongDetailSchema: Schema = new Schema({
       message: '키 조절은 -12부터 +12 사이의 숫자로 입력해주세요.'
     }
   },
-  isFavorite: {
-    type: Boolean,
-    default: false,
-  },
   mrLinks: [MRLinkSchema],
   selectedMRIndex: {
     type: Number,
@@ -95,10 +91,6 @@ const SongDetailSchema: Schema = new Schema({
       message: 'selectedMRIndex must be within the range of available MR links'
     }
   },
-  playlists: [{
-    type: String,
-    trim: true,
-  }],
   personalNotes: {
     type: String,
     trim: true,
@@ -125,11 +117,9 @@ const SongDetailSchema: Schema = new Schema({
 });
 
 SongDetailSchema.index({ title: 1 }, { unique: true });
-SongDetailSchema.index({ isFavorite: -1 });
 SongDetailSchema.index({ sungCount: -1 });
 SongDetailSchema.index({ lastSungDate: -1 });
 SongDetailSchema.index({ searchTags: 1 });
-SongDetailSchema.index({ playlists: 1 });
 SongDetailSchema.index({ language: 1 });
 
 export default mongoose.models.SongbookDetail || mongoose.model<ISongDetail>('SongbookDetail', SongDetailSchema);
