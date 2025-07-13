@@ -54,6 +54,14 @@ class LikesStore {
     }
   }
 
+  // bulk 데이터를 직접 설정
+  setBulkLikes(likesData: Record<string, boolean>) {
+    Object.entries(likesData).forEach(([songId, liked]) => {
+      this.likes.set(songId, liked)
+      this.notifySubscribers(songId)
+    })
+  }
+
   // 대량 로딩 (중복 방지)
   async bulkLoadLikes(songIds: string[], priority: 'high' | 'low' = 'low'): Promise<void> {
     if (this.bulkLoadPromise && priority === 'low') {
@@ -121,6 +129,15 @@ class LikesStore {
 }
 
 const likesStore = new LikesStore()
+
+// 전역 이벤트 리스너 설정 (플레이리스트에서 bulk 데이터 수신)
+if (typeof window !== 'undefined') {
+  window.addEventListener('likesLoaded', (event: any) => {
+    const { likes } = event.detail
+    console.log('📨 좋아요 bulk 데이터 수신:', likes)
+    likesStore.setBulkLikes(likes)
+  })
+}
 
 interface UseLikeReturn {
   liked: boolean

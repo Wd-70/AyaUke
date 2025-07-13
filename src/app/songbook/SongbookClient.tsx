@@ -9,6 +9,7 @@ import Footer from '@/components/Footer';
 import { MusicalNoteIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 import { useBulkLikes } from '@/hooks/useLikes';
+import { useGlobalPlaylists } from '@/hooks/useGlobalPlaylists';
 
 function useChunkedRender(items: Song[], chunkSize: number = 20) {
   const [visibleCount, setVisibleCount] = useState(chunkSize);
@@ -50,12 +51,14 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   const [filteredSongs, setFilteredSongs] = useState<Song[]>(initialSongs);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const { loadLikes } = useBulkLikes();
+  const { refresh: refreshPlaylists } = useGlobalPlaylists();
 
   const visibleSongs = useChunkedRender(filteredSongs, 24);
 
-  // 초기 좋아요 데이터 로딩 (우선순위 높음)
+  // 초기 데이터 로딩 (좋아요만, 플레이리스트는 useGlobalPlaylists에서 자동 처리)
   useEffect(() => {
     if (filteredSongs.length > 0) {
+      // 좋아요 데이터 로딩 (우선순위 높음)
       const initialSongIds = filteredSongs.slice(0, 24).map(song => song.id);
       console.log('🚀 초기 24곡 좋아요 로딩 시작');
       loadLikes(initialSongIds, 'high').then(() => {

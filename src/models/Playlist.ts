@@ -12,6 +12,19 @@ export interface IPlaylist extends mongoose.Document {
     addedAt: Date
     order: number
   }>
+  // 공유 기능 관련
+  shareId: string
+  isPublic: boolean
+  shareSettings: {
+    allowCopy: boolean
+    requireLogin: boolean
+    expiresAt?: Date
+  }
+  shareHistory: Array<{
+    shareId: string
+    createdAt: Date
+    revokedAt: Date
+  }>
   createdAt: Date
   updatedAt: Date
 }
@@ -24,8 +37,7 @@ const playlistSchema = new mongoose.Schema<IPlaylist>({
   },
   channelId: {
     type: String,
-    required: true,
-    index: true
+    required: true
   },
   name: {
     type: String,
@@ -48,7 +60,7 @@ const playlistSchema = new mongoose.Schema<IPlaylist>({
   songs: [{
     songId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'SongDetail',
+      ref: 'SongbookDetail',
       required: true
     },
     addedAt: {
@@ -59,9 +71,50 @@ const playlistSchema = new mongoose.Schema<IPlaylist>({
       type: Number,
       required: true
     }
+  }],
+  // 공유 기능 관련
+  shareId: {
+    type: String,
+    required: true,
+    unique: true,
+    default: () => require('crypto').randomUUID()
+  },
+  isPublic: {
+    type: Boolean,
+    default: false
+  },
+  shareSettings: {
+    allowCopy: {
+      type: Boolean,
+      default: true
+    },
+    requireLogin: {
+      type: Boolean,
+      default: false
+    },
+    expiresAt: {
+      type: Date,
+      default: null
+    }
+  },
+  shareHistory: [{
+    shareId: {
+      type: String,
+      required: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    revokedAt: {
+      type: Date,
+      required: true
+    }
   }]
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 })
 
 // 인덱스
@@ -69,6 +122,8 @@ playlistSchema.index({ channelId: 1, name: 1 })
 playlistSchema.index({ userId: 1, createdAt: -1 })
 playlistSchema.index({ tags: 1 })
 playlistSchema.index({ 'songs.songId': 1 })
+// shareId는 unique: true로 이미 인덱스가 생성됨
+playlistSchema.index({ isPublic: 1 })
 
 // 가상 필드
 playlistSchema.virtual('songCount').get(function() {

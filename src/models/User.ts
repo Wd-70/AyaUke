@@ -17,8 +17,7 @@ const userSchema = new mongoose.Schema<IUser>({
   channelId: {
     type: String,
     required: true,
-    unique: true,
-    index: true
+    unique: true
   },
   channelName: {
     type: String,
@@ -52,8 +51,7 @@ const userSchema = new mongoose.Schema<IUser>({
   timestamps: true
 })
 
-// 인덱스 추가
-userSchema.index({ channelId: 1 })
+// 인덱스 추가 (channelId는 unique: true로 자동 인덱스 생성됨)
 userSchema.index({ isAdmin: 1 })
 
 export default mongoose.models.User || mongoose.model<IUser>('User', userSchema)

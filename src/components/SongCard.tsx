@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Song } from '@/types';
-import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { HeartIcon } from '@heroicons/react/24/solid';
 import YouTube from 'react-youtube';
 import { useLike } from '@/hooks/useLikes';
+import { useSongPlaylists } from '@/hooks/useGlobalPlaylists';
+import PlaylistContextMenu from './PlaylistContextMenu';
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -21,12 +23,15 @@ interface SongCardProps {
 
 export default function SongCard({ song, onPlay }: SongCardProps) {
   const { liked, isLoading: likeLoading, error: likeError, toggleLike } = useLike(song.id);
+  const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [youtubePlayer, setYoutubePlayer] = useState<YouTubePlayer | null>(null);
   const [playerPosition, setPlayerPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
   const [isXLScreen, setIsXLScreen] = useState(false);
+  const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
   const languageColors = {
     Korean: 'bg-blue-500',
@@ -54,8 +59,10 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
 
   // MR 링크에서 YouTube URL 찾기
   const getYouTubeMRLink = () => {
-    if (!song.mrLinksDetailed || song.mrLinksDetailed.length === 0) return null;
-    const selectedMR = song.mrLinksDetailed[song.selectedMRIndex || 0];
+    // mrLinksDetailed와 mrLinks 둘 다 지원
+    const mrLinks = song.mrLinksDetailed || song.mrLinks;
+    if (!mrLinks || mrLinks.length === 0) return null;
+    const selectedMR = mrLinks[song.selectedMRIndex || 0];
     if (!selectedMR) return null;
     
     // URL에 시간 파라미터 추가
@@ -94,21 +101,24 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
     
     if (youtubeMR) {
       // MR 링크가 있을 때만 재생 기능 실행
-      if (youtubePlayer && youtubePlayer.playVideo) {
+      if (youtubePlayer && typeof youtubePlayer.playVideo === 'function' && typeof youtubePlayer.pauseVideo === 'function') {
         // 플레이어가 준비되었을 때
         try {
           if (isPlaying) {
-            setIsPlaying(false);
             youtubePlayer.pauseVideo();
+            setIsPlaying(false);
           } else {
-            setIsPlaying(true);
             youtubePlayer.playVideo();
+            setIsPlaying(true);
           }
         } catch (error) {
-          console.warn('YouTube player error:', error);
+          console.warn('YouTube player control error:', error);
+          // 에러 발생 시 영상 탭으로 전환
+          setShowVideo(true);
         }
       } else {
         // 플레이어가 아직 준비되지 않았을 때 - 영상 탭으로 전환
+        console.log('YouTube player not ready, showing video tab');
         setShowVideo(true);
       }
     } else {
@@ -134,19 +144,37 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
   };
 
   const onYouTubeReady = (event: { target: YouTubePlayer }) => {
+    console.log('YouTube player ready:', event.target);
     setYoutubePlayer(event.target);
-    // 자동 재생 방지
-    event.target.pauseVideo();
-    // 초기 상태를 일시정지로 설정
-    setIsPlaying(false);
+    
+    // 플레이어가 준비되면 자동 재생 방지
+    try {
+      if (event.target && typeof event.target.pauseVideo === 'function') {
+        // 약간의 지연 후 일시정지 (플레이어 초기화 완료 대기)
+        setTimeout(() => {
+          try {
+            event.target.pauseVideo();
+            setIsPlaying(false);
+          } catch (err) {
+            console.warn('Failed to pause video on ready:', err);
+          }
+        }, 100);
+      }
+    } catch (error) {
+      console.warn('YouTube player ready error:', error);
+    }
   };
 
   const onYouTubeStateChange = (event: { data: number }) => {
-    // YouTube 플레이어 상태와 동기화
-    // -1: 시작되지 않음, 0: 종료, 1: 재생 중, 2: 일시정지, 3: 버퍼링, 5: 동영상 신호
-    const playerState = event.data;
-    const isCurrentlyPlaying = playerState === 1;
-    setIsPlaying(isCurrentlyPlaying);
+    try {
+      // YouTube 플레이어 상태와 동기화
+      // -1: 시작되지 않음, 0: 종료, 1: 재생 중, 2: 일시정지, 3: 버퍼링, 5: 동영상 신호
+      const playerState = event.data;
+      const isCurrentlyPlaying = playerState === 1;
+      setIsPlaying(isCurrentlyPlaying);
+    } catch (error) {
+      console.warn('YouTube state change error:', error);
+    }
   };
 
   const toggleVideoView = () => {
@@ -156,6 +184,31 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
     await toggleLike();
+  };
+
+  const handlePlaylistClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // 로그인하지 않은 경우 플레이리스트 메뉴 표시하지 않음
+    if (!songPlaylists && songPlaylists.length === 0) {
+      console.log('🔒 로그인이 필요한 기능입니다');
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenuPosition({
+      x: rect.left,
+      y: rect.bottom + 8
+    });
+    setShowPlaylistMenu(true);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuPosition({
+      x: e.clientX,
+      y: e.clientY
+    });
+    setShowPlaylistMenu(true);
   };
 
   // 다이얼로그 열릴 때 body 스크롤 비활성화
@@ -168,12 +221,18 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
       // body 스크롤 복원
       document.body.style.overflow = '';
       document.body.style.paddingRight = '';
+      // 모달이 닫힐 때 YouTube 플레이어 초기화
+      setYoutubePlayer(null);
+      setIsPlaying(false);
+      setShowVideo(false);
     }
 
     // 컴포넌트 언마운트 시 정리
     return () => {
       document.body.style.overflow = '';
       document.body.style.paddingRight = '';
+      setYoutubePlayer(null);
+      setIsPlaying(false);
     };
   }, [isExpanded]);
 
@@ -264,7 +323,8 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
       console.log('🎤 MR 정보:', {
         basicMRLinks: song.mrLinks,
         detailedMRLinks: song.mrLinksDetailed,
-        selectedMRIndex: song.selectedMRIndex
+        selectedMRIndex: song.selectedMRIndex,
+        actualMRLinks: song.mrLinksDetailed || song.mrLinks
       });
     }
     
@@ -389,9 +449,27 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                         #{tag}
                       </span>
                     ))}
+                    {songPlaylists.map((playlist) => (
+                      <span
+                        key={playlist._id}
+                        className="px-2 py-1 rounded-full text-xs 
+                                 bg-purple-100 dark:bg-purple-900 
+                                 text-purple-800 dark:text-purple-200"
+                      >
+                        🎵 {playlist.name}
+                      </span>
+                    ))}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePlaylistClick}
+                    className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                               transition-colors duration-200"
+                    title="플레이리스트 관리"
+                  >
+                    <ListBulletIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
+                  </button>
                   <button
                     onClick={handleLike}
                     disabled={likeLoading}
@@ -620,6 +698,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
               }}
             >
               <YouTube
+                key={`youtube-${song.id}-${youtubeMR.videoId}`}
                 videoId={youtubeMR.videoId}
                 opts={{
                   height: '100%',
@@ -639,6 +718,11 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                 }}
                 onReady={onYouTubeReady}
                 onStateChange={onYouTubeStateChange}
+                onError={(error) => {
+                  console.warn('YouTube player error:', error);
+                  setYoutubePlayer(null);
+                  setIsPlaying(false);
+                }}
                 className="w-full h-full rounded-lg"
               />
             </div>
@@ -654,6 +738,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
           whileHover={{ y: -5 }}
           transition={{ duration: 0.3 }}
           onClick={handleCardClick}
+          onContextMenu={handleContextMenu}
           className="group relative rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
                      hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer h-52"
         >
@@ -716,12 +801,29 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                   </button>
                 </div>
 
-                {/* Language tag */}
+                {/* Language tag and playlist badges */}
                 <div className="flex flex-wrap gap-2 mb-2">
                   {song.language && (
                     <span className={`px-2 py-1 rounded-full text-xs font-medium text-white 
                                      ${languageColors[song.language as keyof typeof languageColors] || 'bg-gray-500'}`}>
                       {song.language}
+                    </span>
+                  )}
+                  {songPlaylists.slice(0, 2).map((playlist) => (
+                    <span
+                      key={playlist._id}
+                      className="px-2 py-1 rounded-full text-xs font-medium
+                               bg-purple-100 dark:bg-purple-900 
+                               text-purple-800 dark:text-purple-200"
+                    >
+                      🎵 {playlist.name}
+                    </span>
+                  ))}
+                  {songPlaylists.length > 2 && (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium
+                                   bg-gray-100 dark:bg-gray-800 
+                                   text-gray-600 dark:text-gray-400">
+                      +{songPlaylists.length - 2}
                     </span>
                   )}
                 </div>
@@ -786,30 +888,57 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                       {displayArtist}
                     </p>
                   </div>
-                  <button
-                    onClick={handleLike}
-                    disabled={likeLoading}
-                    className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                               transition-colors duration-200 disabled:opacity-50"
-                    title={liked ? '좋아요 취소' : '좋아요'}
-                  >
-                    <HeartIcon 
-                      className={`w-5 h-5 transition-all duration-200 
-                                 ${likeLoading 
-                                   ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
-                                   : liked 
-                                     ? 'text-red-500 fill-current' 
-                                     : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
-                    />
-                  </button>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={handlePlaylistClick}
+                      className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                 transition-colors duration-200"
+                      title="플레이리스트 관리"
+                    >
+                      <ListBulletIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+                    </button>
+                    <button
+                      onClick={handleLike}
+                      disabled={likeLoading}
+                      className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                 transition-colors duration-200 disabled:opacity-50"
+                      title={liked ? '좋아요 취소' : '좋아요'}
+                    >
+                      <HeartIcon 
+                        className={`w-5 h-5 transition-all duration-200 
+                                   ${likeLoading 
+                                     ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
+                                     : liked 
+                                       ? 'text-red-500 fill-current' 
+                                       : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
+                      />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Language tag */}
+                {/* Language tag and playlist badges */}
                 <div className="flex flex-wrap gap-2 mb-2">
                   {song.language && (
                     <span className={`px-2 py-1 rounded-full text-xs font-medium text-white 
                                      ${languageColors[song.language as keyof typeof languageColors] || 'bg-gray-500'}`}>
                       {song.language}
+                    </span>
+                  )}
+                  {songPlaylists.slice(0, 2).map((playlist) => (
+                    <span
+                      key={playlist._id}
+                      className="px-2 py-1 rounded-full text-xs font-medium
+                               bg-purple-100 dark:bg-purple-900 
+                               text-purple-800 dark:text-purple-200"
+                    >
+                      🎵 {playlist.name}
+                    </span>
+                  ))}
+                  {songPlaylists.length > 2 && (
+                    <span className="px-2 py-1 rounded-full text-xs font-medium
+                                   bg-gray-100 dark:bg-gray-800 
+                                   text-gray-600 dark:text-gray-400">
+                      +{songPlaylists.length - 2}
                     </span>
                   )}
                 </div>
@@ -848,6 +977,14 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
           )}
         </motion.div>
       )}
+      
+      {/* 플레이리스트 컨텍스트 메뉴 */}
+      <PlaylistContextMenu
+        songId={song.id}
+        isOpen={showPlaylistMenu}
+        position={menuPosition}
+        onClose={() => setShowPlaylistMenu(false)}
+      />
       </>
     );
 }

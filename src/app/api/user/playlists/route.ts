@@ -2,9 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import dbConnect from '@/lib/mongodb'
 import Playlist from '@/models/Playlist'
+import SongDetail from '@/models/SongDetail'
+import { authOptions } from '@/lib/authOptions'
+import mongoose from 'mongoose'
 
-const authOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+// SongDetail 모델 강제 등록 (스키마 에러 방지)
+try {
+  if (!mongoose.models.SongbookDetail) {
+    console.log('🔧 SongDetail 모델 재등록 시도 (user/playlists)')
+    // 모델이 없으면 강제로 재등록
+    require('@/models/SongDetail')
+  }
+} catch (error) {
+  console.warn('SongDetail 모델 등록 확인 중 에러:', error)
 }
 
 export async function GET(request: NextRequest) {
@@ -22,26 +32,76 @@ export async function GET(request: NextRequest) {
 
     await dbConnect()
 
-    let query = Playlist.find({ channelId: session.user.channelId })
-      .sort({ updatedAt: -1 })
-      .skip(skip)
-      .limit(limit)
+    let playlists
+    let total
+    
+    const baseFilter = { channelId: session.user.channelId }
 
     // 곡 정보 포함 여부에 따라 populate 적용
     if (includeSongs) {
-      query = query.populate('songs.songId', 'title artist language imageUrl')
+      try {
+        // SongDetail 모델 등록 상태 확인 및 강제 등록
+        console.log('🔍 SongDetail 모델 등록 상태:', !!mongoose.models.SongbookDetail)
+        if (!mongoose.models.SongbookDetail) {
+          console.log('🔧 SongDetail 모델 강제 등록 중...')
+          const SongDetailModel = require('@/models/SongDetail').default
+          console.log('✅ SongDetail 모델 등록 완료')
+        }
+        
+        // 새로운 쿼리로 populate 시도
+        const [populatedPlaylists, totalCount] = await Promise.all([
+          Playlist.find(baseFilter)
+            .sort({ updatedAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .populate('songs.songId', 'title artist language imageUrl')
+            .exec(),
+          Playlist.countDocuments(baseFilter)
+        ])
+        playlists = populatedPlaylists
+        total = totalCount
+        console.log('✅ populate 성공')
+      } catch (error) {
+        console.warn('⚠️ populate 실패, 기본 정보만 반환:', error.message)
+        // populate 실패 시 새로운 쿼리로 기본 플레이리스트 정보만 반환
+        const [basicPlaylists, totalCount] = await Promise.all([
+          Playlist.find(baseFilter)
+            .sort({ updatedAt: -1 })
+            .skip(skip)
+            .limit(limit)
+            .exec(),
+          Playlist.countDocuments(baseFilter)
+        ])
+        playlists = basicPlaylists
+        total = totalCount
+      }
+    } else {
+      // includeSongs가 false인 경우
+      const [basicPlaylists, totalCount] = await Promise.all([
+        Playlist.find(baseFilter)
+          .sort({ updatedAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .exec(),
+        Playlist.countDocuments(baseFilter)
+      ])
+      playlists = basicPlaylists
+      total = totalCount
     }
 
-    const [playlists, total] = await Promise.all([
-      query.exec(),
-      Playlist.countDocuments({ channelId: session.user.channelId })
-    ])
-
     // 곡 수 정보 추가
-    const playlistsWithCounts = playlists.map(playlist => ({
-      ...playlist.toObject(),
-      songCount: playlist.songs.length
-    }))
+    const playlistsWithCounts = playlists.map(playlist => {
+      const playlistObj = playlist.toObject()
+      console.log('🔍 플레이리스트 응답 확인:', {
+        name: playlistObj.name,
+        songCount: playlistObj.songs.length,
+        firstSong: playlistObj.songs[0]
+      })
+      return {
+        ...playlistObj,
+        songCount: playlistObj.songs.length
+      }
+    })
 
     const totalPages = Math.ceil(total / limit)
 
