@@ -34,6 +34,8 @@ class GlobalPlaylistsStore {
   private cacheTime = 30000 // 30초 캐시
   private hasInitialized = false // 초기화 여부
   private previousChannelId: string | null = null // 이전 채널 ID
+  // 개별 곡별 작업 상태 관리 - songId -> Set<playlistId>
+  private songOperations: Map<string, Set<string>> = new Map()
 
   subscribe(callback: () => void) {
     this.subscribers.add(callback)
@@ -111,6 +113,34 @@ class GlobalPlaylistsStore {
     this.previousChannelId = channelId
   }
 
+  // 개별 곡 작업 상태 관리
+  setSongOperation(songId: string, playlistId: string, isOperating: boolean) {
+    if (isOperating) {
+      if (!this.songOperations.has(songId)) {
+        this.songOperations.set(songId, new Set())
+      }
+      this.songOperations.get(songId)!.add(playlistId)
+    } else {
+      const operations = this.songOperations.get(songId)
+      if (operations) {
+        operations.delete(playlistId)
+        if (operations.size === 0) {
+          this.songOperations.delete(songId)
+        }
+      }
+    }
+    this.notify()
+  }
+
+  isSongOperating(songId: string, playlistId?: string): boolean {
+    const operations = this.songOperations.get(songId)
+    if (!operations) return false
+    if (playlistId) {
+      return operations.has(playlistId)
+    }
+    return operations.size > 0
+  }
+
   // 플레이리스트에 곡 추가 (로컬 상태 업데이트)
   addSongToPlaylist(playlistId: string, songId: string) {
     const playlist = this.playlists.find(p => p._id === playlistId)
@@ -161,6 +191,7 @@ interface UseGlobalPlaylistsReturn {
   addSongToPlaylist: (playlistId: string, songId: string) => Promise<boolean>
   removeSongFromPlaylist: (playlistId: string, songId: string) => Promise<boolean>
   getPlaylistsForSong: (songId: string) => Array<{ _id: string; name: string }>
+  isSongOperating: (songId: string, playlistId?: string) => boolean
 }
 
 export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
@@ -301,6 +332,9 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
       return false
     }
 
+    // 개별 곡 작업 시작
+    globalPlaylistsStore.setSongOperation(songId, playlistId, true)
+
     // 이미 플레이리스트에 있는지 확인
     const playlists = globalPlaylistsStore.getPlaylists()
     const playlist = playlists.find(p => p._id === playlistId)
@@ -317,6 +351,7 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
     
     if (isAlreadyInPlaylist) {
       console.log('⚠️ 곡이 이미 플레이리스트에 있습니다:', songId)
+      globalPlaylistsStore.setSongOperation(songId, playlistId, false)
       return true // 이미 있으면 성공으로 처리
     }
 
@@ -353,6 +388,9 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
       globalPlaylistsStore.setError('네트워크 오류가 발생했습니다')
       console.error('플레이리스트 추가 오류:', err)
       return false
+    } finally {
+      // 작업 완료
+      globalPlaylistsStore.setSongOperation(songId, playlistId, false)
     }
   }
 
@@ -361,6 +399,9 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
       globalPlaylistsStore.setError('로그인이 필요합니다')
       return false
     }
+
+    // 개별 곡 작업 시작
+    globalPlaylistsStore.setSongOperation(songId, playlistId, true)
 
     // 낙관적 업데이트 - 현재 상태 백업
     const playlist = globalPlaylistsStore.getPlaylists().find(p => p._id === playlistId)
@@ -396,6 +437,9 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
       globalPlaylistsStore.setError('네트워크 오류가 발생했습니다')
       console.error('플레이리스트 제거 오류:', err)
       return false
+    } finally {
+      // 작업 완료
+      globalPlaylistsStore.setSongOperation(songId, playlistId, false)
     }
   }
 
@@ -451,7 +495,8 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
     deletePlaylist,
     addSongToPlaylist,
     removeSongFromPlaylist,
-    getPlaylistsForSong: globalPlaylistsStore.getPlaylistsForSong.bind(globalPlaylistsStore)
+    getPlaylistsForSong: globalPlaylistsStore.getPlaylistsForSong.bind(globalPlaylistsStore),
+    isSongOperating: globalPlaylistsStore.isSongOperating.bind(globalPlaylistsStore)
   }
 }
 

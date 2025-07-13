@@ -15,7 +15,7 @@ interface PlaylistContextMenuProps {
 
 export default function PlaylistContextMenu({ songId, isOpen, position, onClose }: PlaylistContextMenuProps) {
   const { data: session } = useSession();
-  const { playlists: allPlaylists, isLoading: playlistsLoading, createPlaylist, addSongToPlaylist, removeSongFromPlaylist, refresh } = useGlobalPlaylists();
+  const { playlists: allPlaylists, isLoading: playlistsLoading, createPlaylist, addSongToPlaylist, removeSongFromPlaylist, refresh, isSongOperating } = useGlobalPlaylists();
   const { playlists: songPlaylists } = useSongPlaylists(songId);
   const [isCreating, setIsCreating] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState('');
@@ -196,7 +196,7 @@ export default function PlaylistContextMenu({ songId, isOpen, position, onClose 
 
         {/* 플레이리스트 목록 */}
         <div className="max-h-64 overflow-y-auto">
-          {playlistsLoading ? (
+          {playlistsLoading && allPlaylists.length === 0 ? (
             <div className="px-4 py-6 text-center text-light-text/60 dark:text-dark-text/60">
               로딩 중...
             </div>
@@ -207,6 +207,7 @@ export default function PlaylistContextMenu({ songId, isOpen, position, onClose 
           ) : (
             allPlaylists.map((playlist) => {
               const isInPlaylist = songPlaylists.some(p => p._id === playlist._id);
+              const isOperating = isSongOperating(songId, playlist._id);
               
               return (
                 <div
@@ -215,16 +216,21 @@ export default function PlaylistContextMenu({ songId, isOpen, position, onClose 
                 >
                   <button
                     onClick={() => handlePlaylistToggle(playlist._id)}
-                    className="flex items-center gap-3 flex-1"
+                    disabled={isOperating}
+                    className="flex items-center gap-3 flex-1 disabled:opacity-50"
                   >
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors duration-200 ${
-                      isInPlaylist 
-                        ? 'bg-light-accent dark:bg-dark-accent border-light-accent dark:border-dark-accent' 
-                        : 'border-light-text/30 dark:border-dark-text/30'
+                      isOperating
+                        ? 'border-light-accent dark:border-dark-accent animate-spin'
+                        : isInPlaylist 
+                          ? 'bg-light-accent dark:bg-dark-accent border-light-accent dark:border-dark-accent' 
+                          : 'border-light-text/30 dark:border-dark-text/30'
                     }`}>
-                      {isInPlaylist && (
+                      {isOperating ? (
+                        <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full animate-pulse" />
+                      ) : isInPlaylist ? (
                         <CheckIcon className="w-3 h-3 text-white" />
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex-1 text-left">
                       <div className="font-medium text-light-text dark:text-dark-text">
