@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGlobalPlaylists, useSongPlaylists } from '@/hooks/useGlobalPlaylists';
 import { useSession } from 'next-auth/react';
-import { PlusIcon, CheckIcon, ListBulletIcon, CogIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, CheckIcon, ListBulletIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 
 interface PlaylistContextMenuProps {
   songId: string;
@@ -245,9 +245,9 @@ export default function PlaylistContextMenu({ songId, isOpen, position, onClose 
                     <button
                       onClick={(e) => handleGoToPlaylist(e, playlist.shareId)}
                       className="p-1 rounded hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 transition-colors duration-200"
-                      title="플레이리스트 관리 페이지로 이동"
+                      title="플레이리스트 상세 보기"
                     >
-                      <CogIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent" />
+                      <ArrowTopRightOnSquareIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent" />
                     </button>
                   )}
                 </div>

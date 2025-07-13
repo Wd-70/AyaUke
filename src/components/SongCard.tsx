@@ -783,22 +783,32 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                       {displayArtist}
                     </p>
                   </div>
-                  <button
-                    onClick={handleLike}
-                    disabled={likeLoading}
-                    className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                               transition-colors duration-200 disabled:opacity-50"
-                    title={liked ? '좋아요 취소' : '좋아요'}
-                  >
-                    <HeartIcon 
-                      className={`w-5 h-5 transition-all duration-200 
-                                 ${likeLoading 
-                                   ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
-                                   : liked 
-                                     ? 'text-red-500 fill-current' 
-                                     : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
-                    />
-                  </button>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={handleLike}
+                      disabled={likeLoading}
+                      className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                 transition-colors duration-200 disabled:opacity-50"
+                      title={liked ? '좋아요 취소' : '좋아요'}
+                    >
+                      <HeartIcon 
+                        className={`w-5 h-5 transition-all duration-200 
+                                   ${likeLoading 
+                                     ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
+                                     : liked 
+                                       ? 'text-red-500 fill-current' 
+                                       : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
+                      />
+                    </button>
+                    <button
+                      onClick={handlePlaylistClick}
+                      className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                 transition-colors duration-200"
+                      title="플레이리스트 관리"
+                    >
+                      <ListBulletIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Language tag and playlist badges */}
@@ -888,15 +898,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                       {displayArtist}
                     </p>
                   </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={handlePlaylistClick}
-                      className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                                 transition-colors duration-200"
-                      title="플레이리스트 관리"
-                    >
-                      <ListBulletIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-                    </button>
+                  <div className="flex flex-col gap-1">
                     <button
                       onClick={handleLike}
                       disabled={likeLoading}
@@ -912,6 +914,14 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                                        ? 'text-red-500 fill-current' 
                                        : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
                       />
+                    </button>
+                    <button
+                      onClick={handlePlaylistClick}
+                      className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                 transition-colors duration-200"
+                      title="플레이리스트 관리"
+                    >
+                      <ListBulletIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
                     </button>
                   </div>
                 </div>

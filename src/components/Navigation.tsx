@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { UserIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
@@ -198,6 +198,30 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
 function AuthControls() {
   const { data: session, status, update } = useSession();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
+  // 채널 ID 줄임표 표시 함수
+  const truncateChannelId = (channelId: string) => {
+    if (!channelId || channelId.length <= 8) return channelId;
+    return `${channelId.slice(0, 4)}...${channelId.slice(-4)}`;
+  };
 
   // 에러 상태 처리
   if (status === 'unauthenticated' || status === 'loading') {
@@ -223,7 +247,7 @@ function AuthControls() {
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
         className="flex items-center space-x-2 p-2 rounded-lg bg-light-primary/10 dark:bg-dark-primary/10 hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 transition-all duration-300"
@@ -259,7 +283,7 @@ function AuthControls() {
               {session.user.channelName || session.user.name}
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              치지직 ID: {session.user.channelId || '미확인'}
+              치지직 ID: {truncateChannelId(session.user.channelId || '미확인')}
             </div>
             {session.user.isAdmin && (
               <div className="text-xs text-light-accent dark:text-dark-primary font-medium mt-1">
