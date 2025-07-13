@@ -15,14 +15,12 @@ const likeSchema = new mongoose.Schema<ILike>({
   },
   channelId: {
     type: String,
-    required: true,
-    index: true
+    required: true
   },
   songId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'SongDetail',
-    required: true,
-    index: true
+    required: true
   }
 }, {
   timestamps: true
