@@ -19,9 +19,11 @@ interface YouTubePlayer {
 interface SongCardProps {
   song: Song;
   onPlay?: (song: Song) => void;
+  showNumber?: boolean;
+  number?: number;
 }
 
-export default function SongCard({ song, onPlay }: SongCardProps) {
+export default function SongCard({ song, onPlay, showNumber = false, number }: SongCardProps) {
   const { liked, isLoading: likeLoading, error: likeError, toggleLike } = useLike(song.id);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -762,6 +764,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                               dark:from-black/50 dark:via-black/10 dark:to-transparent" />
 
               <div className="relative p-6 bg-white/20 dark:bg-gray-900/20 backdrop-blur-[1px] h-full">
+                
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1 min-w-0">
@@ -769,6 +772,11 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                       <h3 className="text-lg font-semibold text-light-text dark:text-dark-text 
                                      line-clamp-1 group-hover:text-light-accent dark:group-hover:text-dark-accent 
                                      transition-colors duration-300 flex-1">
+                        {showNumber && number && (
+                          <span className="text-light-accent dark:text-dark-accent font-bold mr-2">
+                            {number}.
+                          </span>
+                        )}
                         {displayTitle}
                       </h3>
                       {formatKeyAdjustment(song.keyAdjustment) && (
@@ -877,6 +885,7 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                               group-hover:opacity-100 transition-opacity duration-300"></div>
 
               <div className="relative p-6 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm h-full">
+                
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1 min-w-0">
@@ -884,6 +893,11 @@ export default function SongCard({ song, onPlay }: SongCardProps) {
                       <h3 className="text-lg font-semibold text-light-text dark:text-dark-text 
                                      line-clamp-1 group-hover:text-light-accent dark:group-hover:text-dark-accent 
                                      transition-colors duration-300 flex-1">
+                        {showNumber && number && (
+                          <span className="text-light-accent dark:text-dark-accent font-bold mr-2">
+                            {number}.
+                          </span>
+                        )}
                         {displayTitle}
                       </h3>
                       {formatKeyAdjustment(song.keyAdjustment) && (

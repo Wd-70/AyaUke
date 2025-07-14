@@ -50,6 +50,8 @@ interface SongbookClientProps {
 export default function SongbookClient({ songs: initialSongs, error: serverError }: SongbookClientProps) {
   const [filteredSongs, setFilteredSongs] = useState<Song[]>(initialSongs);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [songs, setSongs] = useState<Song[]>(initialSongs); // 랜덤 섞기를 위한 상태
+  const [showNumbers, setShowNumbers] = useState(false); // 번호 표시 상태
   const { loadLikes } = useBulkLikes();
   const { refresh: refreshPlaylists } = useGlobalPlaylists();
 
@@ -93,6 +95,22 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
       top: 0,
       behavior: 'smooth'
     });
+  };
+
+  // 랜덤 섞기 함수
+  const handleShuffleSongs = () => {
+    const shuffled = [...songs].sort(() => Math.random() - 0.5);
+    setSongs(shuffled);
+    // 필터된 곡들도 업데이트 (현재 필터 조건 유지하면서)
+    setFilteredSongs(prev => {
+      const filteredIds = new Set(prev.map(song => song.id));
+      return shuffled.filter(song => filteredIds.has(song.id));
+    });
+  };
+
+  // 번호 표시 토글 함수
+  const handleToggleNumbers = (show: boolean) => {
+    setShowNumbers(show);
   };
 
   if (serverError) {
@@ -173,7 +191,13 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
           </div>
         </motion.div>
 
-        <SongSearch songs={initialSongs} onFilteredSongs={setFilteredSongs} />
+        <SongSearch 
+          songs={songs} 
+          onFilteredSongs={setFilteredSongs}
+          onShuffleSongs={handleShuffleSongs}
+          showNumbers={showNumbers}
+          onToggleNumbers={handleToggleNumbers}
+        />
 
         {filteredSongs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -190,7 +214,12 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
                   ease: "easeOut"
                 }}
               >
-                <SongCard song={song} onPlay={handleSongPlay} />
+                <SongCard 
+                  song={song} 
+                  onPlay={handleSongPlay}
+                  showNumber={showNumbers}
+                  number={index + 1}
+                />
               </motion.div>
             ))}
             

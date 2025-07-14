@@ -4,12 +4,10 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { 
   ShareIcon, 
-  HeartIcon,
   MusicalNoteIcon,
   ClockIcon,
   UserIcon,
   CogIcon,
-  LinkIcon,
   EyeIcon,
   EyeSlashIcon,
   PencilIcon,
@@ -18,10 +16,11 @@ import {
   XMarkIcon,
   SunIcon,
   MoonIcon,
-  PhotoIcon
+  PhotoIcon,
+  HashtagIcon,
+  HomeIcon
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/solid'
-import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 import SongCard from './SongCard'
 import ShareManagement from './ShareManagement'
 import { Song } from '@/types'
@@ -83,6 +82,7 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
   const [toastType, setToastType] = useState<'success' | 'error'>('success')
   const [isEditingImage, setIsEditingImage] = useState(false)
   const [editedCoverImage, setEditedCoverImage] = useState(playlist.coverImage || '')
+  const [showNumbers, setShowNumbers] = useState(false)
 
   // 플레이리스트 곡들의 좋아요 정보 미리 로드
   useEffect(() => {
@@ -583,29 +583,21 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
 
               {/* 액션 버튼 */}
               <div className="flex flex-wrap gap-3">
-                {!isOwner && (
-                  <button
-                    onClick={() => setIsLiked(!isLiked)}
-                    className="flex items-center gap-2 px-6 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors"
-                  >
-                    {isLiked ? (
-                      <HeartSolidIcon className="w-5 h-5 text-red-500" />
-                    ) : (
-                      <HeartIcon className="w-5 h-5" />
-                    )}
-                    좋아요
-                  </button>
-                )}
+                <button
+                  onClick={() => window.location.href = '/'}
+                  className="flex items-center gap-2 px-6 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors"
+                >
+                  <HomeIcon className="w-5 h-5" />
+                  홈으로
+                </button>
 
-                {permissions.canCopy && !isOwner && (
-                  <button
-                    onClick={handleCopyPlaylist}
-                    className="flex items-center gap-2 px-6 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors"
-                  >
-                    <LinkIcon className="w-5 h-5" />
-                    내 플레이리스트에 복사
-                  </button>
-                )}
+                <button
+                  onClick={() => window.location.href = '/songbook'}
+                  className="flex items-center gap-2 px-6 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors"
+                >
+                  <MusicalNoteIcon className="w-5 h-5" />
+                  노래책
+                </button>
 
                 <button
                   onClick={handleSharePlaylist}
@@ -613,6 +605,18 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
                 >
                   <ShareIcon className="w-5 h-5" />
                   링크 복사
+                </button>
+
+                <button
+                  onClick={() => setShowNumbers(!showNumbers)}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-full transition-colors ${
+                    showNumbers
+                      ? 'bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent border border-light-accent/30 dark:border-dark-accent/30'
+                      : 'border border-light-primary/20 dark:border-dark-primary/20 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'
+                  }`}
+                >
+                  <HashtagIcon className="w-5 h-5" />
+                  {showNumbers ? '번호 숨기기' : '번호 표시'}
                 </button>
               </div>
             </div>
@@ -704,10 +708,12 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {playlist.songs
                 .sort((a, b) => a.order - b.order)
-                .map((item) => (
+                .map((item, index) => (
                   <SongCard
                     key={item._id}
                     song={item.songId}
+                    showNumber={showNumbers}
+                    number={index + 1}
                   />
                 ))}
             </div>

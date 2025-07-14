@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Song } from '@/types';
 import { 
@@ -13,7 +13,9 @@ import {
   Square3Stack3DIcon,
   PlusCircleIcon,
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  ArrowsUpDownIcon,
+  HashtagIcon
 } from '@heroicons/react/24/outline';
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid';
 import { isTextMatch } from '@/lib/searchUtils';
@@ -23,6 +25,9 @@ import { useLikes } from '@/hooks/useLikes';
 interface SongSearchProps {
   songs: Song[];
   onFilteredSongs: (songs: Song[]) => void;
+  onShuffleSongs?: () => void;
+  showNumbers?: boolean;
+  onToggleNumbers?: (show: boolean) => void;
 }
 
 // Debounce hook for performance
@@ -44,7 +49,13 @@ function useDebounce<T>(value: T, delay: number): T {
 
 type FilterMode = 'individual' | 'intersection' | 'union';
 
-export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) {
+export default function SongSearch({ 
+  songs, 
+  onFilteredSongs, 
+  onShuffleSongs, 
+  showNumbers = false, 
+  onToggleNumbers 
+}: SongSearchProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(true); // 기본으로 열려있게 변경
   
@@ -62,13 +73,36 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
   // Debounce search term to reduce filtering frequency
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  const languages = useMemo(() => 
-    Array.from(new Set(songs.map(song => song.language))).filter(Boolean),
-    [songs]
-  );
+  // 언어 목록을 곡 개수가 많은 순서대로 정렬
+  const languages = useMemo(() => {
+    const languageCounts = songs.reduce((acc, song) => {
+      if (song.language) {
+        acc[song.language] = (acc[song.language] || 0) + 1;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return Object.keys(languageCounts)
+      .sort((a, b) => languageCounts[b] - languageCounts[a]); // 개수 많은 순서대로
+  }, [songs]);
 
-  // 좋아요한 곡 ID들 가져오기
-  const likedSongIds = useMemo(() => getLikedSongIds(), [getLikedSongIds]);
+  // 좋아요한 곡 ID들 가져오기 (실시간 업데이트)
+  const [likedSongIds, setLikedSongIds] = useState<string[]>([]);
+  
+  // 좋아요 데이터 실시간 업데이트
+  useEffect(() => {
+    const updateLikedSongs = () => {
+      setLikedSongIds(getLikedSongIds());
+    };
+    
+    // 초기 로드
+    updateLikedSongs();
+    
+    // 주기적 업데이트 (1초마다)
+    const interval = setInterval(updateLikedSongs, 1000);
+    
+    return () => clearInterval(interval);
+  }, [getLikedSongIds]);
 
   // 플레이리스트별 곡 ID 매핑
   const playlistSongIds = useMemo(() => {
@@ -298,23 +332,56 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
           placeholder="노래 제목, 아티스트, 검색태그로 검색... (띄어쓰기 무관, 초성검색, 한/영 오타 허용)"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-10 pr-12 py-3 border border-light-primary/20 dark:border-dark-primary/20 
+          className="block w-full pl-10 pr-32 py-3 border border-light-primary/20 dark:border-dark-primary/20 
                      rounded-xl bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm
                      text-light-text dark:text-dark-text placeholder-light-text/50 dark:placeholder-dark-text/50
                      focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
                      focus:border-transparent transition-all duration-200"
         />
-        <button
-          onClick={() => setIsFilterOpen(!isFilterOpen)}
-          className="absolute inset-y-0 right-0 pr-3 flex items-center"
-          title={isFilterOpen ? "필터 숨기기" : "필터 보기"}
-        >
-          {isFilterOpen ? (
-            <ChevronUpIcon className="h-5 w-5 text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent transition-colors duration-200" />
-          ) : (
-            <ChevronDownIcon className="h-5 w-5 text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent transition-colors duration-200" />
+        <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-1">
+          {/* 랜덤 섞기 버튼 */}
+          {onShuffleSongs && (
+            <button
+              onClick={onShuffleSongs}
+              className="p-1.5 rounded-lg hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 
+                       text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent 
+                       transition-all duration-200 hover:scale-110"
+              title="곡 순서 랜덤 섞기"
+            >
+              <ArrowsUpDownIcon className="h-5 w-5" />
+            </button>
           )}
-        </button>
+          
+          {/* 번호 표시 토글 버튼 */}
+          {onToggleNumbers && (
+            <button
+              onClick={() => onToggleNumbers(!showNumbers)}
+              className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 ${
+                showNumbers
+                  ? 'bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent'
+                  : 'hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent'
+              }`}
+              title={showNumbers ? "번호 숨기기" : "번호 표시"}
+            >
+              <HashtagIcon className="h-5 w-5" />
+            </button>
+          )}
+          
+          {/* 필터 토글 버튼 */}
+          <button
+            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            className="p-1.5 rounded-lg hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 
+                     text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent 
+                     transition-all duration-200 hover:scale-110"
+            title={isFilterOpen ? "필터 숨기기" : "필터 보기"}
+          >
+            {isFilterOpen ? (
+              <ChevronUpIcon className="h-5 w-5" />
+            ) : (
+              <ChevronDownIcon className="h-5 w-5" />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Badge-style filters */}
@@ -391,36 +458,34 @@ export default function SongSearch({ songs, onFilteredSongs }: SongSearchProps) 
                 count={playlist.songCount}
               />
             ))}
-          </div>
 
-          {/* Clear filters button */}
-          {hasActiveFilters && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex justify-end"
-            >
-              <button
-                onClick={clearFilters}
-                className="inline-flex items-center gap-2 px-4 py-2 text-sm 
-                         bg-red-100 dark:bg-red-900/20 
-                         hover:bg-red-200 dark:hover:bg-red-900/30 
-                         text-red-800 dark:text-red-300 rounded-lg transition-colors duration-200
-                         border border-red-200 dark:border-red-800"
-              >
-                <XMarkIcon className="w-4 h-4" />
-                모든 필터 초기화
-              </button>
-            </motion.div>
-          )}
+            {/* Clear filters button */}
+            {hasActiveFilters && (
+              <>
+                <div className="w-px h-6 bg-light-primary/20 dark:bg-dark-primary/20" />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center"
+                >
+                  <button
+                    onClick={clearFilters}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium
+                             bg-red-100 dark:bg-red-900/20 
+                             hover:bg-red-200 dark:hover:bg-red-900/30 
+                             text-red-800 dark:text-red-300 rounded-full transition-all duration-200
+                             border border-red-200 dark:border-red-800 hover:scale-105"
+                  >
+                    <XMarkIcon className="w-4 h-4" />
+                    초기화
+                  </button>
+                </motion.div>
+              </>
+            )}
+          </div>
         </div>
       </motion.div>
 
-      {/* Results count */}
-      <div className="mt-3 text-sm text-light-text/60 dark:text-dark-text/60">
-        {filteredSongs.length}곡 표시 중
-        {hasActiveFilters && ` (전체 ${songs.length}곡 중)`}
-      </div>
     </div>
   );
 }
