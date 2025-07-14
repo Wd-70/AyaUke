@@ -62,6 +62,17 @@ class LikesStore {
     })
   }
 
+  // 좋아요한 곡 ID들 반환
+  getLikedSongIds(): string[] {
+    const likedIds: string[] = []
+    this.likes.forEach((liked, songId) => {
+      if (liked) {
+        likedIds.push(songId)
+      }
+    })
+    return likedIds
+  }
+
   // 대량 로딩 (중복 방지)
   async bulkLoadLikes(songIds: string[], priority: 'high' | 'low' = 'low'): Promise<void> {
     if (this.bulkLoadPromise && priority === 'low') {
@@ -271,6 +282,15 @@ export function useBulkLikes() {
   }, [session?.user?.channelId])
 
   return { loadLikes }
+}
+
+// 좋아요 관련 정보를 가져오는 훅
+export function useLikes() {
+  const getLikedSongIds = useCallback(() => {
+    return likesStore.getLikedSongIds()
+  }, [])
+
+  return { getLikedSongIds }
 }
 
 interface UserLikesReturn {
