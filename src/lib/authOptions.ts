@@ -131,21 +131,41 @@ export const authOptions = {
         // 데이터베이스에서 최신 사용자 정보 가져오기
         try {
           await dbConnect()
+          console.log('🔍 세션 콜백 - 사용자 검색:', { channelId: token.channelId })
           const user = await User.findOne({ channelId: token.channelId })
+          console.log('🔍 세션 콜백 - 조회된 사용자:', user ? {
+            _id: user._id,
+            channelId: user.channelId,
+            channelName: user.channelName,
+            displayName: user.displayName,
+            hasDisplayName: !!user.displayName,
+            allFields: Object.keys(user.toObject())
+          } : null)
+          
           if (user) {
             session.user.channelName = user.channelName
-            session.user.name = user.channelName
+            session.user.name = user.displayName || user.channelName // displayName이 없으면 channelName 사용
             session.user.image = user.profileImageUrl || token.channelImageUrl as string
             session.user.channelImageUrl = user.profileImageUrl || token.channelImageUrl as string
+            
+            console.log('🔍 세션 콜백 - 최종 세션 정보:', {
+              channelId: user.channelId,
+              channelName: user.channelName,
+              displayName: user.displayName,
+              sessionName: session.user.name,
+              hasDisplayName: !!user.displayName
+            })
           } else {
             // DB에 사용자가 없으면 토큰 정보 사용
             session.user.channelName = token.channelName as string
+            session.user.name = token.channelName as string
             session.user.channelImageUrl = token.channelImageUrl as string
           }
         } catch (error) {
           console.error('세션 콜백에서 사용자 정보 조회 오류:', error)
           // 오류 시 토큰 정보 사용
           session.user.channelName = token.channelName as string
+          session.user.name = token.channelName as string
           session.user.channelImageUrl = token.channelImageUrl as string
         }
       }

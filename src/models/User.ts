@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 export interface IUser extends mongoose.Document {
   channelId: string
   channelName: string
+  displayName: string
   profileImageUrl?: string
   isAdmin: boolean
   createdAt: Date
@@ -22,6 +23,10 @@ const userSchema = new mongoose.Schema<IUser>({
   channelName: {
     type: String,
     required: true
+  },
+  displayName: {
+    type: String,
+    required: false
   },
   profileImageUrl: {
     type: String,

@@ -19,6 +19,7 @@ export async function createOrUpdateUser(userData: {
     if (user) {
       // 기존 사용자 업데이트
       user.channelName = userData.channelName
+      // displayName이 없으면 channelName으로 설정하지 않음 (프로필 수정 시에만 생성)
       user.profileImageUrl = userData.profileImageUrl || user.profileImageUrl
       user.isAdmin = isAdmin
       user.lastLoginAt = new Date()
@@ -30,6 +31,7 @@ export async function createOrUpdateUser(userData: {
       user = new User({
         channelId: userData.channelId,
         channelName: userData.channelName,
+        displayName: userData.channelName, // 가입시 channelName을 displayName으로 설정
         profileImageUrl: userData.profileImageUrl,
         isAdmin,
         lastLoginAt: new Date(),

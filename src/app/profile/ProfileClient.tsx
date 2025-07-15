@@ -111,7 +111,7 @@ export default function ProfileClient() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div>
                         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                          {session.user.channelName || session.user.name}
+                          {session.user.name || session.user.channelName}
                         </h1>
                         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                           <span className="flex items-center gap-1">

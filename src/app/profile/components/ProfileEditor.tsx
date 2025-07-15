@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
@@ -21,14 +21,50 @@ export default function ProfileEditor({ isOpen, onClose }: ProfileEditorProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [userProfile, setUserProfile] = useState(null)
   
   const [formData, setFormData] = useState({
-    channelName: session?.user?.channelName || session?.user?.name || '',
+    displayName: '',
     profileImageUrl: session?.user?.image || ''
   })
   
   const [previewImage, setPreviewImage] = useState(session?.user?.image || '')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 사용자 프로필 정보 로드
+  useEffect(() => {
+    if (isOpen && session?.user?.channelId) {
+      loadUserProfile()
+    }
+  }, [isOpen, session?.user?.channelId])
+
+  const loadUserProfile = async () => {
+    try {
+      const response = await fetch('/api/user/profile')
+      if (response.ok) {
+        const data = await response.json()
+        const profile = data.user
+        console.log('🔍 로드된 사용자 프로필:', profile)
+        setUserProfile(profile)
+        setFormData({
+          displayName: profile.displayName || profile.channelName || '',
+          profileImageUrl: profile.profileImageUrl || ''
+        })
+        setPreviewImage(profile.profileImageUrl || '')
+        console.log('📝 폼 데이터 설정:', {
+          displayName: profile.displayName || profile.channelName || '',
+          profileImageUrl: profile.profileImageUrl || ''
+        })
+      }
+    } catch (error) {
+      console.error('프로필 로딩 실패:', error)
+      // 폴백: 세션 정보 사용
+      setFormData({
+        displayName: session?.user?.channelName || session?.user?.name || '',
+        profileImageUrl: session?.user?.image || ''
+      })
+    }
+  }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -83,6 +119,8 @@ export default function ProfileEditor({ isOpen, onClose }: ProfileEditorProps) {
       
       setTimeout(() => {
         onClose()
+        // 페이지 새로고침으로 세션 정보 확실히 업데이트
+        window.location.reload()
       }, 1500)
 
     } catch (err) {
@@ -243,15 +281,15 @@ export default function ProfileEditor({ isOpen, onClose }: ProfileEditorProps) {
                 </label>
                 <input
                   type="text"
-                  value={formData.channelName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, channelName: e.target.value }))}
+                  value={formData.displayName}
+                  onChange={(e) => setFormData(prev => ({ ...prev, displayName: e.target.value }))}
                   disabled={isLoading}
                   className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent focus:border-transparent outline-none transition-all duration-200 disabled:opacity-50"
                   placeholder="사용할 닉네임을 입력하세요"
-                  maxLength={50}
+                  maxLength={20}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {formData.channelName.length}/50자
+                  {formData.displayName.length}/20자 (2자 이상 필요)
                 </p>
               </div>
 
@@ -267,7 +305,7 @@ export default function ProfileEditor({ isOpen, onClose }: ProfileEditorProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={isLoading || !formData.channelName.trim()}
+                  disabled={isLoading || !formData.displayName.trim() || formData.displayName.trim().length < 2}
                   className="flex-1 px-4 py-2 bg-gradient-to-r from-light-accent to-light-secondary dark:from-dark-accent dark:to-dark-secondary text-white rounded-lg hover:from-light-secondary hover:to-light-accent dark:hover:from-dark-secondary dark:hover:to-dark-accent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
