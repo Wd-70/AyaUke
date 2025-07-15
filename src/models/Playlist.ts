@@ -60,7 +60,7 @@ const playlistSchema = new mongoose.Schema<IPlaylist>({
   songs: [{
     songId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'SongbookDetail',
+      ref: 'SongDetail',
       required: true
     },
     addedAt: {

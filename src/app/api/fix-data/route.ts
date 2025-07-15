@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
-import SongbookDetail from '@/models/SongDetail';
+import SongDetail from '@/models/SongDetail';
 
 export async function POST() {
   try {
     await dbConnect();
     
     // 모든 문서 가져오기
-    const allSongs = await SongbookDetail.find({});
+    const allSongs = await SongDetail.find({});
     console.log(`총 ${allSongs.length}곡을 수정합니다...`);
     
     const results = [];
@@ -18,7 +18,7 @@ export async function POST() {
         const originalTitle = song.title;
         const originalArtist = song.artist;
         
-        await SongbookDetail.findByIdAndUpdate(song._id, {
+        await SongDetail.findByIdAndUpdate(song._id, {
           title: originalArtist,   // 기존 artist를 title로
           artist: originalTitle,   // 기존 title을 artist로
         });

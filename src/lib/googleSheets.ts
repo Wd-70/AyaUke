@@ -77,7 +77,7 @@ export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
     
     // 서버사이드에서는 직접 MongoDB 모델 사용
     const dbConnect = (await import('./mongodb')).default;
-    const SongbookDetail = (await import('../models/SongDetail')).default;
+    const SongDetail = (await import('../models/SongDetail')).default;
     
     console.log('📦 MongoDB 모듈 로드 완료');
     
@@ -85,7 +85,7 @@ export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
     console.log('✅ MongoDB 연결 성공');
     
     console.log('📊 MongoDB에서 데이터 조회 중...');
-    const songDetails = await SongbookDetail.find({}).sort({ updatedAt: -1 }).lean();
+    const songDetails = await SongDetail.find({}).sort({ updatedAt: -1 }).lean();
     console.log(`📋 MongoDB에서 ${songDetails.length}곡 조회 완료`);
     
     // Mongoose 문서를 일반 객체로 변환 (MongoDB _id 포함)

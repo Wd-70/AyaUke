@@ -5,7 +5,7 @@ import dbConnect from '@/lib/mongodb'
 import Like from '@/models/Like'
 import Playlist from '@/models/Playlist'
 import User from '@/models/User'
-import SongbookDetail from '@/models/SongDetail'
+import SongDetail from '@/models/SongDetail'
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       Like.find({ channelId: session.user.channelId })
         .populate({
           path: 'songId',
-          model: SongbookDetail,
+          model: SongDetail,
           select: 'title artist'
         })
         .sort({ createdAt: -1 })
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       { $match: { channelId: session.user.channelId } },
       {
         $lookup: {
-          from: 'songbookdetails',
+          from: 'songdetails',
           localField: 'songId',
           foreignField: '_id',
           as: 'song'

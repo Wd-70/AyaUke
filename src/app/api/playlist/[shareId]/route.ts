@@ -8,7 +8,7 @@ import mongoose from 'mongoose'
 
 // SongDetail 모델 강제 등록
 try {
-  if (!mongoose.models.SongbookDetail) {
+  if (!mongoose.models.SongDetail) {
     require('@/models/SongDetail')
   }
 } catch (error) {

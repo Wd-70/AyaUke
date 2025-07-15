@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
       { $match: matchStage },
       {
         $lookup: {
-          from: 'songbookdetails',
+          from: 'songdetails',
           localField: 'songId',
           foreignField: '_id',
           as: 'songId'
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
       { $match: matchStage },
       {
         $lookup: {
-          from: 'songbookdetails',
+          from: 'songdetails',
           localField: 'songId',
           foreignField: '_id',
           as: 'songId'

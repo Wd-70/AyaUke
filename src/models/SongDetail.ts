@@ -122,4 +122,10 @@ SongDetailSchema.index({ lastSungDate: -1 });
 SongDetailSchema.index({ searchTags: 1 });
 SongDetailSchema.index({ language: 1 });
 
-export default mongoose.models.SongbookDetail || mongoose.model<ISongDetail>('SongbookDetail', SongDetailSchema);
+// 새로운 통일된 모델명 (SongDetail)
+const SongDetail = mongoose.models.SongDetail || mongoose.model<ISongDetail>('SongDetail', SongDetailSchema);
+
+// 기존 호환성을 위한 별칭 제거 (마이그레이션 완료)
+// SongDetail 모델만 사용
+
+export default SongDetail;

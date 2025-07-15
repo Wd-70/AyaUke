@@ -8,7 +8,7 @@ import mongoose from 'mongoose'
 
 // SongDetail 모델 강제 등록 (스키마 에러 방지)
 try {
-  if (!mongoose.models.SongbookDetail) {
+  if (!mongoose.models.SongDetail) {
     console.log('🔧 SongDetail 모델 재등록 시도 (user/playlists)')
     // 모델이 없으면 강제로 재등록
     require('@/models/SongDetail')
@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
     if (includeSongs) {
       try {
         // SongDetail 모델 등록 상태 확인 및 강제 등록
-        console.log('🔍 SongDetail 모델 등록 상태:', !!mongoose.models.SongbookDetail)
-        if (!mongoose.models.SongbookDetail) {
+        console.log('🔍 SongDetail 모델 등록 상태:', !!mongoose.models.SongDetail)
+        if (!mongoose.models.SongDetail) {
           console.log('🔧 SongDetail 모델 강제 등록 중...')
           const SongDetailModel = require('@/models/SongDetail').default
           console.log('✅ SongDetail 모델 등록 완료')

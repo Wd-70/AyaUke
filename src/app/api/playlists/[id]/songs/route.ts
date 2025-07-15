@@ -8,7 +8,7 @@ import { authOptions } from '@/lib/authOptions'
 
 // SongDetail 모델 강제 등록 (스키마 에러 방지)
 try {
-  if (!mongoose.models.SongbookDetail) {
+  if (!mongoose.models.SongDetail) {
     console.log('🔧 SongDetail 모델 재등록 시도')
     // 모델이 등록되지 않은 경우에만 강제 등록
     require('@/models/SongDetail')

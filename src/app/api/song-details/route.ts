@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongodb';
-import SongbookDetail from '@/models/SongDetail';
+import SongDetail from '@/models/SongDetail';
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const favorites = searchParams.get('favorites');
     
     if (title) {
-      const songDetail = await SongbookDetail.findOne({ title });
+      const songDetail = await SongDetail.findOne({ title });
       if (!songDetail) {
         return NextResponse.json({ error: 'Song detail not found' }, { status: 404 });
       }
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       query = { isFavorite: true };
     }
     
-    const songDetails = await SongbookDetail.find(query).sort({ updatedAt: -1 });
+    const songDetails = await SongDetail.find(query).sort({ updatedAt: -1 });
     return NextResponse.json(songDetails);
     
   } catch (error) {
@@ -47,12 +47,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
     }
     
-    const existingSongDetail = await SongbookDetail.findOne({ title });
+    const existingSongDetail = await SongDetail.findOne({ title });
     if (existingSongDetail) {
       return NextResponse.json({ error: 'Song detail already exists' }, { status: 409 });
     }
     
-    const songDetail = new SongbookDetail({
+    const songDetail = new SongDetail({
       title,
       ...songDetailData
     });
@@ -77,7 +77,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
     }
     
-    const songDetail = await SongbookDetail.findOneAndUpdate(
+    const songDetail = await SongDetail.findOneAndUpdate(
       { title },
       updateData,
       { new: true, upsert: true }
@@ -102,7 +102,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'title is required' }, { status: 400 });
     }
     
-    const deletedSongDetail = await SongbookDetail.findOneAndDelete({ title });
+    const deletedSongDetail = await SongDetail.findOneAndDelete({ title });
     
     if (!deletedSongDetail) {
       return NextResponse.json({ error: 'Song detail not found' }, { status: 404 });
