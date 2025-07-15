@@ -3,8 +3,8 @@ import { getServerSession } from 'next-auth'
 import dbConnect from '@/lib/mongodb'
 import Playlist from '@/models/Playlist'
 import User from '@/models/User'
-import mongoose from 'mongoose'
 import { authOptions } from '@/lib/authOptions'
+import { randomUUID } from 'crypto'
 
 export async function GET(request: NextRequest) {
   try {
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     // shareId 생성 확인
-    const generatedShareId = require('crypto').randomUUID()
+    const generatedShareId = randomUUID()
     console.log('🔗 생성된 shareId:', generatedShareId)
 
     // 새 플레이리스트 생성 (shareId 자동 생성)

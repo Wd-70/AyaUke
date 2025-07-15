@@ -87,11 +87,11 @@ if (naverCookies) {
               </div>
               <div className="flex items-start space-x-2">
                 <span className="bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 px-2 py-1 rounded-full font-medium">2</span>
-                <span>로그인 완료 후 "쿠키 추출 코드" 실행</span>
+                <span>로그인 완료 후 &quot;쿠키 추출 코드&quot; 실행</span>
               </div>
               <div className="flex items-start space-x-2">
                 <span className="bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200 px-2 py-1 rounded-full font-medium">3</span>
-                <span>추출된 쿠키를 "수동 쿠키 설정"에 입력</span>
+                <span>추출된 쿠키를 &quot;수동 쿠키 설정&quot;에 입력</span>
               </div>
             </div>
           </div>

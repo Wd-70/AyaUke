@@ -200,7 +200,7 @@ export async function extractCookiesViaAPI(): Promise<{ success: boolean, cookie
     
     // Permissions API 확인
     if ('permissions' in navigator) {
-      const permission = await (navigator as any).permissions.query({ name: 'cookies' })
+      const permission = await (navigator as { permissions: { query: (options: { name: string }) => Promise<{ state: string }> } }).permissions.query({ name: 'cookies' })
       console.log('쿠키 권한 상태:', permission.state)
     }
     

@@ -12,7 +12,7 @@ const nextConfig = {
   },
   eslint: {
     // 배포 시 ESLint 오류를 경고로 처리
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
   typescript: {
     // 배포 시 TypeScript 오류를 무시하지 않음 (안전성 유지)

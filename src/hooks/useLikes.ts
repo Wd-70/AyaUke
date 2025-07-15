@@ -143,7 +143,7 @@ const likesStore = new LikesStore()
 
 // 전역 이벤트 리스너 설정 (플레이리스트에서 bulk 데이터 수신)
 if (typeof window !== 'undefined') {
-  window.addEventListener('likesLoaded', (event: any) => {
+  window.addEventListener('likesLoaded', (event: CustomEvent) => {
     const { likes } = event.detail
     console.log('📨 좋아요 bulk 데이터 수신:', likes)
     likesStore.setBulkLikes(likes)
@@ -294,7 +294,7 @@ export function useLikes() {
 }
 
 interface UserLikesReturn {
-  likes: any[]
+  likes: unknown[]
   isLoading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -308,10 +308,10 @@ interface UserLikesReturn {
 
 export function useUserLikes(page: number = 1, limit: number = 20): UserLikesReturn {
   const { data: session } = useSession()
-  const [likes, setLikes] = useState<any[]>([])
+  const [likes, setLikes] = useState<unknown[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [pagination, setPagination] = useState<any>(null)
+  const [pagination, setPagination] = useState<unknown>(null)
 
   const fetchLikes = async () => {
     if (!session?.user?.channelId) return

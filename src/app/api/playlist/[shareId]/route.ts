@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import dbConnect from '@/lib/mongodb'
 import Playlist from '@/models/Playlist'
-import SongDetail from '@/models/SongDetail'
 import { authOptions } from '@/lib/authOptions'
 import mongoose from 'mongoose'
 
 // SongDetail 모델 강제 등록
 try {
   if (!mongoose.models.SongDetail) {
-    require('@/models/SongDetail')
+    await import('@/models/SongDetail')
   }
 } catch (error) {
   console.warn('SongDetail 모델 등록 확인 중 에러:', error)

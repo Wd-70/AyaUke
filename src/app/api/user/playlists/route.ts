@@ -2,20 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import dbConnect from '@/lib/mongodb'
 import Playlist from '@/models/Playlist'
-import SongDetail from '@/models/SongDetail'
 import { authOptions } from '@/lib/authOptions'
 import mongoose from 'mongoose'
 
-// SongDetail 모델 강제 등록 (스키마 에러 방지)
-try {
-  if (!mongoose.models.SongDetail) {
-    console.log('🔧 SongDetail 모델 재등록 시도 (user/playlists)')
-    // 모델이 없으면 강제로 재등록
-    require('@/models/SongDetail')
-  }
-} catch (error) {
-  console.warn('SongDetail 모델 등록 확인 중 에러:', error)
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,7 +33,7 @@ export async function GET(request: NextRequest) {
         console.log('🔍 SongDetail 모델 등록 상태:', !!mongoose.models.SongDetail)
         if (!mongoose.models.SongDetail) {
           console.log('🔧 SongDetail 모델 강제 등록 중...')
-          const SongDetailModel = require('@/models/SongDetail').default
+          await import('@/models/SongDetail')
           console.log('✅ SongDetail 모델 등록 완료')
         }
         

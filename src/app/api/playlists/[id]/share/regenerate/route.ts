@@ -4,6 +4,7 @@ import dbConnect from '@/lib/mongodb'
 import Playlist from '@/models/Playlist'
 import mongoose from 'mongoose'
 import { authOptions } from '@/lib/authOptions'
+import { randomUUID } from 'crypto'
 
 export async function POST(
   request: NextRequest,
@@ -44,7 +45,7 @@ export async function POST(
 
     // 이전 공유 ID를 히스토리에 추가
     const oldShareId = playlist.shareId
-    const newShareId = require('crypto').randomUUID()
+    const newShareId = randomUUID()
 
     console.log('🔄 공유 링크 재생성:', { oldShareId, newShareId })
 

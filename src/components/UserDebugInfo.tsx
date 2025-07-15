@@ -12,7 +12,7 @@ interface ChzzkInfo {
 }
 
 interface UserInfo {
-  session: any
+  session: unknown
   chzzkInfo: ChzzkInfo | null
 }
 

@@ -46,7 +46,7 @@ export async function PUT(
     console.log('✅ 플레이리스트 조회 성공:', playlist.name)
 
     // 설정 업데이트
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     
     if (typeof isPublic === 'boolean') {
       updateData.isPublic = isPublic

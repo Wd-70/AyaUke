@@ -8,7 +8,7 @@ export default function ManualCookieSetup() {
   const { data: session } = useSession()
   const [cookies, setCookies] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [result, setResult] = useState<any>(null)
+  const [result, setResult] = useState<unknown>(null)
 
   if (!session || !session.user.isAdmin) {
     return null

@@ -22,7 +22,7 @@ export const ADMIN_CHANNELS = {
 
 export function isAdminChannel(channelId: string | null | undefined): boolean {
   if (!channelId) return false
-  return ADMIN_CHANNEL_IDS.includes(channelId as any)
+  return ADMIN_CHANNEL_IDS.includes(channelId as string)
 }
 
 export function getAdminInfo(channelId: string | null | undefined) {

@@ -8,7 +8,7 @@ interface Playlist {
   coverImage?: string
   tags: string[]
   songCount: number
-  songs?: any[]
+  songs?: unknown[]
   createdAt: string
   updatedAt: string
 }
@@ -20,7 +20,9 @@ interface CreatePlaylistData {
   tags?: string[]
 }
 
-interface UpdatePlaylistData extends CreatePlaylistData {}
+interface UpdatePlaylistData extends CreatePlaylistData {
+  // 업데이트 시 추가 필드가 있을 수 있음
+}
 
 interface UsePlaylistsReturn {
   playlists: Playlist[]
@@ -43,7 +45,7 @@ export function usePlaylists(page: number = 1, limit: number = 10, includeSongs:
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [pagination, setPagination] = useState<any>(null)
+  const [pagination, setPagination] = useState<unknown>(null)
 
   const fetchPlaylists = async () => {
     if (!session?.user?.channelId) return

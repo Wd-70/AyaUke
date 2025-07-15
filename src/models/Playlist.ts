@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { randomUUID } from 'crypto'
 
 export interface IPlaylist extends mongoose.Document {
   userId: mongoose.Types.ObjectId
@@ -77,7 +78,7 @@ const playlistSchema = new mongoose.Schema<IPlaylist>({
     type: String,
     required: true,
     unique: true,
-    default: () => require('crypto').randomUUID()
+    default: () => randomUUID()
   },
   isPublic: {
     type: Boolean,

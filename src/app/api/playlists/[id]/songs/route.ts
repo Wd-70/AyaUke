@@ -11,7 +11,7 @@ try {
   if (!mongoose.models.SongDetail) {
     console.log('🔧 SongDetail 모델 재등록 시도')
     // 모델이 등록되지 않은 경우에만 강제 등록
-    require('@/models/SongDetail')
+    await import('@/models/SongDetail')
   }
 } catch (error) {
   console.warn('SongDetail 모델 등록 확인 중 에러:', error)

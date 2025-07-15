@@ -293,7 +293,7 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
     })
   }
 
-  const formatDuration = (songs: any[]) => {
+  const formatDuration = (songs: unknown[]) => {
     let totalMinutes = 0
     
     songs.forEach(songItem => {
@@ -659,7 +659,7 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
                       플레이리스트 삭제
                     </h3>
                     <p className="text-red-700 dark:text-red-300 mb-4">
-                      정말로 '<strong>{playlist.name}</strong>' 플레이리스트를 삭제하시겠습니까?
+                      정말로 &apos;<strong>{playlist.name}</strong>&apos; 플레이리스트를 삭제하시겠습니까?
                       <br />
                       <span className="text-sm">이 작업은 되돌릴 수 없으며, 포함된 {playlist.songCount}곡의 정보도 함께 삭제됩니다.</span>
                     </p>

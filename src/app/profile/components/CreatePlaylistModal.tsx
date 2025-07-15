@@ -14,7 +14,7 @@ import {
 interface CreatePlaylistModalProps {
   isOpen: boolean
   onClose: () => void
-  onSuccess: (playlist: any) => void
+  onSuccess: (playlist: unknown) => void
 }
 
 export default function CreatePlaylistModal({ isOpen, onClose, onSuccess }: CreatePlaylistModalProps) {

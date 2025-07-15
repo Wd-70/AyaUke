@@ -28,7 +28,7 @@ export async function testChzzkMethods(cookies?: string) {
       console.log(`\n--- ${method} 메서드 테스트 ---`)
       
       if (method in client) {
-        const methodObj = (client as any)[method]
+        const methodObj = (client as Record<string, unknown>)[method]
         console.log(`${method} 타입:`, typeof methodObj)
         
         if (typeof methodObj === 'object' && methodObj !== null) {
