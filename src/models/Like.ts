@@ -19,7 +19,7 @@ const likeSchema = new mongoose.Schema<ILike>({
   },
   songId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'SongDetail',
+    ref: 'SongbookDetail',
     required: true
   }
 }, {

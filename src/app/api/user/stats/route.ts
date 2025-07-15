@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/authOptions'
 import dbConnect from '@/lib/mongodb'
 import Like from '@/models/Like'
 import Playlist from '@/models/Playlist'
 import User from '@/models/User'
-
-const authOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
-}
+import SongbookDetail from '@/models/SongDetail'
 
 export async function GET(request: NextRequest) {
   try {
@@ -47,7 +45,11 @@ export async function GET(request: NextRequest) {
       
       // 최근 좋아요 (5개)
       Like.find({ channelId: session.user.channelId })
-        .populate('songId', 'title artist')
+        .populate({
+          path: 'songId',
+          model: SongbookDetail,
+          select: 'title artist'
+        })
         .sort({ createdAt: -1 })
         .limit(5),
       
@@ -55,7 +57,7 @@ export async function GET(request: NextRequest) {
       Playlist.find({ channelId: session.user.channelId })
         .sort({ updatedAt: -1 })
         .limit(3)
-        .select('name description songCount updatedAt')
+        .select('name description songs updatedAt')
     ])
 
     // 언어별 좋아요 통계
@@ -98,10 +100,13 @@ export async function GET(request: NextRequest) {
       },
       recent: {
         likes: recentLikes,
-        playlists: recentPlaylists.map(playlist => ({
-          ...playlist.toObject(),
-          songCount: playlist.songs?.length || 0
-        }))
+        playlists: recentPlaylists.map(playlist => {
+          const playlistObj = playlist.toObject()
+          return {
+            ...playlistObj,
+            songCount: Array.isArray(playlistObj.songs) ? playlistObj.songs.length : 0
+          }
+        })
       }
     }
 

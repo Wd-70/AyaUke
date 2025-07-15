@@ -125,9 +125,13 @@ playlistSchema.index({ 'songs.songId': 1 })
 // shareId는 unique: true로 이미 인덱스가 생성됨
 playlistSchema.index({ isPublic: 1 })
 
-// 가상 필드
+// 가상 필드 - 안전한 처리
 playlistSchema.virtual('songCount').get(function() {
-  return this.songs.length
+  try {
+    return Array.isArray(this.songs) ? this.songs.length : 0
+  } catch (error) {
+    return 0
+  }
 })
 
 export default mongoose.models.Playlist || mongoose.model<IPlaylist>('Playlist', playlistSchema)

@@ -2,9 +2,16 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { createManualChzzkClient } from "@/lib/chzzkCookieManual"
 import { isAdminChannel, getAdminInfo } from "@/lib/adminChannels"
 import { createOrUpdateUser } from '@/lib/userService'
+import dbConnect from '@/lib/mongodb'
+import User from '@/models/User'
+import ChzzkProvider from '@/lib/chzzkOAuthProvider'
 
 export const authOptions = {
   providers: [
+    ChzzkProvider({
+      clientId: process.env.CHZZK_CLIENT_ID!,
+      clientSecret: process.env.CHZZK_CLIENT_SECRET!,
+    }),
     CredentialsProvider({
       id: "chzzk-cookie",
       name: "치지직 쿠키 로그인",
@@ -71,27 +78,76 @@ export const authOptions = {
     })
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
-        token.naverId = user.naverId
-        token.channelId = user.channelId
-        token.channelName = user.channelName
-        token.channelImageUrl = user.channelImageUrl
-        token.followerCount = user.followerCount
-        token.isAdmin = user.isAdmin
-        token.adminRole = user.adminRole
+        // OAuth 방식 (치지직 공식 API)
+        if (account?.provider === 'chzzk') {
+          const channelId = user.channelId || user.id
+          const channelName = user.channelName || user.name
+          const isAdmin = isAdminChannel(channelId)
+          const adminInfo = getAdminInfo(channelId)
+          
+          token.naverId = null
+          token.channelId = channelId
+          token.channelName = channelName
+          token.channelImageUrl = user.channelImageUrl || user.image
+          token.followerCount = user.followerCount
+          token.isAdmin = isAdmin
+          token.adminRole = adminInfo?.role || null
+          
+          // 사용자 정보 DB에 저장
+          try {
+            await createOrUpdateUser({
+              channelId: channelId,
+              channelName: channelName,
+              profileImageUrl: user.channelImageUrl || user.image
+            })
+          } catch (dbError) {
+            console.error('OAuth 사용자 DB 저장 오류:', dbError)
+          }
+        }
+        // 쿠키 방식 (기존 로직)
+        else {
+          token.naverId = user.naverId
+          token.channelId = user.channelId
+          token.channelName = user.channelName
+          token.channelImageUrl = user.channelImageUrl
+          token.followerCount = user.followerCount
+          token.isAdmin = user.isAdmin
+          token.adminRole = user.adminRole
+        }
       }
       return token
     },
     async session({ session, token }) {
       if (token && session.user) {
+        // 기본 토큰 정보 설정
         session.user.naverId = token.naverId as string || null
         session.user.channelId = token.channelId as string
-        session.user.channelName = token.channelName as string
-        session.user.channelImageUrl = token.channelImageUrl as string
         session.user.followerCount = token.followerCount as number
         session.user.isAdmin = token.isAdmin as boolean
         session.user.adminRole = token.adminRole as string
+        
+        // 데이터베이스에서 최신 사용자 정보 가져오기
+        try {
+          await dbConnect()
+          const user = await User.findOne({ channelId: token.channelId })
+          if (user) {
+            session.user.channelName = user.channelName
+            session.user.name = user.channelName
+            session.user.image = user.profileImageUrl || token.channelImageUrl as string
+            session.user.channelImageUrl = user.profileImageUrl || token.channelImageUrl as string
+          } else {
+            // DB에 사용자가 없으면 토큰 정보 사용
+            session.user.channelName = token.channelName as string
+            session.user.channelImageUrl = token.channelImageUrl as string
+          }
+        } catch (error) {
+          console.error('세션 콜백에서 사용자 정보 조회 오류:', error)
+          // 오류 시 토큰 정보 사용
+          session.user.channelName = token.channelName as string
+          session.user.channelImageUrl = token.channelImageUrl as string
+        }
       }
       return session
     },

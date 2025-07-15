@@ -8,9 +8,7 @@ import {
   ArrowPathIcon,
   EyeIcon,
   EyeSlashIcon,
-  CalendarIcon,
   UserIcon,
-  ShieldCheckIcon,
   ClockIcon
 } from '@heroicons/react/24/outline'
 import { CheckIcon } from '@heroicons/react/24/solid'
@@ -41,15 +39,11 @@ export default function ShareManagement({ shareId, playlist, onUpdate }: ShareMa
   const [hasChanges, setHasChanges] = useState(false)
   const [originalSettings] = useState({
     isPublic: playlist.isPublic || false,
-    allowCopy: playlist.shareSettings?.allowCopy || true,
-    requireLogin: playlist.shareSettings?.requireLogin || false,
-    expiresAt: playlist.shareSettings?.expiresAt || ''
+    requireLogin: playlist.shareSettings?.requireLogin || false
   })
   const [settings, setSettings] = useState({
     isPublic: playlist.isPublic || false,
-    allowCopy: playlist.shareSettings?.allowCopy || true,
-    requireLogin: playlist.shareSettings?.requireLogin || false,
-    expiresAt: playlist.shareSettings?.expiresAt || ''
+    requireLogin: playlist.shareSettings?.requireLogin || false
   })
 
   const shareUrl = `${window.location.origin}/playlist/${shareId}`
@@ -77,7 +71,23 @@ export default function ShareManagement({ shareId, playlist, onUpdate }: ShareMa
       })
 
       if (response.ok) {
-        onUpdate()
+        const result = await response.json()
+        console.log('API 응답:', result)
+        
+        // API 응답에서 shareId를 가져오기 (여러 경로 시도)
+        const newShareId = result.shareId || result.playlist?.shareId
+        
+        console.log('새로운 shareId:', newShareId)
+        
+        // 새로운 링크로 즉시 이동
+        if (newShareId) {
+          console.log('새 주소로 이동:', `/playlist/${newShareId}`)
+          window.location.href = `/playlist/${newShareId}`
+        } else {
+          console.log('shareId를 찾을 수 없음, 페이지 새로고침')
+          // fallback: 페이지 새로고침
+          onUpdate()
+        }
       } else {
         throw new Error('링크 재생성 실패')
       }
@@ -110,9 +120,9 @@ export default function ShareManagement({ shareId, playlist, onUpdate }: ShareMa
         body: JSON.stringify({
           isPublic: settings.isPublic,
           shareSettings: {
-            allowCopy: settings.allowCopy,
+            allowCopy: true,
             requireLogin: settings.requireLogin,
-            expiresAt: settings.expiresAt || null
+            expiresAt: null
           }
         })
       })
@@ -161,7 +171,7 @@ export default function ShareManagement({ shareId, playlist, onUpdate }: ShareMa
         <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
           현재 공유 링크
         </label>
-        <div className="flex gap-2">
+        <div className="flex gap-2 mb-3">
           <input
             type="text"
             value={shareUrl}
@@ -179,6 +189,22 @@ export default function ShareManagement({ shareId, playlist, onUpdate }: ShareMa
             )}
             {copied ? '복사됨' : '복사'}
           </button>
+        </div>
+        
+        {/* 새 링크 생성 버튼 */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-3 border-t border-light-primary/10 dark:border-dark-primary/10">
+          <button
+            onClick={handleRegenerateLink}
+            disabled={isLoading}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50"
+          >
+            <ArrowPathIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            새 링크 생성
+          </button>
+          
+          <div className="text-sm text-light-text/60 dark:text-dark-text/60 flex items-center">
+            <span>새 링크 생성 시 기존 링크는 무효화됩니다</span>
+          </div>
         </div>
       </div>
 
@@ -220,35 +246,6 @@ export default function ShareManagement({ shareId, playlist, onUpdate }: ShareMa
           </button>
         </div>
 
-        {/* 복사 허용 */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheckIcon className="w-5 h-5 text-blue-500" />
-            <div>
-              <div className="font-medium text-light-text dark:text-dark-text">
-                플레이리스트 복사 허용
-              </div>
-              <div className="text-sm text-light-text/60 dark:text-dark-text/60">
-                다른 사용자가 이 플레이리스트를 복사할 수 있음
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => handleSettingsChange({ allowCopy: !settings.allowCopy })}
-            disabled={isLoading}
-            className={`relative w-12 h-6 rounded-full transition-colors ${
-              settings.allowCopy 
-                ? 'bg-blue-500' 
-                : 'bg-gray-300 dark:bg-gray-600'
-            }`}
-          >
-            <div
-              className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                settings.allowCopy ? 'translate-x-6' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
 
         {/* 로그인 필수 */}
         <div className="flex items-center justify-between">
@@ -256,10 +253,10 @@ export default function ShareManagement({ shareId, playlist, onUpdate }: ShareMa
             <UserIcon className="w-5 h-5 text-orange-500" />
             <div>
               <div className="font-medium text-light-text dark:text-dark-text">
-                로그인 필수
+                {settings.requireLogin ? '로그인 필수' : '로그인 선택사항'}
               </div>
               <div className="text-sm text-light-text/60 dark:text-dark-text/60">
-                로그인한 사용자만 플레이리스트 보기 가능
+                {settings.requireLogin ? '로그인한 사용자만 플레이리스트 보기 가능' : '누구나 플레이리스트 보기 가능'}
               </div>
             </div>
           </div>
@@ -280,23 +277,6 @@ export default function ShareManagement({ shareId, playlist, onUpdate }: ShareMa
           </button>
         </div>
 
-        {/* 만료 날짜 */}
-        <div>
-          <label className="flex items-center gap-2 font-medium text-light-text dark:text-dark-text mb-2">
-            <CalendarIcon className="w-5 h-5 text-purple-500" />
-            만료 날짜 (선택사항)
-          </label>
-          <input
-            type="datetime-local"
-            value={settings.expiresAt}
-            onChange={(e) => handleSettingsChange({ expiresAt: e.target.value })}
-            disabled={isLoading}
-            className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-light-primary/20 dark:border-dark-primary/20 rounded-lg text-sm"
-          />
-          <p className="text-xs text-light-text/60 dark:text-dark-text/60 mt-1">
-            지정한 날짜 이후에는 링크가 작동하지 않습니다
-          </p>
-        </div>
       </div>
 
       {/* 설정 저장 버튼 */}
@@ -329,21 +309,6 @@ export default function ShareManagement({ shareId, playlist, onUpdate }: ShareMa
         </div>
       )}
 
-      {/* 링크 관리 액션 */}
-      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-light-primary/10 dark:border-dark-primary/10">
-        <button
-          onClick={handleRegenerateLink}
-          disabled={isLoading}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50"
-        >
-          <ArrowPathIcon className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-          새 링크 생성
-        </button>
-        
-        <div className="text-sm text-light-text/60 dark:text-dark-text/60 flex items-center">
-          <span>새 링크 생성 시 기존 링크는 무효화됩니다</span>
-        </div>
-      </div>
 
       {/* 공유 히스토리 */}
       {playlist.shareHistory && playlist.shareHistory.length > 0 && (
