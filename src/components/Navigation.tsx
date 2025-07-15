@@ -265,7 +265,7 @@ function AuthControls() {
         )}
         <div className="hidden md:block text-left">
           <div className="text-sm font-medium text-gray-900 dark:text-white">
-            {session.user.channelName || session.user.name}
+            {session.user.name || session.user.channelName}
           </div>
           {session.user.isAdmin && (
             <div className="text-xs text-light-accent dark:text-dark-primary font-medium">
@@ -280,7 +280,7 @@ function AuthControls() {
         <div className="absolute right-0 mt-2 w-56 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-lg shadow-lg border border-light-primary/20 dark:border-dark-primary/20 py-1 z-50">
           <div className="px-4 py-2 border-b border-light-primary/10 dark:border-dark-primary/10">
             <div className="text-sm font-medium text-gray-900 dark:text-white">
-              {session.user.channelName || session.user.name}
+              {session.user.name || session.user.channelName}
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
               치지직 ID: {truncateChannelId(session.user.channelId || '미확인')}
