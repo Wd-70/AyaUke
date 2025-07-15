@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Song } from '@/types';
-import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon } from '@heroicons/react/24/outline';
+import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, TrashIcon, StarIcon } from '@heroicons/react/24/outline';
 import { HeartIcon } from '@heroicons/react/24/solid';
 import YouTube from 'react-youtube';
 import { useLike } from '@/hooks/useLikes';
 import { useSongPlaylists } from '@/hooks/useGlobalPlaylists';
 import PlaylistContextMenu from './PlaylistContextMenu';
+import { useSession } from 'next-auth/react';
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -24,6 +25,7 @@ interface SongCardProps {
 }
 
 export default function SongCard({ song, onPlay, showNumber = false, number }: SongCardProps) {
+  const { data: session } = useSession();
   const { liked, isLoading: likeLoading, error: likeError, toggleLike } = useLike(song.id);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -34,6 +36,162 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
   const [isXLScreen, setIsXLScreen] = useState(false);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  
+  // 편집 모드 상태
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editData, setEditData] = useState({
+    title: '',
+    artist: '',
+    titleAlias: '',
+    artistAlias: '',
+    lyrics: '',
+    personalNotes: '',
+    keyAdjustment: null as number | null, // null과 0을 구분
+    language: '',
+    searchTags: [] as string[],
+    mrLinks: [] as Array<{
+      url: string;
+      skipSeconds?: number;
+      label?: string;
+      duration?: string;
+    }>,
+    selectedMRIndex: 0,
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
+  // 관리자 권한 체크
+  const isAdmin = session?.user?.isAdmin || false;
+
+  // 편집 모드 진입 시 데이터 초기화
+  const initializeEditData = () => {
+    const mrLinks = song.mrLinks || [];
+    setEditData({
+      title: song.title || '', // 원본 제목 (참조용)
+      artist: song.artist || '', // 원본 아티스트 (참조용)
+      titleAlias: displayTitle, // 현재 표시되는 제목 (alias 우선)
+      artistAlias: displayArtist, // 현재 표시되는 아티스트 (alias 우선)
+      lyrics: song.lyrics || '',
+      personalNotes: song.personalNotes || '',
+      keyAdjustment: song.keyAdjustment ?? null, // null과 0을 구분
+      language: song.language || '',
+      searchTags: song.searchTags || [],
+      mrLinks: mrLinks.length > 0 ? mrLinks.map(link => ({
+        url: link.url || '',
+        skipSeconds: link.skipSeconds || 0,
+        label: link.label || '',
+        duration: link.duration || '',
+      })) : [{ url: '', skipSeconds: 0, label: '', duration: '' }],
+      selectedMRIndex: song.selectedMRIndex || 0,
+    });
+  };
+
+  // 편집 모드 토글
+  const toggleEditMode = () => {
+    if (!isEditMode) {
+      initializeEditData();
+    }
+    setIsEditMode(!isEditMode);
+  };
+
+  // 편집 데이터 저장
+  const saveEditData = async () => {
+    if (!song.id) return;
+    
+    setIsSaving(true);
+    try {
+      // 저장할 데이터 준비 - alias 로직 처리
+      const saveData = {
+        ...editData,
+        // 제목: 기본값과 다르면 alias로 저장, 같거나 비어있으면 alias 삭제
+        titleAlias: (!editData.titleAlias.trim() || editData.titleAlias.trim() === song.title.trim()) ? null : editData.titleAlias.trim(),
+        // 아티스트: 기본값과 다르면 alias로 저장, 같거나 비어있으면 alias 삭제  
+        artistAlias: (!editData.artistAlias.trim() || editData.artistAlias.trim() === song.artist.trim()) ? null : editData.artistAlias.trim(),
+        // MR 링크: 빈 URL 제거 후 저장
+        mrLinks: editData.mrLinks.filter(link => link.url.trim() !== ''),
+      };
+      
+      // 기본값은 제거 (수정 불가능)
+      delete saveData.title;
+      delete saveData.artist;
+
+      // 디버깅을 위한 로깅
+      console.log('🚀 저장할 데이터:', JSON.stringify(saveData, null, 2));
+      console.log('🚀 MR 링크 데이터:', saveData.mrLinks);
+
+      const response = await fetch(`/api/songdetails/${song.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(saveData),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // 성공적으로 저장되면 song 객체를 업데이트
+        console.log('✅ 저장 성공, 반환된 데이터:', result.song);
+        console.log('✅ 기존 song 객체:', song);
+        Object.assign(song, result.song);
+        console.log('✅ 업데이트된 song 객체:', song);
+        
+        // 강제 리렌더링 트리거
+        setForceUpdate(prev => prev + 1);
+        setIsEditMode(false);
+        alert('곡 정보가 성공적으로 수정되었습니다.');
+      } else {
+        alert(result.error || '저장에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('저장 오류:', error);
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // 편집 취소
+  const cancelEdit = () => {
+    setIsEditMode(false);
+    initializeEditData();
+  };
+
+  // MR 링크 관리 함수들
+  const addMRLink = () => {
+    setEditData({
+      ...editData,
+      mrLinks: [...editData.mrLinks, { url: '', skipSeconds: 0, label: '', duration: '' }]
+    });
+  };
+
+  const removeMRLink = (index: number) => {
+    if (editData.mrLinks.length > 1) {
+      const newLinks = editData.mrLinks.filter((_, i) => i !== index);
+      setEditData({
+        ...editData,
+        mrLinks: newLinks,
+        selectedMRIndex: Math.min(editData.selectedMRIndex, newLinks.length - 1)
+      });
+    }
+  };
+
+  const updateMRLink = (index: number, field: string, value: string | number) => {
+    const updatedLinks = editData.mrLinks.map((link, i) => 
+      i === index ? { ...link, [field]: value } : link
+    );
+    setEditData({
+      ...editData,
+      mrLinks: updatedLinks
+    });
+  };
+
+  const setMainMRLink = (index: number) => {
+    setEditData({
+      ...editData,
+      selectedMRIndex: index
+    });
+  };
 
   const languageColors = {
     Korean: 'bg-blue-500',
@@ -61,8 +219,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
 
   // MR 링크에서 YouTube URL 찾기
   const getYouTubeMRLink = () => {
-    // mrLinksDetailed와 mrLinks 둘 다 지원
-    const mrLinks = song.mrLinksDetailed || song.mrLinks;
+    // mrLinks 사용
+    const mrLinks = song.mrLinks;
     if (!mrLinks || mrLinks.length === 0) return null;
     const selectedMR = mrLinks[song.selectedMRIndex || 0];
     if (!selectedMR) return null;
@@ -92,9 +250,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
       window.open(youtubeMR.fullUrl, '_blank');
     } else {
       // MR 링크가 없으면 검색 기능 실행
-      if (onPlay) {
-        onPlay(song);
-      }
+      handleMRSearch(e);
     }
   };
 
@@ -125,17 +281,15 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
       }
     } else {
       // MR 링크가 없을 때는 검색 기능 실행
-      if (onPlay) {
-        onPlay(song);
-      }
+      handleMRSearch(e);
     }
   };
 
   const handleMRSearch = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onPlay) {
-      onPlay(song);
-    }
+    // 직접 YouTube 검색 수행 (더 안정적)
+    const searchQuery = encodeURIComponent(`${displayTitle} ${displayArtist} karaoke MR`);
+    window.open(`https://www.youtube.com/results?search_query=${searchQuery}`, '_blank');
   };
 
   const handleOpenInNewTab = (e: React.MouseEvent) => {
@@ -321,12 +475,10 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
       });
     }
     
-    if (song.mrLinks?.length || song.mrLinksDetailed?.length) {
+    if (song.mrLinks?.length) {
       console.log('🎤 MR 정보:', {
-        basicMRLinks: song.mrLinks,
-        detailedMRLinks: song.mrLinksDetailed,
-        selectedMRIndex: song.selectedMRIndex,
-        actualMRLinks: song.mrLinksDetailed || song.mrLinks
+        mrLinks: song.mrLinks,
+        selectedMRIndex: song.selectedMRIndex
       });
     }
     
@@ -348,6 +500,12 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
     
     console.log('🔍 전체 객체:', song);
     console.groupEnd();
+    
+    // 다이얼로그 닫을 때 편집 모드 및 비디오 상태 초기화
+    if (isExpanded) {
+      setIsEditMode(false);
+      setShowVideo(false);
+    }
     
     setIsExpanded(!isExpanded);
   };
@@ -393,22 +551,33 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                 <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">가사</h4>
               </div>
               <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
-                {song.lyrics ? (
-                  <div 
-                    className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
-                    style={{ 
-                      overscrollBehavior: 'contain' 
-                    }}
-                    onWheel={handleScrollPreventPropagation}
-                  >
-                    {song.lyrics}
-                  </div>
+                {isEditMode ? (
+                  <textarea
+                    value={editData.lyrics}
+                    onChange={(e) => setEditData({...editData, lyrics: e.target.value})}
+                    className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg 
+                               bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
+                               outline-none resize-none flex-1 min-h-0"
+                    placeholder="가사를 입력하세요..."
+                  />
                 ) : (
-                  <div className="text-center flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50 flex-1">
-                    <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
-                    <p className="text-lg mb-2">아직 가사가 등록되지 않았습니다</p>
-                    <p className="text-base">곧 업데이트될 예정입니다</p>
-                  </div>
+                  song.lyrics ? (
+                    <div 
+                      className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
+                      style={{ 
+                        overscrollBehavior: 'contain' 
+                      }}
+                      onWheel={handleScrollPreventPropagation}
+                    >
+                      {song.lyrics}
+                    </div>
+                  ) : (
+                    <div className="text-center flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50 flex-1">
+                      <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
+                      <p className="text-lg mb-2">아직 가사가 등록되지 않았습니다</p>
+                      <p className="text-base">곧 업데이트될 예정입니다</p>
+                    </div>
+                  )
                 )}
               </div>
             </div>
@@ -416,87 +585,231 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
             {/* 오른쪽: 모든 다른 요소들 */}
             <div className="flex-1 xl:w-1/2 flex flex-col min-h-0">
               {/* Header */}
-              <div className="flex items-start justify-between mb-3 sm:mb-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                    <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold text-light-text dark:text-dark-text 
-                                   text-light-accent dark:text-dark-accent">
-                      {displayTitle}
-                    </h3>
-                    {formatKeyAdjustment(song.keyAdjustment) && (
-                      <span className="px-2 py-1 text-sm font-medium rounded-md 
-                                     bg-yellow-100 dark:bg-yellow-900 
-                                     text-yellow-800 dark:text-yellow-200">
-                        {formatKeyAdjustment(song.keyAdjustment)}
-                      </span>
-                    )}
+              <div className="mb-3 sm:mb-4">
+                {isEditMode ? (
+                  /* 편집 모드 - 세로 레이아웃 */
+                  <div className="space-y-4">
+                    {/* 편집 액션 버튼들 - 맨 위에 배치 */}
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-lg font-semibold text-light-accent dark:text-dark-accent">곡 정보 편집</h4>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={saveEditData}
+                          disabled={isSaving}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 
+                                     transition-colors duration-200 disabled:opacity-50 text-green-600 dark:text-green-400"
+                          title="저장"
+                        >
+                          {isSaving ? (
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                              className="w-4 h-4 border-2 border-green-600/30 border-t-green-600 rounded-full"
+                            />
+                          ) : (
+                            <CheckIcon className="w-4 h-4" />
+                          )}
+                          <span className="text-sm font-medium">저장</span>
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          disabled={isSaving}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-500/20 hover:bg-gray-500/30 
+                                     transition-colors duration-200 disabled:opacity-50 text-gray-600 dark:text-gray-400"
+                          title="취소"
+                        >
+                          <XMarkIcon className="w-4 h-4" />
+                          <span className="text-sm font-medium">취소</span>
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {/* 곡 제목 */}
+                    <div>
+                      <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">곡 제목</label>
+                      <input
+                        type="text"
+                        value={editData.titleAlias}
+                        onChange={(e) => setEditData({...editData, titleAlias: e.target.value})}
+                        className="w-full text-xl sm:text-2xl font-semibold text-light-accent dark:text-dark-accent 
+                                   bg-transparent border-b-2 border-light-accent dark:border-dark-accent 
+                                   outline-none pb-1"
+                        placeholder="곡 제목"
+                      />
+                    </div>
+                    
+                    {/* 아티스트 */}
+                    <div>
+                      <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">아티스트</label>
+                      <input
+                        type="text"
+                        value={editData.artistAlias}
+                        onChange={(e) => setEditData({...editData, artistAlias: e.target.value})}
+                        className="w-full text-lg text-light-text/70 dark:text-dark-text/70 
+                                   bg-transparent border-b border-light-accent/50 dark:border-dark-accent/50 
+                                   outline-none pb-1"
+                        placeholder="아티스트"
+                      />
+                    </div>
+                    
+                    {/* 키 조절과 언어 - 나란히 배치 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">키 조절</label>
+                        <div className="flex items-center gap-2 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg p-2">
+                          <button
+                            onClick={() => setEditData({...editData, keyAdjustment: editData.keyAdjustment === null ? -1 : Math.max(-12, editData.keyAdjustment - 1)})}
+                            className="p-1 rounded-md hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                       transition-colors duration-200"
+                            title="키 내리기"
+                          >
+                            <MinusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+                          </button>
+                          <span className="px-3 py-1 text-sm font-medium min-w-[4rem] text-center
+                                         bg-yellow-100 dark:bg-yellow-900 
+                                         text-yellow-800 dark:text-yellow-200 rounded-md">
+                            {editData.keyAdjustment === null ? '미등록' : formatKeyAdjustment(editData.keyAdjustment) || '원본키'}
+                          </span>
+                          <button
+                            onClick={() => setEditData({...editData, keyAdjustment: editData.keyAdjustment === null ? 1 : Math.min(12, editData.keyAdjustment + 1)})}
+                            className="p-1 rounded-md hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                       transition-colors duration-200"
+                            title="키 올리기"
+                          >
+                            <PlusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+                          </button>
+                          <button
+                            onClick={() => setEditData({...editData, keyAdjustment: 0})}
+                            className="ml-2 px-2 py-1 text-xs rounded-md bg-blue-500/20 hover:bg-blue-500/30 
+                                       transition-colors duration-200 text-blue-600 dark:text-blue-400"
+                            title="원본키로 설정"
+                          >
+                            원본키
+                          </button>
+                          <button
+                            onClick={() => setEditData({...editData, keyAdjustment: null})}
+                            className="px-2 py-1 text-xs rounded-md bg-gray-500/20 hover:bg-gray-500/30 
+                                       transition-colors duration-200 text-gray-600 dark:text-gray-400"
+                            title="키 정보 삭제"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">언어</label>
+                        <select
+                          value={editData.language}
+                          onChange={(e) => setEditData({...editData, language: e.target.value})}
+                          className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
+                                     rounded-lg outline-none text-light-text dark:text-dark-text"
+                        >
+                          <option value="">선택안함</option>
+                          <option value="Korean">한국어</option>
+                          <option value="English">영어</option>
+                          <option value="Japanese">일본어</option>
+                          <option value="Chinese">중국어</option>
+                          <option value="Other">기타</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 sm:gap-2 flex-wrap mb-1 sm:mb-2">
-                    <p className="text-base sm:text-lg md:text-xl text-light-text/70 dark:text-dark-text/70 line-clamp-1">
-                      {displayArtist}
-                    </p>
-                    {song.language && (
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium text-white 
-                                       ${languageColors[song.language as keyof typeof languageColors] || 'bg-gray-500'}`}>
-                        {song.language}
-                      </span>
-                    )}
-                    {song.searchTags && song.searchTags.map((tag, index) => (
-                      <span
-                        key={index}
-                        className="px-2 py-1 rounded-full text-xs 
-                                 bg-blue-100 dark:bg-blue-900 
-                                 text-blue-800 dark:text-blue-200"
+                ) : (
+                  /* 일반 모드 - 기존 레이아웃 */
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                        <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold text-light-text dark:text-dark-text 
+                                       text-light-accent dark:text-dark-accent">
+                          {displayTitle}
+                        </h3>
+                        {formatKeyAdjustment(song.keyAdjustment) && (
+                          <span className="px-2 py-1 text-sm font-medium rounded-md 
+                                         bg-yellow-100 dark:bg-yellow-900 
+                                         text-yellow-800 dark:text-yellow-200">
+                            {formatKeyAdjustment(song.keyAdjustment)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 sm:gap-2 flex-wrap mb-1 sm:mb-2">
+                        <p className="text-base sm:text-lg md:text-xl text-light-text/70 dark:text-dark-text/70 line-clamp-1">
+                          {displayArtist}
+                        </p>
+                        {song.language && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white 
+                                           ${languageColors[song.language as keyof typeof languageColors] || 'bg-gray-500'}`}>
+                            {song.language}
+                          </span>
+                        )}
+                        {song.searchTags && song.searchTags.map((tag, index) => (
+                          <span
+                            key={index}
+                            className="px-2 py-1 rounded-full text-xs 
+                                     bg-blue-100 dark:bg-blue-900 
+                                     text-blue-800 dark:text-blue-200"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                        {songPlaylists.map((playlist) => (
+                          <span
+                            key={playlist._id}
+                            className="px-2 py-1 rounded-full text-xs 
+                                     bg-purple-100 dark:bg-purple-900 
+                                     text-purple-800 dark:text-purple-200"
+                          >
+                            🎵 {playlist.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isAdmin && (
+                        <button
+                          onClick={toggleEditMode}
+                          className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                     transition-colors duration-200"
+                          title="편집"
+                        >
+                          <PencilIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
+                        </button>
+                      )}
+                      <button
+                        onClick={handlePlaylistClick}
+                        className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                   transition-colors duration-200"
+                        title="플레이리스트 관리"
                       >
-                        #{tag}
-                      </span>
-                    ))}
-                    {songPlaylists.map((playlist) => (
-                      <span
-                        key={playlist._id}
-                        className="px-2 py-1 rounded-full text-xs 
-                                 bg-purple-100 dark:bg-purple-900 
-                                 text-purple-800 dark:text-purple-200"
+                        <ListBulletIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
+                      </button>
+                      <button
+                        onClick={handleLike}
+                        disabled={likeLoading}
+                        className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                   transition-colors duration-200 disabled:opacity-50"
+                        title={liked ? '좋아요 취소' : '좋아요'}
                       >
-                        🎵 {playlist.name}
-                      </span>
-                    ))}
+                        <HeartIcon 
+                          className={`w-5 h-5 transition-all duration-200 
+                                     ${likeLoading 
+                                       ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
+                                       : liked 
+                                         ? 'text-red-500 fill-current' 
+                                         : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
+                        />
+                      </button>
+                      <button
+                        onClick={handleCardClick}
+                        className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
+                                   transition-colors duration-200"
+                        title="닫기"
+                      >
+                        <XMarkIcon className="w-5 h-5 text-red-500" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handlePlaylistClick}
-                    className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                               transition-colors duration-200"
-                    title="플레이리스트 관리"
-                  >
-                    <ListBulletIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
-                  </button>
-                  <button
-                    onClick={handleLike}
-                    disabled={likeLoading}
-                    className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                               transition-colors duration-200 disabled:opacity-50"
-                    title={liked ? '좋아요 취소' : '좋아요'}
-                  >
-                    <HeartIcon 
-                      className={`w-5 h-5 transition-all duration-200 
-                                 ${likeLoading 
-                                   ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
-                                   : liked 
-                                     ? 'text-red-500 fill-current' 
-                                     : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
-                    />
-                  </button>
-                  <button
-                    onClick={handleCardClick}
-                    className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
-                               transition-colors duration-200"
-                    title="닫기"
-                  >
-                    <XMarkIcon className="w-5 h-5 text-red-500" />
-                  </button>
-                </div>
+                )}
               </div>
 
               {/* Legacy Tags (if exists) */}
@@ -517,22 +830,130 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
 
               {/* 큰 화면에서의 영상 섹션 - 플레이어 대상 영역 */}
               <div className="hidden xl:flex flex-col flex-1 gap-6 min-h-0">
-                {youtubeMR && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    transition={{ duration: 0.3, delay: 0.1 }}
-                    className="p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
-                  >
-                    <div className="flex items-center gap-3 mb-4">
-                      <VideoCameraIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
-                      <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">MR 영상</h4>
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                  className="p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
+                >
+                  <div className="flex items-center gap-3 mb-4">
+                    <VideoCameraIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
+                    <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">
+                      {isEditMode ? "MR 링크 관리" : "MR 영상"}
+                    </h4>
+                  </div>
+                  
+                  {isEditMode ? (
+                    /* MR 링크 편집 UI - XL 화면 */
+                    <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
+                      {editData.mrLinks.map((link, index) => (
+                        <div key={index} className="p-4 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg border border-light-primary/20 dark:border-dark-primary/20">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setMainMRLink(index)}
+                                className={`p-1 rounded-full transition-colors duration-200 ${
+                                  editData.selectedMRIndex === index
+                                    ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
+                                    : 'bg-gray-500/20 text-gray-600 dark:text-gray-400 hover:bg-gray-500/30'
+                                }`}
+                                title={editData.selectedMRIndex === index ? "메인 MR" : "메인으로 설정"}
+                              >
+                                <StarIcon className="w-4 h-4" />
+                              </button>
+                              <span className="text-sm font-medium text-light-text/70 dark:text-dark-text/70">
+                                MR 링크 {index + 1}
+                                {editData.selectedMRIndex === index && (
+                                  <span className="ml-2 text-xs text-yellow-600 dark:text-yellow-400">(메인)</span>
+                                )}
+                              </span>
+                            </div>
+                            {editData.mrLinks.length > 1 && (
+                              <button
+                                onClick={() => removeMRLink(index)}
+                                className="p-1 rounded-full bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-colors duration-200"
+                                title="삭제"
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">URL</label>
+                              <input
+                                type="url"
+                                value={link.url}
+                                onChange={(e) => updateMRLink(index, 'url', e.target.value)}
+                                className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
+                                           rounded-md outline-none text-light-text dark:text-dark-text"
+                                placeholder="https://youtube.com/watch?v=..."
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">시작 시간 (초)</label>
+                                <input
+                                  type="number"
+                                  value={link.skipSeconds}
+                                  onChange={(e) => updateMRLink(index, 'skipSeconds', parseInt(e.target.value) || 0)}
+                                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
+                                             rounded-md outline-none text-light-text dark:text-dark-text"
+                                  min="0"
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">라벨</label>
+                                <input
+                                  type="text"
+                                  value={link.label}
+                                  onChange={(e) => updateMRLink(index, 'label', e.target.value)}
+                                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
+                                             rounded-md outline-none text-light-text dark:text-dark-text"
+                                  placeholder="공식 MR"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <div className="flex gap-2">
+                        <button
+                          onClick={addMRLink}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed 
+                                     border-light-accent/50 dark:border-dark-accent/50 rounded-lg
+                                     text-light-accent dark:text-dark-accent hover:bg-light-accent/10 dark:hover:bg-dark-accent/10
+                                     transition-colors duration-200"
+                        >
+                          <PlusIcon className="w-5 h-5" />
+                          <span>MR 링크 추가</span>
+                        </button>
+                        <button
+                          onClick={handleMRSearch}
+                          className="px-4 py-3 bg-light-secondary/20 dark:bg-dark-secondary/20 
+                                     hover:bg-light-secondary/30 dark:hover:bg-dark-secondary/30
+                                     text-light-text dark:text-dark-text rounded-lg
+                                     transition-colors duration-200 flex items-center gap-2"
+                          title="YouTube에서 MR 검색"
+                        >
+                          <MagnifyingGlassIcon className="w-5 h-5" />
+                          <span>MR 검색</span>
+                        </button>
+                      </div>
                     </div>
-                    <div id="xl-player-target" className="aspect-video w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      {/* 플레이어가 여기에 CSS로 배치됨 */}
-                    </div>
-                  </motion.div>
-                )}
+                  ) : (
+                    /* 기존 YouTube 플레이어 */
+                    youtubeMR && (
+                      <div id="xl-player-target" className="aspect-video w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        {/* 플레이어가 여기에 CSS로 배치됨 */}
+                      </div>
+                    )
+                  )}
+                </motion.div>
               </div>
 
               {/* 작은 화면에서의 기존 토글 섹션 */}
@@ -542,31 +963,137 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                 transition={{ duration: 0.3, delay: 0.1 }}
                 className="xl:hidden p-4 sm:p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 relative flex flex-col flex-1 min-h-0"
               >
-                {/* YouTube 플레이어 - MR 링크가 있으면 항상 로드하되 visibility로 제어 */}
-                {youtubeMR && (
-                  <div className={`${showVideo ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
-                    <div className="flex items-center justify-between mb-3 sm:mb-4">
-                      <h4 className="text-lg sm:text-xl font-semibold text-light-text dark:text-dark-text flex items-center gap-2 sm:gap-3">
-                        <VideoCameraIcon className="w-5 h-5 sm:w-6 sm:h-6 text-light-accent dark:text-dark-accent" />
-                        MR 영상
-                      </h4>
-                      <button
-                        onClick={toggleVideoView}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm
-                                 bg-light-primary/20 dark:bg-dark-primary/20 
-                                 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30
-                                 text-light-text dark:text-dark-text transition-colors duration-200"
-                        title="가사 보기"
-                      >
-                        <MusicalNoteIcon className="w-4 h-4" />
-                        <span>가사 보기</span>
-                      </button>
-                    </div>
-                    <div id="mobile-player-target" className="flex-1 w-full min-h-0 aspect-video bg-gray-50 dark:bg-gray-800 rounded-lg">
-                      {/* 플레이어가 여기에 CSS로 배치됨 */}
-                    </div>
+                {/* MR 영상/편집 영역 */}
+                <div className={`${showVideo ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
+                  <div className="flex items-center justify-between mb-3 sm:mb-4">
+                    <h4 className="text-lg sm:text-xl font-semibold text-light-text dark:text-dark-text flex items-center gap-2 sm:gap-3">
+                      <VideoCameraIcon className="w-5 h-5 sm:w-6 sm:h-6 text-light-accent dark:text-dark-accent" />
+                      {isEditMode ? "MR 링크 관리" : "MR 영상"}
+                    </h4>
+                    <button
+                      onClick={toggleVideoView}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm
+                               bg-light-primary/20 dark:bg-dark-primary/20 
+                               hover:bg-light-primary/30 dark:hover:bg-dark-primary/30
+                               text-light-text dark:text-dark-text transition-colors duration-200"
+                      title={isEditMode ? "가사 수정" : "가사 보기"}
+                    >
+                      <MusicalNoteIcon className="w-4 h-4" />
+                      <span>{isEditMode ? "가사 수정" : "가사 보기"}</span>
+                    </button>
                   </div>
-                )}
+                  
+                  {isEditMode ? (
+                    /* MR 링크 편집 UI */
+                    <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
+                      {editData.mrLinks.map((link, index) => (
+                        <div key={index} className="p-4 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg border border-light-primary/20 dark:border-dark-primary/20">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setMainMRLink(index)}
+                                className={`p-1 rounded-full transition-colors duration-200 ${
+                                  editData.selectedMRIndex === index
+                                    ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
+                                    : 'bg-gray-500/20 text-gray-600 dark:text-gray-400 hover:bg-gray-500/30'
+                                }`}
+                                title={editData.selectedMRIndex === index ? "메인 MR" : "메인으로 설정"}
+                              >
+                                <StarIcon className="w-4 h-4" />
+                              </button>
+                              <span className="text-sm font-medium text-light-text/70 dark:text-dark-text/70">
+                                MR 링크 {index + 1}
+                                {editData.selectedMRIndex === index && (
+                                  <span className="ml-2 text-xs text-yellow-600 dark:text-yellow-400">(메인)</span>
+                                )}
+                              </span>
+                            </div>
+                            {editData.mrLinks.length > 1 && (
+                              <button
+                                onClick={() => removeMRLink(index)}
+                                className="p-1 rounded-full bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-colors duration-200"
+                                title="삭제"
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">URL</label>
+                              <input
+                                type="url"
+                                value={link.url}
+                                onChange={(e) => updateMRLink(index, 'url', e.target.value)}
+                                className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
+                                           rounded-md outline-none text-light-text dark:text-dark-text"
+                                placeholder="https://youtube.com/watch?v=..."
+                              />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">시작 시간 (초)</label>
+                                <input
+                                  type="number"
+                                  value={link.skipSeconds}
+                                  onChange={(e) => updateMRLink(index, 'skipSeconds', parseInt(e.target.value) || 0)}
+                                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
+                                             rounded-md outline-none text-light-text dark:text-dark-text"
+                                  min="0"
+                                  placeholder="0"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">라벨</label>
+                                <input
+                                  type="text"
+                                  value={link.label}
+                                  onChange={(e) => updateMRLink(index, 'label', e.target.value)}
+                                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
+                                             rounded-md outline-none text-light-text dark:text-dark-text"
+                                  placeholder="공식 MR"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <div className="flex gap-2">
+                        <button
+                          onClick={addMRLink}
+                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed 
+                                     border-light-accent/50 dark:border-dark-accent/50 rounded-lg
+                                     text-light-accent dark:text-dark-accent hover:bg-light-accent/10 dark:hover:bg-dark-accent/10
+                                     transition-colors duration-200"
+                        >
+                          <PlusIcon className="w-5 h-5" />
+                          <span>MR 링크 추가</span>
+                        </button>
+                        <button
+                          onClick={handleMRSearch}
+                          className="px-4 py-3 bg-light-secondary/20 dark:bg-dark-secondary/20 
+                                     hover:bg-light-secondary/30 dark:hover:bg-dark-secondary/30
+                                     text-light-text dark:text-dark-text rounded-lg
+                                     transition-colors duration-200 flex items-center gap-2"
+                          title="YouTube에서 MR 검색"
+                        >
+                          <MagnifyingGlassIcon className="w-5 h-5" />
+                          <span className="hidden sm:inline">MR 검색</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* 기존 YouTube 플레이어 */
+                    youtubeMR && (
+                      <div id="mobile-player-target" className="flex-1 w-full min-h-0 aspect-video bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        {/* 플레이어가 여기에 CSS로 배치됨 */}
+                      </div>
+                    )
+                  )}
+                </div>
 
                 {/* 가사 섹션 - 작은 화면에서만 표시 */}
                 <div className={`${!showVideo ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
@@ -575,42 +1102,52 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                       <MusicalNoteIcon className="w-5 h-5 sm:w-6 sm:h-6 text-light-accent dark:text-dark-accent" />
                       가사
                     </h4>
-                    {youtubeMR && (
-                      <button
-                        onClick={toggleVideoView}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm
-                                 bg-light-primary/20 dark:bg-dark-primary/20 
-                                 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30
-                                 text-light-text dark:text-dark-text transition-colors duration-200"
-                        title="영상 보기"
-                      >
-                        <VideoCameraIcon className="w-4 h-4" />
-                        <span>영상 보기</span>
-                      </button>
-                    )}
-                  </div>
-                  {song.lyrics ? (
-                    <div 
-                      className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg flex-1 overflow-y-auto min-h-0" 
-                      style={{ 
-                        overscrollBehavior: 'contain' 
-                      }}
-                      onWheel={handleScrollPreventPropagation}
+                    <button
+                      onClick={toggleVideoView}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm
+                               bg-light-primary/20 dark:bg-dark-primary/20 
+                               hover:bg-light-primary/30 dark:hover:bg-dark-primary/30
+                               text-light-text dark:text-dark-text transition-colors duration-200"
+                      title={isEditMode ? "MR 링크 수정" : "영상 보기"}
                     >
-                      {song.lyrics}
-                    </div>
+                      <VideoCameraIcon className="w-4 h-4" />
+                      <span>{isEditMode ? "MR 링크 수정" : "영상 보기"}</span>
+                    </button>
+                  </div>
+                  {isEditMode ? (
+                    <textarea
+                      value={editData.lyrics}
+                      onChange={(e) => setEditData({...editData, lyrics: e.target.value})}
+                      className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg 
+                                 bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
+                                 outline-none resize-none flex-1 min-h-0"
+                      placeholder="가사를 입력하세요..."
+                    />
                   ) : (
-                    <div className="text-center flex-1 flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50">
-                      <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
-                      <p className="text-lg mb-2">아직 가사가 등록되지 않았습니다</p>
-                      <p className="text-base">곧 업데이트될 예정입니다</p>
-                    </div>
+                    song.lyrics ? (
+                      <div 
+                        className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg flex-1 overflow-y-auto min-h-0" 
+                        style={{ 
+                          overscrollBehavior: 'contain' 
+                        }}
+                        onWheel={handleScrollPreventPropagation}
+                      >
+                        {song.lyrics}
+                      </div>
+                    ) : (
+                      <div className="text-center flex-1 flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50">
+                        <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
+                        <p className="text-lg mb-2">아직 가사가 등록되지 않았습니다</p>
+                        <p className="text-base">곧 업데이트될 예정입니다</p>
+                      </div>
+                    )
                   )}
                 </div>
               </motion.div>
 
-              {/* Action buttons */}
-              <div className="flex items-center gap-2 sm:gap-3 flex-wrap mt-3 sm:mt-4">
+              {/* Action buttons - 편집 모드가 아닐 때만 표시 */}
+              {!isEditMode && (
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap mt-3 sm:mt-4">
                 {youtubeMR ? (
                   // MR 링크가 있을 때 - 3개 버튼으로 분리
                   <>
@@ -643,7 +1180,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                                hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 
                                transition-colors duration-200 text-light-text dark:text-dark-text
                                flex items-center gap-2"
-                      title="MR 검색"
+                      title="YouTube에서 MR 검색"
                     >
                       <MagnifyingGlassIcon className="w-5 h-5" />
                       <span className="hidden sm:inline">MR 검색</span>
@@ -665,7 +1202,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                 ) : (
                   // MR 링크가 없을 때 - 기존 검색 버튼
                   <button
-                    onClick={handleModalPlay}
+                    onClick={handleMRSearch}
                     className="flex-1 flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg
                              bg-gradient-to-r from-light-accent to-light-purple 
                              dark:from-dark-accent dark:to-dark-purple text-white 
@@ -676,10 +1213,11 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                     <span>MR 검색</span>
                   </button>
                 )}
-              </div>
+                </div>
+              )}
 
-              {/* Date added */}
-              {song.dateAdded && (
+              {/* Date added - 편집 모드가 아닐 때만 표시 */}
+              {!isEditMode && song.dateAdded && (
                 <div className="mt-3 sm:mt-4 text-sm text-light-text/50 dark:text-dark-text/50">
                   추가일: {new Date(song.dateAdded).toLocaleDateString('ko-KR')}
                 </div>
@@ -688,7 +1226,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
           </div>
 
           {/* 단일 YouTube 플레이어 - Absolute 위치로 이동 */}
-          {youtubeMR && (
+          {youtubeMR && !isEditMode && (
             <div
               className="absolute z-50 pointer-events-auto"
               style={{

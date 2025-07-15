@@ -28,6 +28,10 @@ export default function ChzzkProvider(
         response_type: "code",
       },
     },
+    // 디버깅을 위한 로그
+    ...(process.env.NODE_ENV === 'development' && {
+      debug: true
+    }),
     token: {
       url: "https://chzzk.naver.com/auth/v1/token",
       async request(context) {
@@ -47,6 +51,19 @@ export default function ChzzkProvider(
 
         if (!response.ok) {
           const errorText = await response.text()
+          console.error('치지직 토큰 요청 실패:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText,
+            clientId: options.clientId,
+            redirectUri: `${process.env.NEXTAUTH_URL}/api/auth/callback/chzzk`
+          })
+          
+          // API 승인 관련 오류인지 확인
+          if (response.status === 401 || response.status === 403) {
+            throw new Error(`치지직 API 승인이 필요합니다. 클라이언트 ID/SECRET을 확인하거나 API 승인 상태를 확인하세요. (${response.status})`)
+          }
+          
           throw new Error(`Token request failed: ${response.status} - ${errorText}`)
         }
 
@@ -101,11 +118,29 @@ export default function ChzzkProvider(
                 followerCount: content.followerCount || 0,
               }
             }
+          } else {
+            const errorText = await response.text()
+            console.error('치지직 사용자 정보 API 호출 실패:', {
+              status: response.status,
+              statusText: response.statusText,
+              error: errorText,
+              accessToken: accessToken ? '토큰 있음' : '토큰 없음'
+            })
+            
+            // API 승인 관련 오류인지 확인
+            if (response.status === 401 || response.status === 403) {
+              throw new Error(`치지직 API 승인이 필요합니다. 개발자 콘솔에서 API 승인 상태를 확인하세요. (${response.status})`)
+            }
           }
           
           // 공식 API 응답이 유효하지 않음
         } catch (error) {
-          // 공식 API 호출 실패
+          console.error('치지직 공식 API 호출 실패:', error)
+          
+          // API 승인 관련 오류라면 더 명확한 메시지 표시
+          if (error.message && error.message.includes('승인')) {
+            throw error
+          }
         }
         
         // Fallback API들 시도

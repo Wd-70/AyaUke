@@ -3,14 +3,32 @@
 import { signIn } from "next-auth/react"
 import { useState } from "react"
 import { motion } from "framer-motion"
+import Link from "next/link"
 
 export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false)
+  const [showDevMode, setShowDevMode] = useState(false)
+  const isDev = process.env.NODE_ENV === 'development'
 
   const handleSignIn = async () => {
     setIsLoading(true)
     try {
-      await signIn('chzzk', { callbackUrl: '/' })
+      const result = await signIn('chzzk', { 
+        callbackUrl: '/',
+        redirect: false 
+      })
+      
+      if (result?.error) {
+        console.error('Login error:', result.error)
+        if (result.error.includes('승인')) {
+          alert('치지직 API 승인이 필요합니다. 개발자 콘솔에서 승인 상태를 확인하세요.')
+        } else {
+          alert('로그인에 실패했습니다. 다시 시도해주세요.')
+        }
+        setIsLoading(false)
+      } else if (result?.url) {
+        window.location.href = result.url
+      }
     } catch (error) {
       console.error('Login error:', error)
       alert('로그인에 실패했습니다. 다시 시도해주세요.')
@@ -136,6 +154,39 @@ export default function SignIn() {
                 <span>🔒</span>
                 <span>안전한 OAuth 2.0 인증</span>
               </div>
+              
+              {/* 개발 모드 - API 승인 대기 중일 때 */}
+              {isDev && (
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
+                    ⚠️ 개발 모드: API 승인 대기 중
+                  </p>
+                  <button
+                    onClick={() => setShowDevMode(!showDevMode)}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    {showDevMode ? '개발 옵션 숨기기' : '개발 옵션 보기'}
+                  </button>
+                  {showDevMode && (
+                    <div className="mt-3 space-y-2">
+                      <Link
+                        href="/songbook"
+                        className="block text-xs text-green-600 dark:text-green-400 hover:underline"
+                      >
+                        → 로그인 없이 노래책 둘러보기
+                      </Link>
+                      <a
+                        href="https://developers.naver.com/apps/#/myapps"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        → 네이버 개발자 센터에서 승인 확인
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </motion.div>
 

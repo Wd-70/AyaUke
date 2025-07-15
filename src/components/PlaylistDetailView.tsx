@@ -301,7 +301,7 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
       if (!song) return
       
       // 선택된 MR의 duration 가져오기
-      const mrLinks = song.mrLinksDetailed || song.mrLinks || []
+      const mrLinks = song.mrLinks || []
       const selectedIndex = song.selectedMRIndex || 0
       const selectedMR = mrLinks[selectedIndex]
       

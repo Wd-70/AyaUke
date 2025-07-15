@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import SongDetailModel from '@/models/SongDetail';
 import connectDB from '@/lib/mongodb';
 import mongoose from 'mongoose';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/authOptions';
 
 export async function GET(
   request: NextRequest, 
@@ -46,6 +48,15 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 관리자 권한 체크
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user.isAdmin) {
+      return NextResponse.json(
+        { success: false, error: '관리자 권한이 필요합니다.' },
+        { status: 403 }
+      );
+    }
+
     await connectDB();
     const { id } = await params;
 
@@ -57,6 +68,10 @@ export async function PUT(
     }
 
     const data = await request.json();
+    
+    // 디버깅을 위한 로깅
+    console.log('🔍 받은 데이터:', JSON.stringify(data, null, 2));
+    console.log('🔍 MR 링크 데이터:', data.mrLinks);
     
     const updatedSong = await SongDetailModel.findByIdAndUpdate(
       id,
@@ -75,6 +90,9 @@ export async function PUT(
       );
     }
 
+    console.log('✅ 업데이트된 곡 데이터:', JSON.stringify(updatedSong, null, 2));
+    console.log('✅ MR 링크 필드:', updatedSong.mrLinks);
+    
     return NextResponse.json({
       success: true,
       song: updatedSong,
@@ -112,6 +130,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // 관리자 권한 체크
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user.isAdmin) {
+      return NextResponse.json(
+        { success: false, error: '관리자 권한이 필요합니다.' },
+        { status: 403 }
+      );
+    }
+
     await connectDB();
     const { id } = await params;
 

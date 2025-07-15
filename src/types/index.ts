@@ -19,7 +19,6 @@ export interface Song {
   sungCount?: number;
   lastSungDate?: string;
   keyAdjustment?: number | null;
-  mrLinksDetailed?: MRLink[];
   selectedMRIndex?: number;
   personalNotes?: string;
   imageUrl?: string;
