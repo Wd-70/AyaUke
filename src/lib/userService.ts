@@ -1,6 +1,6 @@
 import mongoose from 'mongoose'
 import User, { IUser } from '@/models/User'
-import { isAdminChannel } from '@/lib/adminChannels'
+import { getStaticUserRole } from '@/lib/adminChannels'
 
 /**
  * 사용자 생성 또는 업데이트 (로그인 시 호출)
@@ -11,7 +11,7 @@ export async function createOrUpdateUser(userData: {
   profileImageUrl?: string
 }): Promise<IUser> {
   try {
-    const isAdmin = isAdminChannel(userData.channelId)
+    const staticRole = getStaticUserRole(userData.channelId)
     
     // 기존 사용자 찾기
     let user = await User.findOne({ channelId: userData.channelId })
@@ -21,7 +21,13 @@ export async function createOrUpdateUser(userData: {
       user.channelName = userData.channelName
       // displayName이 없으면 channelName으로 설정하지 않음 (프로필 수정 시에만 생성)
       user.profileImageUrl = userData.profileImageUrl || user.profileImageUrl
-      user.isAdmin = isAdmin
+      
+      // 정적 권한이 현재 권한보다 높으면 업데이트
+      if (staticRole !== 'user' && (user.role === 'user' || staticRole === 'super_admin')) {
+        user.role = staticRole
+        console.log(`사용자 권한 업데이트: ${userData.channelName} → ${staticRole}`)
+      }
+      
       user.lastLoginAt = new Date()
       
       await user.save()
@@ -33,7 +39,7 @@ export async function createOrUpdateUser(userData: {
         channelName: userData.channelName,
         displayName: userData.channelName, // 가입시 channelName을 displayName으로 설정
         profileImageUrl: userData.profileImageUrl,
-        isAdmin,
+        role: staticRole,
         lastLoginAt: new Date(),
         preferences: {
           theme: 'system',
@@ -42,7 +48,7 @@ export async function createOrUpdateUser(userData: {
       })
       
       await user.save()
-      console.log(`새 사용자 생성: ${userData.channelName} (${userData.channelId})`)
+      console.log(`새 사용자 생성: ${userData.channelName} (${userData.channelId}) - 권한: ${staticRole}`)
     }
     
     return user
@@ -88,7 +94,7 @@ export async function updateUserPreferences(channelId: string, preferences: Part
  */
 export async function getAdminUsers(): Promise<IUser[]> {
   try {
-    return await User.find({ isAdmin: true }).sort({ lastLoginAt: -1 })
+    return await User.find({ role: { $ne: 'user' } }).sort({ lastLoginAt: -1 })
   } catch (error) {
     console.error('관리자 목록 조회 오류:', error)
     return []
@@ -104,7 +110,7 @@ export async function getUserStats() {
     const activeUsers = await User.countDocuments({
       lastLoginAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // 30일 내
     })
-    const adminUsers = await User.countDocuments({ isAdmin: true })
+    const adminUsers = await User.countDocuments({ role: { $ne: 'user' } })
     
     return {
       totalUsers,

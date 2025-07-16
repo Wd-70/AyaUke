@@ -5,7 +5,9 @@ export interface IUser extends mongoose.Document {
   channelName: string
   displayName: string
   profileImageUrl?: string
-  isAdmin: boolean
+  role: 'super_admin' | 'song_admin' | 'song_editor' | 'user'
+  grantedBy?: string
+  grantedAt?: Date
   createdAt: Date
   lastLoginAt: Date
   preferences: {
@@ -32,9 +34,18 @@ const userSchema = new mongoose.Schema<IUser>({
     type: String,
     default: null
   },
-  isAdmin: {
-    type: Boolean,
-    default: false
+  role: {
+    type: String,
+    enum: ['super_admin', 'song_admin', 'song_editor', 'user'],
+    default: 'user'
+  },
+  grantedBy: {
+    type: String,
+    default: null
+  },
+  grantedAt: {
+    type: Date,
+    default: null
   },
   lastLoginAt: {
     type: Date,
@@ -57,6 +68,6 @@ const userSchema = new mongoose.Schema<IUser>({
 })
 
 // 인덱스 추가 (channelId는 unique: true로 자동 인덱스 생성됨)
-userSchema.index({ isAdmin: 1 })
+userSchema.index({ role: 1 })
 
 export default mongoose.models.User || mongoose.model<IUser>('User', userSchema)

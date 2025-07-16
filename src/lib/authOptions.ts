@@ -1,6 +1,7 @@
 import CredentialsProvider from "next-auth/providers/credentials"
 import { createManualChzzkClient } from "@/lib/chzzkCookieManual"
-import { isAdminChannel, getAdminInfo } from "@/lib/adminChannels"
+import { isAdminChannel, getAdminInfo, getStaticUserRole } from "@/lib/adminChannels"
+import { roleToIsAdmin } from '@/lib/permissions'
 import { createOrUpdateUser } from '@/lib/userService'
 import dbConnect from '@/lib/mongodb'
 import User from '@/models/User'
@@ -84,7 +85,7 @@ export const authOptions = {
         if (account?.provider === 'chzzk') {
           const channelId = user.channelId || user.id
           const channelName = user.channelName || user.name
-          const isAdmin = isAdminChannel(channelId)
+          const role = getStaticUserRole(channelId)
           const adminInfo = getAdminInfo(channelId)
           
           token.naverId = null
@@ -92,7 +93,8 @@ export const authOptions = {
           token.channelName = channelName
           token.channelImageUrl = user.channelImageUrl || user.image
           token.followerCount = user.followerCount
-          token.isAdmin = isAdmin
+          token.role = role
+          token.isAdmin = roleToIsAdmin(role) // 하위 호환성
           token.adminRole = adminInfo?.role || null
           
           // 사용자 정보 DB에 저장
@@ -108,13 +110,17 @@ export const authOptions = {
         }
         // 쿠키 방식 (기존 로직)
         else {
+          const role = getStaticUserRole(user.channelId)
+          const adminInfo = getAdminInfo(user.channelId)
+          
           token.naverId = user.naverId
           token.channelId = user.channelId
           token.channelName = user.channelName
           token.channelImageUrl = user.channelImageUrl
           token.followerCount = user.followerCount
-          token.isAdmin = user.isAdmin
-          token.adminRole = user.adminRole
+          token.role = role
+          token.isAdmin = roleToIsAdmin(role) // 하위 호환성
+          token.adminRole = adminInfo?.role || null
         }
       }
       return token
@@ -125,6 +131,7 @@ export const authOptions = {
         session.user.naverId = token.naverId as string || null
         session.user.channelId = token.channelId as string
         session.user.followerCount = token.followerCount as number
+        session.user.role = token.role as string
         session.user.isAdmin = token.isAdmin as boolean
         session.user.adminRole = token.adminRole as string
         
@@ -147,12 +154,15 @@ export const authOptions = {
             session.user.name = user.displayName || user.channelName // displayName이 없으면 channelName 사용
             session.user.image = user.profileImageUrl || token.channelImageUrl as string
             session.user.channelImageUrl = user.profileImageUrl || token.channelImageUrl as string
+            session.user.role = user.role // DB에서 가져온 최신 권한 사용
+            session.user.isAdmin = roleToIsAdmin(user.role as any) // 하위 호환성
             
             console.log('🔍 세션 콜백 - 최종 세션 정보:', {
               channelId: user.channelId,
               channelName: user.channelName,
               displayName: user.displayName,
               sessionName: session.user.name,
+              role: user.role,
               hasDisplayName: !!user.displayName
             })
           } else {

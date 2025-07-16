@@ -2,14 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import { fetchSongsFromSheet } from '@/lib/googleSheets';
+import { hasPermission, Permission, UserRole } from '@/lib/permissions';
+import { connectToDatabase } from '@/lib/mongodb';
+import { SongDetail } from '@/models/SongDetail';
 
 export async function GET(request: NextRequest) {
   try {
-    // 관리자 권한 체크
+    // 노래 조회 권한 체크
     const session = await getServerSession(authOptions);
-    if (!session || !session.user.isAdmin) {
+    if (!session || !hasPermission(session.user.role as UserRole, Permission.SONGS_VIEW)) {
       return NextResponse.json(
-        { success: false, error: '관리자 권한이 필요합니다.' },
+        { success: false, error: '노래 관리 권한이 필요합니다.' },
         { status: 403 }
       );
     }
@@ -107,40 +110,81 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // 관리자 권한 체크
     const session = await getServerSession(authOptions);
-    if (!session || !session.user.isAdmin) {
+    if (!session) {
       return NextResponse.json(
-        { success: false, error: '관리자 권한이 필요합니다.' },
-        { status: 403 }
+        { success: false, error: '로그인이 필요합니다.' },
+        { status: 401 }
       );
     }
 
     const { action, songIds, data } = await request.json();
     
-    console.log(`🔧 일괄 작업 실행: ${action}, 대상 곡: ${songIds.length}개`);
-
+    // 작업별 권한 체크
+    const userRole = session.user.role as UserRole;
+    
     switch (action) {
       case 'bulk-edit':
-        // 일괄 편집 로직
+        if (!hasPermission(userRole, Permission.SONGS_EDIT)) {
+          return NextResponse.json(
+            { success: false, error: '노래 편집 권한이 필요합니다.' },
+            { status: 403 }
+          );
+        }
         console.log('📝 일괄 편집 데이터:', data);
         // TODO: 실제 일괄 편집 구현
         break;
         
       case 'auto-search-mr':
-        // MR 자동 검색 로직
+        if (!hasPermission(userRole, Permission.SONGS_EDIT)) {
+          return NextResponse.json(
+            { success: false, error: '노래 편집 권한이 필요합니다.' },
+            { status: 403 }
+          );
+        }
         console.log('🔍 MR 자동 검색 시작');
         // TODO: YouTube API를 사용한 MR 자동 검색 구현
         break;
         
       case 'add-lyrics':
-        // 가사 일괄 추가 로직
+        if (!hasPermission(userRole, Permission.SONGS_EDIT)) {
+          return NextResponse.json(
+            { success: false, error: '노래 편집 권한이 필요합니다.' },
+            { status: 403 }
+          );
+        }
         console.log('📖 가사 일괄 추가');
         // TODO: 가사 일괄 추가 구현
         break;
         
+      case 'add-song':
+        if (!hasPermission(userRole, Permission.SONGS_CREATE)) {
+          return NextResponse.json(
+            { success: false, error: '노래 생성 권한이 필요합니다.' },
+            { status: 403 }
+          );
+        }
+        console.log('➕ 새 노래 추가:', data.songData);
+        return await handleAddSong(data.songData);
+        
+      case 'create':
+        if (!hasPermission(userRole, Permission.SONGS_CREATE)) {
+          return NextResponse.json(
+            { success: false, error: '노래 생성 권한이 필요합니다.' },
+            { status: 403 }
+          );
+        }
+        console.log('➕ 새 노래 추가');
+        // TODO: 새 노래 추가 구현
+        break;
+        
       case 'delete':
-        // 곡 삭제 로직
+        if (!hasPermission(userRole, Permission.SONGS_DELETE)) {
+          return NextResponse.json(
+            { success: false, error: '노래 삭제 권한이 필요합니다.' },
+            { status: 403 }
+          );
+        }
         console.log('🗑️ 곡 삭제');
         // TODO: 곡 삭제 구현 (신중하게!)
         break;
@@ -152,16 +196,84 @@ export async function POST(request: NextRequest) {
         );
     }
 
+    console.log(`🔧 일괄 작업 실행: ${action}, 대상 곡: ${songIds?.length || 0}개, 권한: ${userRole}`);
+
     return NextResponse.json({
       success: true,
       message: `${action} 작업이 완료되었습니다.`,
-      affectedCount: songIds.length
+      affectedCount: songIds?.length || 0
     });
 
   } catch (error) {
     console.error('❌ 일괄 작업 오류:', error);
     return NextResponse.json(
       { success: false, error: '일괄 작업 중 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+// 새 곡 추가 함수
+async function handleAddSong(songData: {
+  title: string;
+  artist: string;
+  originalTitle?: string;
+  originalArtist?: string;
+  language: string;
+  lyrics?: string;
+  mrLinks?: string[];
+  tags?: string[];
+  personalNotes?: string;
+}) {
+  try {
+    await connectToDatabase();
+    
+    // 중복 체크
+    const existingSong = await SongDetail.findOne({
+      $or: [
+        { title: songData.title, artist: songData.artist },
+        { titleAlias: songData.title, artistAlias: songData.artist }
+      ]
+    });
+    
+    if (existingSong) {
+      return NextResponse.json(
+        { success: false, error: '이미 존재하는 곡입니다.' },
+        { status: 400 }
+      );
+    }
+    
+    // 새 곡 생성
+    const newSong = new SongDetail({
+      title: songData.originalTitle || songData.title,
+      artist: songData.originalArtist || songData.artist,
+      titleAlias: songData.originalTitle ? songData.title : undefined,
+      artistAlias: songData.originalArtist ? songData.artist : undefined,
+      language: songData.language,
+      lyrics: songData.lyrics || '',
+      mrLinks: songData.mrLinks || [],
+      tags: songData.tags || [],
+      searchTags: songData.tags || [],
+      personalNotes: songData.personalNotes || '',
+      sungCount: 0,
+      dateAdded: new Date(),
+      source: 'admin' // 관리자가 직접 추가한 곡임을 표시
+    });
+    
+    await newSong.save();
+    
+    console.log('✅ 새 곡 추가 완료:', songData.title);
+    
+    return NextResponse.json({
+      success: true,
+      message: `${songData.title} 곡이 성공적으로 추가되었습니다.`,
+      song: newSong
+    });
+    
+  } catch (error) {
+    console.error('❌ 새 곡 추가 오류:', error);
+    return NextResponse.json(
+      { success: false, error: '곡 추가 중 오류가 발생했습니다.' },
       { status: 500 }
     );
   }

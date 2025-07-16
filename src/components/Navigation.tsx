@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { UserIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { isSuperAdmin, canManageSongs, UserRole } from '@/lib/permissions';
 
 interface NavigationProps {
   currentPath?: string;
@@ -267,9 +268,11 @@ function AuthControls() {
           <div className="text-sm font-medium text-gray-900 dark:text-white">
             {session.user.name || session.user.channelName}
           </div>
-          {session.user.isAdmin && (
+          {canManageSongs(session.user.role as UserRole) && (
             <div className="text-xs text-light-accent dark:text-dark-primary font-medium">
-              {session.user.adminRole || '관리자'}
+              {session.user.role === 'super_admin' ? '최고 관리자' : 
+               session.user.role === 'song_admin' ? '노래 관리자' : 
+               session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
             </div>
           )}
         </div>
@@ -285,22 +288,26 @@ function AuthControls() {
             <div className="text-xs text-gray-500 dark:text-gray-400">
               치지직 ID: {truncateChannelId(session.user.channelId || '미확인')}
             </div>
-            {session.user.isAdmin && (
+            {canManageSongs(session.user.role as UserRole) && (
               <div className="text-xs text-light-accent dark:text-dark-primary font-medium mt-1">
-                ✨ {session.user.adminRole || '관리자'}
+                ✨ {session.user.role === 'super_admin' ? '최고 관리자' : 
+                    session.user.role === 'song_admin' ? '노래 관리자' : 
+                    session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
               </div>
             )}
           </div>
           
-          {session.user.isAdmin && (
+          {canManageSongs(session.user.role as UserRole) && (
             <>
-              <Link
-                href="/admin"
-                className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors duration-200"
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                관리자 대시보드
-              </Link>
+              {isSuperAdmin(session.user.role as UserRole) && (
+                <Link
+                  href="/admin"
+                  className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors duration-200"
+                  onClick={() => setIsDropdownOpen(false)}
+                >
+                  관리자 대시보드
+                </Link>
+              )}
               <Link
                 href="/admin/songs"
                 className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors duration-200"

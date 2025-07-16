@@ -2,24 +2,18 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { hasPermission, Permission, UserRole, canManageSongs } from "@/lib/permissions"
 import { 
   MusicalNoteIcon,
   MagnifyingGlassIcon,
-  AdjustmentsHorizontalIcon,
   PlusIcon,
-  ArrowDownTrayIcon,
-  ArrowUpTrayIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
-  XMarkIcon,
-  TagIcon,
   LanguageIcon,
   LinkIcon,
-  ClockIcon,
   HeartIcon,
-  ListBulletIcon,
   EyeIcon,
   PencilIcon,
   TrashIcon,
@@ -75,9 +69,12 @@ export default function SongManagement() {
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [selectedSongs, setSelectedSongs] = useState<Set<string>>(new Set())
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
-  const [showFilters, setShowFilters] = useState(false)
   const [loading, setLoading] = useState(true)
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(24) // 그리드 뷰에서 보기 좋은 수 (3x8)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [addLoading, setAddLoading] = useState(false)
   const [stats, setStats] = useState<AdminStats>({
     total: 0,
     complete: 0,
@@ -93,7 +90,7 @@ export default function SongManagement() {
   })
 
   // 실제 데이터 로드
-  const loadSongs = async () => {
+  const loadSongs = useCallback(async () => {
     try {
       setLoading(true)
       console.log('🔄 관리자 노래 목록 로딩 시작...')
@@ -126,7 +123,7 @@ export default function SongManagement() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
     if (status === 'loading') return
@@ -136,18 +133,18 @@ export default function SongManagement() {
       return
     }
 
-    if (!session.user.isAdmin) {
+    if (!canManageSongs(session.user.role as UserRole)) {
       router.push('/')
       return
     }
 
-    // 실제 데이터 로드
+    // 실제 데이터 로드 - 페이지 로딩 시 한 번만 실행
     loadSongs()
-  }, [session, status])
+  }, [session, status, router])
 
   // 필터링 효과
   useEffect(() => {
-    let filtered = songs.filter(song => {
+    const filtered = songs.filter(song => {
       const matchesSearch = song.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            song.artist.toLowerCase().includes(searchTerm.toLowerCase())
       const matchesLanguage = selectedLanguage === 'all' || song.language === selectedLanguage
@@ -157,10 +154,65 @@ export default function SongManagement() {
     })
     
     setFilteredSongs(filtered)
+    setCurrentPage(1) // 필터링 시 첫 페이지로 이동
   }, [songs, searchTerm, selectedLanguage, selectedStatus])
 
+  // 현재 페이지의 곡들
+  const currentSongs = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return filteredSongs.slice(startIndex, endIndex)
+  }, [filteredSongs, currentPage, itemsPerPage])
+
+  // 페이지 정보 계산
+  const totalPages = Math.ceil(filteredSongs.length / itemsPerPage)
+  const hasNextPage = currentPage < totalPages
+  const hasPrevPage = currentPage > 1
+
+  // Hook들을 최상단에 모두 선언
+  const handleSelectSong = useCallback((songId: string) => {
+    setSelectedSongs(prev => {
+      const newSelected = new Set(prev)
+      if (newSelected.has(songId)) {
+        newSelected.delete(songId)
+      } else {
+        newSelected.add(songId)
+      }
+      return newSelected
+    })
+  }, [])
+
+  // 권한별 사용 가능한 작업들을 미리 계산
+  const userRole = session?.user?.role as UserRole
+  const userPermissions = useMemo(() => ({
+    canEdit: userRole ? hasPermission(userRole, Permission.SONGS_EDIT) : false,
+    canCreate: userRole ? hasPermission(userRole, Permission.SONGS_CREATE) : false,
+    canDelete: userRole ? hasPermission(userRole, Permission.SONGS_DELETE) : false
+  }), [userRole])
+
+  const handleSelectAll = useCallback(() => {
+    // 전체 필터링된 곡들 중에서 선택된 곡의 수 계산
+    const selectedFilteredSongs = filteredSongs.filter(song => selectedSongs.has(song.id))
+    
+    if (selectedFilteredSongs.length === filteredSongs.length) {
+      // 전체 해제: 현재 필터링된 곡들만 선택에서 제거
+      setSelectedSongs(prev => {
+        const newSelected = new Set(prev)
+        filteredSongs.forEach(song => newSelected.delete(song.id))
+        return newSelected
+      })
+    } else {
+      // 전체 선택: 현재 필터링된 모든 곡들 선택
+      setSelectedSongs(prev => {
+        const newSelected = new Set(prev)
+        filteredSongs.forEach(song => newSelected.add(song.id))
+        return newSelected
+      })
+    }
+  }, [selectedSongs, filteredSongs])
+
   // 일괄 작업 실행
-  const executeBulkAction = async (action: string, data?: any) => {
+  const executeBulkAction = useCallback(async (action: string, data?: unknown) => {
     if (selectedSongs.size === 0) {
       alert('곡을 선택해주세요.')
       return
@@ -198,7 +250,120 @@ export default function SongManagement() {
     } finally {
       setBulkActionLoading(false)
     }
-  }
+  }, [selectedSongs, loadSongs])
+
+  // 일괄 작업 버튼 정의
+  const bulkActions = useMemo(() => {
+    const actions = []
+    
+    if (selectedSongs.size > 0) {
+      // 편집 권한이 있는 경우에만 편집 관련 액션 추가
+      if (userPermissions.canEdit) {
+        actions.push(
+          {
+            title: "MR 링크 추가",
+            description: "선택한 곡들에 MR 링크 추가",
+            icon: LinkIcon,
+            color: "bg-gradient-to-r from-blue-500 to-blue-600",
+            action: () => {
+              const mrLink = prompt('MR 링크를 입력하세요:')
+              if (mrLink) {
+                executeBulkAction('add-mr-link', { mrLink })
+              }
+            }
+          },
+          {
+            title: "가사 업데이트",
+            description: "선택한 곡들의 가사 상태 업데이트",
+            icon: PencilIcon,
+            color: "bg-gradient-to-r from-green-500 to-green-600",
+            action: () => {
+              const lyrics = prompt('가사를 입력하세요:')
+              if (lyrics) {
+                executeBulkAction('update-lyrics', { lyrics })
+              }
+            }
+          },
+          {
+            title: "상태 변경",
+            description: "선택한 곡들의 상태 일괄 변경",
+            icon: CheckCircleIcon,
+            color: "bg-gradient-to-r from-purple-500 to-purple-600",
+            action: () => {
+              const newStatus = prompt('새 상태를 입력하세요 (complete/missing-mr/missing-lyrics/new):')
+              if (newStatus && ['complete', 'missing-mr', 'missing-lyrics', 'new'].includes(newStatus)) {
+                executeBulkAction('update-status', { status: newStatus })
+              } else if (newStatus) {
+                alert('유효하지 않은 상태입니다.')
+              }
+            }
+          }
+        )
+      }
+      
+      // 삭제 권한이 있는 경우에만 삭제 액션 추가
+      if (userPermissions.canDelete) {
+        actions.push({
+          title: "곡 삭제",
+          description: "선택한 곡들을 삭제",
+          icon: TrashIcon,
+          color: "bg-gradient-to-r from-red-500 to-red-600",
+          action: () => {
+            if (confirm(`선택한 ${selectedSongs.size}곡을 정말 삭제하시겠습니까?`)) {
+              executeBulkAction('delete-songs')
+            }
+          }
+        })
+      }
+    }
+    
+    return actions
+  }, [selectedSongs.size, userPermissions.canEdit, userPermissions.canDelete, executeBulkAction])
+
+  // 새 곡 추가 함수
+  const handleAddSong = useCallback(async (songData: {
+    title: string
+    artist: string
+    originalTitle?: string
+    originalArtist?: string
+    language: string
+    lyrics?: string
+    mrLinks?: string[]
+    tags?: string[]
+    personalNotes?: string
+  }) => {
+    try {
+      setAddLoading(true)
+      console.log('🆕 새 곡 추가 시작:', songData.title)
+      
+      const response = await fetch('/api/admin/songs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'add-song',
+          songData: songData
+        })
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        alert(`${songData.title} 곡이 성공적으로 추가되었습니다!`)
+        setShowAddModal(false)
+        // 데이터 다시 로드
+        await loadSongs()
+      } else {
+        throw new Error(result.error || '곡 추가 실패')
+      }
+    } catch (error) {
+      console.error('❌ 새 곡 추가 오류:', error)
+      alert('곡 추가 중 오류가 발생했습니다.')
+    } finally {
+      setAddLoading(false)
+    }
+  }, [loadSongs])
 
   if (status === 'loading' || loading) {
     return (
@@ -213,7 +378,7 @@ export default function SongManagement() {
     )
   }
 
-  if (!session || !session.user.isAdmin) {
+  if (!session || !canManageSongs(session.user.role as UserRole)) {
     return null
   }
 
@@ -231,23 +396,6 @@ export default function SongManagement() {
     new: '신규'
   }
 
-  const handleSelectAll = () => {
-    if (selectedSongs.size === filteredSongs.length) {
-      setSelectedSongs(new Set())
-    } else {
-      setSelectedSongs(new Set(filteredSongs.map(song => song.id)))
-    }
-  }
-
-  const handleSelectSong = (songId: string) => {
-    const newSelected = new Set(selectedSongs)
-    if (newSelected.has(songId)) {
-      newSelected.delete(songId)
-    } else {
-      newSelected.add(songId)
-    }
-    setSelectedSongs(newSelected)
-  }
 
   const quickStats = [
     {
@@ -276,50 +424,6 @@ export default function SongManagement() {
     }
   ]
 
-  const bulkActions = [
-    {
-      title: "일괄 편집",
-      description: "선택된 곡들의 정보를 한번에 수정",
-      icon: PencilIcon,
-      color: "bg-light-accent hover:bg-light-accent/80",
-      action: () => {
-        // TODO: 일괄 편집 모달 열기
-        alert('일괄 편집 기능이 곧 추가됩니다!')
-      }
-    },
-    {
-      title: "MR 자동 검색",
-      description: "YouTube에서 MR 링크 자동 검색",
-      icon: MagnifyingGlassIcon,
-      color: "bg-orange-500 hover:bg-orange-600",
-      action: () => {
-        if (confirm(`선택된 ${selectedSongs.size}곡의 MR을 자동으로 검색하시겠습니까?`)) {
-          executeBulkAction('auto-search-mr')
-        }
-      }
-    },
-    {
-      title: "가사 일괄 추가",
-      description: "선택된 곡들에 가사 추가",
-      icon: TagIcon,
-      color: "bg-green-500 hover:bg-green-600",
-      action: () => {
-        // TODO: 가사 일괄 추가 모달 열기
-        alert('가사 일괄 추가 기능이 곧 추가됩니다!')
-      }
-    },
-    {
-      title: "삭제",
-      description: "선택된 곡들을 삭제",
-      icon: TrashIcon,
-      color: "bg-red-500 hover:bg-red-600",
-      action: () => {
-        if (confirm(`정말로 선택된 ${selectedSongs.size}곡을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
-          executeBulkAction('delete')
-        }
-      }
-    }
-  ]
 
   return (
     <div className="min-h-screen bg-light-background dark:bg-dark-background">
@@ -478,29 +582,45 @@ export default function SongManagement() {
                   </svg>
                 )}
               </button>
+
+              {/* 새 곡 추가 버튼 - 생성 권한이 있을 때만 표시 */}
+              {userPermissions.canCreate && (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="px-4 py-3 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple 
+                             text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 
+                             flex items-center gap-2 font-medium"
+                  title="새 곡 추가"
+                >
+                  <PlusIcon className="w-5 h-5" />
+                  <span className="hidden sm:inline">새 곡 추가</span>
+                </button>
+              )}
             </div>
           </div>
 
           {/* Bulk Actions */}
           <AnimatePresence>
-            {selectedSongs.size > 0 && (
+            {(selectedSongs.size > 0 || bulkActions.length > 0) && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 className="mt-6 pt-6 border-t border-light-primary/20 dark:border-dark-primary/20"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm text-light-text/60 dark:text-dark-text/60">
-                    {selectedSongs.size}곡 선택됨
+                {selectedSongs.size > 0 && (
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-sm text-light-text/60 dark:text-dark-text/60">
+                      {selectedSongs.size}곡 선택됨
+                    </div>
+                    <button
+                      onClick={() => setSelectedSongs(new Set())}
+                      className="text-sm text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent transition-colors"
+                    >
+                      선택 해제
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setSelectedSongs(new Set())}
-                    className="text-sm text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent transition-colors"
-                  >
-                    선택 해제
-                  </button>
-                </div>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {bulkActions.map((action, index) => (
                     <motion.button
@@ -566,17 +686,19 @@ export default function SongManagement() {
           {filteredSongs.length > 0 && (
             viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredSongs.map((song, index) => (
+                {currentSongs.map((song) => (
                   <motion.div
                     key={song.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: index * 0.05 }}
-                    className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 
-                               border border-light-primary/20 dark:border-dark-primary/20 
-                               hover:border-light-accent/40 dark:hover:border-dark-accent/40 
-                               transition-all duration-300 group cursor-pointer"
+                    transition={{ duration: 0.2 }}
                     onClick={() => handleSelectSong(song.id)}
+                    className={`bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 
+                               border transition-all duration-200 group cursor-pointer
+                               ${selectedSongs.has(song.id) 
+                                 ? 'border-light-accent dark:border-dark-accent bg-light-accent/10 dark:bg-dark-accent/10' 
+                                 : 'border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent/40 dark:hover:border-dark-accent/40'
+                               }`}
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
@@ -591,9 +713,11 @@ export default function SongManagement() {
                         <input
                           type="checkbox"
                           checked={selectedSongs.has(song.id)}
-                          onChange={() => handleSelectSong(song.id)}
+                          onChange={(e) => {
+                            e.stopPropagation()
+                            handleSelectSong(song.id)
+                          }}
                           className="w-4 h-4 text-light-accent focus:ring-light-accent border-light-primary/30 rounded"
-                          onClick={(e) => e.stopPropagation()}
                         />
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[song.status]}`}>
                           {statusLabels[song.status]}
@@ -655,7 +779,7 @@ export default function SongManagement() {
                         <th className="px-6 py-4 text-left">
                           <input
                             type="checkbox"
-                            checked={selectedSongs.size === filteredSongs.length && filteredSongs.length > 0}
+                            checked={filteredSongs.length > 0 && filteredSongs.filter(song => selectedSongs.has(song.id)).length === filteredSongs.length}
                             onChange={handleSelectAll}
                             className="w-4 h-4 text-light-accent focus:ring-light-accent border-light-primary/30 rounded"
                           />
@@ -669,19 +793,27 @@ export default function SongManagement() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-light-primary/10 dark:divide-dark-primary/10">
-                      {filteredSongs.map((song, index) => (
+                      {currentSongs.map((song) => (
                         <motion.tr
                           key={song.id}
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          transition={{ duration: 0.3, delay: index * 0.02 }}
-                          className="hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 transition-colors"
+                          transition={{ duration: 0.1 }}
+                          onClick={() => handleSelectSong(song.id)}
+                          className={`cursor-pointer transition-colors
+                            ${selectedSongs.has(song.id) 
+                              ? 'bg-light-accent/10 dark:bg-dark-accent/10' 
+                              : 'hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                            }`}
                         >
                           <td className="px-6 py-4">
                             <input
                               type="checkbox"
                               checked={selectedSongs.has(song.id)}
-                              onChange={() => handleSelectSong(song.id)}
+                              onChange={(e) => {
+                                e.stopPropagation()
+                                handleSelectSong(song.id)
+                              }}
                               className="w-4 h-4 text-light-accent focus:ring-light-accent border-light-primary/30 rounded"
                             />
                           </td>
@@ -708,14 +840,25 @@ export default function SongManagement() {
                           <td className="px-6 py-4">
                             <div className="flex gap-2">
                               <button 
-                                onClick={() => router.push(`/songbook?search=${encodeURIComponent(song.title)}`)}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  router.push(`/songbook?search=${encodeURIComponent(song.title)}`)
+                                }}
                                 className="p-1 rounded hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors"
                               >
                                 <EyeIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60" />
                               </button>
-                              <button className="p-1 rounded hover:bg-red-500/20 transition-colors">
-                                <TrashIcon className="w-4 h-4 text-red-500" />
-                              </button>
+                              {userPermissions.canDelete && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    // TODO: 삭제 기능 구현
+                                  }}
+                                  className="p-1 rounded hover:bg-red-500/20 transition-colors"
+                                >
+                                  <TrashIcon className="w-4 h-4 text-red-500" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </motion.tr>
@@ -726,20 +869,359 @@ export default function SongManagement() {
               </div>
             )
           )}
+
+          {/* 페이징 UI */}
+          {filteredSongs.length > 0 && (
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+              {/* 페이지 정보 */}
+              <div className="text-sm text-light-text/70 dark:text-dark-text/70">
+                <span className="font-medium text-light-text dark:text-dark-text">
+                  {filteredSongs.length}곡 중 {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredSongs.length)}곡 표시
+                </span>
+                {selectedSongs.size > 0 && (
+                  <span className="ml-2 text-light-accent dark:text-dark-accent">
+                    ({selectedSongs.size}곡 선택됨)
+                  </span>
+                )}
+              </div>
+
+              {/* 페이징 버튼 */}
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={!hasPrevPage}
+                    className="px-3 py-2 text-sm bg-white/30 dark:bg-gray-900/30 border border-light-primary/20 dark:border-dark-primary/20 
+                               rounded-lg hover:border-light-accent/40 dark:hover:border-dark-accent/40 transition-all
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    처음
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={!hasPrevPage}
+                    className="px-3 py-2 text-sm bg-white/30 dark:bg-gray-900/30 border border-light-primary/20 dark:border-dark-primary/20 
+                               rounded-lg hover:border-light-accent/40 dark:hover:border-dark-accent/40 transition-all
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    이전
+                  </button>
+                  
+                  {/* 페이지 번호 */}
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
+                      if (pageNum > totalPages) return null
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`px-3 py-2 text-sm rounded-lg transition-all
+                            ${pageNum === currentPage 
+                              ? 'bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple text-white' 
+                              : 'bg-white/30 dark:bg-gray-900/30 border border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent/40 dark:hover:border-dark-accent/40'
+                            }`}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={!hasNextPage}
+                    className="px-3 py-2 text-sm bg-white/30 dark:bg-gray-900/30 border border-light-primary/20 dark:border-dark-primary/20 
+                               rounded-lg hover:border-light-accent/40 dark:hover:border-dark-accent/40 transition-all
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    다음
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={!hasNextPage}
+                    className="px-3 py-2 text-sm bg-white/30 dark:bg-gray-900/30 border border-light-primary/20 dark:border-dark-primary/20 
+                               rounded-lg hover:border-light-accent/40 dark:hover:border-dark-accent/40 transition-all
+                               disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    마지막
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </motion.div>
 
-        {/* Floating Action Button */}
-        <motion.button
-          initial={{ opacity: 0, scale: 0 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3, delay: 0.5 }}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple 
-                     rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 
-                     flex items-center justify-center text-white z-50"
-        >
-          <PlusIcon className="w-6 h-6" />
-        </motion.button>
+        {/* 새 곡 추가 모달 */}
+        <AnimatePresence>
+          {showAddModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              onClick={() => setShowAddModal(false)}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <AddSongModal
+                  onClose={() => setShowAddModal(false)}
+                  onSubmit={handleAddSong}
+                  loading={addLoading}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
     </div>
+  )
+}
+
+// 새 곡 추가 모달 컴포넌트
+interface AddSongModalProps {
+  onClose: () => void
+  onSubmit: (songData: {
+    title: string
+    artist: string
+    originalTitle?: string
+    originalArtist?: string
+    language: string
+    lyrics?: string
+    mrLinks?: string[]
+    tags?: string[]
+    personalNotes?: string
+  }) => void
+  loading: boolean
+}
+
+function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
+  const [formData, setFormData] = useState({
+    title: '',
+    artist: '',
+    originalTitle: '',
+    originalArtist: '',
+    language: 'Korean',
+    lyrics: '',
+    mrLinks: '',
+    tags: '',
+    personalNotes: ''
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!formData.title.trim() || !formData.artist.trim()) {
+      alert('제목과 아티스트는 필수 항목입니다.')
+      return
+    }
+
+    const songData = {
+      title: formData.title.trim(),
+      artist: formData.artist.trim(),
+      originalTitle: formData.originalTitle.trim() || undefined,
+      originalArtist: formData.originalArtist.trim() || undefined,
+      language: formData.language,
+      lyrics: formData.lyrics.trim() || undefined,
+      mrLinks: formData.mrLinks.trim() ? formData.mrLinks.split('\n').map(link => link.trim()).filter(link => link) : undefined,
+      tags: formData.tags.trim() ? formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : undefined,
+      personalNotes: formData.personalNotes.trim() || undefined
+    }
+
+    onSubmit(songData)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-light-text dark:text-dark-text">새 곡 추가</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-8 h-8 bg-light-primary/20 dark:bg-dark-primary/20 rounded-lg 
+                     hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-colors
+                     flex items-center justify-center"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            제목 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.title}
+            onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                       text-light-text dark:text-dark-text"
+            placeholder="곡 제목을 입력하세요"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            아티스트 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.artist}
+            onChange={(e) => setFormData(prev => ({ ...prev, artist: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                       text-light-text dark:text-dark-text"
+            placeholder="아티스트명을 입력하세요"
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            원제목 (선택)
+          </label>
+          <input
+            type="text"
+            value={formData.originalTitle}
+            onChange={(e) => setFormData(prev => ({ ...prev, originalTitle: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                       text-light-text dark:text-dark-text"
+            placeholder="원제목이 있다면 입력하세요"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            원 아티스트 (선택)
+          </label>
+          <input
+            type="text"
+            value={formData.originalArtist}
+            onChange={(e) => setFormData(prev => ({ ...prev, originalArtist: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                       text-light-text dark:text-dark-text"
+            placeholder="원 아티스트명을 입력하세요"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            언어
+          </label>
+          <select
+            value={formData.language}
+            onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                       text-light-text dark:text-dark-text"
+          >
+            <option value="Korean">한국어</option>
+            <option value="English">영어</option>
+            <option value="Japanese">일본어</option>
+            <option value="Other">기타</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            태그 (선택)
+          </label>
+          <input
+            type="text"
+            value={formData.tags}
+            onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                       text-light-text dark:text-dark-text"
+            placeholder="태그를 쉼표로 구분하여 입력하세요"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+          MR 링크 (선택)
+        </label>
+        <textarea
+          value={formData.mrLinks}
+          onChange={(e) => setFormData(prev => ({ ...prev, mrLinks: e.target.value }))}
+          className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                     rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                     text-light-text dark:text-dark-text"
+          placeholder="MR 링크를 한 줄에 하나씩 입력하세요"
+          rows={3}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+          가사 (선택)
+        </label>
+        <textarea
+          value={formData.lyrics}
+          onChange={(e) => setFormData(prev => ({ ...prev, lyrics: e.target.value }))}
+          className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                     rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                     text-light-text dark:text-dark-text"
+          placeholder="가사를 입력하세요"
+          rows={4}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+          개인 노트 (선택)
+        </label>
+        <textarea
+          value={formData.personalNotes}
+          onChange={(e) => setFormData(prev => ({ ...prev, personalNotes: e.target.value }))}
+          className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                     rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                     text-light-text dark:text-dark-text"
+          placeholder="개인적인 노트나 메모를 입력하세요"
+          rows={2}
+        />
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 text-light-text dark:text-dark-text hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                     rounded-lg transition-colors"
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-6 py-2 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple 
+                     text-white rounded-lg hover:shadow-lg transition-all duration-300 
+                     disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {loading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              추가 중...
+            </>
+          ) : (
+            '곡 추가'
+          )}
+        </button>
+      </div>
+    </form>
   )
 }

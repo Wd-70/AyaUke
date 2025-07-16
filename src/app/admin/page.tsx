@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import { isSuperAdmin, UserRole } from "@/lib/permissions"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   ChartBarIcon,
@@ -41,7 +42,7 @@ export default function AdminDashboard() {
       return
     }
 
-    if (!session.user.isAdmin) {
+    if (!isSuperAdmin(session.user.role as UserRole)) {
       router.push('/')
       return
     }
@@ -63,7 +64,7 @@ export default function AdminDashboard() {
     )
   }
 
-  if (!session || !session.user.isAdmin) {
+  if (!session || !isSuperAdmin(session.user.role as UserRole)) {
     return null
   }
 
@@ -198,7 +199,7 @@ export default function AdminDashboard() {
               </div>
               <div className="flex items-center gap-2">
                 <EyeIcon className="w-4 h-4" />
-                <span>권한: 최고 관리자</span>
+                <span>권한: {session.user.role === 'super_admin' ? '최고 관리자' : session.user.role}</span>
               </div>
             </div>
           </div>
