@@ -609,8 +609,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                      rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
                      shadow-2xl transform -translate-x-1/2 youtube-dialog-container"
           style={{ 
-            top: isMobileScreen ? '1rem' : '5rem', // 모바일에서는 상단 여백을 최소화
-            height: isMobileScreen ? 'calc(var(--vh, 1vh) * 100 - 2rem)' : 'calc(var(--vh, 1vh) * 100 - 6rem)',
+            top: isMobileScreen ? '4.5rem' : '5rem', // 모바일: 네비게이션 바(4rem) + 0.5rem 여백
+            height: isMobileScreen ? 'calc(var(--vh, 1vh) * 100 - 5rem)' : 'calc(var(--vh, 1vh) * 100 - 6rem)',
             overscrollBehavior: 'contain' 
           }}
           onWheel={handleDialogScroll}
