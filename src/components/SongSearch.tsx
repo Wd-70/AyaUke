@@ -134,6 +134,9 @@ export default function SongSearch({
         return (
           isTextMatch(debouncedSearchTerm, song.title) ||
           isTextMatch(debouncedSearchTerm, song.artist) ||
+          // alias 필드도 검색 대상에 포함
+          (song.titleAlias && isTextMatch(debouncedSearchTerm, song.titleAlias)) ||
+          (song.artistAlias && isTextMatch(debouncedSearchTerm, song.artistAlias)) ||
           song.tags?.some((tag: string) =>
             isTextMatch(debouncedSearchTerm, tag)
           ) ||

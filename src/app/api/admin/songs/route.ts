@@ -237,14 +237,15 @@ async function handleAddSong(songData: {
   try {
     await dbConnect();
     
-    // 중복 체크 (title이 unique이므로 제목만 확인)
+    // 중복 체크 (제목+아티스트 복합 unique이므로 둘 다 확인)
     const existingSong = await SongDetail.findOne({
-      title: songData.title
+      title: songData.title,
+      artist: songData.artist
     });
     
     if (existingSong) {
       return NextResponse.json(
-        { success: false, error: '같은 제목의 곡이 이미 존재합니다.' },
+        { success: false, error: '같은 제목과 아티스트의 곡이 이미 존재합니다.' },
         { status: 400 }
       );
     }

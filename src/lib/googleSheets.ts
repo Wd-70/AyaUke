@@ -151,16 +151,21 @@ function normalizeTitle(title: string): string {
     .trim();
 }
 
+// 제목+아티스트 복합키를 생성하는 함수
+function createSongKey(title: string, artist: string): string {
+  return `${normalizeTitle(title)}|||${normalizeTitle(artist)}`;
+}
+
 export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[]): Song[] {
-  // MongoDB 데이터를 정규화된 title로 맵 생성
+  // MongoDB 데이터를 정규화된 title+artist 복합키로 맵 생성
   const detailsMap = new Map<string, SongDetail>();
   const normalizedToOriginalMap = new Map<string, string>(); // 디버깅용
   const usedMongoSongs = new Set<string>(); // 이미 매칭된 MongoDB 곡들 추적
   
   songDetails.forEach(detail => {
-    const normalizedTitle = normalizeTitle(detail.title);
-    detailsMap.set(normalizedTitle, detail);
-    normalizedToOriginalMap.set(normalizedTitle, detail.title);
+    const songKey = createSongKey(detail.title, detail.artist);
+    detailsMap.set(songKey, detail);
+    normalizedToOriginalMap.set(songKey, `${detail.title} - ${detail.artist}`);
   });
 
   console.log('🔍 병합 디버깅:', {
@@ -171,17 +176,18 @@ export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[]): S
 
   // 1. 구글시트 데이터에 MongoDB 데이터 병합
   const mergedSheetSongs = sheetSongs.map(song => {
-    const normalizedSheetTitle = normalizeTitle(song.title);
-    const detail = detailsMap.get(normalizedSheetTitle);
+    const sheetSongKey = createSongKey(song.title, song.artist);
+    const detail = detailsMap.get(sheetSongKey);
     
     // 디버깅: 몇 개 샘플만 출력
     if (song.id === 'song-75' || song.id === 'song-1' || song.id === 'song-10') {
-      console.log(`🔍 "${song.title}" 매칭 결과:`, {
+      console.log(`🔍 "${song.title} - ${song.artist}" 매칭 결과:`, {
         found: !!detail,
         mongoTitle: detail?.title,
+        mongoArtist: detail?.artist,
         sheetTitle: song.title,
-        normalizedSheet: normalizedSheetTitle,
-        normalizedMongo: detail ? normalizeTitle(detail.title) : 'N/A'
+        sheetArtist: song.artist,
+        sheetKey: sheetSongKey
       });
     }
     
@@ -191,7 +197,7 @@ export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[]): S
     }
 
     // 매칭된 MongoDB 곡 표시
-    usedMongoSongs.add(normalizedSheetTitle);
+    usedMongoSongs.add(sheetSongKey);
 
     // MongoDB 데이터를 우선하되, title/artist만 구글시트 값 사용
     return {
@@ -224,10 +230,10 @@ export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[]): S
   let mongoOnlyCounter = 1;
   
   songDetails.forEach(detail => {
-    const normalizedTitle = normalizeTitle(detail.title);
+    const mongoSongKey = createSongKey(detail.title, detail.artist);
     
     // 구글시트에 매칭되지 않은 MongoDB 곡들만 추가
-    if (!usedMongoSongs.has(normalizedTitle)) {
+    if (!usedMongoSongs.has(mongoSongKey)) {
       mongoOnlySongs.push({
         id: detail._id,              // MongoDB ObjectId를 메인 ID로 사용
         title: detail.title,
@@ -255,14 +261,19 @@ export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[]): S
 
   const finalSongs = [...mergedSheetSongs, ...mongoOnlySongs];
   
-  // 중복 제거: ID 기준으로 중복된 곡들 제거
-  const seenIds = new Set<string>();
+  // 중복 제거: 제목+아티스트(alias 기준) 복합키로 중복된 곡들 제거
+  const seenSongKeys = new Set<string>();
   const deduplicatedSongs = finalSongs.filter(song => {
-    if (seenIds.has(song.id)) {
-      console.log('🚫 중복 곡 발견, 제거:', song.title, '-', song.artist, '(ID:', song.id, ')');
+    // alias가 있으면 alias 사용, 없으면 원본 사용
+    const displayTitle = song.titleAlias || song.title;
+    const displayArtist = song.artistAlias || song.artist;
+    const songKey = createSongKey(displayTitle, displayArtist);
+    
+    if (seenSongKeys.has(songKey)) {
+      console.log('🚫 중복 곡 발견, 제거:', displayTitle, '-', displayArtist, '(Key:', songKey, ')');
       return false;
     }
-    seenIds.add(song.id);
+    seenSongKeys.add(songKey);
     return true;
   });
   

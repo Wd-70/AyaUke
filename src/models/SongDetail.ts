@@ -153,7 +153,9 @@ const SongDetailSchema: Schema = new Schema({
   timestamps: true,
 });
 
-SongDetailSchema.index({ title: 1 }, { unique: true });
+// 제목+아티스트 복합 unique 인덱스 (같은 제목이라도 다른 아티스트면 허용)
+SongDetailSchema.index({ title: 1, artist: 1 }, { unique: true });
+SongDetailSchema.index({ title: 1 }); // 제목 검색용
 SongDetailSchema.index({ sungCount: -1 });
 SongDetailSchema.index({ lastSungDate: -1 });
 SongDetailSchema.index({ searchTags: 1 });
