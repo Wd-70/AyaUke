@@ -55,6 +55,7 @@ interface AdminStats {
     Korean: number
     English: number
     Japanese: number
+    Chinese: number
     Other: number
   }
 }
@@ -85,6 +86,7 @@ export default function SongManagement() {
       Korean: 0,
       English: 0,
       Japanese: 0,
+      Chinese: 0,
       Other: 0
     }
   })
@@ -324,13 +326,10 @@ export default function SongManagement() {
   const handleAddSong = useCallback(async (songData: {
     title: string
     artist: string
-    originalTitle?: string
-    originalArtist?: string
     language: string
     lyrics?: string
     mrLinks?: string[]
     tags?: string[]
-    personalNotes?: string
   }) => {
     try {
       setAddLoading(true)
@@ -537,6 +536,7 @@ export default function SongManagement() {
                 <option value="Korean">한국어 ({stats.languages.Korean})</option>
                 <option value="English">영어 ({stats.languages.English})</option>
                 <option value="Japanese">일본어 ({stats.languages.Japanese})</option>
+                <option value="Chinese">중국어 ({stats.languages.Chinese})</option>
                 {stats.languages.Other > 0 && (
                   <option value="Other">기타 ({stats.languages.Other})</option>
                 )}
@@ -990,13 +990,10 @@ interface AddSongModalProps {
   onSubmit: (songData: {
     title: string
     artist: string
-    originalTitle?: string
-    originalArtist?: string
     language: string
     lyrics?: string
     mrLinks?: string[]
     tags?: string[]
-    personalNotes?: string
   }) => void
   loading: boolean
 }
@@ -1005,13 +1002,10 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     artist: '',
-    originalTitle: '',
-    originalArtist: '',
     language: 'Korean',
     lyrics: '',
     mrLinks: '',
-    tags: '',
-    personalNotes: ''
+    tags: ''
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1025,13 +1019,10 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
     const songData = {
       title: formData.title.trim(),
       artist: formData.artist.trim(),
-      originalTitle: formData.originalTitle.trim() || undefined,
-      originalArtist: formData.originalArtist.trim() || undefined,
       language: formData.language,
       lyrics: formData.lyrics.trim() || undefined,
       mrLinks: formData.mrLinks.trim() ? formData.mrLinks.split('\n').map(link => link.trim()).filter(link => link) : undefined,
-      tags: formData.tags.trim() ? formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : undefined,
-      personalNotes: formData.personalNotes.trim() || undefined
+      tags: formData.tags.trim() ? formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : undefined
     }
 
     onSubmit(songData)
@@ -1089,36 +1080,6 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
 
         <div>
           <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
-            원제목 (선택)
-          </label>
-          <input
-            type="text"
-            value={formData.originalTitle}
-            onChange={(e) => setFormData(prev => ({ ...prev, originalTitle: e.target.value }))}
-            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
-                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
-                       text-light-text dark:text-dark-text"
-            placeholder="원제목이 있다면 입력하세요"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
-            원 아티스트 (선택)
-          </label>
-          <input
-            type="text"
-            value={formData.originalArtist}
-            onChange={(e) => setFormData(prev => ({ ...prev, originalArtist: e.target.value }))}
-            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
-                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
-                       text-light-text dark:text-dark-text"
-            placeholder="원 아티스트명을 입력하세요"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
             언어
           </label>
           <select
@@ -1131,6 +1092,7 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
             <option value="Korean">한국어</option>
             <option value="English">영어</option>
             <option value="Japanese">일본어</option>
+            <option value="Chinese">중국어</option>
             <option value="Other">기타</option>
           </select>
         </div>
@@ -1181,20 +1143,6 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
-          개인 노트 (선택)
-        </label>
-        <textarea
-          value={formData.personalNotes}
-          onChange={(e) => setFormData(prev => ({ ...prev, personalNotes: e.target.value }))}
-          className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
-                     rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
-                     text-light-text dark:text-dark-text"
-          placeholder="개인적인 노트나 메모를 입력하세요"
-          rows={2}
-        />
-      </div>
 
       <div className="flex justify-end gap-3 pt-4">
         <button

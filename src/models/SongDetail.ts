@@ -112,6 +112,43 @@ const SongDetailSchema: Schema = new Schema({
       message: '올바른 URL 형식을 입력해주세요.'
     }
   },
+  // 곡 상태 관리
+  status: {
+    type: String,
+    enum: ['active', 'deleted', 'pending', 'rejected'],
+    default: 'active'
+  },
+  // 곡 소스 타입 (기존 source 필드 확장)
+  sourceType: {
+    type: String,
+    enum: ['sheet', 'admin', 'user_suggestion'],
+    default: 'sheet'
+  },
+  // 추천자 정보 (사용자 추천곡인 경우)
+  suggestedBy: {
+    type: String, // 사용자 채널 ID
+    trim: true,
+  },
+  // 삭제 관련 정보
+  deletedAt: {
+    type: Date,
+  },
+  deletedBy: {
+    type: String, // 삭제한 관리자 채널 ID
+    trim: true,
+  },
+  deleteReason: {
+    type: String,
+    trim: true,
+  },
+  // 승인 관련 정보 (추천곡용)
+  approvedAt: {
+    type: Date,
+  },
+  approvedBy: {
+    type: String, // 승인한 관리자 채널 ID
+    trim: true,
+  },
 }, {
   timestamps: true,
 });
@@ -121,6 +158,10 @@ SongDetailSchema.index({ sungCount: -1 });
 SongDetailSchema.index({ lastSungDate: -1 });
 SongDetailSchema.index({ searchTags: 1 });
 SongDetailSchema.index({ language: 1 });
+SongDetailSchema.index({ status: 1 });
+SongDetailSchema.index({ sourceType: 1 });
+SongDetailSchema.index({ suggestedBy: 1 });
+SongDetailSchema.index({ deletedAt: -1 });
 
 // 새로운 통일된 모델명 (SongDetail)
 const SongDetail = mongoose.models.SongDetail || mongoose.model<ISongDetail>('SongDetail', SongDetailSchema);

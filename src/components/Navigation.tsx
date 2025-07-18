@@ -272,6 +272,7 @@ function AuthControls() {
             <div className="text-xs text-light-accent dark:text-dark-primary font-medium">
               {session.user.role === 'super_admin' ? '최고 관리자' : 
                session.user.role === 'song_admin' ? '노래 관리자' : 
+               session.user.role === 'ayauke_admin' ? '노래책 관리자' :
                session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
             </div>
           )}
@@ -292,6 +293,7 @@ function AuthControls() {
               <div className="text-xs text-light-accent dark:text-dark-primary font-medium mt-1">
                 ✨ {session.user.role === 'super_admin' ? '최고 관리자' : 
                     session.user.role === 'song_admin' ? '노래 관리자' : 
+                    session.user.role === 'ayauke_admin' ? '노래책 관리자' :
                     session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
               </div>
             )}

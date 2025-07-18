@@ -3,8 +3,8 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import { fetchSongsFromSheet } from '@/lib/googleSheets';
 import { hasPermission, Permission, UserRole } from '@/lib/permissions';
-import { connectToDatabase } from '@/lib/mongodb';
-import { SongDetail } from '@/models/SongDetail';
+import dbConnect from '@/lib/mongodb';
+import SongDetail from '@/models/SongDetail';
 
 export async function GET(request: NextRequest) {
   try {
@@ -86,7 +86,8 @@ export async function GET(request: NextRequest) {
         Korean: songsWithStatus.filter(s => s.language === 'Korean').length,
         English: songsWithStatus.filter(s => s.language === 'English').length,
         Japanese: songsWithStatus.filter(s => s.language === 'Japanese').length,
-        Other: songsWithStatus.filter(s => !['Korean', 'English', 'Japanese'].includes(s.language)).length
+        Chinese: songsWithStatus.filter(s => s.language === 'Chinese').length,
+        Other: songsWithStatus.filter(s => !['Korean', 'English', 'Japanese', 'Chinese'].includes(s.language)).length
       }
     };
 
@@ -118,7 +119,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { action, songIds, data } = await request.json();
+    const body = await request.json();
+    const { action, songIds, data, songData } = body;
     
     // 작업별 권한 체크
     const userRole = session.user.role as UserRole;
@@ -164,8 +166,8 @@ export async function POST(request: NextRequest) {
             { status: 403 }
           );
         }
-        console.log('➕ 새 노래 추가:', data.songData);
-        return await handleAddSong(data.songData);
+        console.log('➕ 새 노래 추가:', songData);
+        return await handleAddSong(songData);
         
       case 'create':
         if (!hasPermission(userRole, Permission.SONGS_CREATE)) {
@@ -177,6 +179,16 @@ export async function POST(request: NextRequest) {
         console.log('➕ 새 노래 추가');
         // TODO: 새 노래 추가 구현
         break;
+        
+      case 'delete-songs':
+        if (!hasPermission(userRole, Permission.SONGS_DELETE)) {
+          return NextResponse.json(
+            { success: false, error: '노래 삭제 권한이 필요합니다.' },
+            { status: 403 }
+          );
+        }
+        console.log('🗑️ 곡 삭제:', songIds);
+        return await handleDeleteSongs(songIds, session.user.channelId, data?.reason);
         
       case 'delete':
         if (!hasPermission(userRole, Permission.SONGS_DELETE)) {
@@ -217,47 +229,42 @@ export async function POST(request: NextRequest) {
 async function handleAddSong(songData: {
   title: string;
   artist: string;
-  originalTitle?: string;
-  originalArtist?: string;
   language: string;
   lyrics?: string;
   mrLinks?: string[];
   tags?: string[];
-  personalNotes?: string;
 }) {
   try {
-    await connectToDatabase();
+    await dbConnect();
     
-    // 중복 체크
+    // 중복 체크 (title이 unique이므로 제목만 확인)
     const existingSong = await SongDetail.findOne({
-      $or: [
-        { title: songData.title, artist: songData.artist },
-        { titleAlias: songData.title, artistAlias: songData.artist }
-      ]
+      title: songData.title
     });
     
     if (existingSong) {
       return NextResponse.json(
-        { success: false, error: '이미 존재하는 곡입니다.' },
+        { success: false, error: '같은 제목의 곡이 이미 존재합니다.' },
         { status: 400 }
       );
     }
     
+    // MR 링크를 올바른 형식으로 변환
+    const mrLinks = songData.mrLinks?.map(url => ({ url })) || [];
+    
     // 새 곡 생성
     const newSong = new SongDetail({
-      title: songData.originalTitle || songData.title,
-      artist: songData.originalArtist || songData.artist,
-      titleAlias: songData.originalTitle ? songData.title : undefined,
-      artistAlias: songData.originalArtist ? songData.artist : undefined,
+      title: songData.title,
+      artist: songData.artist,
       language: songData.language,
       lyrics: songData.lyrics || '',
-      mrLinks: songData.mrLinks || [],
-      tags: songData.tags || [],
+      mrLinks: mrLinks,
       searchTags: songData.tags || [],
-      personalNotes: songData.personalNotes || '',
+      personalNotes: '',
       sungCount: 0,
-      dateAdded: new Date(),
-      source: 'admin' // 관리자가 직접 추가한 곡임을 표시
+      // 새 필드들 (명시적으로 설정)
+      status: 'active',
+      sourceType: 'admin'
     });
     
     await newSong.save();
@@ -274,6 +281,64 @@ async function handleAddSong(songData: {
     console.error('❌ 새 곡 추가 오류:', error);
     return NextResponse.json(
       { success: false, error: '곡 추가 중 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
+}
+
+// 곡 삭제 함수 (소프트 삭제)
+async function handleDeleteSongs(songIds: string[], deletedBy: string, reason?: string) {
+  try {
+    await dbConnect();
+    
+    if (!songIds || songIds.length === 0) {
+      return NextResponse.json(
+        { success: false, error: '삭제할 곡을 선택해주세요.' },
+        { status: 400 }
+      );
+    }
+    
+    // 존재하는 곡들 확인
+    const existingSongs = await SongDetail.find({
+      _id: { $in: songIds },
+      status: { $ne: 'deleted' }
+    });
+    
+    if (existingSongs.length === 0) {
+      return NextResponse.json(
+        { success: false, error: '삭제할 수 있는 곡이 없습니다.' },
+        { status: 400 }
+      );
+    }
+    
+    // 소프트 삭제 실행
+    const result = await SongDetail.updateMany(
+      {
+        _id: { $in: songIds },
+        status: { $ne: 'deleted' }
+      },
+      {
+        $set: {
+          status: 'deleted',
+          deletedAt: new Date(),
+          deletedBy: deletedBy,
+          deleteReason: reason || '관리자에 의한 삭제'
+        }
+      }
+    );
+    
+    console.log(`✅ ${result.modifiedCount}곡 삭제 완료`);
+    
+    return NextResponse.json({
+      success: true,
+      message: `${result.modifiedCount}곡이 삭제되었습니다.`,
+      affectedCount: result.modifiedCount
+    });
+    
+  } catch (error) {
+    console.error('❌ 곡 삭제 오료:', error);
+    return NextResponse.json(
+      { success: false, error: '곡 삭제 중 오류가 발생했습니다.' },
       { status: 500 }
     );
   }

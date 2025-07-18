@@ -1,6 +1,7 @@
 export enum UserRole {
   SUPER_ADMIN = 'super_admin',
   SONG_ADMIN = 'song_admin', 
+  AYAUKE_ADMIN = 'ayauke_admin', // 아야우케 관리자 (SONG_ADMIN과 동일한 권한)
   SONG_EDITOR = 'song_editor',
   USER = 'user'
 }
@@ -31,6 +32,14 @@ const ROLE_PERMISSIONS = {
     Permission.SONGS_STATS,
   ],
   [UserRole.SONG_ADMIN]: [
+    Permission.SONGS_VIEW,
+    Permission.SONGS_CREATE,
+    Permission.SONGS_EDIT,
+    Permission.SONGS_DELETE,
+    Permission.SONGS_BULK_EDIT,
+    Permission.SONGS_STATS,
+  ],
+  [UserRole.AYAUKE_ADMIN]: [
     Permission.SONGS_VIEW,
     Permission.SONGS_CREATE,
     Permission.SONGS_EDIT,

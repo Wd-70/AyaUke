@@ -121,7 +121,10 @@ export default function ProfileClient() {
                           {session.user.isAdmin && (
                             <span className="flex items-center gap-1 px-2 py-1 bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent rounded-full">
                               <Cog6ToothIcon className="w-3 h-3" />
-                              {session.user.adminRole || '관리자'}
+                              {session.user.role === 'super_admin' ? '최고 관리자' : 
+                               session.user.role === 'song_admin' ? '노래 관리자' : 
+                               session.user.role === 'ayauke_admin' ? '노래책 관리자' :
+                               session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
                             </span>
                           )}
                         </div>

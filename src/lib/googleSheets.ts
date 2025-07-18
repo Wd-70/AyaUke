@@ -85,8 +85,15 @@ export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
     console.log('✅ MongoDB 연결 성공');
     
     console.log('📊 MongoDB에서 데이터 조회 중...');
-    const songDetails = await SongDetail.find({}).sort({ updatedAt: -1 }).lean();
-    console.log(`📋 MongoDB에서 ${songDetails.length}곡 조회 완료`);
+    const songDetails = await SongDetail.find({ 
+      $and: [
+        // 삭제된 곡 제외 (기존 데이터는 status 필드가 없으므로 null도 허용)
+        { $or: [{ status: { $ne: 'deleted' } }, { status: { $exists: false } }] },
+        // 유저 추천곡 제외 (기존 데이터는 sourceType 필드가 없으므로 null도 허용)
+        { $or: [{ sourceType: { $in: ['sheet', 'admin'] } }, { sourceType: { $exists: false } }] }
+      ]
+    }).sort({ updatedAt: -1 }).lean();
+    console.log(`📋 MongoDB에서 ${songDetails.length}곡 조회 완료 (삭제된 곡 제외)`);
     
     // Mongoose 문서를 일반 객체로 변환 (MongoDB _id 포함)
     return songDetails.map(doc => ({
@@ -107,6 +114,15 @@ export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
       imageUrl: doc.imageUrl,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
+      // 새 필드들 (기존 데이터 호환성을 위한 기본값 설정)
+      status: doc.status || 'active',
+      sourceType: doc.sourceType || 'sheet',
+      suggestedBy: doc.suggestedBy,
+      deletedAt: doc.deletedAt,
+      deletedBy: doc.deletedBy,
+      deleteReason: doc.deleteReason,
+      approvedAt: doc.approvedAt,
+      approvedBy: doc.approvedBy,
     }));
   } catch (error) {
     console.error('❌ MongoDB 오류 발생:', error);
