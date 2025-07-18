@@ -74,8 +74,11 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
 
           {/* Right side - Controls */}
           <div className="flex items-center justify-end flex-1 space-x-2">
-            {/* Auth Controls */}
-            <AuthControls />
+            {/* Desktop Auth Controls */}
+            <div className="hidden md:block">
+              <AuthControls />
+            </div>
+            
             {/* Mobile menu button */}
             <button 
               className="md:hidden p-2 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-all duration-300"
@@ -131,6 +134,10 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-light-primary/20 dark:border-dark-primary/20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md">
             <div className="px-4 py-2 space-y-1">
+              {/* 1. 사용자 정보 */}
+              <MobileUserProfile />
+              
+              {/* 2. 홈, 노래책 링크 */}
               <Link 
                 href="/" 
                 className={`block px-3 py-2 text-base font-medium rounded-lg transition-all duration-200 ${
@@ -154,7 +161,13 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
                 노래책
               </Link>
               
-              {/* Theme toggle for mobile */}
+              {/* 3. 권한별 추가 메뉴 */}
+              <MobileAdminMenus onMenuClose={() => setIsMobileMenuOpen(false)} />
+              
+              {/* 4. 로그아웃 */}
+              <MobileLogout onMenuClose={() => setIsMobileMenuOpen(false)} />
+              
+              {/* 5. 테마 토글 */}
               <div className="border-t border-light-primary/10 dark:border-dark-primary/10 pt-1 mt-1">
                 <button
                   className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
@@ -233,7 +246,7 @@ function AuthControls() {
         ) : (
           <Link
             href="/auth/signin"
-            className="hidden md:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-light-accent to-light-secondary hover:from-light-secondary hover:to-light-accent dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent text-white text-sm font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-light-accent to-light-secondary hover:from-light-secondary hover:to-light-accent dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent text-white text-sm font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
           >
             <UserIcon className="w-4 h-4" />
             <span>로그인</span>
@@ -340,6 +353,132 @@ function AuthControls() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// 1. 사용자 정보 (로그인/프로필)
+function MobileUserProfile() {
+  const { data: session, status } = useSession();
+
+  if (status === 'loading') {
+    return (
+      <div className="mb-3 pb-3 border-b border-light-primary/10 dark:border-dark-primary/10">
+        <div className="px-3 py-2">
+          <div className="w-full h-8 bg-light-primary/20 dark:bg-dark-primary/20 rounded-lg animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="mb-3 pb-3 border-b border-light-primary/10 dark:border-dark-primary/10">
+        <Link
+          href="/auth/signin"
+          className="flex items-center w-full px-3 py-2 text-base font-medium text-white bg-gradient-to-r from-light-accent to-light-secondary hover:from-light-secondary hover:to-light-accent dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent rounded-lg transition-all duration-200"
+        >
+          <UserIcon className="w-5 h-5 mr-3" />
+          <span>로그인</span>
+        </Link>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return null;
+  }
+
+  return (
+    <div className="mb-3 pb-3 border-b border-light-primary/10 dark:border-dark-primary/10">
+      <div className="px-3 py-2">
+        <div className="flex items-center space-x-3">
+          {session.user.image ? (
+            <img
+              src={session.user.image}
+              alt={session.user.name || 'Profile'}
+              className="w-8 h-8 rounded-full"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-light-accent to-light-secondary dark:from-dark-accent dark:to-dark-secondary flex items-center justify-center">
+              <UserIcon className="w-4 h-4 text-white" />
+            </div>
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              {session.user.name || session.user.channelName}
+            </div>
+            {canManageSongs(session.user.role as UserRole) && (
+              <div className="text-xs text-light-accent dark:text-dark-primary font-medium">
+                ✨ {session.user.role === 'super_admin' ? '최고 관리자' : 
+                    session.user.role === 'song_admin' ? '노래 관리자' : 
+                    session.user.role === 'ayauke_admin' ? '노래책 관리자' :
+                    session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {/* 프로필 링크도 사용자 정보에 포함 */}
+      <Link
+        href="/profile"
+        className="block px-3 py-2 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
+      >
+        내 프로필
+      </Link>
+    </div>
+  );
+}
+
+// 3. 권한별 추가 메뉴
+function MobileAdminMenus({ onMenuClose }: { onMenuClose: () => void }) {
+  const { data: session } = useSession();
+
+  if (!session || !canManageSongs(session.user.role as UserRole)) {
+    return null;
+  }
+
+  return (
+    <div className="mb-3 pb-3 border-b border-light-primary/10 dark:border-dark-primary/10">
+      {isSuperAdmin(session.user.role as UserRole) && (
+        <Link
+          href="/admin"
+          className="block px-3 py-2 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
+          onClick={onMenuClose}
+        >
+          관리자 대시보드
+        </Link>
+      )}
+      <Link
+        href="/admin/songs"
+        className="block px-3 py-2 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
+        onClick={onMenuClose}
+      >
+        노래 관리
+      </Link>
+    </div>
+  );
+}
+
+// 4. 로그아웃
+function MobileLogout({ onMenuClose }: { onMenuClose: () => void }) {
+  const { data: session } = useSession();
+
+  if (!session) {
+    return null;
+  }
+
+  return (
+    <div className="mb-3 pb-3 border-b border-light-primary/10 dark:border-dark-primary/10">
+      <button
+        onClick={() => {
+          onMenuClose();
+          signOut();
+        }}
+        className="block w-full text-left px-3 py-2 text-base font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+      >
+        로그아웃
+      </button>
     </div>
   );
 }
