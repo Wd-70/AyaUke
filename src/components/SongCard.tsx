@@ -396,13 +396,17 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
   // 다이얼로그 열릴 때 body 스크롤 비활성화
   useEffect(() => {
     if (isExpanded) {
-      // body 스크롤 비활성화
+      // body 스크롤 완전 비활성화
       document.body.style.overflow = 'hidden';
       document.body.style.paddingRight = '0px'; // 스크롤바 공간 보정
+      document.body.style.touchAction = 'none'; // 터치 스크롤 방지
+      document.documentElement.style.overflow = 'hidden'; // html 요소도 차단
     } else {
       // body 스크롤 복원
       document.body.style.overflow = '';
       document.body.style.paddingRight = '';
+      document.body.style.touchAction = '';
+      document.documentElement.style.overflow = '';
       // 모달이 닫힐 때 YouTube 플레이어 초기화
       setYoutubePlayer(null);
       setIsPlaying(false);
@@ -413,6 +417,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
     return () => {
       document.body.style.overflow = '';
       document.body.style.paddingRight = '';
+      document.body.style.touchAction = '';
+      document.documentElement.style.overflow = '';
       setYoutubePlayer(null);
       setIsPlaying(false);
     };
@@ -421,6 +427,23 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
   // 스크롤 이벤트 전파 방지 핸들러 (다중 이벤트 처리)
   const handleScrollPreventPropagation = (e: React.WheelEvent) => {
     e.stopPropagation();
+  };
+
+  // 다이얼로그 전체에서 스크롤 이벤트 완전 차단
+  const handleDialogScroll = (e: React.WheelEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // 추가 보안: 네이티브 이벤트도 차단
+    if (e.nativeEvent) {
+      e.nativeEvent.stopImmediatePropagation();
+    }
+  };
+
+  // 스크롤 가능한 영역에서만 스크롤 허용
+  const handleScrollableAreaScroll = (e: React.WheelEvent) => {
+    e.stopPropagation();
+    // 여기서는 preventDefault를 호출하지 않아 자연스러운 스크롤 허용
   };
 
   // 화면 크기에 따라 플레이어 위치 계산 (다이얼로그 기준)
@@ -563,7 +586,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                      rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
                      shadow-2xl transform -translate-x-1/2 youtube-dialog-container"
           style={{ overscrollBehavior: 'contain' }}
-          onWheel={handleScrollPreventPropagation}
+          onWheel={handleDialogScroll}
         >
           {/* Background gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-light-accent/5 to-light-purple/5 
@@ -585,15 +608,16 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                                bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
                                outline-none resize-none flex-1 min-h-0"
                     placeholder="가사를 입력하세요..."
+                    onWheel={handleScrollableAreaScroll}
                   />
                 ) : (
                   song.lyrics ? (
                     <div 
-                      className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
+                      className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
                       style={{ 
                         overscrollBehavior: 'contain' 
                       }}
-                      onWheel={handleScrollPreventPropagation}
+                      onWheel={handleScrollableAreaScroll}
                     >
                       {song.lyrics}
                     </div>
@@ -932,7 +956,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                   
                   {isEditMode ? (
                     /* MR 링크 편집 UI - XL 화면 */
-                    <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
+                    <div className="scrollable-content flex-1 space-y-4 overflow-y-auto min-h-0" onWheel={handleScrollableAreaScroll}>
                       {editData.mrLinks.map((link, index) => (
                         <div key={index} className="p-4 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg border border-light-primary/20 dark:border-dark-primary/20">
                           <div className="flex items-center justify-between mb-3">
@@ -1072,7 +1096,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                   
                   {isEditMode ? (
                     /* MR 링크 편집 UI */
-                    <div className="flex-1 space-y-4 overflow-y-auto min-h-0">
+                    <div className="scrollable-content flex-1 space-y-4 overflow-y-auto min-h-0" onWheel={handleScrollableAreaScroll}>
                       {editData.mrLinks.map((link, index) => (
                         <div key={index} className="p-4 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg border border-light-primary/20 dark:border-dark-primary/20">
                           <div className="flex items-center justify-between mb-3">
@@ -1209,15 +1233,16 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
                                  bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
                                  outline-none resize-none flex-1 min-h-0"
                       placeholder="가사를 입력하세요..."
+                      onWheel={handleScrollableAreaScroll}
                     />
                   ) : (
                     song.lyrics ? (
                       <div 
-                        className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg flex-1 overflow-y-auto min-h-0" 
+                        className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg flex-1 overflow-y-auto min-h-0" 
                         style={{ 
                           overscrollBehavior: 'contain' 
                         }}
-                        onWheel={handleScrollPreventPropagation}
+                        onWheel={handleScrollableAreaScroll}
                       >
                         {song.lyrics}
                       </div>
