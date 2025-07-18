@@ -388,7 +388,7 @@ export default function SongSearch({
 
   return (
     <div
-      className="sticky top-16 z-20 mb-8 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md 
+      className="sticky top-16 z-20 mb-8 bg-light-background/95 dark:bg-dark-background/95 backdrop-blur-md 
                     border-b border-light-primary/20 dark:border-dark-primary/20 
                     py-4 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8"
     >
@@ -403,7 +403,7 @@ export default function SongSearch({
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="block w-full pl-10 pr-32 py-3 border border-light-primary/20 dark:border-dark-primary/20 
-                     rounded-xl bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm
+                     rounded-xl bg-light-background/50 dark:bg-dark-background/50 backdrop-blur-sm
                      text-light-text dark:text-dark-text placeholder-light-text/50 dark:placeholder-dark-text/50
                      focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
                      focus:border-transparent transition-all duration-200"

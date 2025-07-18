@@ -6,6 +6,7 @@ import Navigation from '@/components/Navigation';
 import SongSearch from '@/components/SongSearch';
 import SongCard from '@/components/SongCard';
 import Footer from '@/components/Footer';
+import SongbookHeader from '@/components/SongbookHeader';
 import { MusicalNoteIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 import { useBulkLikes } from '@/hooks/useLikes';
@@ -48,14 +49,24 @@ interface SongbookClientProps {
 }
 
 export default function SongbookClient({ songs: initialSongs, error: serverError }: SongbookClientProps) {
-  const [filteredSongs, setFilteredSongs] = useState<Song[]>(initialSongs);
+  const [filteredSongs, setFilteredSongs] = useState<Song[]>(initialSongs || []);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [songs, setSongs] = useState<Song[]>(initialSongs); // 랜덤 섞기를 위한 상태
+  const [songs, setSongs] = useState<Song[]>(initialSongs || []); // 랜덤 섞기를 위한 상태
   const [showNumbers, setShowNumbers] = useState(false); // 번호 표시 상태
+  const [isLoading, setIsLoading] = useState(!initialSongs || initialSongs.length === 0); // 로딩 상태
   const { loadLikes } = useBulkLikes();
   const { refresh: refreshPlaylists } = useGlobalPlaylists();
 
   const visibleSongs = useChunkedRender(filteredSongs, 24);
+
+  // initialSongs가 변경되면 상태 업데이트 (서버에서 데이터가 도착했을 때)
+  useEffect(() => {
+    if (initialSongs && initialSongs.length > 0) {
+      setSongs(initialSongs);
+      setFilteredSongs(initialSongs);
+      setIsLoading(false);
+    }
+  }, [initialSongs]);
 
   // 초기 데이터 로딩 (좋아요만, 플레이리스트는 useGlobalPlaylists에서 자동 처리)
   useEffect(() => {
@@ -158,48 +169,43 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
       </div>
 
       <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12"
-        >
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <MusicalNoteIcon className="w-12 h-12 text-light-accent dark:text-dark-accent" />
-            <h1 className="text-5xl sm:text-6xl font-bold font-display gradient-text">
-              노래책
-            </h1>
-          </div>
-          <p className="text-xl text-light-text/70 dark:text-dark-text/70 mb-6">
-            아야가 부르는 노래들을 모아둔 특별한 공간입니다
-          </p>
-          <div className="flex items-center justify-center gap-6 text-sm text-light-text/60 dark:text-dark-text/60">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
-              <span>총 {initialSongs.length}곡</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
-              <span>검색된 곡: {filteredSongs.length}곡</span>
-            </div>
-            {visibleSongs.length < filteredSongs.length && (
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-light-purple dark:bg-dark-purple rounded-full"></div>
-                <span>표시 중: {visibleSongs.length}곡</span>
-              </div>
-            )}
-          </div>
-        </motion.div>
+        <SongbookHeader 
+          totalSongs={initialSongs?.length || 0}
+          filteredSongs={filteredSongs.length || 0}
+          visibleSongs={visibleSongs.length}
+          isLoading={isLoading}
+        />
 
         <SongSearch 
-          songs={songs} 
+          songs={songs || []} 
           onFilteredSongs={setFilteredSongs}
           onShuffleSongs={handleShuffleSongs}
           showNumbers={showNumbers}
           onToggleNumbers={handleToggleNumbers}
         />
 
-        {filteredSongs.length > 0 ? (
+        {isLoading ? (
+          // 데이터 로딩 중 상태
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="text-center py-16"
+          >
+            <div className="w-24 h-24 mx-auto mb-6 bg-light-primary/20 dark:bg-dark-primary/20 
+                           rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 border-3 border-light-primary/30 dark:border-dark-primary/30 
+                              border-t-light-primary dark:border-t-dark-primary rounded-full animate-spin"></div>
+            </div>
+            <h3 className="text-xl font-semibold text-light-text dark:text-dark-text mb-2">
+              노래를 불러오는 중...
+            </h3>
+            <p className="text-light-text/70 dark:text-dark-text/70">
+              잠시만 기다려주세요
+            </p>
+          </motion.div>
+        ) : songs && songs.length > 0 ? (
+          filteredSongs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {visibleSongs.map((song, index) => (
               <motion.div
@@ -263,9 +269,28 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
               모든 노래 보기
             </button>
           </motion.div>
+        )
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="text-center py-16"
+          >
+            <div className="w-24 h-24 mx-auto mb-6 bg-light-primary/20 dark:bg-dark-primary/20 
+                           rounded-full flex items-center justify-center">
+              <MusicalNoteIcon className="w-12 h-12 text-light-text/40 dark:text-dark-text/40" />
+            </div>
+            <h3 className="text-xl font-semibold text-light-text dark:text-dark-text mb-2">
+              데이터가 없습니다
+            </h3>
+            <p className="text-light-text/70 dark:text-dark-text/70">
+              노래 데이터를 불러올 수 없습니다
+            </p>
+          </motion.div>
         )}
 
-        {initialSongs.length > 0 && (
+        {!isLoading && initialSongs && initialSongs.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
