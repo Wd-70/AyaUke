@@ -36,6 +36,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
   const [isXLScreen, setIsXLScreen] = useState(false);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
+  const [isMobileScreen, setIsMobileScreen] = useState(false);
   
   // 편집 모드 상태
   const [isEditMode, setIsEditMode] = useState(false);
@@ -393,15 +394,35 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
     setShowPlaylistMenu(true);
   };
 
-  // 다이얼로그 열릴 때 body 스크롤 비활성화
+  // 실제 뷰포트 높이 계산 및 body 스크롤 비활성화
   useEffect(() => {
+    const setViewportHeight = () => {
+      // 실제 뷰포트 높이 계산 (모바일 브라우저 주소창/메뉴바 고려)
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+      
+      // 모바일 화면 여부 체크
+      setIsMobileScreen(window.innerWidth < 640);
+    };
+
     if (isExpanded) {
+      // 뷰포트 높이 설정
+      setViewportHeight();
+      
+      // 리사이즈 이벤트 리스너 추가 (모바일에서 주소창이 사라질 때 감지)
+      window.addEventListener('resize', setViewportHeight);
+      window.addEventListener('orientationchange', setViewportHeight);
+      
       // body 스크롤 완전 비활성화
       document.body.style.overflow = 'hidden';
       document.body.style.paddingRight = '0px'; // 스크롤바 공간 보정
       document.body.style.touchAction = 'none'; // 터치 스크롤 방지
       document.documentElement.style.overflow = 'hidden'; // html 요소도 차단
     } else {
+      // 이벤트 리스너 제거
+      window.removeEventListener('resize', setViewportHeight);
+      window.removeEventListener('orientationchange', setViewportHeight);
+      
       // body 스크롤 복원
       document.body.style.overflow = '';
       document.body.style.paddingRight = '';
@@ -415,6 +436,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
 
     // 컴포넌트 언마운트 시 정리
     return () => {
+      window.removeEventListener('resize', setViewportHeight);
+      window.removeEventListener('orientationchange', setViewportHeight);
       document.body.style.overflow = '';
       document.body.style.paddingRight = '';
       document.body.style.touchAction = '';
@@ -580,12 +603,16 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
           animate={{ opacity: 1, scale: 1, x: '-50%', y: '0%' }}
           exit={{ opacity: 0, scale: 0.9, x: '-50%', y: '-10%' }}
           transition={{ duration: 0.3 }}
-          className="fixed top-20 left-1/2 z-40 
-                     w-[90vw] max-w-7xl h-[calc(100vh-6rem)] overflow-hidden
+          className="fixed top-20 sm:top-20 left-1/2 z-40 
+                     w-[90vw] max-w-7xl overflow-hidden
                      bg-white dark:bg-gray-900 backdrop-blur-sm 
                      rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
                      shadow-2xl transform -translate-x-1/2 youtube-dialog-container"
-          style={{ overscrollBehavior: 'contain' }}
+          style={{ 
+            top: isMobileScreen ? '1rem' : '5rem', // 모바일에서는 상단 여백을 최소화
+            height: isMobileScreen ? 'calc(var(--vh, 1vh) * 100 - 2rem)' : 'calc(var(--vh, 1vh) * 100 - 6rem)',
+            overscrollBehavior: 'contain' 
+          }}
           onWheel={handleDialogScroll}
         >
           {/* Background gradient overlay */}
