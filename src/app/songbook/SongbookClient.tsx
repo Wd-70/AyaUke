@@ -54,6 +54,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   const [songs, setSongs] = useState<Song[]>(initialSongs || []); // 랜덤 섞기를 위한 상태
   const [showNumbers, setShowNumbers] = useState(false); // 번호 표시 상태
   const [isLoading, setIsLoading] = useState(!initialSongs || initialSongs.length === 0); // 로딩 상태
+  const [hasOpenDialog, setHasOpenDialog] = useState(false); // 다이얼로그 열림 상태
   const { loadLikes } = useBulkLikes();
   const { refresh: refreshPlaylists } = useGlobalPlaylists();
 
@@ -225,6 +226,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
                   onPlay={handleSongPlay}
                   showNumber={showNumbers}
                   number={index + 1}
+                  onDialogStateChange={setHasOpenDialog}
                 />
               </motion.div>
             ))}
@@ -342,8 +344,8 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
         onClick={scrollToTop}
         initial={{ opacity: 0, scale: 0 }}
         animate={{ 
-          opacity: showScrollTop ? 1 : 0, 
-          scale: showScrollTop ? 1 : 0 
+          opacity: (showScrollTop && !hasOpenDialog) ? 1 : 0, 
+          scale: (showScrollTop && !hasOpenDialog) ? 1 : 0 
         }}
         transition={{ duration: 0.3, ease: "easeOut" }}
         className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary 

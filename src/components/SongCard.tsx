@@ -22,9 +22,10 @@ interface SongCardProps {
   onPlay?: (song: Song) => void;
   showNumber?: boolean;
   number?: number;
+  onDialogStateChange?: (isOpen: boolean) => void;
 }
 
-export default function SongCard({ song, onPlay, showNumber = false, number }: SongCardProps) {
+export default function SongCard({ song, onPlay, showNumber = false, number, onDialogStateChange }: SongCardProps) {
   const { data: session } = useSession();
   const { liked, isLoading: likeLoading, error: likeError, toggleLike } = useLike(song.id);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
@@ -446,6 +447,13 @@ export default function SongCard({ song, onPlay, showNumber = false, number }: S
       setIsPlaying(false);
     };
   }, [isExpanded]);
+
+  // 다이얼로그 상태 변경 시 부모 컴포넌트에 알림
+  useEffect(() => {
+    if (onDialogStateChange) {
+      onDialogStateChange(isExpanded);
+    }
+  }, [isExpanded, onDialogStateChange]);
 
   // 스크롤 이벤트 전파 방지 핸들러 (다중 이벤트 처리)
   const handleScrollPreventPropagation = (e: React.WheelEvent) => {
