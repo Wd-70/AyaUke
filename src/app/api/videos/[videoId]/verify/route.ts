@@ -8,7 +8,7 @@ import { canManageSongs, UserRole } from '@/lib/permissions';
 // PUT: 영상 검증 (관리자 전용)
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { videoId: string } }
+  { params }: { params: Promise<{ videoId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -29,7 +29,7 @@ export async function PUT(
 
     await connectToDatabase();
     
-    const { videoId } = params;
+    const { videoId } = await params;
     const body = await request.json();
     const { isVerified } = body;
     

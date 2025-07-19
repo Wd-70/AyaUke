@@ -8,12 +8,12 @@ import { canManageSongs, UserRole } from '@/lib/permissions';
 // GET: 특정 영상 정보 조회
 export async function GET(
   request: NextRequest,
-  { params }: { params: { videoId: string } }
+  { params }: { params: Promise<{ videoId: string }> }
 ) {
   try {
     await connectToDatabase();
     
-    const { videoId } = params;
+    const { videoId } = await params;
     
     const video = await SongVideo.findById(videoId).lean();
     if (!video) {
@@ -42,7 +42,7 @@ export async function GET(
 // PUT: 영상 정보 수정
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { videoId: string } }
+  { params }: { params: Promise<{ videoId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -55,7 +55,7 @@ export async function PUT(
 
     await connectToDatabase();
     
-    const { videoId } = params;
+    const { videoId } = await params;
     const body = await request.json();
     
     const video = await SongVideo.findById(videoId);
@@ -135,7 +135,7 @@ export async function PUT(
 // DELETE: 영상 삭제
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { videoId: string } }
+  { params }: { params: Promise<{ videoId: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -148,7 +148,7 @@ export async function DELETE(
 
     await connectToDatabase();
     
-    const { videoId } = params;
+    const { videoId } = await params;
     
     const video = await SongVideo.findById(videoId);
     if (!video) {

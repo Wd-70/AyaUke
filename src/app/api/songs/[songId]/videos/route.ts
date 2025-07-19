@@ -9,12 +9,12 @@ import { SongVideo as SongVideoType } from '@/types';
 // GET: 특정 곡의 영상 목록 조회
 export async function GET(
   request: NextRequest,
-  { params }: { params: { songId: string } }
+  { params }: { params: Promise<{ songId: string }> }
 ) {
   try {
     await connectToDatabase();
     
-    const { songId } = params;
+    const { songId } = await params;
     
     // 곡이 존재하는지 확인
     const song = await SongDetail.findById(songId);
@@ -49,7 +49,7 @@ export async function GET(
 // POST: 새 영상 추가
 export async function POST(
   request: NextRequest,
-  { params }: { params: { songId: string } }
+  { params }: { params: Promise<{ songId: string }> }
 ) {
   try {
     // 인증 확인
@@ -63,7 +63,7 @@ export async function POST(
 
     await connectToDatabase();
     
-    const { songId } = params;
+    const { songId } = await params;
     const body = await request.json();
     
     // 곡이 존재하는지 확인

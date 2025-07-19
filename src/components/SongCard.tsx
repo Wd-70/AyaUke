@@ -520,8 +520,17 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       const xlScreen = window.innerWidth >= 1280;
       setIsXLScreen(xlScreen);
       
-      // MR 플레이어 위치 업데이트
-      if (isExpanded && youtubeMR) {
+      // MR 플레이어 위치 업데이트 - 내부에서 MR 링크 재계산
+      const mrLinks = song.mrLinks;
+      const hasMR = mrLinks && mrLinks.length > 0;
+      const selectedMR = hasMR ? mrLinks[song.selectedMRIndex || 0] : null;
+      const currentYoutubeMR = selectedMR ? (() => {
+        const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+        const match = selectedMR.url.match(regex);
+        return match ? { videoId: match[1], skipSeconds: selectedMR.skipSeconds || 0 } : null;
+      })() : null;
+      
+      if (isExpanded && currentYoutubeMR) {
         let targetId = '';
         let shouldShow = false;
         
@@ -608,12 +617,27 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       }
     };
     
-    updateScreenSizeAndPosition();
-    window.addEventListener('resize', updateScreenSizeAndPosition);
-    return () => {
-      window.removeEventListener('resize', updateScreenSizeAndPosition);
+    // 초기 위치 계산 - DOM 안정화를 위해 여러 단계로 실행
+    const timeoutId1 = setTimeout(updateScreenSizeAndPosition, 50);
+    const timeoutId2 = setTimeout(updateScreenSizeAndPosition, 200);
+    const timeoutId3 = setTimeout(updateScreenSizeAndPosition, 500);
+    
+    // 리사이즈 이벤트 디바운싱
+    let resizeTimeout: NodeJS.Timeout;
+    const debouncedResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(updateScreenSizeAndPosition, 100);
     };
-  }, [isExpanded, youtubeMR, currentTab, songVideos, selectedVideoIndex]);
+    
+    window.addEventListener('resize', debouncedResize);
+    return () => {
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', debouncedResize);
+    };
+  }, [isExpanded, currentTab, songVideos.length, selectedVideoIndex, song.mrLinks, song.selectedMRIndex]);
 
   // 유튜브 영상 데이터 가져오기
   useEffect(() => {
