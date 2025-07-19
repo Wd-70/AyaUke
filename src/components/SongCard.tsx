@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Song } from '@/types';
+import { Song, SongVideo } from '@/types';
 import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, TrashIcon, StarIcon } from '@heroicons/react/24/outline';
 import { HeartIcon } from '@heroicons/react/24/solid';
 import YouTube from 'react-youtube';
@@ -31,9 +31,46 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showVideo, setShowVideo] = useState(false);
+  const [currentTab, setCurrentTab] = useState<'lyrics' | 'mr' | 'videos'>('lyrics');
+  const [songVideos, setSongVideos] = useState<SongVideo[]>([]);
+  const [selectedVideoIndex, setSelectedVideoIndex] = useState(0);
+  const [videosLoading, setVideosLoading] = useState(false);
+  
+  // XL 화면에서는 MR 탭을 기본으로 설정
+  useEffect(() => {
+    const updateDefaultTab = () => {
+      const isXL = window.innerWidth >= 1280;
+      if (isExpanded && isXL && currentTab === 'lyrics') {
+        // XL 화면에서 가사 탭이 선택되어 있으면 MR 탭으로 변경
+        setCurrentTab('mr');
+      }
+    };
+    
+    // 다이얼로그가 열릴 때 실행
+    if (isExpanded) {
+      updateDefaultTab();
+      // 화면 크기 변경 감지
+      window.addEventListener('resize', updateDefaultTab);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', updateDefaultTab);
+    };
+  }, [isExpanded, currentTab]);
   const [youtubePlayer, setYoutubePlayer] = useState<YouTubePlayer | null>(null);
-  const [playerPosition, setPlayerPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
+  const [videoPlayer, setVideoPlayer] = useState<YouTubePlayer | null>(null);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [showAddVideoForm, setShowAddVideoForm] = useState(false);
+  const [addVideoData, setAddVideoData] = useState({
+    videoUrl: '',
+    sungDate: '',
+    description: '',
+    startTime: 0,
+    endTime: undefined as number | undefined
+  });
+  const [isAddingVideo, setIsAddingVideo] = useState(false);
+  const [playerPosition, setPlayerPosition] = useState({ top: 0, left: 0, width: 0, height: 0, display: false });
+  const [videoPlayerPosition, setVideoPlayerPosition] = useState({ top: 0, left: 0, width: 0, height: 0, display: false });
   const [isXLScreen, setIsXLScreen] = useState(false);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
@@ -299,13 +336,13 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
           }
         } catch (error) {
           console.warn('YouTube player control error:', error);
-          // 에러 발생 시 영상 탭으로 전환
-          setShowVideo(true);
+          // 에러 발생 시 MR 탭으로 전환
+          setCurrentTab('mr');
         }
       } else {
-        // 플레이어가 아직 준비되지 않았을 때 - 영상 탭으로 전환
-        console.log('YouTube player not ready, showing video tab');
-        setShowVideo(true);
+        // 플레이어가 아직 준비되지 않았을 때 - MR 탭으로 전환
+        console.log('YouTube player not ready, switching to MR tab');
+        setCurrentTab('mr');
       }
     } else {
       // MR 링크가 없을 때는 검색 기능 실행
@@ -361,8 +398,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     }
   };
 
-  const toggleVideoView = () => {
-    setShowVideo(!showVideo);
+  const switchTab = (tab: 'lyrics' | 'mr' | 'videos') => {
+    setCurrentTab(tab);
   };
 
   const handleLike = async (e: React.MouseEvent) => {
@@ -432,7 +469,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       // 모달이 닫힐 때 YouTube 플레이어 초기화
       setYoutubePlayer(null);
       setIsPlaying(false);
-      setShowVideo(false);
+      setCurrentTab('lyrics');
     }
 
     // 컴포넌트 언마운트 시 정리
@@ -477,35 +514,163 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     // 여기서는 preventDefault를 호출하지 않아 자연스러운 스크롤 허용
   };
 
-  // 화면 크기에 따라 플레이어 위치 계산 (다이얼로그 기준)
+  // 화면 크기 감지 및 MR 플레이어 위치 계산
   useEffect(() => {
-    if (!isExpanded || !youtubeMR) return;
-
-    const updatePlayerPosition = () => {
+    const updateScreenSizeAndPosition = () => {
       const xlScreen = window.innerWidth >= 1280;
       setIsXLScreen(xlScreen);
+      
+      // MR 플레이어 위치 업데이트
+      if (isExpanded && youtubeMR) {
+        let targetId = '';
+        let shouldShow = false;
+        
+        if (xlScreen && (currentTab === 'mr' || currentTab === 'lyrics')) {
+          targetId = 'xl-mr-player-target';
+          shouldShow = true;
+        } else if (!xlScreen && currentTab === 'mr') {
+          targetId = 'small-mr-player-target';
+          shouldShow = true;
+        }
+        
+        if (shouldShow && targetId) {
+          const targetElement = document.getElementById(targetId);
+          if (targetElement) {
+            const rect = targetElement.getBoundingClientRect();
+            setPlayerPosition(prev => {
+              // 값이 실제로 변경된 경우에만 업데이트 (1px 허용 오차)
+              if (Math.abs(prev.top - rect.top) > 1 || 
+                  Math.abs(prev.left - rect.left) > 1 || 
+                  Math.abs(prev.width - rect.width) > 1 || 
+                  Math.abs(prev.height - rect.height) > 1 ||
+                  prev.display !== true) {
+                return {
+                  top: rect.top,
+                  left: rect.left,
+                  width: rect.width,
+                  height: rect.height,
+                  display: true
+                };
+              }
+              return prev;
+            });
+          }
+        } else {
+          setPlayerPosition(prev => prev.display !== false ? ({ ...prev, display: false }) : prev);
+        }
+      } else {
+        setPlayerPosition(prev => prev.display !== false ? ({ ...prev, display: false }) : prev);
+      }
+      
+      // 비디오 플레이어 위치 업데이트
+      const currentSelectedVideo = songVideos[selectedVideoIndex];
+      const currentSelectedVideoUrl = currentSelectedVideo ? `https://www.youtube.com/watch?v=${currentSelectedVideo.videoId}${currentSelectedVideo.startTime ? `&t=${currentSelectedVideo.startTime}s` : ''}` : null;
+      
+      if (isExpanded && currentSelectedVideo && currentSelectedVideoUrl) {
+        let videoTargetId = '';
+        let shouldShowVideo = false;
+        
+        if (xlScreen && currentTab === 'videos') {
+          videoTargetId = 'xl-video-player-target';
+          shouldShowVideo = true;
+        } else if (!xlScreen && currentTab === 'videos') {
+          videoTargetId = 'video-player-target';
+          shouldShowVideo = true;
+        }
+        
+        if (shouldShowVideo && videoTargetId) {
+          const videoTargetElement = document.getElementById(videoTargetId);
+          if (videoTargetElement) {
+            const rect = videoTargetElement.getBoundingClientRect();
+            setVideoPlayerPosition(prev => {
+              // 값이 실제로 변경된 경우에만 업데이트 (1px 허용 오차)
+              if (Math.abs(prev.top - rect.top) > 1 || 
+                  Math.abs(prev.left - rect.left) > 1 || 
+                  Math.abs(prev.width - rect.width) > 1 || 
+                  Math.abs(prev.height - rect.height) > 1 ||
+                  prev.display !== true) {
+                return {
+                  top: rect.top,
+                  left: rect.left,
+                  width: rect.width,
+                  height: rect.height,
+                  display: true
+                };
+              }
+              return prev;
+            });
+          }
+        } else {
+          setVideoPlayerPosition(prev => prev.display !== false ? ({ ...prev, display: false }) : prev);
+        }
+      } else {
+        setVideoPlayerPosition(prev => prev.display !== false ? ({ ...prev, display: false }) : prev);
+      }
+    };
+    
+    updateScreenSizeAndPosition();
+    window.addEventListener('resize', updateScreenSizeAndPosition);
+    return () => {
+      window.removeEventListener('resize', updateScreenSizeAndPosition);
+    };
+  }, [isExpanded, youtubeMR, currentTab, songVideos, selectedVideoIndex]);
+
+  // 유튜브 영상 데이터 가져오기
+  useEffect(() => {
+    const fetchSongVideos = async () => {
+      if (!song.id || !isExpanded) return;
+      
+      setVideosLoading(true);
+      try {
+        const response = await fetch(`/api/songs/${song.id}/videos`);
+        if (response.ok) {
+          const data = await response.json();
+          setSongVideos(data.videos || []);
+        }
+      } catch (error) {
+        console.error('영상 목록 조회 실패:', error);
+      } finally {
+        setVideosLoading(false);
+      }
+    };
+
+    fetchSongVideos();
+  }, [song.id, isExpanded]);
+
+  // 선택된 영상 정보
+  const selectedVideo = songVideos[selectedVideoIndex];
+  const selectedVideoUrl = selectedVideo ? `https://www.youtube.com/watch?v=${selectedVideo.videoId}${selectedVideo.startTime ? `&t=${selectedVideo.startTime}s` : ''}` : null;
+
+  // 비디오 플레이어 위치 업데이트
+  useEffect(() => {
+    if (!isExpanded || !selectedVideoUrl) return;
+
+    const updateVideoPlayerPosition = () => {
+      const xlScreen = window.innerWidth >= 1280;
       
       const dialogContainer = document.querySelector('.youtube-dialog-container');
       let targetContainer = null;
       
-      if (xlScreen) {
-        targetContainer = document.getElementById('xl-player-target');
-      } else if (showVideo) {
-        targetContainer = document.getElementById('mobile-player-target');
+      if (xlScreen && currentTab === 'videos') {
+        targetContainer = document.getElementById('xl-video-player-target');
+      } else if (currentTab === 'videos') {
+        targetContainer = document.getElementById('video-player-target');
       }
 
       if (targetContainer && dialogContainer) {
         const dialogRect = dialogContainer.getBoundingClientRect();
         const targetRect = targetContainer.getBoundingClientRect();
         
-        // 다이얼로그 기준 상대 위치 계산
         const relativeTop = targetRect.top - dialogRect.top;
         const relativeLeft = targetRect.left - dialogRect.left;
         
-        setPlayerPosition(prev => {
-          // 값이 실제로 변경된 경우에만 업데이트 (1px 허용 오차)
-          if (Math.abs(prev.top - relativeTop) > 1 || Math.abs(prev.left - relativeLeft) > 1 || 
-              Math.abs(prev.width - targetRect.width) > 1 || Math.abs(prev.height - targetRect.height) > 1) {
+        setVideoPlayerPosition(prev => {
+          if (
+            Math.abs(prev.top - relativeTop) > 1 ||
+            Math.abs(prev.left - relativeLeft) > 1 ||
+            Math.abs(prev.width - targetRect.width) > 1 ||
+            Math.abs(prev.height - targetRect.height) > 1
+          ) {
             return {
               top: relativeTop,
               left: relativeLeft,
@@ -518,16 +683,14 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       }
     };
 
-    // DOM 렌더링 완료 후 위치 계산
-    const timeoutId = setTimeout(updatePlayerPosition, 50);
-    window.addEventListener('resize', updatePlayerPosition);
+    const timeoutId = setTimeout(updateVideoPlayerPosition, 50);
+    window.addEventListener('resize', updateVideoPlayerPosition);
 
     return () => {
       clearTimeout(timeoutId);
-      window.removeEventListener('resize', updatePlayerPosition);
+      window.removeEventListener('resize', updateVideoPlayerPosition);
     };
-  }, [isExpanded, youtubeMR, showVideo]);
-
+  }, [isExpanded, selectedVideoUrl, currentTab, selectedVideoIndex]);
 
   const handleCardClick = () => {
     // 곡 데이터를 콘솔에 출력
@@ -584,7 +747,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     // 다이얼로그 닫을 때 편집 모드 및 비디오 상태 초기화
     if (isExpanded) {
       setIsEditMode(false);
-      setShowVideo(false);
+      setCurrentTab('lyrics');
     }
     
     setIsExpanded(!isExpanded);
@@ -982,12 +1145,39 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   transition={{ duration: 0.3, delay: 0.1 }}
                   className="p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
                 >
-                  <div className="flex items-center gap-3 mb-4">
-                    <VideoCameraIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
-                    <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">
-                      {isEditMode ? "MR 링크 관리" : "MR 영상"}
-                    </h4>
+                  {/* XL 화면 탭 네비게이션 */}
+                  <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20 mb-4">
+                    <button
+                      onClick={() => switchTab('mr')}
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
+                        currentTab === 'mr'
+                          ? 'text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                      }`}
+                    >
+                      <VideoCameraIcon className="w-5 h-5" />
+                      <span>{isEditMode ? "MR 링크 관리" : "MR 영상"}</span>
+                    </button>
+                    <button
+                      onClick={() => switchTab('videos')}
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
+                        currentTab === 'videos'
+                          ? 'text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10'
+                          : 'text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                      }`}
+                    >
+                      <PlayIcon className="w-5 h-5" />
+                      <span>라이브 클립</span>
+                      {songVideos.length > 0 && (
+                        <span className="ml-1 px-1.5 py-0.5 text-xs bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent rounded-full">
+                          {songVideos.length}
+                        </span>
+                      )}
+                    </button>
                   </div>
+
+                  {/* XL 화면 MR 섹션 */}
+                  <div className={`${currentTab === 'mr' ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
                   
                   {isEditMode ? (
                     /* MR 링크 편집 UI - XL 화면 */
@@ -1094,40 +1284,142 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   ) : (
                     /* 기존 YouTube 플레이어 */
                     youtubeMR && (
-                      <div id="xl-player-target" className="aspect-video w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        {/* 플레이어가 여기에 CSS로 배치됨 */}
+                      <div id="xl-mr-player-target" className="aspect-video w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        {/* MR 플레이어가 여기에 표시됨 (조건부 위치) */}
                       </div>
                     )
                   )}
+                  </div>
+
+                  {/* XL 화면 유튜브 영상 섹션 */}
+                  <div className={`${currentTab === 'videos' ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
+                    {videosLoading ? (
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-light-accent dark:border-dark-accent"></div>
+                      </div>
+                    ) : songVideos.length > 0 ? (
+                      <div className="flex gap-6 flex-1 min-h-0">
+                        {/* 유튜브 플레이어 - XL 화면에서는 더 큰 크기 */}
+                        <div className="flex-1 aspect-video bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden">
+                          <div id="xl-video-player-target" className="w-full h-full">
+                            {/* 비디오 플레이어가 여기에 표시됨 (조건부 위치) */}
+                          </div>
+                        </div>
+                        
+                        {/* 영상 목록 */}
+                        <div className="w-80 flex flex-col">
+                          <h5 className="text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-3">
+                            라이브 클립 ({songVideos.length}개)
+                          </h5>
+                          <div className="scrollable-content space-y-2 overflow-y-auto flex-1" onWheel={handleScrollableAreaScroll}>
+                            {songVideos.map((video, index) => (
+                              <div
+                                key={video._id}
+                                onClick={() => setSelectedVideoIndex(index)}
+                                className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                  selectedVideoIndex === index
+                                    ? 'border-light-accent/50 dark:border-dark-accent/50 bg-light-accent/10 dark:bg-dark-accent/10'
+                                    : 'border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent/30 dark:hover:border-dark-accent/30 hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-light-text dark:text-dark-text truncate">
+                                      {new Date(video.sungDate).toLocaleDateString('ko-KR')}
+                                    </div>
+                                    {video.description && (
+                                      <div className="text-xs text-light-text/60 dark:text-dark-text/60 mt-1 truncate">
+                                        {video.description}
+                                      </div>
+                                    )}
+                                    <div className="text-xs text-light-text/50 dark:text-dark-text/50 mt-1">
+                                      {video.addedByName}
+                                      {video.isVerified && (
+                                        <span className="ml-2 text-green-600 dark:text-green-400">✓ 검증됨</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {selectedVideoIndex === index && (
+                                    <PlayIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50">
+                        <PlayIcon className="w-16 h-16 mb-4 opacity-30" />
+                        <p className="text-lg mb-2">아직 등록된 라이브 클립이 없습니다</p>
+                        <p className="text-base">사용자가 라이브 클립을 추가할 수 있습니다</p>
+                        {session && (
+                          <button
+                            onClick={() => setShowAddVideoForm(true)}
+                            className="mt-4 px-4 py-2 bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent rounded-lg hover:bg-light-accent/30 dark:hover:bg-dark-accent/30 transition-colors duration-200"
+                          >
+                            라이브 클립 추가
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </motion.div>
               </div>
 
-              {/* 작은 화면에서의 기존 토글 섹션 */}
+              {/* 작은 화면에서의 탭 섹션 */}
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 transition={{ duration: 0.3, delay: 0.1 }}
-                className="xl:hidden p-4 sm:p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 relative flex flex-col flex-1 min-h-0"
+                className="xl:hidden bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 relative flex flex-col flex-1 min-h-0"
               >
-                {/* MR 영상/편집 영역 */}
-                <div className={`${showVideo ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
-                  <div className="flex items-center justify-between mb-3 sm:mb-4">
-                    <h4 className="text-lg sm:text-xl font-semibold text-light-text dark:text-dark-text flex items-center gap-2 sm:gap-3">
-                      <VideoCameraIcon className="w-5 h-5 sm:w-6 sm:h-6 text-light-accent dark:text-dark-accent" />
-                      {isEditMode ? "MR 링크 관리" : "MR 영상"}
-                    </h4>
-                    <button
-                      onClick={toggleVideoView}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm
-                               bg-light-primary/20 dark:bg-dark-primary/20 
-                               hover:bg-light-primary/30 dark:hover:bg-dark-primary/30
-                               text-light-text dark:text-dark-text transition-colors duration-200"
-                      title={isEditMode ? "가사 수정" : "가사 보기"}
-                    >
-                      <MusicalNoteIcon className="w-4 h-4" />
-                      <span>{isEditMode ? "가사 수정" : "가사 보기"}</span>
-                    </button>
-                  </div>
+                {/* 탭 네비게이션 */}
+                <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20">
+                  <button
+                    onClick={() => switchTab('lyrics')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
+                      currentTab === 'lyrics'
+                        ? 'text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                    }`}
+                  >
+                    <MusicalNoteIcon className="w-4 h-4" />
+                    <span>가사</span>
+                  </button>
+                  <button
+                    onClick={() => switchTab('mr')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
+                      currentTab === 'mr'
+                        ? 'text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                    }`}
+                  >
+                    <VideoCameraIcon className="w-4 h-4" />
+                    <span>MR</span>
+                  </button>
+                  <button
+                    onClick={() => switchTab('videos')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
+                      currentTab === 'videos'
+                        ? 'text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                    }`}
+                  >
+                    <PlayIcon className="w-4 h-4" />
+                    <span>라이브 클립</span>
+                    {songVideos.length > 0 && (
+                      <span className="ml-1 px-1.5 py-0.5 text-xs bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent rounded-full">
+                        {songVideos.length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+
+                {/* 탭 콘텐츠 */}
+                <div className="flex-1 min-h-0 p-4 sm:p-6">
+                  {/* MR 영상/편집 영역 */}
+                  <div className={`${currentTab === 'mr' ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
                   
                   {isEditMode ? (
                     /* MR 링크 편집 UI */
@@ -1234,32 +1526,15 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   ) : (
                     /* 기존 YouTube 플레이어 */
                     youtubeMR && (
-                      <div id="mobile-player-target" className="flex-1 w-full min-h-0 aspect-video bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        {/* 플레이어가 여기에 CSS로 배치됨 */}
+                      <div id="small-mr-player-target" className="flex-1 w-full min-h-0 aspect-video bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        {/* MR 플레이어가 여기에 표시됨 (조건부 위치) */}
                       </div>
                     )
                   )}
                 </div>
 
-                {/* 가사 섹션 - 작은 화면에서만 표시 */}
-                <div className={`${!showVideo ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
-                  <div className="flex items-center justify-between mb-3 sm:mb-4">
-                    <h4 className="text-lg sm:text-xl font-semibold text-light-text dark:text-dark-text flex items-center gap-2 sm:gap-3">
-                      <MusicalNoteIcon className="w-5 h-5 sm:w-6 sm:h-6 text-light-accent dark:text-dark-accent" />
-                      가사
-                    </h4>
-                    <button
-                      onClick={toggleVideoView}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm
-                               bg-light-primary/20 dark:bg-dark-primary/20 
-                               hover:bg-light-primary/30 dark:hover:bg-dark-primary/30
-                               text-light-text dark:text-dark-text transition-colors duration-200"
-                      title={isEditMode ? "MR 링크 수정" : "영상 보기"}
-                    >
-                      <VideoCameraIcon className="w-4 h-4" />
-                      <span>{isEditMode ? "MR 링크 수정" : "영상 보기"}</span>
-                    </button>
-                  </div>
+                  {/* 가사 섹션 */}
+                  <div className={`${currentTab === 'lyrics' ? 'flex' : 'hidden'} flex-col h-full min-h-0`}>
                   {isEditMode ? (
                     <textarea
                       value={editData.lyrics}
@@ -1273,22 +1548,98 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   ) : (
                     song.lyrics ? (
                       <div 
-                        className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg flex-1 overflow-y-auto min-h-0" 
+                        className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg h-full overflow-y-auto" 
                         style={{ 
-                          overscrollBehavior: 'contain' 
+                          overscrollBehavior: 'contain',
+                          maxHeight: '100%'
                         }}
                         onWheel={handleScrollableAreaScroll}
                       >
                         {song.lyrics}
                       </div>
                     ) : (
-                      <div className="text-center flex-1 flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50">
+                      <div className="text-center h-full flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50">
                         <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
                         <p className="text-lg mb-2">아직 가사가 등록되지 않았습니다</p>
                         <p className="text-base">곧 업데이트될 예정입니다</p>
                       </div>
                     )
                   )}
+                  </div>
+
+                  {/* 유튜브 영상 섹션 */}
+                  <div className={`${currentTab === 'videos' ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
+                    {videosLoading ? (
+                      <div className="flex-1 flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-light-accent dark:border-dark-accent"></div>
+                      </div>
+                    ) : songVideos.length > 0 ? (
+                      <div className="flex flex-col flex-1 min-h-0">
+                        {/* 유튜브 플레이어 */}
+                        <div className="aspect-video w-full mb-4 bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden">
+                          <div id="video-player-target" className="w-full h-full">
+                            {/* 비디오 플레이어가 여기에 표시됨 (조건부 위치) */}
+                          </div>
+                        </div>
+                        
+                        {/* 영상 목록 */}
+                        <div className="flex-1 min-h-0">
+                          <h5 className="text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-3">
+                            라이브 클립 ({songVideos.length}개)
+                          </h5>
+                          <div className="scrollable-content space-y-2 overflow-y-auto min-h-0" onWheel={handleScrollableAreaScroll}>
+                            {songVideos.map((video, index) => (
+                              <div
+                                key={video._id}
+                                onClick={() => setSelectedVideoIndex(index)}
+                                className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                  selectedVideoIndex === index
+                                    ? 'border-light-accent/50 dark:border-dark-accent/50 bg-light-accent/10 dark:bg-dark-accent/10'
+                                    : 'border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent/30 dark:hover:border-dark-accent/30 hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-medium text-light-text dark:text-dark-text truncate">
+                                      {new Date(video.sungDate).toLocaleDateString('ko-KR')}
+                                    </div>
+                                    {video.description && (
+                                      <div className="text-xs text-light-text/60 dark:text-dark-text/60 mt-1 truncate">
+                                        {video.description}
+                                      </div>
+                                    )}
+                                    <div className="text-xs text-light-text/50 dark:text-dark-text/50 mt-1">
+                                      {video.addedByName}
+                                      {video.isVerified && (
+                                        <span className="ml-2 text-green-600 dark:text-green-400">✓ 검증됨</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {selectedVideoIndex === index && (
+                                    <PlayIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50">
+                        <PlayIcon className="w-16 h-16 mb-4 opacity-30" />
+                        <p className="text-lg mb-2">아직 등록된 라이브 클립이 없습니다</p>
+                        <p className="text-base">사용자가 라이브 클립을 추가할 수 있습니다</p>
+                        {session && (
+                          <button
+                            onClick={() => setShowAddVideoForm(true)}
+                            className="mt-4 px-4 py-2 bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent rounded-lg hover:bg-light-accent/30 dark:hover:bg-dark-accent/30 transition-colors duration-200"
+                          >
+                            라이브 클립 추가
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </motion.div>
 
@@ -1372,48 +1723,6 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
             </div>
           </div>
 
-          {/* 단일 YouTube 플레이어 - Absolute 위치로 이동 */}
-          {youtubeMR && !isEditMode && (
-            <div
-              className="absolute z-50 pointer-events-auto"
-              style={{
-                top: playerPosition.top,
-                left: playerPosition.left,
-                width: playerPosition.width,
-                height: playerPosition.height,
-                display: (isXLScreen || showVideo) ? 'block' : 'none'
-              }}
-            >
-              <YouTube
-                key={`youtube-${song.id}-${youtubeMR.videoId}`}
-                videoId={youtubeMR.videoId}
-                opts={{
-                  height: '100%',
-                  width: '100%',
-                  playerVars: {
-                    autoplay: 0,
-                    start: youtubeMR.skipSeconds || 0,
-                    controls: 1,
-                    disablekb: 0,
-                    enablejsapi: 1,
-                    fs: 1,
-                    modestbranding: 1,
-                    rel: 0,
-                    showinfo: 0,
-                    iv_load_policy: 3,
-                  },
-                }}
-                onReady={onYouTubeReady}
-                onStateChange={onYouTubeStateChange}
-                onError={(error) => {
-                  console.warn('YouTube player error:', error);
-                  setYoutubePlayer(null);
-                  setIsPlaying(false);
-                }}
-                className="w-full h-full rounded-lg"
-              />
-            </div>
-          )}
         </motion.div>
       )}
       
@@ -1687,6 +1996,84 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
         </motion.div>
       )}
       
+
+      {/* 단일 MR YouTube 플레이어 - 항상 렌더링, 위치만 조건부 */}
+      {isExpanded && youtubeMR && (
+        <YouTube
+          key={`mr-unified-${song.id}-${youtubeMR.videoId}`}
+          videoId={youtubeMR.videoId}
+          opts={{
+            width: '100%',
+            height: '100%',
+            playerVars: {
+              autoplay: 0,
+              controls: 1,
+              rel: 0,
+              modestbranding: 1,
+              start: youtubeMR.skipSeconds || 0,
+              iv_load_policy: 3,
+              cc_load_policy: 0,
+            },
+          }}
+          onReady={(event) => {
+            setYoutubePlayer(event.target);
+          }}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onEnd={() => setIsPlaying(false)}
+          style={{
+            position: 'fixed',
+            top: playerPosition.top,
+            left: playerPosition.left,
+            width: playerPosition.width,
+            height: playerPosition.height,
+            pointerEvents: 'auto',
+            zIndex: 50,
+            display: playerPosition.display ? 'block' : 'none',
+          }}
+          className="rounded-lg"
+        />
+      )}
+
+      {/* 단일 비디오 YouTube 플레이어 - 항상 렌더링, 위치만 조건부 */}
+      {isExpanded && selectedVideo && selectedVideoUrl && (
+        <YouTube
+          key={`video-unified-${selectedVideo._id}`}
+          videoId={selectedVideo.videoId}
+          opts={{
+            width: '100%',
+            height: '100%',
+            playerVars: {
+              autoplay: 0,
+              controls: 1,
+              rel: 0,
+              modestbranding: 1,
+              start: selectedVideo.startTime || 0,
+              end: selectedVideo.endTime || undefined,
+              iv_load_policy: 3,
+              cc_load_policy: 0,
+            },
+          }}
+          onReady={(event) => {
+            setVideoPlayer(event.target);
+          }}
+          onPlay={() => setIsVideoPlaying(true)}
+          onPause={() => setIsVideoPlaying(false)}
+          onEnd={() => setIsVideoPlaying(false)}
+          style={{
+            position: 'fixed',
+            top: videoPlayerPosition.top,
+            left: videoPlayerPosition.left,
+            width: videoPlayerPosition.width,
+            height: videoPlayerPosition.height,
+            pointerEvents: 'auto',
+            zIndex: 50,
+            display: videoPlayerPosition.display ? 'block' : 'none',
+          }}
+          className="rounded-lg"
+        />
+      )}
+
       {/* 플레이리스트 컨텍스트 메뉴 */}
       <PlaylistContextMenu
         songId={song.id}
