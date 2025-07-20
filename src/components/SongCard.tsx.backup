@@ -69,8 +69,9 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     endTime: undefined as number | undefined
   });
   const [isAddingVideo, setIsAddingVideo] = useState(false);
+  const [playerPosition, setPlayerPosition] = useState({ top: 0, left: 0, width: 0, height: 0, display: false });
+  const [videoPlayerPosition, setVideoPlayerPosition] = useState({ top: 0, left: 0, width: 0, height: 0, display: false });
   const [isXLScreen, setIsXLScreen] = useState(false);
-  const [playerPosition, setPlayerPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [isMobileScreen, setIsMobileScreen] = useState(false);
@@ -513,90 +514,130 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     // 여기서는 preventDefault를 호출하지 않아 자연스러운 스크롤 허용
   };
 
-  // MR 플레이어 위치 계산 및 표시 조건
+  // 화면 크기 감지 및 MR 플레이어 위치 계산
   useEffect(() => {
-    if (!isExpanded || !youtubeMR || isEditMode) return;
-    
-    const updatePlayerPosition = () => {
+    const updateScreenSizeAndPosition = () => {
       const xlScreen = window.innerWidth >= 1280;
       setIsXLScreen(xlScreen);
       
-      // 플레이어가 표시되어야 하는 조건 확인
-      let targetContainer = null;
+      // MR 플레이어 위치 업데이트 - 내부에서 MR 링크 재계산
+      const mrLinks = song.mrLinks;
+      const hasMR = mrLinks && mrLinks.length > 0;
+      const selectedMR = hasMR ? mrLinks[song.selectedMRIndex || 0] : null;
+      const currentYoutubeMR = selectedMR ? (() => {
+        const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+        const match = selectedMR.url.match(regex);
+        return match ? { videoId: match[1], skipSeconds: selectedMR.skipSeconds || 0 } : null;
+      })() : null;
       
-      if (xlScreen && (currentTab === 'mr' || currentTab === 'lyrics')) {
-        targetContainer = document.getElementById('xl-player-target');
-      } else if (!xlScreen && currentTab === 'mr') {
-        targetContainer = document.getElementById('mobile-player-target');
-      }
-      
-      if (targetContainer) {
-        const targetRect = targetContainer.getBoundingClientRect();
-        const computedStyle = window.getComputedStyle(targetContainer);
+      if (isExpanded && currentYoutubeMR) {
+        let targetId = '';
+        let shouldShow = false;
         
-        // 패딩과 보더를 제외한 실제 내부 크기 계산
-        const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
-        const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
-        const paddingTop = parseFloat(computedStyle.paddingTop) || 0;
-        const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0;
-        const borderLeft = parseFloat(computedStyle.borderLeftWidth) || 0;
-        const borderRight = parseFloat(computedStyle.borderRightWidth) || 0;
-        const borderTop = parseFloat(computedStyle.borderTopWidth) || 0;
-        const borderBottom = parseFloat(computedStyle.borderBottomWidth) || 0;
-        
-        const innerWidth = targetRect.width - paddingLeft - paddingRight - borderLeft - borderRight;
-        const innerHeight = targetRect.height - paddingTop - paddingBottom - borderTop - borderBottom;
-        
-        // 최상위 컨테이너(.flex-1 min-h-0 p-4 sm:p-6)의 실제 높이 제한 확인
-        let maxAvailableHeight = innerHeight;
-        let currentElement = targetContainer.parentElement;
-        
-        // 부모 체인을 따라가면서 실제 제한 높이 찾기
-        while (currentElement) {
-          const rect = currentElement.getBoundingClientRect();
-          const style = window.getComputedStyle(currentElement);
-          
-          // flex-1과 min-h-0 클래스를 가진 컨테이너 찾기
-          if (currentElement.classList.contains('flex-1') && currentElement.classList.contains('min-h-0')) {
-            const padding = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
-            const availableHeight = rect.height - padding;
-            maxAvailableHeight = Math.min(maxAvailableHeight, availableHeight);
-            break; // 최상위 flex-1 컨테이너를 찾았으므로 중단
-          }
-          
-          currentElement = currentElement.parentElement;
+        if (xlScreen && (currentTab === 'mr' || currentTab === 'lyrics')) {
+          targetId = 'xl-mr-player-target';
+          shouldShow = true;
+        } else if (!xlScreen && currentTab === 'mr') {
+          targetId = 'small-mr-player-target';
+          shouldShow = true;
         }
         
-        setPlayerPosition(prev => {
-          const newPosition = {
-            top: Math.round(targetRect.top + paddingTop + borderTop),
-            left: Math.round(targetRect.left + paddingLeft + borderLeft),
-            width: Math.round(Math.max(innerWidth, 0)),
-            height: Math.round(Math.max(maxAvailableHeight, 0))
-          };
-          
-          // 위치가 실제로 변경된 경우에만 업데이트 (더 큰 허용 오차)
-          if (Math.abs(prev.top - newPosition.top) > 5 || 
-              Math.abs(prev.left - newPosition.left) > 5 || 
-              Math.abs(prev.width - newPosition.width) > 5 || 
-              Math.abs(prev.height - newPosition.height) > 5) {
-            return newPosition;
+        if (shouldShow && targetId) {
+          const targetElement = document.getElementById(targetId);
+          if (targetElement) {
+            const rect = targetElement.getBoundingClientRect();
+            setPlayerPosition(prev => {
+              // 값이 실제로 변경된 경우에만 업데이트 (1px 허용 오차)
+              if (Math.abs(prev.top - rect.top) > 1 || 
+                  Math.abs(prev.left - rect.left) > 1 || 
+                  Math.abs(prev.width - rect.width) > 1 || 
+                  Math.abs(prev.height - rect.height) > 1 ||
+                  prev.display !== true) {
+                return {
+                  top: rect.top,
+                  left: rect.left,
+                  width: rect.width,
+                  height: rect.height,
+                  display: true
+                };
+              }
+              return prev;
+            });
           }
-          return prev;
-        });
+        } else {
+          setPlayerPosition(prev => prev.display !== false ? ({ ...prev, display: false }) : prev);
+        }
+      } else {
+        setPlayerPosition(prev => prev.display !== false ? ({ ...prev, display: false }) : prev);
+      }
+      
+      // 비디오 플레이어 위치 업데이트
+      const currentSelectedVideo = songVideos[selectedVideoIndex];
+      const currentSelectedVideoUrl = currentSelectedVideo ? `https://www.youtube.com/watch?v=${currentSelectedVideo.videoId}${currentSelectedVideo.startTime ? `&t=${currentSelectedVideo.startTime}s` : ''}` : null;
+      
+      if (isExpanded && currentSelectedVideo && currentSelectedVideoUrl) {
+        let videoTargetId = '';
+        let shouldShowVideo = false;
+        
+        if (xlScreen && currentTab === 'videos') {
+          videoTargetId = 'xl-video-player-target';
+          shouldShowVideo = true;
+        } else if (!xlScreen && currentTab === 'videos') {
+          videoTargetId = 'video-player-target';
+          shouldShowVideo = true;
+        }
+        
+        if (shouldShowVideo && videoTargetId) {
+          const videoTargetElement = document.getElementById(videoTargetId);
+          if (videoTargetElement) {
+            const rect = videoTargetElement.getBoundingClientRect();
+            setVideoPlayerPosition(prev => {
+              // 값이 실제로 변경된 경우에만 업데이트 (1px 허용 오차)
+              if (Math.abs(prev.top - rect.top) > 1 || 
+                  Math.abs(prev.left - rect.left) > 1 || 
+                  Math.abs(prev.width - rect.width) > 1 || 
+                  Math.abs(prev.height - rect.height) > 1 ||
+                  prev.display !== true) {
+                return {
+                  top: rect.top,
+                  left: rect.left,
+                  width: rect.width,
+                  height: rect.height,
+                  display: true
+                };
+              }
+              return prev;
+            });
+          }
+        } else {
+          setVideoPlayerPosition(prev => prev.display !== false ? ({ ...prev, display: false }) : prev);
+        }
+      } else {
+        setVideoPlayerPosition(prev => prev.display !== false ? ({ ...prev, display: false }) : prev);
       }
     };
     
-    // 초기 위치 설정
-    updatePlayerPosition();
+    // 초기 위치 계산 - DOM 안정화를 위해 여러 단계로 실행
+    const timeoutId1 = setTimeout(updateScreenSizeAndPosition, 50);
+    const timeoutId2 = setTimeout(updateScreenSizeAndPosition, 200);
+    const timeoutId3 = setTimeout(updateScreenSizeAndPosition, 500);
     
-    // 리사이즈 감지
-    window.addEventListener('resize', updatePlayerPosition);
-    
-    return () => {
-      window.removeEventListener('resize', updatePlayerPosition);
+    // 리사이즈 이벤트 디바운싱
+    let resizeTimeout: NodeJS.Timeout;
+    const debouncedResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(updateScreenSizeAndPosition, 100);
     };
-  }, [isExpanded, youtubeMR, currentTab, isEditMode]);
+    
+    window.addEventListener('resize', debouncedResize);
+    return () => {
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
+      clearTimeout(timeoutId3);
+      clearTimeout(resizeTimeout);
+      window.removeEventListener('resize', debouncedResize);
+    };
+  }, [isExpanded, currentTab, songVideos.length, selectedVideoIndex, song.mrLinks, song.selectedMRIndex]);
 
   // 유튜브 영상 데이터 가져오기
   useEffect(() => {
@@ -624,6 +665,56 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   const selectedVideo = songVideos[selectedVideoIndex];
   const selectedVideoUrl = selectedVideo ? `https://www.youtube.com/watch?v=${selectedVideo.videoId}${selectedVideo.startTime ? `&t=${selectedVideo.startTime}s` : ''}` : null;
 
+  // 비디오 플레이어 위치 업데이트
+  useEffect(() => {
+    if (!isExpanded || !selectedVideoUrl) return;
+
+    const updateVideoPlayerPosition = () => {
+      const xlScreen = window.innerWidth >= 1280;
+      
+      const dialogContainer = document.querySelector('.youtube-dialog-container');
+      let targetContainer = null;
+      
+      if (xlScreen && currentTab === 'videos') {
+        targetContainer = document.getElementById('xl-video-player-target');
+      } else if (currentTab === 'videos') {
+        targetContainer = document.getElementById('video-player-target');
+      }
+
+      if (targetContainer && dialogContainer) {
+        const dialogRect = dialogContainer.getBoundingClientRect();
+        const targetRect = targetContainer.getBoundingClientRect();
+        
+        const relativeTop = targetRect.top - dialogRect.top;
+        const relativeLeft = targetRect.left - dialogRect.left;
+        
+        setVideoPlayerPosition(prev => {
+          if (
+            Math.abs(prev.top - relativeTop) > 1 ||
+            Math.abs(prev.left - relativeLeft) > 1 ||
+            Math.abs(prev.width - targetRect.width) > 1 ||
+            Math.abs(prev.height - targetRect.height) > 1
+          ) {
+            return {
+              top: relativeTop,
+              left: relativeLeft,
+              width: targetRect.width,
+              height: targetRect.height
+            };
+          }
+          return prev;
+        });
+      }
+    };
+
+    const timeoutId = setTimeout(updateVideoPlayerPosition, 50);
+    window.addEventListener('resize', updateVideoPlayerPosition);
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', updateVideoPlayerPosition);
+    };
+  }, [isExpanded, selectedVideoUrl, currentTab, selectedVideoIndex]);
 
   const handleCardClick = () => {
     // 곡 데이터를 콘솔에 출력
@@ -681,11 +772,6 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     if (isExpanded) {
       setIsEditMode(false);
       setCurrentTab('lyrics');
-      // 모든 플레이어 상태 초기화
-      setYoutubePlayer(null);
-      setVideoPlayer(null);
-      setIsPlaying(false);
-      setIsVideoPlaying(false);
     }
     
     setIsExpanded(!isExpanded);
@@ -1222,8 +1308,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   ) : (
                     /* 기존 YouTube 플레이어 */
                     youtubeMR && (
-                      <div id="xl-player-target" className="aspect-video w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        {/* 통합 플레이어가 여기에 위치함 */}
+                      <div id="xl-mr-player-target" className="aspect-video w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        {/* MR 플레이어가 여기에 표시됨 (조건부 위치) */}
                       </div>
                     )
                   )}
@@ -1239,31 +1325,9 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                       <div className="flex gap-6 flex-1 min-h-0">
                         {/* 유튜브 플레이어 - XL 화면에서는 더 큰 크기 */}
                         <div className="flex-1 aspect-video bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden">
-                          {selectedVideo && (
-                            <YouTube
-                              key={`xl-video-${selectedVideo._id}`}
-                              videoId={selectedVideo.videoId}
-                              opts={{
-                                width: '100%',
-                                height: '100%',
-                                playerVars: {
-                                  autoplay: 0,
-                                  controls: 1,
-                                  rel: 0,
-                                  modestbranding: 1,
-                                  start: selectedVideo.startTime || 0,
-                                  end: selectedVideo.endTime || undefined,
-                                  iv_load_policy: 3,
-                                  cc_load_policy: 0,
-                                },
-                              }}
-                              onReady={(event) => setVideoPlayer(event.target)}
-                              onPlay={() => setIsVideoPlaying(true)}
-                              onPause={() => setIsVideoPlaying(false)}
-                              onEnd={() => setIsVideoPlaying(false)}
-                              className="w-full h-full"
-                            />
-                          )}
+                          <div id="xl-video-player-target" className="w-full h-full">
+                            {/* 비디오 플레이어가 여기에 표시됨 (조건부 위치) */}
+                          </div>
                         </div>
                         
                         {/* 영상 목록 */}
@@ -1486,8 +1550,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   ) : (
                     /* 기존 YouTube 플레이어 */
                     youtubeMR && (
-                      <div id="mobile-player-target" className="flex-1 w-full min-h-0 aspect-video bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        {/* 통합 플레이어가 여기에 위치함 */}
+                      <div id="small-mr-player-target" className="flex-1 w-full min-h-0 aspect-video bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        {/* MR 플레이어가 여기에 표시됨 (조건부 위치) */}
                       </div>
                     )
                   )}
@@ -1537,31 +1601,9 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                       <div className="flex flex-col flex-1 min-h-0">
                         {/* 유튜브 플레이어 */}
                         <div className="aspect-video w-full mb-4 bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden">
-                          {selectedVideo && (
-                            <YouTube
-                              key={`small-video-${selectedVideo._id}`}
-                              videoId={selectedVideo.videoId}
-                              opts={{
-                                width: '100%',
-                                height: '100%',
-                                playerVars: {
-                                  autoplay: 0,
-                                  controls: 1,
-                                  rel: 0,
-                                  modestbranding: 1,
-                                  start: selectedVideo.startTime || 0,
-                                  end: selectedVideo.endTime || undefined,
-                                  iv_load_policy: 3,
-                                  cc_load_policy: 0,
-                                },
-                              }}
-                              onReady={(event) => setVideoPlayer(event.target)}
-                              onPlay={() => setIsVideoPlaying(true)}
-                              onPause={() => setIsVideoPlaying(false)}
-                              onEnd={() => setIsVideoPlaying(false)}
-                              className="w-full h-full"
-                            />
-                          )}
+                          <div id="video-player-target" className="w-full h-full">
+                            {/* 비디오 플레이어가 여기에 표시됨 (조건부 위치) */}
+                          </div>
                         </div>
                         
                         {/* 영상 목록 */}
@@ -1978,62 +2020,82 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
         </motion.div>
       )}
       
-      {/* 통합 MR YouTube 플레이어 - wrapper로 크기 제한 */}
-      {isExpanded && youtubeMR && !isEditMode && (
-        <div
+
+      {/* 단일 MR YouTube 플레이어 - 항상 렌더링, 위치만 조건부 */}
+      {isExpanded && youtubeMR && (
+        <YouTube
+          key={`mr-unified-${song.id}-${youtubeMR.videoId}`}
+          videoId={youtubeMR.videoId}
+          opts={{
+            width: '100%',
+            height: '100%',
+            playerVars: {
+              autoplay: 0,
+              controls: 1,
+              rel: 0,
+              modestbranding: 1,
+              start: youtubeMR.skipSeconds || 0,
+              iv_load_policy: 3,
+              cc_load_policy: 0,
+            },
+          }}
+          onReady={(event) => {
+            setYoutubePlayer(event.target);
+          }}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onEnd={() => setIsPlaying(false)}
           style={{
             position: 'fixed',
-            top: (() => {
-              const shouldShow = (isXLScreen && (currentTab === 'mr' || currentTab === 'lyrics')) || 
-                                (!isXLScreen && currentTab === 'mr');
-              return shouldShow ? playerPosition.top : -9999;
-            })(),
-            left: (() => {
-              const shouldShow = (isXLScreen && (currentTab === 'mr' || currentTab === 'lyrics')) || 
-                                (!isXLScreen && currentTab === 'mr');
-              return shouldShow ? playerPosition.left : -9999;
-            })(),
-            width: `${playerPosition.width || 0}px`,
-            height: `${playerPosition.height || 0}px`,
-            maxWidth: `${playerPosition.width || 0}px`,
-            maxHeight: `${playerPosition.height || 0}px`,
-            minWidth: 0,
-            minHeight: 0,
+            top: playerPosition.top,
+            left: playerPosition.left,
+            width: playerPosition.width,
+            height: playerPosition.height,
             pointerEvents: 'auto',
             zIndex: 50,
-            overflow: 'hidden',
-            boxSizing: 'border-box',
+            display: playerPosition.display ? 'block' : 'none',
           }}
           className="rounded-lg"
-        >
-          <YouTube
-            key={`unified-mr-${song.id}-${youtubeMR.videoId}`}
-            videoId={youtubeMR.videoId}
-            opts={{
-              width: Math.round(playerPosition.width || 0),
-              height: Math.round(playerPosition.height || 0),
-              playerVars: {
-                autoplay: 0,
-                controls: 1,
-                rel: 0,
-                modestbranding: 1,
-                start: youtubeMR.skipSeconds || 0,
-                iv_load_policy: 3,
-                cc_load_policy: 0,
-              },
-            }}
-            onReady={onYouTubeReady}
-            onStateChange={onYouTubeStateChange}
-            onPlay={() => setIsPlaying(true)}
-            onPause={() => setIsPlaying(false)}
-            onEnd={() => setIsPlaying(false)}
-            style={{
-              width: `${playerPosition.width || 0}px`,
-              height: `${playerPosition.height || 0}px`,
-              objectFit: 'fill', // 비율 무시하고 컨테이너에 맞춤
-            }}
-          />
-        </div>
+        />
+      )}
+
+      {/* 단일 비디오 YouTube 플레이어 - 항상 렌더링, 위치만 조건부 */}
+      {isExpanded && selectedVideo && selectedVideoUrl && (
+        <YouTube
+          key={`video-unified-${selectedVideo._id}`}
+          videoId={selectedVideo.videoId}
+          opts={{
+            width: '100%',
+            height: '100%',
+            playerVars: {
+              autoplay: 0,
+              controls: 1,
+              rel: 0,
+              modestbranding: 1,
+              start: selectedVideo.startTime || 0,
+              end: selectedVideo.endTime || undefined,
+              iv_load_policy: 3,
+              cc_load_policy: 0,
+            },
+          }}
+          onReady={(event) => {
+            setVideoPlayer(event.target);
+          }}
+          onPlay={() => setIsVideoPlaying(true)}
+          onPause={() => setIsVideoPlaying(false)}
+          onEnd={() => setIsVideoPlaying(false)}
+          style={{
+            position: 'fixed',
+            top: videoPlayerPosition.top,
+            left: videoPlayerPosition.left,
+            width: videoPlayerPosition.width,
+            height: videoPlayerPosition.height,
+            pointerEvents: 'auto',
+            zIndex: 50,
+            display: videoPlayerPosition.display ? 'block' : 'none',
+          }}
+          className="rounded-lg"
+        />
       )}
 
       {/* 플레이리스트 컨텍스트 메뉴 */}

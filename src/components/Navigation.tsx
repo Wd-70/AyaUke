@@ -1,51 +1,16 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useState, useEffect, useRef } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
-import { UserIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
-import { isSuperAdmin, canManageSongs, UserRole } from "@/lib/permissions";
-
-// 네비게이션 메뉴 항목 관리
-const navigationItems = [
-  {
-    href: "/",
-    label: "홈",
-    path: "/",
-  },
-  {
-    href: "/songbook",
-    label: "노래책",
-    path: "/songbook",
-  },
-  // {
-  //   href: '/suggestions',
-  //   label: '노래 추천소',
-  //   path: '/suggestions'
-  // },
-  // 향후 추가할 메뉴 항목들
-  // {
-  //   href: '/schedule',
-  //   label: '스케줄',
-  //   path: '/schedule'
-  // },
-  // {
-  //   href: '/vods',
-  //   label: '다시보기',
-  //   path: '/vods'
-  // },
-  // {
-  //   href: '/games',
-  //   label: '게임',
-  //   path: '/games'
-  // }
-];
+import Link from 'next/link';
+import { useState, useEffect, useRef } from 'react';
+import { useSession, signIn, signOut } from 'next-auth/react';
+import { UserIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
+import { isSuperAdmin, canManageSongs, UserRole } from '@/lib/permissions';
 
 interface NavigationProps {
   currentPath?: string;
 }
 
-export default function Navigation({ currentPath = "/" }: NavigationProps) {
+export default function Navigation({ currentPath = '/' }: NavigationProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-light-primary/20 dark:border-dark-primary/20">
@@ -53,38 +18,58 @@ export default function Navigation({ currentPath = "/" }: NavigationProps) {
         <div className="flex items-center h-16">
           {/* Left side - Logo */}
           <div className="flex-1">
-            <Link
-              href="/"
-              className="inline-flex items-center space-x-2 group cursor-pointer"
-            >
+            <Link href="/" className="inline-flex items-center space-x-2 group cursor-pointer">
               <div className="w-10 h-10 bg-gradient-to-br from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary rounded-lg flex items-center justify-center p-1 group-hover:scale-105 transition-transform duration-200">
-                <img
-                  src="/honeyz.png"
-                  alt="HONEYZ Logo"
+                <img 
+                  src="/honeyz.png" 
+                  alt="HONEYZ Logo" 
                   className="w-full h-full object-contain"
                 />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary bg-clip-text text-transparent">
-                AyaUke
-              </span>
+              <span className="text-xl font-bold bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary bg-clip-text text-transparent">AyaUke</span>
             </Link>
           </div>
-
+          
           {/* Center - Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8 flex-1 justify-center flex-row">
-            {navigationItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-3 py-2 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap ${
-                  currentPath === item.path
-                    ? "text-light-accent dark:text-dark-primary"
-                    : "text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary"
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
+            <Link 
+              href="/" 
+              className={`px-3 py-2 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap ${
+                currentPath === '/' 
+                  ? 'text-light-accent dark:text-dark-primary' 
+                  : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary'
+              }`}
+            >
+              홈
+            </Link>
+            <Link 
+              href="/songbook" 
+              className={`px-3 py-2 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap ${
+                currentPath === '/songbook' 
+                  ? 'text-light-accent dark:text-dark-primary' 
+                  : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary'
+              }`}
+            >
+              노래책
+            </Link>
+            {/* <Link 
+              href="#" 
+              className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
+            >
+              스케줄
+            </Link>
+            <Link 
+              href="#" 
+              className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
+            >
+              다시보기
+            </Link>
+            <Link 
+              href="#" 
+              className="px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap"
+            >
+              게임
+            </Link> */}
           </div>
 
           {/* Right side - Controls */}
@@ -93,112 +78,95 @@ export default function Navigation({ currentPath = "/" }: NavigationProps) {
             <div className="hidden md:block">
               <AuthControls />
             </div>
-
+            
             {/* Mobile menu button */}
-            <button
+            <button 
               className="md:hidden p-2 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-all duration-300"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Toggle mobile menu"
             >
-              <svg
-                className="w-6 h-6 text-gray-600 dark:text-gray-300"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+              <svg className="w-6 h-6 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {isMobileMenuOpen ? (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 ) : (
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 )}
               </svg>
             </button>
-
+            
             {/* Theme toggle - Desktop only */}
-            <div
+            <div 
               className="hidden md:block relative p-2 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-all duration-300 group cursor-pointer"
               data-theme-toggle
               aria-label="Toggle theme"
             >
               <div className="relative w-6 h-6">
                 {/* Sun Icon */}
-                <svg
+                <svg 
                   className="absolute inset-0 w-6 h-6 text-light-purple dark:text-dark-text transition-all duration-300 transform dark:opacity-0 dark:rotate-90 dark:scale-75 opacity-100 rotate-0 scale-100"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor" 
                   strokeWidth={2}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
-
+                
                 {/* Moon Icon */}
-                <svg
+                <svg 
                   className="absolute inset-0 w-6 h-6 text-light-purple dark:text-dark-text transition-all duration-300 transform opacity-0 -rotate-90 scale-75 dark:opacity-100 dark:rotate-0 dark:scale-100"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor" 
                   strokeWidth={2}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                 </svg>
               </div>
-
+              
               {/* Hover gradient overlay */}
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-light-accent/0 to-light-accent/20 dark:from-dark-accent/0 dark:to-dark-accent/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
             </div>
           </div>
         </div>
-
+        
         {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-light-primary/20 dark:border-dark-primary/20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md">
             <div className="px-4 py-2 space-y-1">
               {/* 1. 사용자 정보 */}
               <MobileUserProfile />
-
-              {/* 2. 네비게이션 메뉴 */}
-              {navigationItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`block px-3 py-2 text-base font-medium rounded-lg transition-all duration-200 ${
-                    currentPath === item.path
-                      ? "text-light-accent dark:text-dark-primary bg-light-primary/10 dark:bg-dark-primary/10"
-                      : "text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"
-                  }`}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  {item.label}
-                </Link>
-              ))}
-
+              
+              {/* 2. 홈, 노래책 링크 */}
+              <Link 
+                href="/" 
+                className={`block px-3 py-2 text-base font-medium rounded-lg transition-all duration-200 ${
+                  currentPath === '/' 
+                    ? 'text-light-accent dark:text-dark-primary bg-light-primary/10 dark:bg-dark-primary/10' 
+                    : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                홈
+              </Link>
+              <Link 
+                href="/songbook" 
+                className={`block px-3 py-2 text-base font-medium rounded-lg transition-all duration-200 ${
+                  currentPath === '/songbook' 
+                    ? 'text-light-accent dark:text-dark-primary bg-light-primary/10 dark:bg-dark-primary/10' 
+                    : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                노래책
+              </Link>
+              
               {/* 3. 권한별 추가 메뉴 */}
-              <MobileAdminMenus
-                onMenuClose={() => setIsMobileMenuOpen(false)}
-              />
-
+              <MobileAdminMenus onMenuClose={() => setIsMobileMenuOpen(false)} />
+              
               {/* 4. 로그아웃 */}
               <MobileLogout onMenuClose={() => setIsMobileMenuOpen(false)} />
-
+              
               {/* 5. 테마 토글 */}
               <div className="border-t border-light-primary/10 dark:border-dark-primary/10 pt-1 mt-1">
                 <button
@@ -208,33 +176,25 @@ export default function Navigation({ currentPath = "/" }: NavigationProps) {
                 >
                   <div className="relative w-5 h-5 mr-3">
                     {/* Sun Icon */}
-                    <svg
+                    <svg 
                       className="absolute inset-0 w-5 h-5 transition-all duration-300 transform dark:opacity-0 dark:rotate-90 dark:scale-75 opacity-100 rotate-0 scale-100"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor" 
                       strokeWidth={2}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"
-                      />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
-
+                    
                     {/* Moon Icon */}
-                    <svg
+                    <svg 
                       className="absolute inset-0 w-5 h-5 transition-all duration-300 transform opacity-0 -rotate-90 scale-75 dark:opacity-100 dark:rotate-0 dark:scale-100"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor" 
                       strokeWidth={2}
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"
-                      />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                     </svg>
                   </div>
                   <span className="dark:hidden">다크 모드</span>
@@ -257,20 +217,17 @@ function AuthControls() {
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
     };
 
     if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isDropdownOpen]);
 
@@ -281,10 +238,10 @@ function AuthControls() {
   };
 
   // 에러 상태 처리
-  if (status === "unauthenticated" || status === "loading") {
+  if (status === 'unauthenticated' || status === 'loading') {
     return (
       <>
-        {status === "loading" ? (
+        {status === 'loading' ? (
           <div className="w-8 h-8 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 animate-pulse" />
         ) : (
           <Link
@@ -296,11 +253,11 @@ function AuthControls() {
           </Link>
         )}
       </>
-    );
+    )
   }
 
   if (!session) {
-    return null;
+    return null
   }
 
   return (
@@ -312,7 +269,7 @@ function AuthControls() {
         {session.user.image ? (
           <img
             src={session.user.image}
-            alt={session.user.name || "Profile"}
+            alt={session.user.name || 'Profile'}
             className="w-8 h-8 rounded-full"
           />
         ) : (
@@ -326,15 +283,10 @@ function AuthControls() {
           </div>
           {canManageSongs(session.user.role as UserRole) && (
             <div className="text-xs text-light-accent dark:text-dark-primary font-medium">
-              {session.user.role === "super_admin"
-                ? "최고 관리자"
-                : session.user.role === "song_admin"
-                ? "노래 관리자"
-                : session.user.role === "ayauke_admin"
-                ? "노래책 관리자"
-                : session.user.role === "song_editor"
-                ? "노래 편집자"
-                : "관리자"}
+              {session.user.role === 'super_admin' ? '최고 관리자' : 
+               session.user.role === 'song_admin' ? '노래 관리자' : 
+               session.user.role === 'ayauke_admin' ? '노래책 관리자' :
+               session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
             </div>
           )}
         </div>
@@ -348,24 +300,18 @@ function AuthControls() {
               {session.user.name || session.user.channelName}
             </div>
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              치지직 ID: {truncateChannelId(session.user.channelId || "미확인")}
+              치지직 ID: {truncateChannelId(session.user.channelId || '미확인')}
             </div>
             {canManageSongs(session.user.role as UserRole) && (
               <div className="text-xs text-light-accent dark:text-dark-primary font-medium mt-1">
-                ✨{" "}
-                {session.user.role === "super_admin"
-                  ? "최고 관리자"
-                  : session.user.role === "song_admin"
-                  ? "노래 관리자"
-                  : session.user.role === "ayauke_admin"
-                  ? "노래책 관리자"
-                  : session.user.role === "song_editor"
-                  ? "노래 편집자"
-                  : "관리자"}
+                ✨ {session.user.role === 'super_admin' ? '최고 관리자' : 
+                    session.user.role === 'song_admin' ? '노래 관리자' : 
+                    session.user.role === 'ayauke_admin' ? '노래책 관리자' :
+                    session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
               </div>
             )}
           </div>
-
+          
           {canManageSongs(session.user.role as UserRole) && (
             <>
               {isSuperAdmin(session.user.role as UserRole) && (
@@ -387,7 +333,7 @@ function AuthControls() {
               <div className="border-t border-light-primary/10 dark:border-dark-primary/10 my-1" />
             </>
           )}
-
+          
           <Link
             href="/profile"
             className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors duration-200"
@@ -395,7 +341,7 @@ function AuthControls() {
           >
             내 프로필
           </Link>
-
+          
           <button
             onClick={() => {
               setIsDropdownOpen(false);
@@ -415,7 +361,7 @@ function AuthControls() {
 function MobileUserProfile() {
   const { data: session, status } = useSession();
 
-  if (status === "loading") {
+  if (status === 'loading') {
     return (
       <div className="mb-3 pb-3 border-b border-light-primary/10 dark:border-dark-primary/10">
         <div className="px-3 py-2">
@@ -425,7 +371,7 @@ function MobileUserProfile() {
     );
   }
 
-  if (status === "unauthenticated") {
+  if (status === 'unauthenticated') {
     return (
       <div className="mb-3 pb-3 border-b border-light-primary/10 dark:border-dark-primary/10">
         <Link
@@ -450,7 +396,7 @@ function MobileUserProfile() {
           {session.user.image ? (
             <img
               src={session.user.image}
-              alt={session.user.name || "Profile"}
+              alt={session.user.name || 'Profile'}
               className="w-8 h-8 rounded-full"
             />
           ) : (
@@ -464,16 +410,10 @@ function MobileUserProfile() {
             </div>
             {canManageSongs(session.user.role as UserRole) && (
               <div className="text-xs text-light-accent dark:text-dark-primary font-medium">
-                ✨{" "}
-                {session.user.role === "super_admin"
-                  ? "최고 관리자"
-                  : session.user.role === "song_admin"
-                  ? "노래 관리자"
-                  : session.user.role === "ayauke_admin"
-                  ? "노래책 관리자"
-                  : session.user.role === "song_editor"
-                  ? "노래 편집자"
-                  : "관리자"}
+                ✨ {session.user.role === 'super_admin' ? '최고 관리자' : 
+                    session.user.role === 'song_admin' ? '노래 관리자' : 
+                    session.user.role === 'ayauke_admin' ? '노래책 관리자' :
+                    session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
               </div>
             )}
           </div>

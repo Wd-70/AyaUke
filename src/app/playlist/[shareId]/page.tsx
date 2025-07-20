@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: PlaylistPageProps): Promise<M
   const { playlist } = data
   
   return {
-    title: `${playlist.name} - 플레이리스트`,
+    title: `${playlist.name} - 아야우케 플레이리스트`,
     description: playlist.description || `${playlist.songCount}곡이 담긴 플레이리스트입니다.`,
     openGraph: {
       title: playlist.name,

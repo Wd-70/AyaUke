@@ -95,6 +95,7 @@ export interface NotificationSettings {
   streamNotifications: boolean;
   soundEnabled: boolean;
   volume: number;
+<<<<<<< HEAD
 }
 
 // 노래 추천소 관련 타입들
@@ -209,4 +210,6 @@ export interface SongVideo {
   duration?: string; // 영상 길이 (유튜브에서 자동 추출)
   createdAt?: Date;
   updatedAt?: Date;
+=======
+>>>>>>> parent of 742ec04 (플레이리스트 타이틀 텍스트 변경, 노래 추천소 구현했지만 비공개 상태)
 }
