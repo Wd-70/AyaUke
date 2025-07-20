@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Song } from '@/types';
+import { SongData } from '@/types';
 import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, TrashIcon, StarIcon } from '@heroicons/react/24/outline';
 import { HeartIcon } from '@heroicons/react/24/solid';
 import YouTube from 'react-youtube';
@@ -625,6 +625,270 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     setIsExpanded(!isExpanded);
   };
 
+  // ================ UI 렌더링 함수들 ================
+  
+  // XL 화면 왼쪽 가사 영역 렌더링
+  const renderXLLyricsPanel = () => (
+    <div className="hidden xl:flex xl:w-1/2 flex-col min-h-0">
+      <div className="flex items-center gap-3 mb-4">
+        <MusicalNoteIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
+        <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">가사</h4>
+      </div>
+      <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
+        {isEditMode ? (
+          <textarea
+            value={editData.lyrics}
+            onChange={(e) => setEditData({...editData, lyrics: e.target.value})}
+            className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg 
+                       bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
+                       outline-none resize-none flex-1 min-h-0"
+            placeholder="가사를 입력하세요..."
+            style={{
+              willChange: 'scroll-position',
+              transform: 'translateZ(0)'
+            }}
+          />
+        ) : (
+          song.lyrics ? (
+            <div 
+              className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
+              style={{ 
+                overscrollBehavior: 'contain',
+                willChange: 'scroll-position',
+                transform: 'translateZ(0)'
+              }}
+            >
+              {song.lyrics}
+            </div>
+          ) : (
+            <div className="text-center flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50 flex-1">
+              <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
+              <p className="text-lg mb-2">아직 가사가 등록되지 않았습니다</p>
+              <p className="text-base">곧 업데이트될 예정입니다</p>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+
+  // 편집 모드 헤더 렌더링
+  const renderEditModeHeader = () => (
+    <div className="space-y-4">
+      {/* 편집 액션 버튼들 - 맨 위에 배치 */}
+      <div className="flex items-center justify-between">
+        <h4 className="text-lg font-semibold text-light-accent dark:text-dark-accent">곡 정보 편집</h4>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={saveEditData}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 
+                       transition-colors duration-200 disabled:opacity-50 text-green-600 dark:text-green-400"
+            title="저장"
+          >
+            {isSaving ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-4 h-4 border-2 border-green-600/30 border-t-green-600 rounded-full"
+              />
+            ) : (
+              <CheckIcon className="w-4 h-4" />
+            )}
+            <span className="text-sm font-medium">저장</span>
+          </button>
+          <button
+            onClick={cancelEdit}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-500/20 hover:bg-gray-500/30 
+                       transition-colors duration-200 disabled:opacity-50 text-gray-600 dark:text-gray-400"
+            title="취소"
+          >
+            <XMarkIcon className="w-4 h-4" />
+            <span className="text-sm font-medium">취소</span>
+          </button>
+          <button
+            onClick={handleCardClick}
+            className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
+                       transition-colors duration-200"
+            title="닫기"
+          >
+            <XMarkIcon className="w-5 h-5 text-red-500" />
+          </button>
+        </div>
+      </div>
+      
+      {/* 곡 제목 */}
+      <div>
+        <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">곡 제목</label>
+        <input
+          type="text"
+          value={editData.titleAlias}
+          onChange={(e) => setEditData({...editData, titleAlias: e.target.value})}
+          className="w-full text-xl sm:text-2xl font-semibold text-light-accent dark:text-dark-accent 
+                     bg-transparent border-b-2 border-light-accent dark:border-dark-accent 
+                     outline-none pb-1"
+          placeholder="곡 제목"
+        />
+      </div>
+      
+      {/* 아티스트 */}
+      <div>
+        <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">아티스트</label>
+        <input
+          type="text"
+          value={editData.artistAlias}
+          onChange={(e) => setEditData({...editData, artistAlias: e.target.value})}
+          className="w-full text-lg text-light-text/70 dark:text-dark-text/70 
+                     bg-transparent border-b border-light-accent/50 dark:border-dark-accent/50 
+                     outline-none pb-1"
+          placeholder="아티스트"
+        />
+      </div>
+      
+      {/* 키 조절과 언어 - 나란히 배치 */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">키 조절</label>
+          <div className="flex items-center gap-2 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg p-2">
+            <button
+              onClick={() => setEditData({...editData, keyAdjustment: editData.keyAdjustment === null ? -1 : Math.max(-12, editData.keyAdjustment - 1)})}
+              className="p-1 rounded-md hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                         transition-colors duration-200"
+              title="키 내리기"
+            >
+              <MinusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+            </button>
+            <span className="px-3 py-1 text-sm font-medium min-w-[4rem] text-center
+                           bg-yellow-100 dark:bg-yellow-900 
+                           text-yellow-800 dark:text-yellow-200 rounded-md">
+              {editData.keyAdjustment === null ? '미등록' : formatKeyAdjustment(editData.keyAdjustment) || '원본키'}
+            </span>
+            <button
+              onClick={() => setEditData({...editData, keyAdjustment: editData.keyAdjustment === null ? 1 : Math.min(12, editData.keyAdjustment + 1)})}
+              className="p-1 rounded-md hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                         transition-colors duration-200"
+              title="키 올리기"
+            >
+              <PlusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+            </button>
+            <button
+              onClick={() => setEditData({...editData, keyAdjustment: 0})}
+              className="ml-2 px-2 py-1 text-xs rounded-md bg-blue-500/20 hover:bg-blue-500/30 
+                         transition-colors duration-200 text-blue-600 dark:text-blue-400"
+              title="원본키로 설정"
+            >
+              원본키
+            </button>
+            <button
+              onClick={() => setEditData({...editData, keyAdjustment: null})}
+              className="px-2 py-1 text-xs rounded-md bg-gray-500/20 hover:bg-gray-500/30 
+                         transition-colors duration-200 text-gray-600 dark:text-gray-400"
+              title="키 정보 삭제"
+            >
+              삭제
+            </button>
+          </div>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">언어</label>
+          <select
+            value={editData.language}
+            onChange={(e) => setEditData({...editData, language: e.target.value})}
+            className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
+                       rounded-lg outline-none text-light-text dark:text-dark-text"
+          >
+            <option value="">선택안함</option>
+            <option value="Korean">한국어</option>
+            <option value="English">영어</option>
+            <option value="Japanese">일본어</option>
+            <option value="Chinese">중국어</option>
+            <option value="Other">기타</option>
+          </select>
+        </div>
+      </div>
+
+      {/* 검색 태그 편집 */}
+      <TagManager 
+        tags={editData.searchTags}
+        onTagsChange={handleTagsChange}
+        isEditMode={true}
+      />
+    </div>
+  );
+
+  // 일반 모드 헤더 렌더링
+  const renderNormalModeHeader = () => (
+    <div className="flex items-start justify-between">
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+          <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold text-light-text dark:text-dark-text 
+                         text-light-accent dark:text-dark-accent">
+            {displayTitle}
+          </h3>
+          {formatKeyAdjustment(song.keyAdjustment) && (
+            <span className="px-2 py-1 text-sm font-medium rounded-md 
+                           bg-yellow-100 dark:bg-yellow-900 
+                           text-yellow-800 dark:text-yellow-200">
+              {formatKeyAdjustment(song.keyAdjustment)}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap mb-1 sm:mb-2">
+          <p className="text-base sm:text-lg md:text-xl text-light-text/70 dark:text-dark-text/70 line-clamp-1">
+            {displayArtist}
+          </p>
+          {song.language && (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium text-white 
+                             ${languageColors[song.language as keyof typeof languageColors] || 'bg-gray-500'}`}>
+              {song.language}
+            </span>
+          )}
+          <TagManager 
+            tags={song.searchTags || []}
+            onTagsChange={() => {}}
+            isEditMode={false}
+          />
+          {songPlaylists.map((playlist) => (
+            <span
+              key={playlist._id}
+              className="px-2 py-1 rounded-full text-xs 
+                       bg-green-100 dark:bg-green-900 
+                       text-green-800 dark:text-green-200"
+            >
+              📋 {playlist.name}
+            </span>
+          ))}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              setMenuPosition({ x: rect.left, y: rect.bottom + 5 });
+              setShowPlaylistMenu(true);
+            }}
+            className="px-2 py-1 rounded-full text-xs 
+                     bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30
+                     text-light-text/70 dark:text-dark-text/70 transition-colors duration-200"
+            title="플레이리스트에 추가"
+          >
+            + 플레이리스트
+          </button>
+        </div>
+      </div>
+      {isAdmin && (
+        <button
+          onClick={toggleEditMode}
+          className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 
+                     hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200 ml-2 sm:ml-3"
+          title="편집"
+        >
+          <PencilIcon className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <>
       {/* 확장 시 배경 오버레이 */}
@@ -664,286 +928,13 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
 
           <div className="relative p-4 sm:p-6 xl:p-8 flex flex-col xl:flex-row h-full gap-4 sm:gap-6 xl:gap-8">
             {/* 왼쪽: 가사 전용 영역 (XL 이상에서만) */}
-            <div className="hidden xl:flex xl:w-1/2 flex-col min-h-0">
-              <div className="flex items-center gap-3 mb-4">
-                <MusicalNoteIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
-                <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">가사</h4>
-              </div>
-              <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
-                {isEditMode ? (
-                  <textarea
-                    value={editData.lyrics}
-                    onChange={(e) => setEditData({...editData, lyrics: e.target.value})}
-                    className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg 
-                               bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
-                               outline-none resize-none flex-1 min-h-0"
-                    placeholder="가사를 입력하세요..."
-                    style={{
-                      willChange: 'scroll-position',
-                      transform: 'translateZ(0)'
-                    }}
-                  />
-                ) : (
-                  song.lyrics ? (
-                    <div 
-                      className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
-                      style={{ 
-                        overscrollBehavior: 'contain',
-                        willChange: 'scroll-position',
-                        transform: 'translateZ(0)'
-                      }}
-                    >
-                      {song.lyrics}
-                    </div>
-                  ) : (
-                    <div className="text-center flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50 flex-1">
-                      <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
-                      <p className="text-lg mb-2">아직 가사가 등록되지 않았습니다</p>
-                      <p className="text-base">곧 업데이트될 예정입니다</p>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
+            {renderXLLyricsPanel()}
 
             {/* 오른쪽: 모든 다른 요소들 */}
             <div className="flex-1 xl:w-1/2 flex flex-col min-h-0">
               {/* Header */}
               <div className="mb-3 sm:mb-4">
-                {isEditMode ? (
-                  /* 편집 모드 - 세로 레이아웃 */
-                  <div className="space-y-4">
-                    {/* 편집 액션 버튼들 - 맨 위에 배치 */}
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-lg font-semibold text-light-accent dark:text-dark-accent">곡 정보 편집</h4>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={saveEditData}
-                          disabled={isSaving}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 
-                                     transition-colors duration-200 disabled:opacity-50 text-green-600 dark:text-green-400"
-                          title="저장"
-                        >
-                          {isSaving ? (
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                              className="w-4 h-4 border-2 border-green-600/30 border-t-green-600 rounded-full"
-                            />
-                          ) : (
-                            <CheckIcon className="w-4 h-4" />
-                          )}
-                          <span className="text-sm font-medium">저장</span>
-                        </button>
-                        <button
-                          onClick={cancelEdit}
-                          disabled={isSaving}
-                          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-500/20 hover:bg-gray-500/30 
-                                     transition-colors duration-200 disabled:opacity-50 text-gray-600 dark:text-gray-400"
-                          title="취소"
-                        >
-                          <XMarkIcon className="w-4 h-4" />
-                          <span className="text-sm font-medium">취소</span>
-                        </button>
-                        <button
-                          onClick={handleCardClick}
-                          className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
-                                     transition-colors duration-200"
-                          title="닫기"
-                        >
-                          <XMarkIcon className="w-5 h-5 text-red-500" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* 곡 제목 */}
-                    <div>
-                      <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">곡 제목</label>
-                      <input
-                        type="text"
-                        value={editData.titleAlias}
-                        onChange={(e) => setEditData({...editData, titleAlias: e.target.value})}
-                        className="w-full text-xl sm:text-2xl font-semibold text-light-accent dark:text-dark-accent 
-                                   bg-transparent border-b-2 border-light-accent dark:border-dark-accent 
-                                   outline-none pb-1"
-                        placeholder="곡 제목"
-                      />
-                    </div>
-                    
-                    {/* 아티스트 */}
-                    <div>
-                      <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">아티스트</label>
-                      <input
-                        type="text"
-                        value={editData.artistAlias}
-                        onChange={(e) => setEditData({...editData, artistAlias: e.target.value})}
-                        className="w-full text-lg text-light-text/70 dark:text-dark-text/70 
-                                   bg-transparent border-b border-light-accent/50 dark:border-dark-accent/50 
-                                   outline-none pb-1"
-                        placeholder="아티스트"
-                      />
-                    </div>
-                    
-                    {/* 키 조절과 언어 - 나란히 배치 */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">키 조절</label>
-                        <div className="flex items-center gap-2 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg p-2">
-                          <button
-                            onClick={() => setEditData({...editData, keyAdjustment: editData.keyAdjustment === null ? -1 : Math.max(-12, editData.keyAdjustment - 1)})}
-                            className="p-1 rounded-md hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                                       transition-colors duration-200"
-                            title="키 내리기"
-                          >
-                            <MinusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-                          </button>
-                          <span className="px-3 py-1 text-sm font-medium min-w-[4rem] text-center
-                                         bg-yellow-100 dark:bg-yellow-900 
-                                         text-yellow-800 dark:text-yellow-200 rounded-md">
-                            {editData.keyAdjustment === null ? '미등록' : formatKeyAdjustment(editData.keyAdjustment) || '원본키'}
-                          </span>
-                          <button
-                            onClick={() => setEditData({...editData, keyAdjustment: editData.keyAdjustment === null ? 1 : Math.min(12, editData.keyAdjustment + 1)})}
-                            className="p-1 rounded-md hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                                       transition-colors duration-200"
-                            title="키 올리기"
-                          >
-                            <PlusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-                          </button>
-                          <button
-                            onClick={() => setEditData({...editData, keyAdjustment: 0})}
-                            className="ml-2 px-2 py-1 text-xs rounded-md bg-blue-500/20 hover:bg-blue-500/30 
-                                       transition-colors duration-200 text-blue-600 dark:text-blue-400"
-                            title="원본키로 설정"
-                          >
-                            원본키
-                          </button>
-                          <button
-                            onClick={() => setEditData({...editData, keyAdjustment: null})}
-                            className="px-2 py-1 text-xs rounded-md bg-gray-500/20 hover:bg-gray-500/30 
-                                       transition-colors duration-200 text-gray-600 dark:text-gray-400"
-                            title="키 정보 삭제"
-                          >
-                            삭제
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">언어</label>
-                        <select
-                          value={editData.language}
-                          onChange={(e) => setEditData({...editData, language: e.target.value})}
-                          className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
-                                     rounded-lg outline-none text-light-text dark:text-dark-text"
-                        >
-                          <option value="">선택안함</option>
-                          <option value="Korean">한국어</option>
-                          <option value="English">영어</option>
-                          <option value="Japanese">일본어</option>
-                          <option value="Chinese">중국어</option>
-                          <option value="Other">기타</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* 검색 태그 편집 */}
-                    <TagManager 
-                      tags={editData.searchTags}
-                      onTagsChange={handleTagsChange}
-                      isEditMode={true}
-                    />
-                  </div>
-                ) : (
-                  /* 일반 모드 - 기존 레이아웃 */
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                        <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold text-light-text dark:text-dark-text 
-                                       text-light-accent dark:text-dark-accent">
-                          {displayTitle}
-                        </h3>
-                        {formatKeyAdjustment(song.keyAdjustment) && (
-                          <span className="px-2 py-1 text-sm font-medium rounded-md 
-                                         bg-yellow-100 dark:bg-yellow-900 
-                                         text-yellow-800 dark:text-yellow-200">
-                            {formatKeyAdjustment(song.keyAdjustment)}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 sm:gap-2 flex-wrap mb-1 sm:mb-2">
-                        <p className="text-base sm:text-lg md:text-xl text-light-text/70 dark:text-dark-text/70 line-clamp-1">
-                          {displayArtist}
-                        </p>
-                        {song.language && (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium text-white 
-                                           ${languageColors[song.language as keyof typeof languageColors] || 'bg-gray-500'}`}>
-                            {song.language}
-                          </span>
-                        )}
-                        <TagManager 
-                          tags={song.searchTags || []}
-                          onTagsChange={() => {}}
-                          isEditMode={false}
-                        />
-                        {songPlaylists.map((playlist) => (
-                          <span
-                            key={playlist._id}
-                            className="px-2 py-1 rounded-full text-xs 
-                                     bg-purple-100 dark:bg-purple-900 
-                                     text-purple-800 dark:text-purple-200"
-                          >
-                            🎵 {playlist.name}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {isAdmin && (
-                        <button
-                          onClick={toggleEditMode}
-                          className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                                     transition-colors duration-200"
-                          title="편집"
-                        >
-                          <PencilIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
-                        </button>
-                      )}
-                      <button
-                        onClick={handlePlaylistClick}
-                        className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                                   transition-colors duration-200"
-                        title="플레이리스트 관리"
-                      >
-                        <ListBulletIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
-                      </button>
-                      <button
-                        onClick={handleLike}
-                        disabled={likeLoading}
-                        className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                                   transition-colors duration-200 disabled:opacity-50"
-                        title={liked ? '좋아요 취소' : '좋아요'}
-                      >
-                        <HeartIcon 
-                          className={`w-5 h-5 transition-all duration-200 
-                                     ${likeLoading 
-                                       ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
-                                       : liked 
-                                         ? 'text-red-500 fill-current' 
-                                         : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
-                        />
-                      </button>
-                      <button
-                        onClick={handleCardClick}
-                        className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
-                                   transition-colors duration-200"
-                        title="닫기"
-                      >
-                        <XMarkIcon className="w-5 h-5 text-red-500" />
-                      </button>
-                    </div>
-                  </div>
-                )}
+                {isEditMode ? renderEditModeHeader() : renderNormalModeHeader()}
               </div>
 
               {/* Legacy Tags (if exists) */}

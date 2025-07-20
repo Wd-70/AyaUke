@@ -24,6 +24,12 @@ export interface Song {
   imageUrl?: string;
 }
 
+// SongCard에서 사용하는 확장된 Song 타입
+export interface SongData extends Song {
+  mrLinks?: MRLink[];  // string[] 대신 MRLink[] 사용
+  isFavorite?: boolean;
+}
+
 export interface MRLink {
   url: string;
   skipSeconds?: number;
@@ -95,98 +101,6 @@ export interface NotificationSettings {
   streamNotifications: boolean;
   soundEnabled: boolean;
   volume: number;
-<<<<<<< HEAD
-}
-
-// 노래 추천소 관련 타입들
-export interface SongRequest {
-  id: string;
-  title: string;
-  artist: string;
-  
-  // 제출자 정보
-  originalSubmitter: string;
-  originalSubmitterName: string;
-  submittedAt: string;
-  
-  // 추천 시스템 (노래책 좋아요와 별개)
-  recommendationCount: number;
-  recommendedBy: string[];
-  isRecommendedByUser?: boolean; // 현재 유저의 추천 여부
-  
-  // 조회수
-  viewCount: number;
-  
-  // 기본 곡 정보 (노래책과 호환)
-  language?: string;
-  genre?: string;
-  difficulty?: string;
-  lyrics?: string;
-  description?: string; // 추천 이유/설명
-  
-  // 태그 시스템
-  tags: string[];
-  searchTags?: string[]; // 검색용 추가 태그
-  
-  // MR 링크들 (노래책과 동일한 구조)
-  mrLinks: MRLink[];
-  selectedMRIndex?: number; // 기본 MR 선택
-  
-  // 원곡 관련 링크들
-  originalTrackUrl?: string; // 원곡 링크 (YouTube, Spotify 등)
-  lyricsUrl?: string; // 가사 원본 링크
-  
-  // 추가 메타데이터
-  keyAdjustment?: number | null; // 키 조정
-  duration?: string; // 곡 길이
-  releaseYear?: string; // 발매년도
-  
-  // 편집 이력
-  editHistory: EditHistoryEntry[];
-  
-  // 상태 관리
-  status: 'active' | 'pending_approval' | 'approved' | 'rejected';
-  
-  // 노래책 편입 여부
-  promotedToSongbook: boolean;
-  promotedAt?: string;
-  promotedBy?: string;
-  songbookId?: string;
-  
-  // 메타데이터
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface EditHistoryEntry {
-  userId: string;
-  userName: string;
-  editedAt: string;
-  changes: string;
-  fieldsChanged: string[];
-}
-
-export type SongRequestSortOption = 
-  | 'latest'        // 최신순
-  | 'recommended'   // 추천순
-  | 'viewed'        // 조회수순
-  | 'trending'      // 인기순 (추천+조회수 복합)
-  | 'pending';      // 승격 대기순
-
-export interface SongRequestFilters {
-  search?: string;
-  genre?: string;
-  tags?: string[];
-  status?: SongRequest['status'];
-  promotedToSongbook?: boolean;
-}
-
-export interface SongRequestStats {
-  totalRequests: number;
-  weeklyNewRequests: number;
-  pendingPromotions: number;
-  totalRecommendations: number;
-  activeContributors: number;
 }
 
 // 노래 영상 관련 타입들
@@ -210,6 +124,4 @@ export interface SongVideo {
   duration?: string; // 영상 길이 (유튜브에서 자동 추출)
   createdAt?: Date;
   updatedAt?: Date;
-=======
->>>>>>> parent of 742ec04 (플레이리스트 타이틀 텍스트 변경, 노래 추천소 구현했지만 비공개 상태)
 }
