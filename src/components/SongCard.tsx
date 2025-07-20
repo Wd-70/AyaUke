@@ -850,42 +850,52 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
             onTagsChange={() => {}}
             isEditMode={false}
           />
-          {songPlaylists.map((playlist) => (
-            <span
-              key={playlist._id}
-              className="px-2 py-1 rounded-full text-xs 
-                       bg-green-100 dark:bg-green-900 
-                       text-green-800 dark:text-green-200"
-            >
-              📋 {playlist.name}
-            </span>
-          ))}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              setMenuPosition({ x: rect.left, y: rect.bottom + 5 });
-              setShowPlaylistMenu(true);
-            }}
-            className="px-2 py-1 rounded-full text-xs 
-                     bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30
-                     text-light-text/70 dark:text-dark-text/70 transition-colors duration-200"
-            title="플레이리스트에 추가"
-          >
-            + 플레이리스트
-          </button>
         </div>
       </div>
-      {isAdmin && (
+      <div className="flex items-center gap-2">
+        {isAdmin && (
+          <button
+            onClick={toggleEditMode}
+            className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                       transition-colors duration-200"
+            title="편집"
+          >
+            <PencilIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
+          </button>
+        )}
         <button
-          onClick={toggleEditMode}
-          className="p-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 
-                     hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors duration-200 ml-2 sm:ml-3"
-          title="편집"
+          onClick={handlePlaylistClick}
+          className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                     transition-colors duration-200"
+          title="플레이리스트 관리"
         >
-          <PencilIcon className="w-4 h-4" />
+          <ListBulletIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
         </button>
-      )}
+        <button
+          onClick={handleLike}
+          disabled={likeLoading}
+          className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                     transition-colors duration-200 disabled:opacity-50"
+          title={liked ? '좋아요 취소' : '좋아요'}
+        >
+          <HeartIcon 
+            className={`w-5 h-5 transition-all duration-200 
+                       ${likeLoading 
+                         ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
+                         : liked 
+                           ? 'text-red-500 fill-current' 
+                           : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
+          />
+        </button>
+        <button
+          onClick={handleCardClick}
+          className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
+                     transition-colors duration-200"
+          title="닫기"
+        >
+          <XMarkIcon className="w-5 h-5 text-red-500" />
+        </button>
+      </div>
     </div>
   );
 
