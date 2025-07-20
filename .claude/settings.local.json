@@ -15,7 +15,8 @@
       "Bash(grep:*)",
       "Bash(rg:*)",
       "Bash(npx eslint:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(npx tsc:*)"
     ],
     "deny": []
   }

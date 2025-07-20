@@ -10,6 +10,7 @@ import { useLike } from '@/hooks/useLikes';
 import { useSongPlaylists } from '@/hooks/useGlobalPlaylists';
 import PlaylistContextMenu from './PlaylistContextMenu';
 import LiveClipManager from './LiveClipManager';
+import SongEditForm from './SongEditForm';
 import { useSession } from 'next-auth/react';
 
 // YouTube 플레이어 타입 정의
@@ -42,14 +43,13 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   
   // 편집 모드 상태
   const [isEditMode, setIsEditMode] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
+  // 임시 편집 관련 상태 (제거 예정)
   const [editData, setEditData] = useState({
-    title: '',
-    artist: '',
     titleAlias: '',
     artistAlias: '',
-    lyrics: '',
-    personalNotes: '',
-    keyAdjustment: null as number | null, // null과 0을 구분
+    keyAdjustment: null as number | null,
     language: '',
     searchTags: [] as string[],
     mrLinks: [] as Array<{
@@ -59,9 +59,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       duration?: string;
     }>,
     selectedMRIndex: 0,
+    lyrics: ''
   });
-  const [isSaving, setIsSaving] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(0);
   const [newTag, setNewTag] = useState('');
   
   // 관리자 권한 체크
@@ -89,160 +88,31 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     };
   }, [isExpanded, currentTab]);
 
-  // 편집 모드 진입 시 데이터 초기화
-  const initializeEditData = () => {
-    const mrLinks = song.mrLinks || [];
-    setEditData({
-      title: song.title || '', // 원본 제목 (참조용)
-      artist: song.artist || '', // 원본 아티스트 (참조용)
-      titleAlias: displayTitle, // 현재 표시되는 제목 (alias 우선)
-      artistAlias: displayArtist, // 현재 표시되는 아티스트 (alias 우선)
-      lyrics: song.lyrics || '',
-      personalNotes: song.personalNotes || '',
-      keyAdjustment: song.keyAdjustment ?? null, // null과 0을 구분
-      language: song.language || '',
-      searchTags: song.searchTags || [],
-      mrLinks: mrLinks.length > 0 ? mrLinks.map(link => ({
-        url: link.url || '',
-        skipSeconds: link.skipSeconds || 0,
-        label: link.label || '',
-        duration: link.duration || '',
-      })) : [{ url: '', skipSeconds: 0, label: '', duration: '' }],
-      selectedMRIndex: song.selectedMRIndex || 0,
-    });
-  };
 
   // 편집 모드 토글
   const toggleEditMode = () => {
-    if (!isEditMode) {
-      initializeEditData();
-    }
     setIsEditMode(!isEditMode);
   };
 
-  // 태그 관리 함수들
-  const addTag = () => {
-    if (newTag.trim() && !editData.searchTags.includes(newTag.trim())) {
-      setEditData({
-        ...editData,
-        searchTags: [...editData.searchTags, newTag.trim()]
-      });
-      setNewTag('');
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setEditData({
-      ...editData,
-      searchTags: editData.searchTags.filter(tag => tag !== tagToRemove)
-    });
-  };
-
-  const handleTagKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addTag();
-    }
-  };
-
-  // 편집 데이터 저장
-  const saveEditData = async () => {
-    if (!song.id) return;
-    
-    setIsSaving(true);
-    try {
-      // 저장할 데이터 준비 - alias 로직 처리
-      const saveData = {
-        ...editData,
-        // 제목: 기본값과 다르면 alias로 저장, 같거나 비어있으면 alias 삭제
-        titleAlias: (!editData.titleAlias.trim() || editData.titleAlias.trim() === song.title.trim()) ? null : editData.titleAlias.trim(),
-        // 아티스트: 기본값과 다르면 alias로 저장, 같거나 비어있으면 alias 삭제  
-        artistAlias: (!editData.artistAlias.trim() || editData.artistAlias.trim() === song.artist.trim()) ? null : editData.artistAlias.trim(),
-        // MR 링크: 빈 URL 제거 후 저장
-        mrLinks: editData.mrLinks.filter(link => link.url.trim() !== ''),
-      };
-      
-      // 기본값은 제거 (수정 불가능)
-      delete saveData.title;
-      delete saveData.artist;
-
-      // 디버깅을 위한 로깅
-      console.log('🚀 저장할 데이터:', JSON.stringify(saveData, null, 2));
-      console.log('🚀 MR 링크 데이터:', saveData.mrLinks);
-
-      const response = await fetch(`/api/songdetails/${song.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(saveData),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // 성공적으로 저장되면 song 객체를 업데이트
-        console.log('✅ 저장 성공, 반환된 데이터:', result.song);
-        console.log('✅ 기존 song 객체:', song);
-        Object.assign(song, result.song);
-        console.log('✅ 업데이트된 song 객체:', song);
-        
-        // 강제 리렌더링 트리거
-        setForceUpdate(prev => prev + 1);
-        setIsEditMode(false);
-        alert('곡 정보가 성공적으로 수정되었습니다.');
-      } else {
-        alert(result.error || '저장에 실패했습니다.');
-      }
-    } catch (error) {
-      console.error('저장 오류:', error);
-      alert('저장 중 오류가 발생했습니다.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // 편집 취소
-  const cancelEdit = () => {
+  // 편집 저장 핸들러
+  const handleSaveEdit = (updatedSong: SongData) => {
+    Object.assign(song, updatedSong);
+    setForceUpdate(prev => prev + 1);
     setIsEditMode(false);
-    initializeEditData();
   };
 
-  // MR 링크 관리 함수들
-  const addMRLink = () => {
-    setEditData({
-      ...editData,
-      mrLinks: [...editData.mrLinks, { url: '', skipSeconds: 0, label: '', duration: '' }]
-    });
+  // 편집 취소 핸들러
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
   };
 
-  const removeMRLink = (index: number) => {
-    if (editData.mrLinks.length > 1) {
-      const newLinks = editData.mrLinks.filter((_, i) => i !== index);
-      setEditData({
-        ...editData,
-        mrLinks: newLinks,
-        selectedMRIndex: Math.min(editData.selectedMRIndex, newLinks.length - 1)
-      });
-    }
-  };
-
-  const updateMRLink = (index: number, field: string, value: string | number) => {
-    const updatedLinks = editData.mrLinks.map((link, i) => 
-      i === index ? { ...link, [field]: value } : link
-    );
-    setEditData({
-      ...editData,
-      mrLinks: updatedLinks
-    });
-  };
-
-  const setMainMRLink = (index: number) => {
-    setEditData({
-      ...editData,
-      selectedMRIndex: index
-    });
-  };
+  // 임시 함수들 (제거 예정)
+  const addTag = () => {};
+  const removeTag = () => {};
+  const setMainMRLink = () => {};
+  const removeMRLink = () => {};
+  const updateMRLink = () => {};
+  const addMRLink = () => {};
 
   const languageColors = {
     Korean: 'bg-blue-500',
@@ -696,20 +566,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                 <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">가사</h4>
               </div>
               <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
-                {isEditMode ? (
-                  <textarea
-                    value={editData.lyrics}
-                    onChange={(e) => setEditData({...editData, lyrics: e.target.value})}
-                    className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg 
-                               bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
-                               outline-none resize-none flex-1 min-h-0"
-                    placeholder="가사를 입력하세요..."
-                    style={{
-                      willChange: 'scroll-position',
-                      transform: 'translateZ(0)'
-                    }}
-                  />
-                ) : (
+                {
                   song.lyrics ? (
                     <div 
                       className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
@@ -721,14 +578,14 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                     >
                       {song.lyrics}
                     </div>
-                  ) : (
-                    <div className="text-center flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50 flex-1">
-                      <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
-                      <p className="text-lg mb-2">아직 가사가 등록되지 않았습니다</p>
-                      <p className="text-base">곧 업데이트될 예정입니다</p>
-                    </div>
-                  )
-                )}
+                ) : (
+                  <div className="text-center flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50 flex-1">
+                    <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
+                    <p className="text-lg mb-2">아직 가사가 등록되지 않았습니다</p>
+                    <p className="text-base">곧 업데이트될 예정입니다</p>
+                  </div>
+                )
+              }
               </div>
             </div>
 
@@ -1041,12 +898,27 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
 
               {/* 큰 화면에서의 영상 섹션 - 플레이어 대상 영역 */}
               <div className="hidden xl:flex flex-col flex-1 gap-6 min-h-0">
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  transition={{ duration: 0.3, delay: 0.1 }}
-                  className="p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
-                >
+                {isEditMode ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
+                  >
+                    <SongEditForm 
+                      song={song}
+                      isVisible={true}
+                      onSave={handleSaveEdit}
+                      onCancel={handleCancelEdit}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    transition={{ duration: 0.3, delay: 0.1 }}
+                    className="p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
+                  >
                   {/* XL 화면 탭 네비게이션 */}
                   <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20 mb-4">
                     <button
@@ -1075,112 +947,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
 
                   {/* XL 화면 MR 섹션 */}
                   <div className={`${currentTab === 'mr' ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
-                  
-                  {isEditMode ? (
-                    /* MR 링크 편집 UI - XL 화면 */
-                    <div className="scrollable-content flex-1 space-y-4 overflow-y-auto min-h-0" onWheel={handleScrollableAreaScroll}>
-                      {editData.mrLinks.map((link, index) => (
-                        <div key={index} className="p-4 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg border border-light-primary/20 dark:border-dark-primary/20">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setMainMRLink(index)}
-                                className={`p-1 rounded-full transition-colors duration-200 ${
-                                  editData.selectedMRIndex === index
-                                    ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
-                                    : 'bg-gray-500/20 text-gray-600 dark:text-gray-400 hover:bg-gray-500/30'
-                                }`}
-                                title={editData.selectedMRIndex === index ? "메인 MR" : "메인으로 설정"}
-                              >
-                                <StarIcon className="w-4 h-4" />
-                              </button>
-                              <span className="text-sm font-medium text-light-text/70 dark:text-dark-text/70">
-                                MR 링크 {index + 1}
-                                {editData.selectedMRIndex === index && (
-                                  <span className="ml-2 text-xs text-yellow-600 dark:text-yellow-400">(메인)</span>
-                                )}
-                              </span>
-                            </div>
-                            {editData.mrLinks.length > 1 && (
-                              <button
-                                onClick={() => removeMRLink(index)}
-                                className="p-1 rounded-full bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-colors duration-200"
-                                title="삭제"
-                              >
-                                <TrashIcon className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                          
-                          <div className="space-y-3">
-                            <div>
-                              <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">URL</label>
-                              <input
-                                type="url"
-                                value={link.url}
-                                onChange={(e) => updateMRLink(index, 'url', e.target.value)}
-                                className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
-                                           rounded-md outline-none text-light-text dark:text-dark-text"
-                                placeholder="https://youtube.com/watch?v=..."
-                              />
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">시작 시간 (초)</label>
-                                <input
-                                  type="number"
-                                  value={link.skipSeconds}
-                                  onChange={(e) => updateMRLink(index, 'skipSeconds', parseInt(e.target.value) || 0)}
-                                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
-                                             rounded-md outline-none text-light-text dark:text-dark-text"
-                                  min="0"
-                                  placeholder="0"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">라벨</label>
-                                <input
-                                  type="text"
-                                  value={link.label}
-                                  onChange={(e) => updateMRLink(index, 'label', e.target.value)}
-                                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
-                                             rounded-md outline-none text-light-text dark:text-dark-text"
-                                  placeholder="공식 MR"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      
-                      <div className="flex gap-2">
-                        <button
-                          onClick={addMRLink}
-                          className="flex-1 flex items-center justify-center gap-2 py-3 px-4 border-2 border-dashed 
-                                     border-light-accent/50 dark:border-dark-accent/50 rounded-lg
-                                     text-light-accent dark:text-dark-accent hover:bg-light-accent/10 dark:hover:bg-dark-accent/10
-                                     transition-colors duration-200"
-                        >
-                          <PlusIcon className="w-5 h-5" />
-                          <span>MR 링크 추가</span>
-                        </button>
-                        <button
-                          onClick={handleMRSearch}
-                          className="px-4 py-3 bg-light-secondary/20 dark:bg-dark-secondary/20 
-                                     hover:bg-light-secondary/30 dark:hover:bg-dark-secondary/30
-                                     text-light-text dark:text-dark-text rounded-lg
-                                     transition-colors duration-200 flex items-center gap-2"
-                          title="YouTube에서 MR 검색"
-                        >
-                          <MagnifyingGlassIcon className="w-5 h-5" />
-                          <span>MR 검색</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* 기존 YouTube 플레이어 */
-                    youtubeMR && (
+                    {/* 기존 YouTube 플레이어 */}
+                    {youtubeMR && (
                       <div 
                         id="xl-player-target" 
                         className="w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg"
@@ -1192,8 +960,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                       >
                         {/* 통합 플레이어가 여기에 위치함 */}
                       </div>
-                    )
-                  )}
+                    )}
                   </div>
 
                   {/* XL 화면 유튜브 영상 섹션 */}
@@ -1205,6 +972,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                     />
                   </div>
                 </motion.div>
+                )}
               </div>
 
               {/* 작은 화면에서의 탭 섹션 */}
