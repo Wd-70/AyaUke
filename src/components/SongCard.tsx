@@ -744,16 +744,20 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                                bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
                                outline-none resize-none flex-1 min-h-0"
                     placeholder="가사를 입력하세요..."
-                    onWheel={handleScrollableAreaScroll}
+                    style={{
+                      willChange: 'scroll-position',
+                      transform: 'translateZ(0)'
+                    }}
                   />
                 ) : (
                   song.lyrics ? (
                     <div 
                       className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
                       style={{ 
-                        overscrollBehavior: 'contain' 
+                        overscrollBehavior: 'contain',
+                        willChange: 'scroll-position',
+                        transform: 'translateZ(0)'
                       }}
-                      onWheel={handleScrollableAreaScroll}
                     >
                       {song.lyrics}
                     </div>
@@ -1222,7 +1226,15 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   ) : (
                     /* 기존 YouTube 플레이어 */
                     youtubeMR && (
-                      <div id="xl-player-target" className="aspect-video w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <div 
+                        id="xl-player-target" 
+                        className="w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                        style={{
+                          height: '100%',
+                          maxHeight: '100%',
+                          overflow: 'hidden'
+                        }}
+                      >
                         {/* 통합 플레이어가 여기에 위치함 */}
                       </div>
                     )
@@ -1379,7 +1391,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                 {/* 탭 콘텐츠 */}
                 <div className="flex-1 min-h-0 p-4 sm:p-6">
                   {/* MR 영상/편집 영역 */}
-                  <div className={`${currentTab === 'mr' ? 'flex' : 'hidden'} flex-col flex-1 min-h-0`}>
+                  <div className={`${currentTab === 'mr' ? 'flex' : 'hidden'} flex-col h-full min-h-0`}>
                   
                   {isEditMode ? (
                     /* MR 링크 편집 UI */
@@ -1486,8 +1498,17 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   ) : (
                     /* 기존 YouTube 플레이어 */
                     youtubeMR && (
-                      <div id="mobile-player-target" className="flex-1 w-full min-h-0 aspect-video bg-gray-50 dark:bg-gray-800 rounded-lg">
-                        {/* 통합 플레이어가 여기에 위치함 */}
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <div 
+                          id="mobile-player-target" 
+                          className="w-full bg-gray-50 dark:bg-gray-800 rounded-lg flex-1"
+                          style={{
+                            minHeight: '240px',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {/* 통합 플레이어가 여기에 위치함 */}
+                        </div>
                       </div>
                     )
                   )}
@@ -1503,17 +1524,20 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                                  bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
                                  outline-none resize-none flex-1 min-h-0"
                       placeholder="가사를 입력하세요..."
-                      onWheel={handleScrollableAreaScroll}
+                      style={{
+                        willChange: 'scroll-position',
+                        transform: 'translateZ(0)'
+                      }}
                     />
                   ) : (
                     song.lyrics ? (
                       <div 
-                        className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg h-full overflow-y-auto" 
+                        className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg flex-1 overflow-y-auto" 
                         style={{ 
                           overscrollBehavior: 'contain',
-                          maxHeight: '100%'
+                          willChange: 'scroll-position',
+                          transform: 'translateZ(0)'
                         }}
-                        onWheel={handleScrollableAreaScroll}
                       >
                         {song.lyrics}
                       </div>
@@ -1979,6 +2003,16 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       )}
       
       {/* 통합 MR YouTube 플레이어 - wrapper로 크기 제한 */}
+      {(() => {
+        console.log('🎬 Player Debug:', {
+          isExpanded,
+          youtubeMR: !!youtubeMR,
+          isEditMode,
+          playerPosition,
+          shouldRender: isExpanded && youtubeMR && !isEditMode
+        });
+        return null;
+      })()}
       {isExpanded && youtubeMR && !isEditMode && (
         <div
           style={{
@@ -1986,7 +2020,9 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
             top: (() => {
               const shouldShow = (isXLScreen && (currentTab === 'mr' || currentTab === 'lyrics')) || 
                                 (!isXLScreen && currentTab === 'mr');
-              return shouldShow ? playerPosition.top : -9999;
+              const pos = shouldShow ? playerPosition.top : -9999;
+              console.log('🎯 Player Position:', { shouldShow, top: pos, playerPosition });
+              return pos;
             })(),
             left: (() => {
               const shouldShow = (isXLScreen && (currentTab === 'mr' || currentTab === 'lyrics')) || 
@@ -2002,7 +2038,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
             pointerEvents: 'auto',
             zIndex: 50,
             overflow: 'hidden',
-            boxSizing: 'border-box',
+            boxSizing: 'border-box'
           }}
           className="rounded-lg"
         >
@@ -2010,8 +2046,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
             key={`unified-mr-${song.id}-${youtubeMR.videoId}`}
             videoId={youtubeMR.videoId}
             opts={{
-              width: Math.round(playerPosition.width || 0),
-              height: Math.round(playerPosition.height || 0),
+              width: '100%',
+              height: '100%',
               playerVars: {
                 autoplay: 0,
                 controls: 1,
@@ -2028,9 +2064,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
             onPause={() => setIsPlaying(false)}
             onEnd={() => setIsPlaying(false)}
             style={{
-              width: `${playerPosition.width || 0}px`,
-              height: `${playerPosition.height || 0}px`,
-              objectFit: 'fill', // 비율 무시하고 컨테이너에 맞춤
+              width: '100%',
+              height: '100%',
             }}
           />
         </div>
