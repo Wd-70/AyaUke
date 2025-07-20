@@ -11,6 +11,7 @@ import { useSongPlaylists } from '@/hooks/useGlobalPlaylists';
 import PlaylistContextMenu from './PlaylistContextMenu';
 import LiveClipManager from './LiveClipManager';
 import SongEditForm from './SongEditForm';
+import TagManager from './TagManager';
 import { useSession } from 'next-auth/react';
 
 // YouTube 플레이어 타입 정의
@@ -62,7 +63,6 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     selectedMRIndex: 0,
     lyrics: ''
   });
-  const [newTag, setNewTag] = useState('');
   
   // 관리자 권한 체크
   const isAdmin = session?.user?.isAdmin || false;
@@ -194,29 +194,12 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     });
   };
 
-  // 태그 관리 함수들
-  const addTag = () => {
-    if (newTag.trim() && !editData.searchTags.includes(newTag.trim())) {
-      setEditData({
-        ...editData,
-        searchTags: [...editData.searchTags, newTag.trim()]
-      });
-      setNewTag('');
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
+  // 태그 변경 핸들러
+  const handleTagsChange = (newTags: string[]) => {
     setEditData({
       ...editData,
-      searchTags: editData.searchTags.filter(tag => tag !== tagToRemove)
+      searchTags: newTags
     });
-  };
-
-  const handleTagKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addTag();
-    }
   };
 
   // MR 링크 관리 함수들
@@ -885,65 +868,11 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                     </div>
 
                     {/* 검색 태그 편집 */}
-                    <div>
-                      <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">검색 태그</label>
-                      <div className="space-y-3">
-                        {/* 새 태그 추가 */}
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 relative">
-                            <input
-                              type="text"
-                              value={newTag}
-                              onChange={(e) => setNewTag(e.target.value)}
-                              onKeyPress={handleTagKeyPress}
-                              className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 
-                                         border border-light-accent/50 dark:border-dark-accent/50 
-                                         rounded-lg outline-none text-light-text dark:text-dark-text
-                                         focus:border-light-accent dark:focus:border-dark-accent
-                                         focus:ring-1 focus:ring-light-accent dark:focus:ring-dark-accent"
-                              placeholder="새 태그 입력 (Enter로 추가)"
-                            />
-                          </div>
-                          <button
-                            onClick={addTag}
-                            disabled={!newTag.trim() || editData.searchTags.includes(newTag.trim())}
-                            className="px-3 py-2 rounded-lg bg-light-accent/20 hover:bg-light-accent/30 
-                                       dark:bg-dark-accent/20 dark:hover:bg-dark-accent/30
-                                       transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed
-                                       text-light-accent dark:text-dark-accent"
-                            title="태그 추가"
-                          >
-                            <PlusIcon className="w-4 h-4" />
-                          </button>
-                        </div>
-                        
-                        {/* 기존 태그들 */}
-                        <div className="flex flex-wrap gap-2">
-                          {editData.searchTags.map((tag, index) => (
-                            <div
-                              key={index}
-                              className="flex items-center gap-1 px-3 py-1 rounded-full bg-blue-100 dark:bg-blue-900 
-                                         text-blue-800 dark:text-blue-200 text-sm"
-                            >
-                              <span>#{tag}</span>
-                              <button
-                                onClick={() => removeTag(tag)}
-                                className="p-0.5 rounded-full hover:bg-blue-200 dark:hover:bg-blue-800 
-                                           transition-colors duration-200"
-                                title="태그 삭제"
-                              >
-                                <XMarkIcon className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ))}
-                          {editData.searchTags.length === 0 && (
-                            <span className="text-light-text/50 dark:text-dark-text/50 text-sm italic">
-                              검색 태그가 없습니다
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    <TagManager 
+                      tags={editData.searchTags}
+                      onTagsChange={handleTagsChange}
+                      isEditMode={true}
+                    />
                   </div>
                 ) : (
                   /* 일반 모드 - 기존 레이아웃 */
@@ -972,16 +901,11 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                             {song.language}
                           </span>
                         )}
-                        {song.searchTags && song.searchTags.map((tag, index) => (
-                          <span
-                            key={index}
-                            className="px-2 py-1 rounded-full text-xs 
-                                     bg-blue-100 dark:bg-blue-900 
-                                     text-blue-800 dark:text-blue-200"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
+                        <TagManager 
+                          tags={song.searchTags || []}
+                          onTagsChange={() => {}}
+                          isEditMode={false}
+                        />
                         {songPlaylists.map((playlist) => (
                           <span
                             key={playlist._id}
