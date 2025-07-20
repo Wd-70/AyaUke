@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { SongData } from '@/types';
 import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, TrashIcon, StarIcon } from '@heroicons/react/24/outline';
@@ -48,6 +48,10 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   const [forceUpdate, setForceUpdate] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   
+  // 가사 전용 상태 (성능 최적화를 위해 분리)
+  const [lyricsText, setLyricsText] = useState('');
+  const lyricsUpdateTimeout = useRef<NodeJS.Timeout | null>(null);
+  
   // 임시 편집 관련 상태 (제거 예정)
   const [editData, setEditData] = useState({
     titleAlias: '',
@@ -71,6 +75,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   // 편집 데이터 초기화
   useEffect(() => {
     if (isEditMode) {
+      const lyrics = song.lyrics || '';
       setEditData({
         titleAlias: song.titleAlias || song.title,
         artistAlias: song.artistAlias || song.artist,
@@ -86,10 +91,37 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
             }))
           : [{ url: '', skipSeconds: 0, label: '', duration: '' }],
         selectedMRIndex: song.selectedMRIndex || 0,
-        lyrics: song.lyrics || ''
+        lyrics: lyrics
       });
+      // 가사 전용 상태도 초기화
+      setLyricsText(lyrics);
     }
   }, [isEditMode, song]);
+
+  // debounced 가사 업데이트 핸들러 (성능 최적화)
+  const handleLyricsChange = useCallback((newLyrics: string) => {
+    // 즉시 UI 업데이트 (사용자 입력 반응성 유지)
+    setLyricsText(newLyrics);
+    
+    // 기존 타이머 정리
+    if (lyricsUpdateTimeout.current) {
+      clearTimeout(lyricsUpdateTimeout.current);
+    }
+    
+    // 300ms 후에 실제 editData 업데이트 (debounce)
+    lyricsUpdateTimeout.current = setTimeout(() => {
+      setEditData(prev => ({ ...prev, lyrics: newLyrics }));
+    }, 300);
+  }, []);
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (lyricsUpdateTimeout.current) {
+        clearTimeout(lyricsUpdateTimeout.current);
+      }
+    };
+  }, []);
 
   // XL 화면에서는 MR 탭을 기본으로 설정
   useEffect(() => {
@@ -137,9 +169,16 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     
     setIsSaving(true);
     try {
+      // 펜딩 중인 가사 업데이트 즉시 반영
+      if (lyricsUpdateTimeout.current) {
+        clearTimeout(lyricsUpdateTimeout.current);
+        setEditData(prev => ({ ...prev, lyrics: lyricsText }));
+      }
+      
       // 저장할 데이터 준비 - alias 로직 처리
       const saveData = {
         ...editData,
+        lyrics: lyricsText, // 최신 가사 텍스트 사용
         titleAlias: (!editData.titleAlias.trim() || editData.titleAlias.trim() === song.title.trim()) ? null : editData.titleAlias.trim(),
         artistAlias: (!editData.artistAlias.trim() || editData.artistAlias.trim() === song.artist.trim()) ? null : editData.artistAlias.trim(),
         mrLinks: editData.mrLinks.filter(link => link.url.trim() !== ''),
@@ -637,8 +676,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
         {isEditMode ? (
           <textarea
-            value={editData.lyrics}
-            onChange={(e) => setEditData({...editData, lyrics: e.target.value})}
+            value={lyricsText}
+            onChange={(e) => handleLyricsChange(e.target.value)}
             className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg 
                        bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
                        outline-none resize-none flex-1 min-h-0"
@@ -1121,8 +1160,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   <div className={`${currentTab === 'lyrics' ? 'flex' : 'hidden'} flex-col h-full min-h-0`}>
                     {isEditMode ? (
                       <textarea
-                        value={editData.lyrics}
-                        onChange={(e) => setEditData({...editData, lyrics: e.target.value})}
+                        value={lyricsText}
+                        onChange={(e) => handleLyricsChange(e.target.value)}
                         className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg 
                                    bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
                                    outline-none resize-none flex-1 min-h-0"
