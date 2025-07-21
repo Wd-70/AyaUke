@@ -29,6 +29,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
   const [videosLoading, setVideosLoading] = useState(false);
   const [videoPlayer, setVideoPlayer] = useState<YouTubePlayer | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
   const [showAddVideoForm, setShowAddVideoForm] = useState(false);
   const [addVideoData, setAddVideoData] = useState({
     videoUrl: '',
@@ -463,10 +464,26 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
                         cc_load_policy: 0,
                       },
                     }}
-                    onReady={(event) => setVideoPlayer(event.target)}
+                    onReady={(event) => {
+                      setVideoPlayer(event.target);
+                      // 자동 재생이 필요한 경우 재생 시작
+                      if (shouldAutoPlay) {
+                        setTimeout(() => {
+                          event.target.playVideo();
+                          setShouldAutoPlay(false);
+                        }, 500); // 짧은 딩레이로 안정성 향상
+                      }
+                    }}
                     onPlay={() => setIsVideoPlaying(true)}
                     onPause={() => setIsVideoPlaying(false)}
-                    onEnd={() => setIsVideoPlaying(false)}
+                    onEnd={() => {
+                      setIsVideoPlaying(false);
+                      // 다음 영상이 있으면 자동 재생
+                      if (selectedVideoIndex < songVideos.length - 1) {
+                        setShouldAutoPlay(true); // 자동 재생 플래그 설정
+                        setSelectedVideoIndex(selectedVideoIndex + 1);
+                      }
+                    }}
                     className="w-full h-full"
                   />
                 )}
