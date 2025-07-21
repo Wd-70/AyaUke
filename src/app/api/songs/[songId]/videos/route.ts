@@ -103,12 +103,28 @@ export async function POST(
       );
     }
 
+    // 유튜브 비디오 ID 추출
+    const extractYouTubeVideoId = (url: string): string | null => {
+      const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/;
+      const match = url.match(regex);
+      return match ? match[1] : null;
+    };
+
+    const videoId = extractYouTubeVideoId(videoUrl);
+    if (!videoId) {
+      return NextResponse.json(
+        { error: '올바른 유튜브 URL을 입력해주세요.' },
+        { status: 400 }
+      );
+    }
+
     // 새 영상 생성
     const newVideo = new SongVideo({
       songId,
       title: song.title,
       artist: song.artist,
       videoUrl,
+      videoId, // 추출된 비디오 ID 포함
       sungDate: new Date(sungDate),
       description,
       startTime: startTime || 0,
@@ -116,6 +132,7 @@ export async function POST(
       addedBy: session.user.channelId,
       addedByName: session.user.name || session.user.channelName,
       isVerified: false,
+      thumbnailUrl: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`, // 썸네일 URL 생성
     });
 
     await newVideo.save();
