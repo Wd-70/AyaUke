@@ -228,10 +228,13 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
     }));
   };
 
-  // 유튜브 영상 데이터 가져오기
+  // 데이터 로드 여부 추적
+  const [hasLoadedData, setHasLoadedData] = useState(false);
+
+  // 유튜브 영상 데이터 가져오기 - 처음 한 번만
   useEffect(() => {
     const fetchSongVideos = async () => {
-      if (!songId || !isVisible) return;
+      if (!songId || !isVisible || hasLoadedData) return;
       
       setVideosLoading(true);
       try {
@@ -239,6 +242,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
         if (response.ok) {
           const data = await response.json();
           setSongVideos(data.videos || []);
+          setHasLoadedData(true); // 로드 완료 표시
         }
       } catch (error) {
         console.error('영상 목록 조회 실패:', error);
@@ -248,7 +252,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
     };
 
     fetchSongVideos();
-  }, [songId, isVisible]);
+  }, [songId, isVisible, hasLoadedData]);
 
   // 권한 확인 함수
   const canEditVideo = (video: SongVideo): boolean => {
@@ -445,7 +449,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
                 isPlayerMinimized 
                   ? 'aspect-video max-h-[20vh] min-h-[120px]' 
                   : 'aspect-video max-h-[40vh] sm:max-h-[45vh] min-h-[200px] sm:min-h-[250px]'
-              }`}>
+              }`} style={{ visibility: isVisible ? 'visible' : 'hidden', position: isVisible ? 'static' : 'fixed', left: isVisible ? 'auto' : '-9999px' }}>
                 {selectedVideo && (
                   <YouTube
                     key={`video-${selectedVideo._id}`}
