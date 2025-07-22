@@ -10,10 +10,10 @@ export interface ISongVideo extends Document {
   description?: string; // 영상에 대한 설명 (옵션)
   startTime?: number; // 시작 시간 (초) - 노래 시작 부분으로 바로 이동
   endTime?: number; // 종료 시간 (초) - 노래 끝나는 부분
-  addedBy: string; // 추가한 사용자의 채널 ID
+  addedBy: mongoose.Types.ObjectId; // 추가한 사용자의 MongoDB ObjectId (User._id 참조)
   addedByName: string; // 추가한 사용자의 이름
   isVerified: boolean; // 관리자가 검증한 영상인지
-  verifiedBy?: string; // 검증한 관리자 채널 ID
+  verifiedBy?: mongoose.Types.ObjectId; // 검증한 관리자 User ObjectId
   verifiedAt?: Date; // 검증 날짜
   thumbnailUrl?: string; // 썸네일 URL (유튜브에서 자동 추출)
   duration?: string; // 영상 길이 (유튜브에서 자동 추출)
@@ -79,9 +79,9 @@ const SongVideoSchema: Schema = new Schema({
     min: 0,
   },
   addedBy: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
     required: true,
-    trim: true,
     index: true,
   },
   addedByName: {
@@ -95,8 +95,8 @@ const SongVideoSchema: Schema = new Schema({
     index: true,
   },
   verifiedBy: {
-    type: String,
-    trim: true,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
   },
   verifiedAt: {
     type: Date,

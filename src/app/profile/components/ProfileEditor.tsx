@@ -14,9 +14,14 @@ import {
 interface ProfileEditorProps {
   isOpen: boolean
   onClose: () => void
+  onSuccess?: () => void
+  initialUserData?: {
+    displayName?: string
+    profileImageUrl?: string
+  }
 }
 
-export default function ProfileEditor({ isOpen, onClose }: ProfileEditorProps) {
+export default function ProfileEditor({ isOpen, onClose, onSuccess, initialUserData }: ProfileEditorProps) {
   const { data: session, update } = useSession()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -24,19 +29,19 @@ export default function ProfileEditor({ isOpen, onClose }: ProfileEditorProps) {
   const [userProfile, setUserProfile] = useState(null)
   
   const [formData, setFormData] = useState({
-    displayName: '',
-    profileImageUrl: session?.user?.image || ''
+    displayName: initialUserData?.displayName || '',
+    profileImageUrl: initialUserData?.profileImageUrl || session?.user?.image || ''
   })
   
-  const [previewImage, setPreviewImage] = useState(session?.user?.image || '')
+  const [previewImage, setPreviewImage] = useState(initialUserData?.profileImageUrl || session?.user?.image || '')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // 사용자 프로필 정보 로드
+  // 사용자 프로필 정보 로드 (초기 데이터가 없을 때만)
   useEffect(() => {
-    if (isOpen && session?.user?.channelId) {
+    if (isOpen && session?.user?.channelId && !initialUserData?.displayName) {
       loadUserProfile()
     }
-  }, [isOpen, session?.user?.channelId])
+  }, [isOpen, session?.user?.channelId, initialUserData?.displayName])
 
   const loadUserProfile = async () => {
     try {
@@ -118,9 +123,13 @@ export default function ProfileEditor({ isOpen, onClose }: ProfileEditorProps) {
       setSuccess('프로필이 성공적으로 업데이트되었습니다!')
       
       setTimeout(() => {
-        onClose()
-        // 페이지 새로고침으로 세션 정보 확실히 업데이트
-        window.location.reload()
+        if (onSuccess) {
+          onSuccess()
+        } else {
+          onClose()
+          // 페이지 새로고침으로 세션 정보 확실히 업데이트
+          window.location.reload()
+        }
       }, 1500)
 
     } catch (err) {

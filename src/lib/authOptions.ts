@@ -99,11 +99,12 @@ export const authOptions = {
           
           // 사용자 정보 DB에 저장
           try {
-            await createOrUpdateUser({
+            const dbUser = await createOrUpdateUser({
               channelId: channelId,
               channelName: channelName,
               profileImageUrl: user.channelImageUrl || user.image
             })
+            token.userId = dbUser._id.toString() // MongoDB ObjectId를 토큰에 저장
           } catch (dbError) {
             console.error('OAuth 사용자 DB 저장 오류:', dbError)
           }
@@ -121,6 +122,18 @@ export const authOptions = {
           token.role = role
           token.isAdmin = roleToIsAdmin(role) // 하위 호환성
           token.adminRole = adminInfo?.role || null
+          
+          // 쿠키 방식에서도 DB에 사용자 정보 저장하고 ObjectId 가져오기
+          try {
+            const dbUser = await createOrUpdateUser({
+              channelId: user.channelId,
+              channelName: user.channelName,
+              profileImageUrl: user.channelImageUrl
+            })
+            token.userId = dbUser._id.toString() // MongoDB ObjectId를 토큰에 저장
+          } catch (dbError) {
+            console.error('쿠키 방식 사용자 DB 저장 오류:', dbError)
+          }
         }
       }
       return token
@@ -130,6 +143,7 @@ export const authOptions = {
         // 기본 토큰 정보 설정
         session.user.naverId = token.naverId as string || null
         session.user.channelId = token.channelId as string
+        session.user.userId = token.userId as string // MongoDB ObjectId 추가
         session.user.followerCount = token.followerCount as number
         session.user.role = token.role as string
         session.user.isAdmin = token.isAdmin as boolean

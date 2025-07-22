@@ -6,6 +6,7 @@ declare module "next-auth" {
     user: {
       naverId: string
       channelId: string
+      userId: string // MongoDB ObjectId
       channelName: string
       channelImageUrl: string
       followerCount: number
@@ -17,6 +18,7 @@ declare module "next-auth" {
   interface User extends DefaultUser {
     naverId: string
     channelId: string
+    userId: string // MongoDB ObjectId
     channelName: string
     channelImageUrl: string
     followerCount: number
@@ -29,6 +31,7 @@ declare module "next-auth/jwt" {
   interface JWT extends DefaultJWT {
     naverId: string
     channelId: string
+    userId: string // MongoDB ObjectId
     channelName: string
     channelImageUrl: string
     followerCount: number

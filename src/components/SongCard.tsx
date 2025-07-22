@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { SongData } from '@/types';
 import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, TrashIcon, StarIcon } from '@heroicons/react/24/outline';
@@ -71,6 +71,28 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   
   // 관리자 권한 체크
   const isAdmin = session?.user?.isAdmin || false;
+
+  // Player position 계산 최적화
+  const optimizedPlayerStyle = useMemo(() => {
+    const shouldShow = (isXLScreen && (currentTab === 'mr' || currentTab === 'lyrics')) || 
+                      (!isXLScreen && currentTab === 'mr');
+    
+    return {
+      position: 'fixed' as const,
+      top: shouldShow ? playerPosition.top : -9999,
+      left: shouldShow ? playerPosition.left : -9999,
+      width: `${playerPosition.width || 0}px`,
+      height: `${playerPosition.height || 0}px`,
+      maxWidth: `${playerPosition.width || 0}px`,
+      maxHeight: `${playerPosition.height || 0}px`,
+      minWidth: 0,
+      minHeight: 0,
+      pointerEvents: 'auto' as const,
+      zIndex: 50,
+      overflow: 'hidden' as const,
+      boxSizing: 'border-box' as const
+    };
+  }, [isXLScreen, currentTab, playerPosition]);
 
   // 편집 데이터 초기화
   useEffect(() => {
@@ -499,7 +521,11 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   // 다이얼로그 전체에서 스크롤 이벤트 완전 차단
   const handleDialogScroll = (e: React.WheelEvent) => {
     e.stopPropagation();
-    e.preventDefault();
+    
+    // passive 이벤트 리스너 경고 방지 - 이벤트가 cancellable일 때만 preventDefault 호출
+    if (e.cancelable) {
+      e.preventDefault();
+    }
     
     // 추가 보안: 네이티브 이벤트도 차단
     if (e.nativeEvent) {
@@ -1582,43 +1608,9 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       )}
       
       {/* 통합 MR YouTube 플레이어 - wrapper로 크기 제한 */}
-      {(() => {
-        console.log('🎬 Player Debug:', {
-          isExpanded,
-          youtubeMR: !!youtubeMR,
-          isEditMode,
-          playerPosition,
-          shouldRender: isExpanded && youtubeMR && !isEditMode
-        });
-        return null;
-      })()}
       {isExpanded && youtubeMR && !isEditMode && (
         <div
-          style={{
-            position: 'fixed',
-            top: (() => {
-              const shouldShow = (isXLScreen && (currentTab === 'mr' || currentTab === 'lyrics')) || 
-                                (!isXLScreen && currentTab === 'mr');
-              const pos = shouldShow ? playerPosition.top : -9999;
-              console.log('🎯 Player Position:', { shouldShow, top: pos, playerPosition });
-              return pos;
-            })(),
-            left: (() => {
-              const shouldShow = (isXLScreen && (currentTab === 'mr' || currentTab === 'lyrics')) || 
-                                (!isXLScreen && currentTab === 'mr');
-              return shouldShow ? playerPosition.left : -9999;
-            })(),
-            width: `${playerPosition.width || 0}px`,
-            height: `${playerPosition.height || 0}px`,
-            maxWidth: `${playerPosition.width || 0}px`,
-            maxHeight: `${playerPosition.height || 0}px`,
-            minWidth: 0,
-            minHeight: 0,
-            pointerEvents: 'auto',
-            zIndex: 50,
-            overflow: 'hidden',
-            boxSizing: 'border-box'
-          }}
+          style={optimizedPlayerStyle}
           className="rounded-lg"
         >
           <YouTube

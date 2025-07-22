@@ -26,6 +26,30 @@ export default function ProfileClient() {
   const { data: session, status } = useSession()
   const [activeTab, setActiveTab] = useState<'overview' | 'likes' | 'playlists'>('overview')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [userProfile, setUserProfile] = useState<any>(null)
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false)
+
+  // 사용자 프로필 데이터 로드
+  useEffect(() => {
+    if (session?.user?.channelId && !userProfile) {
+      loadUserProfile()
+    }
+  }, [session?.user?.channelId, userProfile])
+
+  const loadUserProfile = async () => {
+    setIsLoadingProfile(true)
+    try {
+      const response = await fetch('/api/user/profile')
+      if (response.ok) {
+        const data = await response.json()
+        setUserProfile(data.user)
+      }
+    } catch (error) {
+      console.error('프로필 로딩 실패:', error)
+    } finally {
+      setIsLoadingProfile(false)
+    }
+  }
 
   if (status === 'loading') {
     return (
@@ -86,10 +110,10 @@ export default function ProfileClient() {
                   {/* 프로필 이미지 */}
                   <div className="relative">
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gradient-to-br from-light-accent to-light-secondary dark:from-dark-accent to-dark-secondary ring-4 ring-white/20 dark:ring-gray-800/20">
-                      {session.user.image ? (
+                      {userProfile?.profileImageUrl || session.user.image ? (
                         <img
-                          src={session.user.image}
-                          alt={session.user.name || 'Profile'}
+                          src={userProfile?.profileImageUrl || session.user.image}
+                          alt={userProfile?.displayName || session.user.name || 'Profile'}
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -111,7 +135,7 @@ export default function ProfileClient() {
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                       <div>
                         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                          {session.user.name || session.user.channelName}
+                          {userProfile?.displayName || session.user.name || session.user.channelName}
                         </h1>
                         <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
                           <span className="flex items-center gap-1">
@@ -238,6 +262,15 @@ export default function ProfileClient() {
         <ProfileEditor
           isOpen={isEditingProfile}
           onClose={() => setIsEditingProfile(false)}
+          onSuccess={() => {
+            // 프로필 업데이트 성공 시 데이터 새로고침
+            loadUserProfile()
+            setIsEditingProfile(false)
+          }}
+          initialUserData={userProfile ? {
+            displayName: userProfile.displayName,
+            profileImageUrl: userProfile.profileImageUrl
+          } : undefined}
         />
       )}
     </div>

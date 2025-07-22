@@ -129,8 +129,8 @@ export async function POST(
       description,
       startTime: startTime || 0,
       endTime,
-      addedBy: session.user.channelId,
-      addedByName: session.user.name || session.user.channelName,
+      addedBy: session.user.userId,
+      addedByName: session.user.displayName || session.user.name || session.user.channelName,
       isVerified: false,
       thumbnailUrl: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`, // 썸네일 URL 생성
     });

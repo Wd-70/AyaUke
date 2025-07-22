@@ -229,21 +229,210 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
     }));
   };
 
-  // 데이터 로드 여부 추적
-  const [hasLoadedData, setHasLoadedData] = useState(false);
+  // 데이터 로드 여부 추적 - songId별로 관리
+  const [loadedSongIds, setLoadedSongIds] = useState<Set<string>>(new Set());
+
+  // 업로더 현재 정보 조회 함수
+  const getUploaderInfo = async (userId: string): Promise<{ displayName?: string; channelName?: string; success: boolean }> => {
+    try {
+      const response = await fetch(`/api/user/${userId}`);
+      const result = await response.json();
+      
+      if (result.success && result.user) {
+        return { 
+          displayName: result.user.displayName, 
+          channelName: result.user.channelName, 
+          success: true 
+        };
+      }
+      return { success: false };
+    } catch (error) {
+      console.error('업로더 정보 조회 실패:', error);
+      return { success: false };
+    }
+  };
+
+  // 업로더 닉네임 동기화 함수
+  const syncUploaderName = async (videoId: string): Promise<{ updated: boolean; newName?: string }> => {
+    try {
+      const response = await fetch(`/api/videos/${videoId}/sync-uploader`, {
+        method: 'PATCH',
+      });
+      const result = await response.json();
+      
+      if (result.success && result.updated) {
+        console.log(`✅ 닉네임 동기화: ${result.previousNickname} → ${result.currentNickname}`);
+        return { updated: true, newName: result.currentNickname };
+      }
+      return { updated: false };
+    } catch (error) {
+      console.error('닉네임 동기화 실패:', error);
+      return { updated: false };
+    }
+  };
 
   // 유튜브 영상 데이터 가져오기 - 처음 한 번만
   useEffect(() => {
     const fetchSongVideos = async () => {
-      if (!songId || !isVisible || hasLoadedData) return;
+      if (!songId || !isVisible) return;
+      
+      // 이미 로드된 songId는 건너뛰기
+      if (loadedSongIds.has(songId)) {
+        console.log(`🎬 LiveClipManager 건너뛰기: songId=${songId} 이미 로드됨`);
+        return;
+      }
+      
+      console.log(`🎬 LiveClipManager 시작: songId=${songId}, isVisible=${isVisible}`);
       
       setVideosLoading(true);
       try {
         const response = await fetch(`/api/songs/${songId}/videos`);
         if (response.ok) {
           const data = await response.json();
-          setSongVideos(data.videos || []);
-          setHasLoadedData(true); // 로드 완료 표시
+          let videos = data.videos || [];
+          
+          // 1단계: 즉시 화면에 표시 (UI 우선)
+          setSongVideos(videos);
+          
+          // 2단계: 백그라운드에서 닉네임 동기화 처리
+          if (videos.length > 0) {
+            // 업로더별로 그룹핑 (중복 제거)
+            const uploaderGroups = new Map<string, { 
+              uploaderInfo: any; 
+              videoIndexes: number[]; 
+              videoNames: string[];  // 모든 클립의 닉네임들
+            }>();
+            
+            // 업로더별 비디오 그룹핑
+            videos.forEach((video: any, index: number) => {
+              if (!uploaderGroups.has(video.addedBy)) {
+                uploaderGroups.set(video.addedBy, {
+                  uploaderInfo: null,
+                  videoIndexes: [],
+                  videoNames: []
+                });
+              }
+              const group = uploaderGroups.get(video.addedBy)!;
+              group.videoIndexes.push(index);
+              group.videoNames.push(video.addedByName);
+            });
+            
+            console.log(`🔄 닉네임 동기화 시작: ${uploaderGroups.size}명의 업로더`);
+            
+            // 백그라운드 처리 (UI 블로킹 없이)
+            setTimeout(async () => {
+              const updatePromises = Array.from(uploaderGroups.entries()).map(async ([uploaderId, group]) => {
+                try {
+                  // 업로더 정보 조회 (업로더당 1회만)  
+                  const firstVideoName = group.videoNames[0];
+                  console.log(`🔍 업로더 "${uploaderId}" (${firstVideoName}) 정보 확인`);
+                  const uploaderInfo = await getUploaderInfo(uploaderId);
+                  const currentDisplayName = uploaderInfo.displayName || uploaderInfo.channelName;
+                  
+                  if (!uploaderInfo.success || !currentDisplayName) {
+                    console.log(`⚠️ 업로더 "${uploaderId}" 정보 조회 실패`);
+                    return;
+                  }
+                  
+                  // 모든 클립의 닉네임과 비교하여 동기화 필요 여부 확인
+                  const outdatedIndexes: number[] = [];
+                  const uniqueCurrentNames = [...new Set(group.videoNames)];
+                  
+                  group.videoIndexes.forEach((videoIndex, i) => {
+                    const currentVideoName = group.videoNames[i];
+                    if (currentVideoName !== currentDisplayName) {
+                      outdatedIndexes.push(videoIndex);
+                    }
+                  });
+                  
+                  if (outdatedIndexes.length === 0) {
+                    console.log(`ℹ️ 업로더 "${uploaderId}" 모든 클립 닉네임 최신: "${currentDisplayName}" (${group.videoIndexes.length}개 클립)`);
+                    return;
+                  }
+                  
+                  console.log(`🔄 닉네임 동기화 필요: 업로더 "${uploaderId}" ${outdatedIndexes.length}/${group.videoIndexes.length}개 클립`);
+                  uniqueCurrentNames.forEach(oldName => {
+                    if (oldName !== currentDisplayName) {
+                      console.log(`   변경: "${oldName}" → "${currentDisplayName}"`);
+                    }
+                  });
+                  
+                  // 즉시 화면 업데이트 (해당 업로더의 모든 비디오)
+                  setSongVideos(prevVideos => {
+                    const updatedVideos = [...prevVideos];
+                    group.videoIndexes.forEach(index => {
+                      if (updatedVideos[index] && updatedVideos[index].addedBy === uploaderId) {
+                        updatedVideos[index] = { ...updatedVideos[index], addedByName: currentDisplayName };
+                      }
+                    });
+                    return updatedVideos;
+                  });
+                  
+                  // DB 동기화 (업데이트가 필요한 클립들만)
+                  const syncPromises = outdatedIndexes.map(async (index) => {
+                    try {
+                      const videoId = videos[index]._id;
+                      const oldName = videos[index].addedByName;
+                      const syncResult = await syncUploaderName(videoId);
+                      return { 
+                        videoId, 
+                        oldName, 
+                        success: syncResult.updated, 
+                        error: null 
+                      };
+                    } catch (error) {
+                      return { 
+                        videoId: videos[index]._id, 
+                        oldName: videos[index].addedByName,
+                        success: false, 
+                        error 
+                      };
+                    }
+                  });
+                  
+                  try {
+                    const syncResults = await Promise.all(syncPromises);
+                    const successCount = syncResults.filter(r => r.success).length;
+                    const totalCount = syncResults.length;
+                    
+                    if (successCount > 0) {
+                      console.log(`✅ 업로더 "${uploaderId}" DB 동기화 완료: ${successCount}/${totalCount}개 클립 업데이트됨 → "${currentDisplayName}"`);
+                      
+                      // 성공한 클립들의 이전 닉네임들 표시
+                      const successResults = syncResults.filter(r => r.success);
+                      const uniqueOldNames = [...new Set(successResults.map(r => r.oldName))];
+                      uniqueOldNames.forEach(oldName => {
+                        console.log(`   "${oldName}" → "${currentDisplayName}"`);
+                      });
+                    } else if (totalCount > 0) {
+                      console.log(`ℹ️ 업로더 "${uploaderId}" DB 동기화: ${totalCount}개 클립 이미 최신 상태 또는 업데이트 불필요`);
+                    }
+                    
+                    // 실패한 클립이 있다면 로그 출력
+                    const failedResults = syncResults.filter(r => !r.success && r.error);
+                    if (failedResults.length > 0) {
+                      console.log(`⚠️ 업로더 "${uploaderId}" 일부 클립 동기화 실패: ${failedResults.length}개`);
+                      failedResults.forEach(result => {
+                        console.log(`   실패: ${result.videoId} (${result.oldName})`, result.error);
+                      });
+                    }
+                  } catch (error) {
+                    console.log(`❌ 업로더 "${uploaderId}" DB 동기화 중 오류:`, error);
+                  }
+                  
+                } catch (error) {
+                  console.error(`❌ 업로더 "${uploaderId}" 처리 실패:`, error);
+                }
+              });
+              
+              // 모든 업로더 처리 완료 대기 (백그라운드에서)
+              await Promise.all(updatePromises);
+              console.log('🎯 모든 업로더 동기화 완료');
+            }, 0); // 다음 이벤트 루프에서 실행
+          }
+          
+          // 현재 songId를 로드 완료 목록에 추가
+          setLoadedSongIds(prev => new Set([...prev, songId]));
         }
       } catch (error) {
         console.error('영상 목록 조회 실패:', error);
@@ -253,7 +442,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
     };
 
     fetchSongVideos();
-  }, [songId, isVisible, hasLoadedData]);
+  }, [songId, isVisible]); // hasLoadedData 제거 - 무한 루프 방지
 
   // 권한 확인 함수
   const canEditVideo = (video: SongVideo): boolean => {
