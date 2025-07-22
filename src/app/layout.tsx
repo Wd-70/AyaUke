@@ -18,8 +18,8 @@ const poppins = Poppins({
 
 export const metadata: Metadata = {
   title: "아야 AyaUke",
-  description: "허니즈의 메인보컬이자 생활애교가 흘러넘치는 치지직의 분내담당 아야의 팬이 만든 페이지입니다. 노래책과 활동 정보를 제공합니다.",
-  keywords: ["아야", "AyaUke", "HONEYZ", "버튜버", "VTuber", "노래방송", "게임방송"],
+  description: "아야가 부르는 노래들을 모아둔 노래책 사이트. K-pop, J-pop, 최신곡까지 다양한 곡들과 라이브 클립을 확인하고 플레이리스트를 만들어보세요.",
+  keywords: ["아야", "AyaUke", "HONEYZ", "버튜버", "VTuber", "노래방송", "노래책", "플레이리스트"],
   authors: [{ name: "AyaUke" }],
   creator: "AyaUke",
   icons: {
@@ -28,24 +28,24 @@ export const metadata: Metadata = {
     apple: "/favicon.png",
   },
   openGraph: {
-    title: "아야 AyaUke - HONEYZ 버튜버 팬페이지",
-    description: "허니즈의 메인보컬이자 생활애교가 흘러넘치는 치지직의 분내담당 아야의 팬페이지",
+    title: "아야 AyaUke - 노래책",
+    description: "아야가 부르는 노래들을 모아둔 노래책. K-pop, J-pop, 최신곡까지 다양한 곡들과 라이브 클립을 확인해보세요.",
     type: "website",
     locale: "ko_KR",
     images: [
       {
-        url: "/honeyz_pink.png",
+        url: "/profile1.png",
         width: 1200,
         height: 630,
-        alt: "아야 AyaUke - HONEYZ 버튜버",
+        alt: "아야 AyaUke 노래책",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "아야 AyaUke - HONEYZ 버튜버",
-    description: "HONEYZ의 따뜻한 목소리, 게임과 노래를 사랑하는 버튜버",
-    images: ["/honeyz_pink.png"],
+    title: "아야 AyaUke - 노래책",
+    description: "아야가 부르는 노래들을 모아둔 노래책. 플레이리스트 생성과 라이브 클립 확인이 가능합니다.",
+    images: ["/profile1.png"],
   },
 };
 

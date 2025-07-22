@@ -358,6 +358,32 @@ function parseSheetData(values: string[][]): Song[] {
         source: 'sheet' as const, // 구글시트 데이터 표시
       };
       return song;
+    })
+    .filter(song => {
+      // 중복으로 인한 문제가 되는 곡들을 하드코딩으로 제외
+      const problematicSongs = [
+        { title: 'gods', artist: '뉴진스' },
+        { title: 'sugarcoat', artist: '키스오브라이프' },
+        { title: '나는 최강', artist: 'ado' },
+        { title: '타상연화', artist: '요네즈 켄시' },
+        { title: '아이돌', artist: '최애의 아이 ost' }
+      ];
+      
+      const normalizedTitle = song.title.toLowerCase().replace(/\s/g, '');
+      const normalizedArtist = song.artist.toLowerCase().replace(/\s/g, '');
+      
+      const isProblematic = problematicSongs.some(problematic => {
+        const problemTitle = problematic.title.toLowerCase().replace(/\s/g, '');
+        const problemArtist = problematic.artist.toLowerCase().replace(/\s/g, '');
+        return normalizedTitle === problemTitle && normalizedArtist === problemArtist;
+      });
+      
+      if (isProblematic) {
+        console.log(`🚫 문제 곡 시트에서 제외: ${song.title} - ${song.artist}`);
+        return false;
+      }
+      
+      return true;
     });
 }
 
