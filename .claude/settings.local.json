@@ -16,7 +16,10 @@
       "Bash(rg:*)",
       "Bash(npx eslint:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "mcp__playwright__playwright_press_key",
+      "mcp__playwright__playwright_get_visible_html",
+      "mcp__playwright__playwright_close"
     ],
     "deny": []
   }

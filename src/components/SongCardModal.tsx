@@ -211,7 +211,7 @@ export default function SongCardModal({
           </div>
 
           {/* 오른쪽: 모든 다른 요소들 */}
-          <div className="flex-1 xl:w-1/2 flex flex-col min-h-0">
+          <div className="flex-1 xl:w-1/2 flex flex-col min-h-0 relative">
             {/* 편집 액션 버튼들 - 맨 위에 배치 */}
             {isAdmin && (
               <div className="flex justify-end gap-2 mb-4">
@@ -361,7 +361,7 @@ export default function SongCardModal({
                   </div>
 
                   {/* XL 화면 유튜브 영상 섹션 */}
-                  <div className={`${currentTab === 'videos' ? 'flex' : 'hidden'} flex-col h-full min-h-0`}>
+                  <div className={`${currentTab === 'videos' ? 'flex' : 'hidden'} flex-col h-full min-h-0 relative`}>
                     <LiveClipManager 
                       songId={song.id}
                       songTitle={displayTitle}
@@ -370,6 +370,33 @@ export default function SongCardModal({
                   </div>
                 </motion.div>
               )}
+            </div>
+
+            {/* LiveClipManager - 독립적으로 렌더링, 탭 콘텐츠 영역에만 표시 */}
+            {/* 모바일 화면 */}
+            <div className="xl:hidden" style={{ 
+              position: 'absolute', 
+              top: 0, 
+              left: 0, 
+              width: '100%', 
+              height: '100%', 
+              pointerEvents: 'none',
+              zIndex: 1
+            }}>
+              <div style={{ 
+                position: 'absolute',
+                bottom: currentTab === 'videos' ? '4rem' : '-100vh', // Action buttons 위에 위치
+                left: 0,
+                right: 0,
+                top: '8rem', // 모바일~일반 화면에서 더 아래로
+                pointerEvents: currentTab === 'videos' ? 'auto' : 'none'
+              }}>
+                <LiveClipManager 
+                  songId={song.id}
+                  songTitle={displayTitle}
+                  isVisible={currentTab === 'videos'}
+                />
+              </div>
             </div>
 
             {/* 작은 화면에서의 탭 섹션 */}
@@ -462,11 +489,7 @@ export default function SongCardModal({
 
                 {/* 유튜브 영상 섹션 */}
                 <div className={`${currentTab === 'videos' ? 'flex' : 'hidden'} flex-col h-full min-h-0`}>
-                  <LiveClipManager 
-                    songId={song.id}
-                    songTitle={displayTitle}
-                    isVisible={currentTab === 'videos'}
-                  />
+                  {/* 빈 공간 - LiveClipManager는 독립적으로 렌더링됨 */}
                 </div>
               </div>
             </motion.div>

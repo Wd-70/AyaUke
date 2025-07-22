@@ -427,10 +427,10 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
   };
 
 
-  if (!isVisible) return null;
-
   return (
-    <div className="flex flex-col h-full min-h-0 p-4 pb-6 sm:p-6 xl:p-0 xl:pb-4">
+    <>
+    {/* UI는 isVisible일 때만 표시 */}
+    <div className="flex flex-col h-full min-h-0 p-4 pb-6 sm:p-6 xl:p-0 xl:pb-4" style={{ display: isVisible ? 'flex' : 'none' }}>
       {!showAddVideoForm ? (
         videosLoading ? (
           <div className="flex-1 flex items-center justify-center">
@@ -449,7 +449,21 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
                 isPlayerMinimized 
                   ? 'aspect-video max-h-[20vh] min-h-[120px]' 
                   : 'aspect-video max-h-[40vh] sm:max-h-[45vh] min-h-[200px] sm:min-h-[250px]'
-              }`} style={{ visibility: isVisible ? 'visible' : 'hidden', position: isVisible ? 'static' : 'fixed', left: isVisible ? 'auto' : '-9999px' }}>
+              }`} style={{ 
+                ...(isVisible 
+                  ? { visibility: 'visible', position: 'static', left: 'auto', top: 'auto' }
+                  : { 
+                      position: 'fixed', 
+                      left: '-320px', 
+                      top: '-240px', 
+                      width: '320px', 
+                      height: '240px', 
+                      opacity: 0,
+                      pointerEvents: 'none',
+                      zIndex: -1
+                    }
+                )
+              }}>
                 {selectedVideo && (
                   <YouTube
                     key={`video-${selectedVideo._id}`}
@@ -466,6 +480,9 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
                         end: selectedVideo.endTime || undefined,
                         iv_load_policy: 3,
                         cc_load_policy: 0,
+                        // 백그라운드 재생 개선을 위한 추가 설정
+                        playsinline: 1,
+                        enablejsapi: 1
                       },
                     }}
                     onReady={(event) => {
@@ -476,6 +493,27 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
                           event.target.playVideo();
                           setShouldAutoPlay(false);
                         }, 500); // 짧은 딩레이로 안정성 향상
+                      }
+                    }}
+                    onStateChange={(event) => {
+                      // YouTube 플레이어 상태와 동기화
+                      const playerState = event.data;
+                      const isCurrentlyPlaying = playerState === 1; // 재생 중
+                      const isPaused = playerState === 2; // 일시정지
+                      
+                      setIsVideoPlaying(isCurrentlyPlaying);
+                      
+                      // 탭이 숨겨진 상태에서 재생이 중단된 경우 복원 시도
+                      if (document.hidden && isPaused && !isVisible) {
+                        console.log('🔄 백그라운드에서 재생 중단 감지 - 복원 시도');
+                        setTimeout(() => {
+                          try {
+                            event.target.playVideo();
+                            console.log('🎵 백그라운드 재생 복원');
+                          } catch (e) {
+                            console.log('⚠️ 백그라운드 재생 복원 실패:', e);
+                          }
+                        }, 100);
                       }
                     }}
                     onPlay={() => setIsVideoPlaying(true)}
@@ -1096,5 +1134,72 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
         </motion.div>
       )}
     </div>
+    
+    {/* 백그라운드 플레이어 - 항상 렌더링, isVisible이 false일 때는 숨김 */}
+    {selectedVideo && (
+      <div style={{ 
+        ...(isVisible 
+          ? { display: 'none' } // 보이는 상태에서는 숨김 (위의 UI에 표시되므로)
+          : { 
+              position: 'fixed', 
+              left: '-320px', 
+              top: '-240px', 
+              width: '320px', 
+              height: '240px', 
+              opacity: 0,
+              pointerEvents: 'none',
+              zIndex: -1
+            }
+        )
+      }}>
+        <YouTube
+          key={`background-video-${selectedVideo._id}`}
+          videoId={selectedVideo.videoId}
+          opts={{
+            width: '100%',
+            height: '100%',
+            playerVars: {
+              autoplay: 0,
+              controls: 1,
+              rel: 0,
+              modestbranding: 1,
+              start: selectedVideo.startTime || 0,
+              end: selectedVideo.endTime || undefined,
+              iv_load_policy: 3,
+              cc_load_policy: 0,
+              playsinline: 1,
+              enablejsapi: 1
+            },
+          }}
+          onReady={(event) => {
+            if (!isVisible) {
+              setVideoPlayer(event.target);
+              if (shouldAutoPlay) {
+                setTimeout(() => {
+                  event.target.playVideo();
+                  setShouldAutoPlay(false);
+                }, 500);
+              }
+            }
+          }}
+          onStateChange={(event) => {
+            const playerState = event.data;
+            const isCurrentlyPlaying = playerState === 1;
+            setIsVideoPlaying(isCurrentlyPlaying);
+          }}
+          onPlay={() => setIsVideoPlaying(true)}
+          onPause={() => setIsVideoPlaying(false)}
+          onEnd={() => {
+            setIsVideoPlaying(false);
+            if (selectedVideoIndex < songVideos.length - 1) {
+              setShouldAutoPlay(true);
+              setSelectedVideoIndex(selectedVideoIndex + 1);
+            }
+          }}
+          className="w-full h-full"
+        />
+      </div>
+    )}
+    </>
   );
 }
