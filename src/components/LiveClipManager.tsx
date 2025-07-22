@@ -12,21 +12,33 @@ import { UserRole, roleToIsAdmin } from '@/lib/permissions';
 interface YouTubePlayer {
   playVideo(): void;
   pauseVideo(): void;
+  getCurrentTime(): number;
+  seekTo(seconds: number): void;
 }
 
 interface LiveClipManagerProps {
   songId: string;
   songTitle: string;
   isVisible: boolean;
+  songVideos: SongVideo[];
+  setSongVideos: (videos: SongVideo[]) => void;
+  videosLoading: boolean;
+  loadSongVideos: () => Promise<void>;
 }
 
-export default function LiveClipManager({ songId, songTitle, isVisible }: LiveClipManagerProps) {
+export default function LiveClipManager({ 
+  songId, 
+  songTitle, 
+  isVisible, 
+  songVideos, 
+  setSongVideos, 
+  videosLoading, 
+  loadSongVideos 
+}: LiveClipManagerProps) {
   const { data: session } = useSession();
   
-  // 라이브 클립 관련 상태
-  const [songVideos, setSongVideos] = useState<SongVideo[]>([]);
+  // 라이브 클립 관련 상태 (videos 탭의 상태만 유지)
   const [selectedVideoIndex, setSelectedVideoIndex] = useState(0);
-  const [videosLoading, setVideosLoading] = useState(false);
   const [videoPlayer, setVideoPlayer] = useState<YouTubePlayer | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [shouldAutoPlay, setShouldAutoPlay] = useState(false);
@@ -229,8 +241,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
     }));
   };
 
-  // 데이터 로드 여부 추적 - songId별로 관리
-  const [loadedSongIds, setLoadedSongIds] = useState<Set<string>>(new Set());
+  // 데이터 로드 여부 추적 제거 - 상위 컴포넌트에서 관리
 
   // 업로더 현재 정보 조회 함수
   const getUploaderInfo = async (userId: string): Promise<{ displayName?: string; channelName?: string; success: boolean }> => {
@@ -271,189 +282,170 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
     }
   };
 
-  // 유튜브 영상 데이터 가져오기 - 처음 한 번만
+  // 닉네임 동기화는 props로 받은 데이터에 대해서만 수행
   useEffect(() => {
-    const fetchSongVideos = async () => {
-      if (!songId || !isVisible) return;
+    if (!isVisible || songVideos.length === 0) return;
+    
+    // 백그라운드에서 닉네임 동기화 처리
+    setTimeout(async () => {
+      // 업로더별로 그룹핑 (중복 제거)
+      const uploaderGroups = new Map<string, { 
+        uploaderInfo: any; 
+        videoIndexes: number[]; 
+        videoNames: string[];  // 모든 클립의 닉네임들
+      }>();
       
-      // 이미 로드된 songId는 건너뛰기
-      if (loadedSongIds.has(songId)) {
-        console.log(`🎬 LiveClipManager 건너뛰기: songId=${songId} 이미 로드됨`);
-        return;
-      }
+      // 업로더별 비디오 그룹핑
+      songVideos.forEach((video: any, index: number) => {
+        if (!uploaderGroups.has(video.addedBy)) {
+          uploaderGroups.set(video.addedBy, {
+            uploaderInfo: null,
+            videoIndexes: [],
+            videoNames: []
+          });
+        }
+        const group = uploaderGroups.get(video.addedBy)!;
+        group.videoIndexes.push(index);
+        group.videoNames.push(video.addedByName);
+      });
       
-      console.log(`🎬 LiveClipManager 시작: songId=${songId}, isVisible=${isVisible}`);
+      if (uploaderGroups.size === 0) return;
       
-      setVideosLoading(true);
-      try {
-        const response = await fetch(`/api/songs/${songId}/videos`);
-        if (response.ok) {
-          const data = await response.json();
-          let videos = data.videos || [];
+      console.log(`🔄 닉네임 동기화 시작: ${uploaderGroups.size}명의 업로더`);
+      
+      const updatePromises = Array.from(uploaderGroups.entries()).map(async ([uploaderId, group]) => {
+        try {
+          // 업로더 정보 조회 (업로더당 1회만)  
+          const firstVideoName = group.videoNames[0];
+          console.log(`🔍 업로더 "${uploaderId}" (${firstVideoName}) 정보 확인`);
+          const uploaderInfo = await getUploaderInfo(uploaderId);
+          const currentDisplayName = uploaderInfo.displayName || uploaderInfo.channelName;
           
-          // 1단계: 즉시 화면에 표시 (UI 우선)
-          setSongVideos(videos);
-          
-          // 2단계: 백그라운드에서 닉네임 동기화 처리
-          if (videos.length > 0) {
-            // 업로더별로 그룹핑 (중복 제거)
-            const uploaderGroups = new Map<string, { 
-              uploaderInfo: any; 
-              videoIndexes: number[]; 
-              videoNames: string[];  // 모든 클립의 닉네임들
-            }>();
-            
-            // 업로더별 비디오 그룹핑
-            videos.forEach((video: any, index: number) => {
-              if (!uploaderGroups.has(video.addedBy)) {
-                uploaderGroups.set(video.addedBy, {
-                  uploaderInfo: null,
-                  videoIndexes: [],
-                  videoNames: []
-                });
-              }
-              const group = uploaderGroups.get(video.addedBy)!;
-              group.videoIndexes.push(index);
-              group.videoNames.push(video.addedByName);
-            });
-            
-            console.log(`🔄 닉네임 동기화 시작: ${uploaderGroups.size}명의 업로더`);
-            
-            // 백그라운드 처리 (UI 블로킹 없이)
-            setTimeout(async () => {
-              const updatePromises = Array.from(uploaderGroups.entries()).map(async ([uploaderId, group]) => {
-                try {
-                  // 업로더 정보 조회 (업로더당 1회만)  
-                  const firstVideoName = group.videoNames[0];
-                  console.log(`🔍 업로더 "${uploaderId}" (${firstVideoName}) 정보 확인`);
-                  const uploaderInfo = await getUploaderInfo(uploaderId);
-                  const currentDisplayName = uploaderInfo.displayName || uploaderInfo.channelName;
-                  
-                  if (!uploaderInfo.success || !currentDisplayName) {
-                    console.log(`⚠️ 업로더 "${uploaderId}" 정보 조회 실패`);
-                    return;
-                  }
-                  
-                  // 모든 클립의 닉네임과 비교하여 동기화 필요 여부 확인
-                  const outdatedIndexes: number[] = [];
-                  const uniqueCurrentNames = [...new Set(group.videoNames)];
-                  
-                  group.videoIndexes.forEach((videoIndex, i) => {
-                    const currentVideoName = group.videoNames[i];
-                    if (currentVideoName !== currentDisplayName) {
-                      outdatedIndexes.push(videoIndex);
-                    }
-                  });
-                  
-                  if (outdatedIndexes.length === 0) {
-                    console.log(`ℹ️ 업로더 "${uploaderId}" 모든 클립 닉네임 최신: "${currentDisplayName}" (${group.videoIndexes.length}개 클립)`);
-                    return;
-                  }
-                  
-                  console.log(`🔄 닉네임 동기화 필요: 업로더 "${uploaderId}" ${outdatedIndexes.length}/${group.videoIndexes.length}개 클립`);
-                  uniqueCurrentNames.forEach(oldName => {
-                    if (oldName !== currentDisplayName) {
-                      console.log(`   변경: "${oldName}" → "${currentDisplayName}"`);
-                    }
-                  });
-                  
-                  // 즉시 화면 업데이트 (해당 업로더의 모든 비디오)
-                  setSongVideos(prevVideos => {
-                    const updatedVideos = [...prevVideos];
-                    group.videoIndexes.forEach(index => {
-                      if (updatedVideos[index] && updatedVideos[index].addedBy === uploaderId) {
-                        updatedVideos[index] = { ...updatedVideos[index], addedByName: currentDisplayName };
-                      }
-                    });
-                    return updatedVideos;
-                  });
-                  
-                  // DB 동기화 (업데이트가 필요한 클립들만)
-                  const syncPromises = outdatedIndexes.map(async (index) => {
-                    try {
-                      const videoId = videos[index]._id;
-                      const oldName = videos[index].addedByName;
-                      const syncResult = await syncUploaderName(videoId);
-                      return { 
-                        videoId, 
-                        oldName, 
-                        success: syncResult.updated, 
-                        error: null 
-                      };
-                    } catch (error) {
-                      return { 
-                        videoId: videos[index]._id, 
-                        oldName: videos[index].addedByName,
-                        success: false, 
-                        error 
-                      };
-                    }
-                  });
-                  
-                  try {
-                    const syncResults = await Promise.all(syncPromises);
-                    const successCount = syncResults.filter(r => r.success).length;
-                    const totalCount = syncResults.length;
-                    
-                    if (successCount > 0) {
-                      console.log(`✅ 업로더 "${uploaderId}" DB 동기화 완료: ${successCount}/${totalCount}개 클립 업데이트됨 → "${currentDisplayName}"`);
-                      
-                      // 성공한 클립들의 이전 닉네임들 표시
-                      const successResults = syncResults.filter(r => r.success);
-                      const uniqueOldNames = [...new Set(successResults.map(r => r.oldName))];
-                      uniqueOldNames.forEach(oldName => {
-                        console.log(`   "${oldName}" → "${currentDisplayName}"`);
-                      });
-                    } else if (totalCount > 0) {
-                      console.log(`ℹ️ 업로더 "${uploaderId}" DB 동기화: ${totalCount}개 클립 이미 최신 상태 또는 업데이트 불필요`);
-                    }
-                    
-                    // 실패한 클립이 있다면 로그 출력
-                    const failedResults = syncResults.filter(r => !r.success && r.error);
-                    if (failedResults.length > 0) {
-                      console.log(`⚠️ 업로더 "${uploaderId}" 일부 클립 동기화 실패: ${failedResults.length}개`);
-                      failedResults.forEach(result => {
-                        console.log(`   실패: ${result.videoId} (${result.oldName})`, result.error);
-                      });
-                    }
-                  } catch (error) {
-                    console.log(`❌ 업로더 "${uploaderId}" DB 동기화 중 오류:`, error);
-                  }
-                  
-                } catch (error) {
-                  console.error(`❌ 업로더 "${uploaderId}" 처리 실패:`, error);
-                }
-              });
-              
-              // 모든 업로더 처리 완료 대기 (백그라운드에서)
-              await Promise.all(updatePromises);
-              console.log('🎯 모든 업로더 동기화 완료');
-            }, 0); // 다음 이벤트 루프에서 실행
+          if (!uploaderInfo.success || !currentDisplayName) {
+            console.log(`⚠️ 업로더 "${uploaderId}" 정보 조회 실패`);
+            return;
           }
           
-          // 현재 songId를 로드 완료 목록에 추가
-          setLoadedSongIds(prev => new Set([...prev, songId]));
+          // 모든 클립의 닉네임과 비교하여 동기화 필요 여부 확인
+          const outdatedIndexes: number[] = [];
+          const uniqueCurrentNames = [...new Set(group.videoNames)];
+          
+          group.videoIndexes.forEach((videoIndex, i) => {
+            const currentVideoName = group.videoNames[i];
+            if (currentVideoName !== currentDisplayName) {
+              outdatedIndexes.push(videoIndex);
+            }
+          });
+          
+          if (outdatedIndexes.length === 0) {
+            console.log(`ℹ️ 업로더 "${uploaderId}" 모든 클립 닉네임 최신: "${currentDisplayName}" (${group.videoIndexes.length}개 클립)`);
+            return;
+          }
+          
+          console.log(`🔄 닉네임 동기화 필요: 업로더 "${uploaderId}" ${outdatedIndexes.length}/${group.videoIndexes.length}개 클립`);
+          uniqueCurrentNames.forEach(oldName => {
+            if (oldName !== currentDisplayName) {
+              console.log(`   변경: "${oldName}" → "${currentDisplayName}"`);
+            }
+          });
+          
+          // 즉시 화면 업데이트 (해당 업로더의 모든 비디오)
+          setSongVideos(prevVideos => {
+            const updatedVideos = [...prevVideos];
+            group.videoIndexes.forEach(index => {
+              if (updatedVideos[index] && updatedVideos[index].addedBy === uploaderId) {
+                updatedVideos[index] = { ...updatedVideos[index], addedByName: currentDisplayName };
+              }
+            });
+            return updatedVideos;
+          });
+          
+          // DB 동기화 (업데이트가 필요한 클립들만)
+          const syncPromises = outdatedIndexes.map(async (index) => {
+            try {
+              const videoId = songVideos[index]._id;
+              const oldName = songVideos[index].addedByName;
+              const syncResult = await syncUploaderName(videoId);
+              return { 
+                videoId, 
+                oldName, 
+                success: syncResult.updated, 
+                error: null 
+              };
+            } catch (error) {
+              return { 
+                videoId: songVideos[index]._id, 
+                oldName: songVideos[index].addedByName,
+                success: false, 
+                error 
+              };
+            }
+          });
+          
+          try {
+            const syncResults = await Promise.all(syncPromises);
+            const successCount = syncResults.filter(r => r.success).length;
+            const totalCount = syncResults.length;
+            
+            if (successCount > 0) {
+              console.log(`✅ 업로더 "${uploaderId}" DB 동기화 완료: ${successCount}/${totalCount}개 클립 업데이트됨 → "${currentDisplayName}"`);
+              
+              // 성공한 클립들의 이전 닉네임들 표시
+              const successResults = syncResults.filter(r => r.success);
+              const uniqueOldNames = [...new Set(successResults.map(r => r.oldName))];
+              uniqueOldNames.forEach(oldName => {
+                console.log(`   "${oldName}" → "${currentDisplayName}"`);
+              });
+            } else if (totalCount > 0) {
+              console.log(`ℹ️ 업로더 "${uploaderId}" DB 동기화: ${totalCount}개 클립 이미 최신 상태 또는 업데이트 불필요`);
+            }
+            
+            // 실패한 클립이 있다면 로그 출력
+            const failedResults = syncResults.filter(r => !r.success && r.error);
+            if (failedResults.length > 0) {
+              console.log(`⚠️ 업로더 "${uploaderId}" 일부 클립 동기화 실패: ${failedResults.length}개`);
+              failedResults.forEach(result => {
+                console.log(`   실패: ${result.videoId} (${result.oldName})`, result.error);
+              });
+            }
+          } catch (error) {
+            console.log(`❌ 업로더 "${uploaderId}" DB 동기화 중 오류:`, error);
+          }
+          
+        } catch (error) {
+          console.error(`❌ 업로더 "${uploaderId}" 처리 실패:`, error);
         }
-      } catch (error) {
-        console.error('영상 목록 조회 실패:', error);
-      } finally {
-        setVideosLoading(false);
-      }
-    };
+      });
+      
+      // 모든 업로더 처리 완료 대기 (백그라운드에서)
+      await Promise.all(updatePromises);
+      console.log('🎯 모든 업로더 동기화 완료');
+    }, 0); // 다음 이벤트 루프에서 실행
+  }, [isVisible, songVideos]); // songVideos가 변경될 때만 동기화 수행
 
-    fetchSongVideos();
-  }, [songId, isVisible]); // hasLoadedData 제거 - 무한 루프 방지
+  // 관리자 여부 확인
+  const isAdmin = (): boolean => {
+    if (!session?.user?.isAdmin || !session?.user?.role) return false;
+    return roleToIsAdmin(session.user.role as UserRole);
+  };
 
   // 권한 확인 함수
   const canEditVideo = (video: SongVideo): boolean => {
     if (!session || !session.user) return false;
-    return video.addedBy === session.user.channelId || session.user.role === 'admin';
-  };
-
-  // 관리자 여부 확인
-  const isAdmin = (): boolean => {
-    if (!session?.user?.role) return false;
-    return roleToIsAdmin(session.user.role as UserRole);
+    
+    const isOwner = video.addedBy === session.user.userId;
+    const isAdminUser = isAdmin();
+    
+    // 디버깅 로그 (개발 중에만)
+    console.log(`🔐 권한 확인 - 클립 ID: ${video._id}`);
+    console.log(`   클립 업로더: ${video.addedBy}`);
+    console.log(`   현재 사용자 ID: ${session.user.userId}`);
+    console.log(`   소유자 여부: ${isOwner}`);
+    console.log(`   관리자 여부: ${isAdminUser}`);
+    console.log(`   편집 가능: ${isOwner || isAdminUser}`);
+    
+    // 자신이 추가한 클립이거나 관리자인 경우
+    return isOwner || isAdminUser;
   };
 
   // 편집 모드 시작
@@ -478,6 +470,41 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
       startTime: 0,
       endTime: undefined
     });
+  };
+
+  // 현재 재생 시간을 시작 시간으로 설정
+  const setCurrentTimeAsStart = () => {
+    if (videoPlayer) {
+      const currentTime = Math.floor(videoPlayer.getCurrentTime());
+      setEditingVideoData(prev => ({
+        ...prev,
+        startTime: currentTime
+      }));
+    }
+  };
+
+  // 현재 재생 시간을 종료 시간으로 설정
+  const setCurrentTimeAsEnd = () => {
+    if (videoPlayer) {
+      const currentTime = Math.floor(videoPlayer.getCurrentTime());
+      setEditingVideoData(prev => ({
+        ...prev,
+        endTime: currentTime
+      }));
+    }
+  };
+
+  // 시간을 hh:mm:ss 형식으로 변환
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
   };
 
   // 영상 수정 핸들러
@@ -510,10 +537,8 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
 
       if (response.ok) {
         const result = await response.json();
-        // 목록에서 해당 영상 업데이트
-        setSongVideos(prev => prev.map(video => 
-          video._id === editingVideoId ? result.video : video
-        ));
+        // 상위 컴포넌트에서 데이터 새로고침
+        await loadSongVideos();
         cancelEditVideo();
         console.log('라이브 클립이 성공적으로 수정되었습니다!');
       } else {
@@ -540,8 +565,8 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
       });
 
       if (response.ok) {
-        // 목록에서 해당 영상 제거
-        setSongVideos(prev => prev.filter(video => video._id !== videoId));
+        // 상위 컴포넌트에서 데이터 새로고침
+        await loadSongVideos();
         // 삭제된 영상이 현재 선택된 영상이었다면 첫 번째 영상으로 변경
         if (selectedVideo && selectedVideo._id === videoId) {
           setSelectedVideoIndex(0);
@@ -584,8 +609,8 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
 
       if (response.ok) {
         const result = await response.json();
-        // 새 영상을 목록에 추가
-        setSongVideos(prev => [result.video, ...prev]);
+        // 상위 컴포넌트에서 데이터 새로고침
+        await loadSongVideos();
         // 폼 초기화
         setAddVideoData({
           videoUrl: '',
@@ -831,58 +856,80 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
                               시작 시간 (초)
                               {editingVideoData.startTime > 0 && (
                                 <span className="text-xs text-green-600 dark:text-green-400 ml-1">
-                                  ({Math.floor(editingVideoData.startTime / 3600)}:{String(Math.floor((editingVideoData.startTime % 3600) / 60)).padStart(2, '0')}:{String(editingVideoData.startTime % 60).padStart(2, '0')})
+                                  ({formatTime(editingVideoData.startTime)})
                                 </span>
                               )}
                             </label>
-                            <input
-                              type="number"
-                              value={editingVideoData.startTime}
-                              onChange={(e) => setEditingVideoData(prev => ({...prev, startTime: parseInt(e.target.value) || 0}))}
-                              onPaste={(e) => {
-                                const pastedText = e.clipboardData.getData('text');
-                                // URL인지 확인 (프로토콜 포함)
-                                if (pastedText.includes('://')) {
-                                  const parsedTime = extractTimeFromUrl(pastedText);
-                                  if (parsedTime > 0) {
-                                    e.preventDefault();
-                                    setEditingVideoData(prev => ({...prev, startTime: parsedTime}));
+                            <div className="flex gap-1">
+                              <input
+                                type="number"
+                                value={editingVideoData.startTime}
+                                onChange={(e) => setEditingVideoData(prev => ({...prev, startTime: parseInt(e.target.value) || 0}))}
+                                onPaste={(e) => {
+                                  const pastedText = e.clipboardData.getData('text');
+                                  // URL인지 확인 (프로토콜 포함)
+                                  if (pastedText.includes('://')) {
+                                    const parsedTime = extractTimeFromUrl(pastedText);
+                                    if (parsedTime > 0) {
+                                      e.preventDefault();
+                                      setEditingVideoData(prev => ({...prev, startTime: parsedTime}));
+                                    }
                                   }
-                                }
-                              }}
-                              className="w-full px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
-                              min="0"
-                              placeholder="시간(s) 또는 URL 붙여넣기"
-                            />
+                                }}
+                                className="flex-1 px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
+                                min="0"
+                                placeholder="시간(s) 또는 URL"
+                              />
+                              <button
+                                type="button"
+                                onClick={setCurrentTimeAsStart}
+                                disabled={!videoPlayer}
+                                className="px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                title="현재 재생 시간을 시작 시간으로 설정"
+                              >
+                                ⏯️
+                              </button>
+                            </div>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
                               종료 시간 (초)
                               {editingVideoData.endTime && (
                                 <span className="text-xs text-green-600 dark:text-green-400 ml-1">
-                                  ({Math.floor(editingVideoData.endTime / 3600)}:{String(Math.floor((editingVideoData.endTime % 3600) / 60)).padStart(2, '0')}:{String(editingVideoData.endTime % 60).padStart(2, '0')})
+                                  ({formatTime(editingVideoData.endTime)})
                                 </span>
                               )}
                             </label>
-                            <input
-                              type="number"
-                              value={editingVideoData.endTime || ''}
-                              onChange={(e) => setEditingVideoData(prev => ({...prev, endTime: e.target.value ? parseInt(e.target.value) : undefined}))}
-                              onPaste={(e) => {
-                                const pastedText = e.clipboardData.getData('text');
-                                // URL인지 확인 (프로토콜 포함)
-                                if (pastedText.includes('://')) {
-                                  const parsedTime = extractTimeFromUrl(pastedText);
-                                  if (parsedTime > 0) {
-                                    e.preventDefault();
-                                    setEditingVideoData(prev => ({...prev, endTime: parsedTime}));
+                            <div className="flex gap-1">
+                              <input
+                                type="number"
+                                value={editingVideoData.endTime || ''}
+                                onChange={(e) => setEditingVideoData(prev => ({...prev, endTime: e.target.value ? parseInt(e.target.value) : undefined}))}
+                                onPaste={(e) => {
+                                  const pastedText = e.clipboardData.getData('text');
+                                  // URL인지 확인 (프로토콜 포함)
+                                  if (pastedText.includes('://')) {
+                                    const parsedTime = extractTimeFromUrl(pastedText);
+                                    if (parsedTime > 0) {
+                                      e.preventDefault();
+                                      setEditingVideoData(prev => ({...prev, endTime: parsedTime}));
+                                    }
                                   }
-                                }
-                              }}
-                              className="w-full px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
-                              placeholder="시간(s) 또는 URL 붙여넣기"
-                              min="0"
-                            />
+                                }}
+                                className="flex-1 px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
+                                placeholder="시간(s) 또는 URL"
+                                min="0"
+                              />
+                              <button
+                                type="button"
+                                onClick={setCurrentTimeAsEnd}
+                                disabled={!videoPlayer}
+                                className="px-2 py-1 text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                title="현재 재생 시간을 종료 시간으로 설정"
+                              >
+                                ⏹️
+                              </button>
+                            </div>
                           </div>
                         </div>
                         

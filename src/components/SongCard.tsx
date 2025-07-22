@@ -10,6 +10,7 @@ import { useLike } from '@/hooks/useLikes';
 import { useSongPlaylists } from '@/hooks/useGlobalPlaylists';
 import PlaylistContextMenu from './PlaylistContextMenu';
 import LiveClipManager from './LiveClipManager';
+import LiveClipEditor from './LiveClipEditor';
 import SongEditForm from './SongEditForm';
 import TagManager from './TagManager';
 import MRLinkManager from './MRLinkManager';
@@ -47,6 +48,11 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   const [isEditMode, setIsEditMode] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // 라이브 클립 데이터 상태 (LiveClipManager와 LiveClipEditor 공유)
+  const [songVideos, setSongVideos] = useState<any[]>([]);
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [videosLoaded, setVideosLoaded] = useState(false); // 한 번이라도 로드 시도했는지 추적
   
   // 가사 전용 상태 (성능 최적화를 위해 분리)
   const [lyricsText, setLyricsText] = useState('');
@@ -120,6 +126,41 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     }
   }, [isEditMode, song]);
 
+  // 라이브 클립 데이터 로드
+  const loadSongVideos = useCallback(async () => {
+    setVideosLoading(true);
+    try {
+      const response = await fetch(`/api/songs/${song.id}/videos`);
+      if (response.ok) {
+        const data = await response.json();
+        setSongVideos(data.videos || []);
+        setVideosLoaded(true); // 성공적으로 로드했음을 표시
+      } else {
+        console.error('라이브 클립 로딩 실패');
+        setVideosLoaded(true); // 실패해도 시도했음을 표시
+      }
+    } catch (error) {
+      console.error('라이브 클립 로딩 오류:', error);
+      setVideosLoaded(true); // 에러가 나도 시도했음을 표시
+    } finally {
+      setVideosLoading(false);
+    }
+  }, [song.id]); // song.id가 변경될 때만 함수 재생성
+
+  // 곡이 바뀔 때 라이브 클립 상태 초기화
+  useEffect(() => {
+    setSongVideos([]);
+    setVideosLoaded(false);
+    setVideosLoading(false);
+  }, [song.id]);
+
+  // 라이브 클립 데이터 로드 (videos 탭을 처음 열 때만)
+  useEffect(() => {
+    if (isExpanded && currentTab === 'videos' && !videosLoaded && !videosLoading) {
+      loadSongVideos();
+    }
+  }, [isExpanded, currentTab, videosLoaded, videosLoading, loadSongVideos]);
+
   // debounced 가사 업데이트 핸들러 (성능 최적화)
   const handleLyricsChange = useCallback((newLyrics: string) => {
     // 즉시 UI 업데이트 (사용자 입력 반응성 유지)
@@ -166,7 +207,6 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       window.removeEventListener('resize', updateDefaultTab);
     };
   }, [isExpanded, currentTab]);
-
 
   // 편집 모드 토글
   const toggleEditMode = () => {
@@ -1095,41 +1135,64 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
 
                   {/* XL 화면 유튜브 영상 섹션 */}
                   <div className={`${currentTab === 'videos' ? 'flex' : 'hidden'} flex-col h-full min-h-0 relative`}>
-                    <LiveClipManager 
-                      songId={song.id}
-                      songTitle={displayTitle}
-                      isVisible={currentTab === 'videos'}
-                    />
+                    {isEditMode ? (
+                      <div className="h-full overflow-y-auto p-4">
+                        <LiveClipEditor 
+                          songId={song.id}
+                          songTitle={displayTitle}
+                          songVideos={songVideos}
+                          setSongVideos={setSongVideos}
+                          videosLoading={videosLoading}
+                          loadSongVideos={loadSongVideos}
+                        />
+                      </div>
+                    ) : (
+                      <LiveClipManager 
+                        songId={song.id}
+                        songTitle={displayTitle}
+                        isVisible={currentTab === 'videos'}
+                        songVideos={songVideos}
+                        setSongVideos={setSongVideos}
+                        videosLoading={videosLoading}
+                        loadSongVideos={loadSongVideos}
+                      />
+                    )}
                   </div>
                 </motion.div>
               </div>
 
-              {/* LiveClipManager - 독립적으로 렌더링, 탭 콘텐츠 영역에만 표시 */}
+              {/* LiveClipManager - 독립적으로 렌더링, 탭 콘텐츠 영역에만 표시 (편집 모드가 아닐 때만) */}
               {/* 모바일 화면 */}
-              <div className="xl:hidden" style={{ 
-                position: 'absolute', 
-                top: 0, 
-                left: 0, 
-                width: '100%', 
-                height: '100%', 
-                pointerEvents: 'none',
-                zIndex: 1
-              }}>
-                <div style={{ 
-                  position: 'absolute',
-                  bottom: currentTab === 'videos' ? '5rem' : '-100vh', // Action buttons 위에 위치
-                  left: 0,
-                  right: 0,
-                  top: '7.5rem', // 탭 메뉴와 충분한 여백 확보
-                  pointerEvents: currentTab === 'videos' ? 'auto' : 'none'
+              {!isEditMode && (
+                <div className="xl:hidden" style={{ 
+                  position: 'absolute', 
+                  top: 0, 
+                  left: 0, 
+                  width: '100%', 
+                  height: '100%', 
+                  pointerEvents: 'none',
+                  zIndex: 1
                 }}>
-                  <LiveClipManager 
-                    songId={song.id}
-                    songTitle={displayTitle}
-                    isVisible={currentTab === 'videos'}
-                  />
+                  <div style={{ 
+                    position: 'absolute',
+                    bottom: currentTab === 'videos' ? '5rem' : '-100vh', // Action buttons 위에 위치
+                    left: 0,
+                    right: 0,
+                    top: '7.5rem', // 탭 메뉴와 충분한 여백 확보
+                    pointerEvents: currentTab === 'videos' ? 'auto' : 'none'
+                  }}>
+                    <LiveClipManager 
+                      songId={song.id}
+                      songTitle={displayTitle}
+                      isVisible={currentTab === 'videos'}
+                      songVideos={songVideos}
+                      setSongVideos={setSongVideos}
+                      videosLoading={videosLoading}
+                      loadSongVideos={loadSongVideos}
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 작은 화면에서의 탭 섹션 */}
               <motion.div
@@ -1249,7 +1312,19 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
 
                   {/* 유튜브 영상 섹션 */}
                   <div className={`${currentTab === 'videos' ? 'flex' : 'hidden'} flex-col h-full min-h-0 relative`}>
-                    {/* LiveClipManager UI가 이 영역에만 표시됨 */}
+                    {/* 편집 모드일 때는 LiveClipEditor 사용 */}
+                    {isEditMode ? (
+                      <div className="h-full overflow-y-auto p-4">
+                        <LiveClipEditor 
+                          songId={song.id}
+                          songTitle={displayTitle}
+                          songVideos={songVideos}
+                          setSongVideos={setSongVideos}
+                          videosLoading={videosLoading}
+                          loadSongVideos={loadSongVideos}
+                        />
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </motion.div>
