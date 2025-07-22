@@ -466,7 +466,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
               }}>
                 {selectedVideo && (
                   <YouTube
-                    key={`video-${selectedVideo._id}`}
+                    key={`liveclip-player-${selectedVideo._id}`}
                     videoId={selectedVideo.videoId}
                     opts={{
                       width: '100%',
@@ -520,9 +520,9 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
                     onPause={() => setIsVideoPlaying(false)}
                     onEnd={() => {
                       setIsVideoPlaying(false);
-                      // 다음 영상이 있으면 자동 재생
-                      if (selectedVideoIndex < songVideos.length - 1) {
-                        setShouldAutoPlay(true); // 자동 재생 플래그 설정
+                      // 보이는 상태일 때만 다음 영상 전환
+                      if (isVisible && selectedVideoIndex < songVideos.length - 1) {
+                        setShouldAutoPlay(true);
                         setSelectedVideoIndex(selectedVideoIndex + 1);
                       }
                     }}
@@ -1153,7 +1153,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
         )
       }}>
         <YouTube
-          key={`background-video-${selectedVideo._id}`}
+          key={`liveclip-player-${selectedVideo._id}`}
           videoId={selectedVideo.videoId}
           opts={{
             width: '100%',
@@ -1191,7 +1191,8 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
           onPause={() => setIsVideoPlaying(false)}
           onEnd={() => {
             setIsVideoPlaying(false);
-            if (selectedVideoIndex < songVideos.length - 1) {
+            // 비보이는 상태일 때만 다음 영상 전환 (백그라운드 재생용)
+            if (!isVisible && selectedVideoIndex < songVideos.length - 1) {
               setShouldAutoPlay(true);
               setSelectedVideoIndex(selectedVideoIndex + 1);
             }
