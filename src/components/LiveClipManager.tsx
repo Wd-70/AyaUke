@@ -63,6 +63,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
   // 선택된 영상 정보
   const selectedVideo = songVideos[selectedVideoIndex];
 
+
   // YouTube URL에서 시간 파라미터 추출
   const extractTimeFromUrl = (url: string): number => {
     if (!url) return 0;
@@ -430,7 +431,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
   return (
     <>
     {/* UI는 isVisible일 때만 표시 */}
-    <div className="flex flex-col h-full min-h-0 p-4 pb-6 sm:p-6 xl:p-0 xl:pb-4" style={{ display: isVisible ? 'flex' : 'none' }}>
+    <div className="flex flex-col h-full min-h-0 p-4 pb-6 sm:p-6 xl:p-0 xl:pb-1" style={{ display: isVisible ? 'flex' : 'none' }}>
       {!showAddVideoForm ? (
         videosLoading ? (
           <div className="flex-1 flex items-center justify-center">
@@ -1191,11 +1192,7 @@ export default function LiveClipManager({ songId, songTitle, isVisible }: LiveCl
           onPause={() => setIsVideoPlaying(false)}
           onEnd={() => {
             setIsVideoPlaying(false);
-            // 비보이는 상태일 때만 다음 영상 전환 (백그라운드 재생용)
-            if (!isVisible && selectedVideoIndex < songVideos.length - 1) {
-              setShouldAutoPlay(true);
-              setSelectedVideoIndex(selectedVideoIndex + 1);
-            }
+            // 백그라운드에서는 다음 영상 전환 안 함 (예측 가능한 동작)
           }}
           className="w-full h-full"
         />

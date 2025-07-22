@@ -385,10 +385,10 @@ export default function SongCardModal({
             }}>
               <div style={{ 
                 position: 'absolute',
-                bottom: currentTab === 'videos' ? '4rem' : '-100vh', // Action buttons 위에 위치
+                bottom: currentTab === 'videos' ? '5rem' : '-100vh', // Action buttons 위에 위치
                 left: 0,
                 right: 0,
-                top: '8rem', // 모바일~일반 화면에서 더 아래로
+                top: '7.5rem', // 탭 메뉴와 충분한 여백 확보
                 pointerEvents: currentTab === 'videos' ? 'auto' : 'none'
               }}>
                 <LiveClipManager 
