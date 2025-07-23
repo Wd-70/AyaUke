@@ -12,6 +12,7 @@ interface NavigationProps {
 
 export default function Navigation({ currentPath = '/' }: NavigationProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { data: session, status, update } = useSession(); // 한 번만 호출
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-light-primary/20 dark:border-dark-primary/20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -76,7 +77,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
           <div className="flex items-center justify-end flex-1 space-x-2">
             {/* Desktop Auth Controls */}
             <div className="hidden md:block">
-              <AuthControls />
+              <AuthControls session={session} status={status} update={update} />
             </div>
             
             {/* Mobile menu button */}
@@ -135,7 +136,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
           <div className="md:hidden border-t border-light-primary/20 dark:border-dark-primary/20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md">
             <div className="px-4 py-2 space-y-1">
               {/* 1. 사용자 정보 */}
-              <MobileUserProfile />
+              <MobileUserProfile session={session} status={status} />
               
               {/* 2. 홈, 노래책 링크 */}
               <Link 
@@ -162,10 +163,10 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
               </Link>
               
               {/* 3. 권한별 추가 메뉴 */}
-              <MobileAdminMenus onMenuClose={() => setIsMobileMenuOpen(false)} />
+              <MobileAdminMenus session={session} onMenuClose={() => setIsMobileMenuOpen(false)} />
               
               {/* 4. 로그아웃 */}
-              <MobileLogout onMenuClose={() => setIsMobileMenuOpen(false)} />
+              <MobileLogout session={session} onMenuClose={() => setIsMobileMenuOpen(false)} />
               
               {/* 5. 테마 토글 */}
               <div className="border-t border-light-primary/10 dark:border-dark-primary/10 pt-1 mt-1">
@@ -209,8 +210,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
   );
 }
 
-function AuthControls() {
-  const { data: session, status, update } = useSession();
+function AuthControls({ session, status, update }: { session: any, status: string, update: any }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -358,8 +358,7 @@ function AuthControls() {
 }
 
 // 1. 사용자 정보 (로그인/프로필)
-function MobileUserProfile() {
-  const { data: session, status } = useSession();
+function MobileUserProfile({ session, status }: { session: any, status: string }) {
 
   if (status === 'loading') {
     return (
@@ -431,8 +430,7 @@ function MobileUserProfile() {
 }
 
 // 3. 권한별 추가 메뉴
-function MobileAdminMenus({ onMenuClose }: { onMenuClose: () => void }) {
-  const { data: session } = useSession();
+function MobileAdminMenus({ session, onMenuClose }: { session: any, onMenuClose: () => void }) {
 
   if (!session || !canManageSongs(session.user.role as UserRole)) {
     return null;
@@ -461,8 +459,7 @@ function MobileAdminMenus({ onMenuClose }: { onMenuClose: () => void }) {
 }
 
 // 4. 로그아웃
-function MobileLogout({ onMenuClose }: { onMenuClose: () => void }) {
-  const { data: session } = useSession();
+function MobileLogout({ session, onMenuClose }: { session: any, onMenuClose: () => void }) {
 
   if (!session) {
     return null;
