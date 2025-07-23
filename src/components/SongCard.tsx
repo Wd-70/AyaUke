@@ -832,9 +832,66 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   // XL 화면 왼쪽 가사 영역 렌더링
   const renderXLLyricsPanel = () => (
     <div className="hidden xl:flex xl:w-1/2 flex-col min-h-0">
-      <div className="flex items-center gap-3 mb-4">
-        <MusicalNoteIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
-        <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">가사</h4>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <MusicalNoteIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
+          <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">가사</h4>
+        </div>
+        
+        {/* XL 화면 전용 OBS 컨트롤 - 더 큰 크기와 명확한 레이블 */}
+        {session?.user?.userId && (
+          <div className="flex items-center gap-3">
+            {/* OBS 링크 복사 버튼 - OBS 활성화 시에만 나타남 (왼쪽에 배치) */}
+            <motion.div
+              initial={false}
+              animate={{ 
+                opacity: obsActive ? 1 : 0,
+                scale: obsActive ? 1 : 0.8,
+                width: obsActive ? 'auto' : 0
+              }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+              {obsActive && (
+                <button
+                  onClick={copyOBSLink}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 
+                           text-blue-600 dark:text-blue-400 border-2 border-blue-500/20 hover:border-blue-500/30
+                           transition-all duration-200"
+                  title="OBS 링크 복사"
+                >
+                  <ClipboardDocumentIcon className="w-5 h-5" />
+                  <span className="text-sm font-medium">링크 복사</span>
+                </button>
+              )}
+            </motion.div>
+            
+            {/* OBS 토글 버튼 - 고정 위치 (오른쪽에 배치) */}
+            <button
+              onClick={toggleOBS}
+              disabled={obsLoading}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-200 disabled:opacity-50 w-24 justify-center ${
+                obsActive 
+                  ? 'bg-green-500/20 text-green-600 dark:text-green-400 border-2 border-green-500/30' 
+                  : 'bg-light-primary/10 dark:bg-dark-primary/10 text-light-accent dark:text-dark-accent border-2 border-light-primary/20 dark:border-dark-primary/20 hover:bg-light-primary/20 dark:hover:bg-dark-primary/20'
+              }`}
+              title={obsActive ? 'OBS 표시 끄기' : 'OBS 표시 켜기'}
+            >
+              {obsLoading ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-5 h-5 border-2 border-light-accent/30 border-t-light-accent rounded-full dark:border-dark-accent/30 dark:border-t-dark-accent"
+                />
+              ) : (
+                <>
+                  <TvIcon className="w-5 h-5" />
+                  <span className="text-sm font-medium">OBS</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
       <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
         {isEditMode ? (
@@ -1055,13 +1112,27 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {/* OBS 토글 버튼 - 로그인한 사용자만 */}
+        {/* OBS 토글 버튼 - 로그인한 사용자만, XL 화면에서는 숨김 */}
         {session?.user?.userId && (
           <>
+            {obsActive && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.2 }}
+                onClick={copyOBSLink}
+                className="xl:hidden w-10 h-10 flex items-center justify-center rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                           transition-colors duration-200 text-blue-600 dark:text-blue-400"
+                title="OBS 링크 복사"
+              >
+                <ClipboardDocumentIcon className="w-5 h-5" />
+              </motion.button>
+            )}
             <button
               onClick={toggleOBS}
               disabled={obsLoading}
-              className={`p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+              className={`xl:hidden w-10 h-10 flex items-center justify-center rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
                          transition-all duration-200 disabled:opacity-50 ${
                            obsActive 
                              ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
@@ -1079,16 +1150,6 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                 <TvIcon className="w-5 h-5" />
               )}
             </button>
-            {obsActive && (
-              <button
-                onClick={copyOBSLink}
-                className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                           transition-colors duration-200 text-blue-600 dark:text-blue-400"
-                title="OBS 링크 복사"
-              >
-                <ClipboardDocumentIcon className="w-5 h-5" />
-              </button>
-            )}
           </>
         )}
         {isAdmin && (

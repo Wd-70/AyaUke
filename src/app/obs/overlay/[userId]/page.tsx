@@ -127,7 +127,7 @@ export default function OBSOverlayPage() {
   return (
     <div className="min-h-screen bg-transparent flex items-end justify-start p-6">
       {shouldShowContent && (
-        <div className={`relative overflow-hidden transition-all duration-500 ease-out ${
+        <div className={`relative overflow-hidden transition-all duration-500 ease-out min-w-80 ${
           animationState === 'entering' 
             ? 'opacity-0 transform translate-y-8 scale-95' 
             : animationState === 'visible'
@@ -136,18 +136,22 @@ export default function OBSOverlayPage() {
             ? 'opacity-0 transform translate-y-4 scale-95'
             : 'opacity-0 transform translate-y-8 scale-95'
         }`}>
-          {/* 메인 컨테이너 - 높은 투명도로 수정 */}
-          <div className="relative bg-gradient-to-br from-purple-900/40 via-pink-800/35 to-purple-900/40 
-                          backdrop-blur-sm rounded-2xl px-6 py-4 
-                          border border-purple-400/20 shadow-xl shadow-purple-500/10
+          {/* 메인 컨테이너 - 사이트 컬러 팔레트 적용 */}
+          <div className="relative bg-gradient-to-br from-light-primary/30 via-light-accent/25 to-light-purple/30 
+                          dark:from-dark-secondary/30 dark:via-dark-accent/25 dark:to-dark-purple/30
+                          backdrop-blur-sm rounded-2xl px-6 py-4 min-w-80
+                          border border-light-accent/20 dark:border-dark-accent/20 
+                          shadow-xl shadow-light-accent/10 dark:shadow-dark-accent/10
                           transform transition-all duration-300">
             
-            {/* 배경 장식 요소들 - 더 투명하게 */}
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-pink-400/10 to-purple-500/10 rounded-full blur-xl transform translate-x-12 -translate-y-12"></div>
-            <div className="absolute bottom-0 left-0 w-20 h-20 bg-gradient-to-tr from-purple-500/8 to-pink-400/8 rounded-full blur-lg transform -translate-x-10 translate-y-10"></div>
+            {/* 배경 장식 요소들 - 사이트 컬러로 조정 */}
+            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-light-accent/8 to-light-purple/8 
+                            dark:from-dark-accent/8 dark:to-dark-purple/8 rounded-full blur-xl transform translate-x-12 -translate-y-12"></div>
+            <div className="absolute bottom-0 left-0 w-20 h-20 bg-gradient-to-tr from-light-purple/6 to-light-accent/6 
+                            dark:from-dark-purple/6 dark:to-dark-accent/6 rounded-full blur-lg transform -translate-x-10 translate-y-10"></div>
             
-            {/* 음표 아이콘 */}
-            <div className="absolute top-3 right-3 text-pink-300/25">
+            {/* 음표 아이콘 - 빨간색 하이라이트 */}
+            <div className="absolute top-3 right-3 text-dark-primary/40">
               <svg className="w-5 h-5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
               </svg>
@@ -155,39 +159,40 @@ export default function OBSOverlayPage() {
             
             {/* 컨텐츠 */}
             <div className="relative z-10">
-              {/* "지금 부르는 중" 라벨 */}
+              {/* "지금 부르는 중" 라벨 - 빨간색 하이라이트 */}
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-1.5 h-1.5 bg-pink-400/80 rounded-full animate-pulse"></div>
-                <span className="text-pink-200/90 text-xs font-medium tracking-wide">
+                <div className="w-1.5 h-1.5 bg-dark-primary rounded-full animate-pulse"></div>
+                <span className="text-white text-xs font-medium tracking-wide">
                   ♪ 지금 부르는 중
                 </span>
-                <div className="flex-1 h-px bg-gradient-to-r from-pink-400/30 to-transparent"></div>
+                <div className="flex-1 h-px bg-gradient-to-r from-dark-primary/40 to-transparent"></div>
               </div>
               
-              {/* 곡 제목 */}
+              {/* 곡 제목 - 흰색 텍스트 */}
               <div className="mb-1">
-                <h2 className="text-white/95 text-xl font-bold leading-tight
-                             bg-gradient-to-r from-white/95 via-pink-100/90 to-purple-100/90 bg-clip-text text-transparent
-                             drop-shadow-md">
+                <h2 className="text-xl font-bold leading-tight text-white drop-shadow-md">
                   {obsData?.currentSong?.title || 'Loading...'}
                 </h2>
               </div>
               
-              {/* 아티스트 */}
+              {/* 아티스트 - 흰색 텍스트 */}
               <div className="flex items-center gap-2">
-                <div className="w-0.5 h-0.5 bg-purple-300/70 rounded-full"></div>
-                <p className="text-purple-200/85 text-base font-medium">
+                <div className="w-0.5 h-0.5 bg-white/70 rounded-full"></div>
+                <p className="text-white/90 text-base font-medium">
                   {obsData?.currentSong?.artist || 'Artist'}
                 </p>
               </div>
             </div>
             
-            {/* 하단 장식 라인 - 더 투명하게 */}
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-pink-500/40 via-purple-500/40 to-pink-500/40"></div>
+            {/* 하단 장식 라인 - 빨간색 하이라이트 그라디언트 */}
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 
+                            bg-gradient-to-r from-dark-primary/50 via-light-purple/30 to-dark-primary/50"></div>
           </div>
           
-          {/* 외곽 글로우 효과 - 더 투명하게 */}
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500/8 to-pink-500/8 rounded-2xl blur-xl scale-110 -z-10 animate-pulse"></div>
+          {/* 외곽 글로우 효과 - 보라색과 빨간색 하이라이트 조합 */}
+          <div className="absolute inset-0 
+                          bg-gradient-to-br from-light-purple/5 via-dark-primary/4 to-light-accent/5 
+                          rounded-2xl blur-xl scale-110 -z-10 animate-pulse"></div>
         </div>
       )}
     </div>
