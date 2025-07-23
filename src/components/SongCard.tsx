@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { SongData } from '@/types';
-import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, TrashIcon, StarIcon } from '@heroicons/react/24/outline';
+import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, TrashIcon, StarIcon, TvIcon, ClipboardDocumentIcon } from '@heroicons/react/24/outline';
 import { HeartIcon } from '@heroicons/react/24/solid';
 import YouTube from 'react-youtube';
 import { useLike } from '@/hooks/useLikes';
@@ -77,6 +77,10 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   
   // 관리자 권한 체크
   const isAdmin = session?.user?.isAdmin || false;
+
+  // OBS 상태 관리
+  const [obsActive, setObsActive] = useState(false);
+  const [obsLoading, setObsLoading] = useState(false);
 
   // Player position 계산 최적화
   const optimizedPlayerStyle = useMemo(() => {
@@ -294,6 +298,88 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       selectedMRIndex: song.selectedMRIndex || 0,
       lyrics: song.lyrics || ''
     });
+  };
+
+  // OBS 토글 함수
+  const toggleOBS = async () => {
+    if (!session?.user?.userId) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
+
+    if (obsLoading) {
+      console.log('OBS 요청 이미 진행 중...');
+      return; // 중복 실행 방지
+    }
+
+    setObsLoading(true);
+    try {
+      if (obsActive) {
+        // OBS OFF - 상태 삭제
+        const response = await fetch('/api/obs/delete', {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          setObsActive(false);
+          console.log('OBS 상태 OFF');
+        } else {
+          // 개발 환경에서는 서버 재시작으로 상태가 사라질 수 있음
+          console.log('OBS OFF 응답 (개발환경에서는 정상)');
+          setObsActive(false);
+        }
+      } else {
+        // OBS ON - 상태 생성
+        const currentSong = {
+          title: song.titleAlias || song.title,
+          artist: song.artistAlias || song.artist
+        };
+
+        const response = await fetch('/api/obs/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ currentSong })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          setObsActive(true);
+          console.log(`OBS 상태 ON: ${result.obsUrl}`);
+        } else {
+          alert('OBS 켜기에 실패했습니다.');
+        }
+      }
+    } catch (error) {
+      console.error('OBS 토글 오류:', error);
+      alert('OBS 설정 중 오류가 발생했습니다.');
+    } finally {
+      setObsLoading(false);
+    }
+  };
+
+  // OBS 링크 복사 함수
+  const copyOBSLink = async () => {
+    if (!session?.user?.userId) return;
+    
+    const obsUrl = `${window.location.origin}/obs/overlay/${session.user.userId}`;
+    
+    try {
+      await navigator.clipboard.writeText(obsUrl);
+      alert('OBS 링크가 클립보드에 복사되었습니다!');
+    } catch (error) {
+      console.error('클립보드 복사 오류:', error);
+      // 대체 방법으로 텍스트 선택
+      const textArea = document.createElement('textarea');
+      textArea.value = obsUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      alert('OBS 링크가 클립보드에 복사되었습니다!');
+    }
   };
 
   // 태그 변경 핸들러
@@ -666,7 +752,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
 
 
 
-  const handleCardClick = () => {
+  const handleCardClick = async () => {
     // 곡 데이터를 콘솔에 출력
     console.group(`🎵 ${song.title} - ${song.artist}`);
     console.log('📋 기본 정보:', {
@@ -725,6 +811,17 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       // 모든 플레이어 상태 초기화
       setYoutubePlayer(null);
       setIsPlaying(false);
+      
+      // OBS 상태가 활성화되어 있으면 OFF로 변경
+      if (obsActive && session?.user?.userId) {
+        try {
+          await fetch('/api/obs/delete', { method: 'DELETE' });
+          setObsActive(false);
+          console.log('다이얼로그 닫힘으로 인한 OBS 상태 OFF');
+        } catch (error) {
+          console.error('OBS 상태 정리 오류:', error);
+        }
+      }
     }
     
     setIsExpanded(!isExpanded);
@@ -958,6 +1055,42 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {/* OBS 토글 버튼 - 로그인한 사용자만 */}
+        {session?.user?.userId && (
+          <>
+            <button
+              onClick={toggleOBS}
+              disabled={obsLoading}
+              className={`p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                         transition-all duration-200 disabled:opacity-50 ${
+                           obsActive 
+                             ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
+                             : 'text-light-accent dark:text-dark-accent'
+                         }`}
+              title={obsActive ? 'OBS 표시 끄기' : 'OBS 표시 켜기'}
+            >
+              {obsLoading ? (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-5 h-5 border-2 border-light-accent/30 border-t-light-accent rounded-full dark:border-dark-accent/30 dark:border-t-dark-accent"
+                />
+              ) : (
+                <TvIcon className="w-5 h-5" />
+              )}
+            </button>
+            {obsActive && (
+              <button
+                onClick={copyOBSLink}
+                className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                           transition-colors duration-200 text-blue-600 dark:text-blue-400"
+                title="OBS 링크 복사"
+              >
+                <ClipboardDocumentIcon className="w-5 h-5" />
+              </button>
+            )}
+          </>
+        )}
         {isAdmin && (
           <button
             onClick={toggleEditMode}
