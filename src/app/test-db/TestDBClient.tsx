@@ -3,10 +3,23 @@
 import { useState, useEffect } from 'react';
 // import { songDetailApi } from '@/lib/songDetailApi';
 import { SongDetail } from '@/types';
-import { MagnifyingGlassIcon, PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { 
+  MagnifyingGlassIcon, 
+  PlusIcon, 
+  PencilIcon, 
+  TrashIcon, 
+  EyeIcon,
+  Cog6ToothIcon,
+  MusicalNoteIcon,
+  DocumentDuplicateIcon,
+  ClockIcon
+} from '@heroicons/react/24/outline';
+import TimestampParserTab from './tabs/TimestampParserTab';
 
 interface SongWithId extends SongDetail {
   _id: string;
+  playlists?: string[];
+  isFavorite?: boolean;
 }
 
 interface YouTubeSearchResult {
@@ -40,7 +53,33 @@ interface CollectionStats {
   }>;
 }
 
+type TabType = 'songs' | 'backup' | 'timestamp';
+
+const tabs = [
+  {
+    id: 'songs' as const,
+    name: '노래 관리',
+    icon: MusicalNoteIcon,
+    description: '노래 데이터 조회, 편집, 삭제'
+  },
+  {
+    id: 'backup' as const,
+    name: '백업 관리',
+    icon: DocumentDuplicateIcon,
+    description: 'DB 백업, 복원, 통계'
+  },
+  {
+    id: 'timestamp' as const,
+    name: '타임스탬프 파서',
+    icon: ClockIcon,
+    description: '댓글 타임스탬프로 라이브 클립 일괄 등록'
+  }
+];
+
 export default function TestDBClient() {
+  // 탭 상태
+  const [activeTab, setActiveTab] = useState<TabType>('songs');
+  
   const [songs, setSongs] = useState<SongWithId[]>([]);
   const [filteredSongs, setFilteredSongs] = useState<SongWithId[]>([]);
   const [loading, setLoading] = useState(true);
@@ -553,23 +592,40 @@ export default function TestDBClient() {
     );
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* 헤더 */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            노래책 DB 관리
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            총 {filteredSongs.length}곡 | 검색 결과: {filteredSongs.length}곡
-            {selectedSongs.size > 0 && (
-              <span className="ml-4 text-blue-600 dark:text-blue-400 font-medium">
-                | 선택됨: {selectedSongs.size}곡
-              </span>
-            )}
-          </p>
+  // 탭 콘텐츠 렌더링
+  const renderTabContent = () => {
+    if (activeTab === 'timestamp') {
+      return <TimestampParserTab />;
+    } else if (activeTab === 'backup') {
+      return renderBackupContent();
+    } else {
+      return renderSongContent();
+    }
+  };
+
+  // 노래 관리 콘텐츠
+  const renderSongContent = () => {
+    return (
+    <div className="p-6">
+      {/* 헤더 */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <MusicalNoteIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              노래 관리
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              총 {filteredSongs.length}곡 | 검색 결과: {filteredSongs.length}곡
+              {selectedSongs.size > 0 && (
+                <span className="ml-4 text-blue-600 dark:text-blue-400 font-medium">
+                  | 선택됨: {selectedSongs.size}곡
+                </span>
+              )}
+            </p>
+          </div>
         </div>
+      </div>
 
         {/* 검색 및 액션 바 */}
         <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
@@ -1234,8 +1290,8 @@ export default function TestDBClient() {
         {/* 곡 상세/수정/추가 모달 */}
         {isModalOpen && <SongDetailModal />}
       </div>
-    </div>
-  );
+    );
+  };
 
   // 곡 상세 모달 컴포넌트
   function SongDetailModal() {
@@ -1292,7 +1348,7 @@ export default function TestDBClient() {
         const submitData = {
           ...formData,
           searchTags: formData.searchTags.filter(tag => tag.trim()),
-          playlists: formData.playlists.filter(playlist => playlist.trim()),
+          playlists: formData.playlists?.filter((playlist: string) => playlist.trim()) || [],
         };
 
         let response;
@@ -1345,7 +1401,7 @@ export default function TestDBClient() {
     };
 
     const removePlaylist = (index: number) => {
-      setFormData(prev => ({ ...prev, playlists: prev.playlists.filter((_, i) => i !== index) }));
+      setFormData(prev => ({ ...prev, playlists: prev.playlists?.filter((_: string, i: number) => i !== index) || [] }));
     };
 
     const addMRLink = () => {
@@ -1638,7 +1694,7 @@ export default function TestDBClient() {
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
-                {formData.playlists.map((playlist, index) => (
+                {formData.playlists?.map((playlist: string, index: number) => (
                   <span
                     key={index}
                     className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900 
@@ -1869,4 +1925,204 @@ export default function TestDBClient() {
       </div>
     );
   }
+
+  // 백업 관리 콘텐츠
+  const renderBackupContent = () => {
+    return (
+    <div className="p-6">
+      {/* 헤더 */}
+      <div className="flex items-center gap-3 mb-6">
+        <DocumentDuplicateIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            백업 관리
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            MongoDB 데이터베이스 백업 생성, 다운로드, 복원 및 통계를 관리합니다.
+          </p>
+        </div>
+      </div>
+
+      {/* 백업 토글 버튼 */}
+      <button
+        onClick={() => setShowBackupSection(!showBackupSection)}
+        className="mb-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+      >
+        {showBackupSection ? '백업 관리 숨기기' : '백업 관리 보기'}
+      </button>
+
+      {showBackupSection && (
+        <div className="space-y-6">
+          {/* 컬렉션 현황 */}
+          {collectionStats && (
+            <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+              <h3 className="font-medium text-gray-900 dark:text-white mb-3">📊 현재 DB 현황</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white dark:bg-gray-800 p-3 rounded">
+                  <div className="text-2xl font-bold text-light-accent dark:text-dark-accent">
+                    {collectionStats.totalDocuments.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">총 문서</div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-3 rounded">
+                  <div className="text-2xl font-bold text-light-accent dark:text-dark-accent">
+                    {collectionStats.totalCollections}
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">컬렉션</div>
+                </div>
+                <div className="bg-white dark:bg-gray-800 p-3 rounded">
+                  <div className="text-sm text-gray-700 dark:text-gray-300">
+                    <div className="font-medium mb-1">컬렉션별:</div>
+                    {collectionStats.collections.map((collection, index) => (
+                      <div key={index} className="flex justify-between">
+                        <span>{collection.name}:</span>
+                        <span className="font-mono">{collection.count.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 새 백업 생성 */}
+          <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border">
+            <h3 className="font-medium text-gray-900 dark:text-white mb-3">🆕 새 백업 생성</h3>
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={backupName}
+                onChange={(e) => setBackupName(e.target.value)}
+                placeholder="백업명 입력 (예: before_mr_update_2024)"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
+                           bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={backupLoading}
+              />
+              <button
+                onClick={createBackup}
+                disabled={backupLoading || !backupName.trim()}
+                className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed
+                           text-white font-medium rounded-lg transition-colors duration-200"
+              >
+                {backupLoading ? '⏳ 생성 중...' : '💾 백업 생성'}
+              </button>
+            </div>
+          </div>
+
+          {/* 백업 목록 */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="font-medium text-gray-900 dark:text-white">📋 백업 목록</h3>
+            </div>
+            <div className="p-4">
+              {backups.length > 0 ? (
+                <div className="space-y-3">
+                  {backups.map((backup) => (
+                    <div key={backup.name} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-white">{backup.name}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {new Date(backup.timestamp).toLocaleString('ko-KR')}
+                          {backup.metadata && ` | ${backup.metadata.totalDocuments.toLocaleString()}개 문서`}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => restoreBackup(backup.name)}
+                          disabled={backupLoading}
+                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50
+                                     text-white text-sm rounded transition-colors"
+                        >
+                          복원
+                        </button>
+                        <button
+                          onClick={() => deleteBackup(backup.name)}
+                          disabled={backupLoading}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 disabled:opacity-50
+                                     text-white text-sm rounded transition-colors"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-4">백업이 없습니다.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+    );
+  };
+
+  // 메인 return
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <Cog6ToothIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+              <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+                개발자 도구
+              </h1>
+              <span className="px-2 py-1 text-xs bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-full">
+                로컬 전용
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex gap-8">
+          {/* Sidebar */}
+          <div className="w-64 flex-shrink-0">
+            <nav className="space-y-2">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full text-left px-4 py-3 rounded-lg transition-all duration-200 ${
+                      isActive
+                        ? 'bg-light-accent/10 dark:bg-dark-accent/10 border border-light-accent/20 dark:border-dark-accent/20 text-light-accent dark:text-dark-accent'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Icon className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <div className="font-medium">{tab.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {tab.description}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1 min-w-0">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              {renderTabContent()}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 모달 */}
+      {isModalOpen && <SongDetailModal />}
+    </div>
+  );
 }

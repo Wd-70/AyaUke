@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import SongDetailModel from '@/models/SongDetail';
 import connectDB from '@/lib/mongodb';
+import mongoose from 'mongoose';
 
 export async function GET(request: NextRequest) {
   try {
