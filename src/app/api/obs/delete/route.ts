@@ -14,7 +14,7 @@ export async function DELETE(request: NextRequest) {
     // OBS 상태 삭제
     const deleted = activeOBSUsers.delete(session.user.userId);
 
-    console.log(`OBS 상태 삭제: ${session.user.userId} - ${deleted ? '성공' : '이미 없음'}`);
+    // console.log(`OBS 상태 삭제: ${session.user.userId} - ${deleted ? '성공' : '이미 없음'}`);
 
     return NextResponse.json({ 
       success: true,

@@ -12,16 +12,19 @@ export async function GET(
       return NextResponse.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    // OBS 상태 조회
+    // OBS 상태 조회 (메모리 기반, DB 연결 불필요)
     const obsState = activeOBSUsers.get(userId);
-    
-    // 디버그: 가끔 필요시에만 사용
-    // console.log(`🔍 OBS 상태 조회: ${userId}`, { found: !!obsState });
 
     if (!obsState) {
       return NextResponse.json({ 
         active: false,
         message: 'No active OBS session'
+      }, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
       });
     }
 
@@ -29,6 +32,12 @@ export async function GET(
       active: true,
       currentSong: obsState.currentSong,
       createdAt: obsState.createdAt
+    }, {
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      }
     });
 
   } catch (error) {

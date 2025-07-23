@@ -26,7 +26,6 @@ activeOBSUsers.set('__dummy__', {
 
 export async function POST(request: NextRequest) {
   try {
-    
     const session = await getServerSession(authOptions);
     
     if (!session?.user?.userId) {
@@ -52,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     activeOBSUsers.set(session.user.userId, obsState);
 
-    console.log(`OBS 상태 생성: ${session.user.userId} - ${currentSong.artist} - ${currentSong.title}`);
+    // console.log(`OBS 상태 생성: ${session.user.userId} - ${currentSong.artist} - ${currentSong.title}`);
 
     return NextResponse.json({ 
       success: true,
