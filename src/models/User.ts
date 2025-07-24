@@ -10,6 +10,11 @@ export interface IUser extends mongoose.Document {
   grantedAt?: Date
   createdAt: Date
   lastLoginAt: Date
+  channelNameHistory: Array<{
+    channelName: string
+    changedAt: Date
+    source: 'login' | 'initial'
+  }>
   preferences: {
     theme: 'light' | 'dark' | 'system'
     defaultPlaylistView: 'grid' | 'list'
@@ -51,6 +56,21 @@ const userSchema = new mongoose.Schema<IUser>({
     type: Date,
     default: Date.now
   },
+  channelNameHistory: [{
+    channelName: {
+      type: String,
+      required: true
+    },
+    changedAt: {
+      type: Date,
+      default: Date.now
+    },
+    source: {
+      type: String,
+      enum: ['login', 'initial'],
+      required: true
+    }
+  }],
   preferences: {
     theme: {
       type: String,

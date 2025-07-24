@@ -18,7 +18,20 @@ export async function createOrUpdateUser(userData: {
     
     if (user) {
       // 기존 사용자 업데이트
-      user.channelName = userData.channelName
+      const oldChannelName = user.channelName
+      const newChannelName = userData.channelName
+      
+      // channelName 변경 감지 및 이력 추가
+      if (oldChannelName !== newChannelName) {
+        user.channelNameHistory.push({
+          channelName: newChannelName,
+          changedAt: new Date(),
+          source: 'login'
+        })
+        console.log(`치지직 채널명 변경 감지: ${oldChannelName} → ${newChannelName}`)
+      }
+      
+      user.channelName = newChannelName
       // displayName이 없으면 channelName으로 설정하지 않음 (프로필 수정 시에만 생성)
       user.profileImageUrl = userData.profileImageUrl || user.profileImageUrl
       
@@ -41,6 +54,11 @@ export async function createOrUpdateUser(userData: {
         profileImageUrl: userData.profileImageUrl,
         role: staticRole,
         lastLoginAt: new Date(),
+        channelNameHistory: [{
+          channelName: userData.channelName,
+          changedAt: new Date(),
+          source: 'initial'
+        }],
         preferences: {
           theme: 'system',
           defaultPlaylistView: 'grid'

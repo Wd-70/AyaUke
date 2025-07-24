@@ -45,7 +45,7 @@ export default function OBSOverlayPage() {
           
           // 고빈도 모드로 전환
           clearInterval(intervalId);
-          startPolling(1000);
+          startPolling(2000);
         }
         
         previousDataStr = currentDataStr;
@@ -97,8 +97,8 @@ export default function OBSOverlayPage() {
     const startPolling = (interval: number) => {
       intervalId = setInterval(() => {
         
-        // 5분 경과 체크 (고빈도 모드일 때만) - 더 빠른 복귀
-        if (isHighFrequency && Date.now() - lastChangeTime > 5 * 60 * 1000) {
+        // 20분 경과 체크 (고빈도 모드일 때만) - 더 빠른 복귀
+        if (isHighFrequency && Date.now() - lastChangeTime > 20 * 60 * 1000) {
           isHighFrequency = false;
           clearInterval(intervalId);
           startPolling(7000); // 기본 모드로 복귀
