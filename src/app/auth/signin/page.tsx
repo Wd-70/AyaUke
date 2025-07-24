@@ -3,12 +3,9 @@
 import { signIn } from "next-auth/react"
 import { useState } from "react"
 import { motion } from "framer-motion"
-import Link from "next/link"
 
 export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false)
-  const [showDevMode, setShowDevMode] = useState(false)
-  const isDev = process.env.NODE_ENV === 'development'
 
   const handleSignIn = async () => {
     setIsLoading(true)
@@ -154,39 +151,6 @@ export default function SignIn() {
                 <span>🔒</span>
                 <span>안전한 OAuth 2.0 인증</span>
               </div>
-              
-              {/* 개발 모드 - API 승인 대기 중일 때 */}
-              {isDev && (
-                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
-                    ⚠️ 개발 모드: API 승인 대기 중
-                  </p>
-                  <button
-                    onClick={() => setShowDevMode(!showDevMode)}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {showDevMode ? '개발 옵션 숨기기' : '개발 옵션 보기'}
-                  </button>
-                  {showDevMode && (
-                    <div className="mt-3 space-y-2">
-                      <Link
-                        href="/songbook"
-                        className="block text-xs text-green-600 dark:text-green-400 hover:underline"
-                      >
-                        → 로그인 없이 노래책 둘러보기
-                      </Link>
-                      <a
-                        href="https://developers.naver.com/apps/#/myapps"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                      >
-                        → 네이버 개발자 센터에서 승인 확인
-                      </a>
-                    </div>
-                  )}
-                </div>
-              )}
             </motion.div>
           </motion.div>
 
