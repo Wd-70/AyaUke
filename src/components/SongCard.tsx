@@ -216,6 +216,96 @@ export default function SongCard({ song, showNumber = false, number, onDialogSta
     setIsEditMode(!isEditMode);
   };
 
+  // 변경사항 확인 함수
+  const hasUnsavedChanges = () => {
+    if (!isEditMode) return false;
+    
+    // 가사 변경 확인
+    const currentLyrics = lyricsText.trim();
+    const originalLyrics = (song.lyrics || '').trim();
+    if (currentLyrics !== originalLyrics) return true;
+    
+    // 제목 별칭 변경 확인
+    const currentTitleAlias = editData.titleAlias?.trim() || '';
+    const originalTitleAlias = song.titleAlias?.trim() || song.title?.trim() || '';
+    if (currentTitleAlias !== originalTitleAlias) return true;
+    
+    // 아티스트 별칭 변경 확인
+    const currentArtistAlias = editData.artistAlias?.trim() || '';
+    const originalArtistAlias = song.artistAlias?.trim() || song.artist?.trim() || '';
+    if (currentArtistAlias !== originalArtistAlias) return true;
+    
+    // 키 조정 변경 확인
+    if (editData.keyAdjustment !== song.keyAdjustment) return true;
+    
+    // 언어 변경 확인
+    if (editData.language !== song.language) return true;
+    
+    // 태그 변경 확인
+    const currentTags = JSON.stringify(editData.searchTags?.sort() || []);
+    const originalTags = JSON.stringify(song.searchTags?.sort() || []);
+    if (currentTags !== originalTags) return true;
+    
+    // MR 링크 변경 확인
+    const currentMRLinks = JSON.stringify(editData.mrLinks || []);
+    const originalMRLinks = JSON.stringify(song.mrLinks || []);
+    if (currentMRLinks !== originalMRLinks) return true;
+    
+    return false;
+  };
+
+  // 편집 데이터 초기화 함수
+  const resetEditData = () => {
+    setLyricsText(song.lyrics || '');
+    setEditData({
+      titleAlias: song.titleAlias || song.title,
+      artistAlias: song.artistAlias || song.artist,
+      mrLinks: song.mrLinks || [],
+      keyAdjustment: song.keyAdjustment,
+      language: song.language,
+      searchTags: song.searchTags || [],
+      selectedMRIndex: song.selectedMRIndex || 0,
+      lyrics: song.lyrics || ''
+    });
+  };
+
+  // ESC 키 핸들러
+  const handleEscapeKey = useCallback(() => {
+    if (isEditMode) {
+      // 수정 모드에서 ESC: 변경사항 확인 후 일반 모드로
+      if (hasUnsavedChanges()) {
+        const confirmed = window.confirm('수정 중인 내용이 있습니다. 정말 취소하시겠습니까?');
+        if (confirmed) {
+          setIsEditMode(false);
+          resetEditData(); // 모든 편집 데이터 초기화
+        }
+      } else {
+        setIsEditMode(false);
+      }
+    } else {
+      // 일반 모드에서 ESC: 다이얼로그 닫기
+      setIsExpanded(false);
+    }
+  }, [isEditMode, hasUnsavedChanges]);
+
+  // ESC 키 이벤트 리스너 등록
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        handleEscapeKey();
+      }
+    };
+
+    if (isExpanded) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isExpanded, handleEscapeKey]);
+
   // 편집 저장 핸들러
 
   // 편집 데이터 저장
