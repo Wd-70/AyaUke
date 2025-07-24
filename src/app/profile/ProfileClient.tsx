@@ -13,7 +13,8 @@ import {
   EyeIcon,
   EyeSlashIcon,
   Cog6ToothIcon,
-  SparklesIcon
+  SparklesIcon,
+  TrophyIcon
 } from '@heroicons/react/24/outline'
 import { HeartIcon as HeartSolidIcon } from '@heroicons/react/24/solid'
 import Navigation from '@/components/Navigation'
@@ -21,10 +22,11 @@ import ProfileEditor from './components/ProfileEditor'
 import LikedSongs from './components/LikedSongs'
 import PlaylistManager from './components/PlaylistManager'
 import ProfileStats from './components/ProfileStats'
+import TitleManager from './components/TitleManager'
 
 export default function ProfileClient() {
   const { data: session, status } = useSession()
-  const [activeTab, setActiveTab] = useState<'overview' | 'likes' | 'playlists'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'likes' | 'playlists' | 'titles'>('overview')
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [userProfile, setUserProfile] = useState<any>(null)
   const [isLoadingProfile, setIsLoadingProfile] = useState(false)
@@ -72,6 +74,12 @@ export default function ProfileClient() {
       label: '프로필', 
       icon: UserIcon,
       description: '내 정보 관리'
+    },
+    { 
+      id: 'titles' as const, 
+      label: '타이틀', 
+      icon: TrophyIcon,
+      description: '보유 타이틀 관리'
     },
     { 
       id: 'likes' as const, 
@@ -251,6 +259,7 @@ export default function ProfileClient() {
               </div>
             )}
 
+            {activeTab === 'titles' && <TitleManager />}
             {activeTab === 'likes' && <LikedSongs />}
             {activeTab === 'playlists' && <PlaylistManager />}
           </motion.div>
