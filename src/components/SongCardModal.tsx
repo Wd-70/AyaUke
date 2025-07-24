@@ -48,7 +48,6 @@ export default function SongCardModal({
   const [isEditMode, setIsEditMode] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [youtubePlayer, setYoutubePlayer] = useState<YouTubePlayer | null>(null);
-  const [forceUpdate, setForceUpdate] = useState(0);
 
   // 관리자 권한 체크
   const isAdmin = session?.user?.isAdmin || false;
@@ -89,7 +88,6 @@ export default function SongCardModal({
   // 편집 저장 핸들러
   const handleSaveEdit = (updatedSong: SongData) => {
     Object.assign(song, updatedSong);
-    setForceUpdate(prev => prev + 1);
     setIsEditMode(false);
   };
 

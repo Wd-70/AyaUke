@@ -259,7 +259,6 @@ export default function SongCard({ song, showNumber = false, number, onDialogSta
         console.log('✅ 저장 성공, 반환된 데이터:', result.song);
         // 곡 데이터 업데이트
         Object.assign(song, result.song);
-        setForceUpdate(prev => prev + 1);
         setIsEditMode(false);
         alert('곡 정보가 성공적으로 수정되었습니다.');
       } else {
