@@ -812,15 +812,15 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       setYoutubePlayer(null);
       setIsPlaying(false);
       
-      // OBS 상태가 활성화되어 있으면 OFF로 변경
+      // OBS 상태가 활성화되어 있으면 OFF로 변경 (응답 대기 안함)
       if (obsActive && session?.user?.userId) {
-        try {
-          await fetch('/api/obs/delete', { method: 'DELETE' });
-          setObsActive(false);
-          console.log('다이얼로그 닫힘으로 인한 OBS 상태 OFF');
-        } catch (error) {
+        // 즉시 UI 상태 업데이트
+        setObsActive(false);
+        // API 요청은 백그라운드에서 처리 (응답 대기 안함)
+        fetch('/api/obs/delete', { method: 'DELETE' }).catch(error => {
           console.error('OBS 상태 정리 오류:', error);
-        }
+        });
+        console.log('다이얼로그 닫힘으로 인한 OBS 상태 OFF');
       }
     }
     
@@ -847,7 +847,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
               animate={{ 
                 opacity: obsActive ? 1 : 0,
                 scale: obsActive ? 1 : 0.8,
-                width: obsActive ? 'auto' : 0
+                width: obsActive ? 120 : 0
               }}
               transition={{ duration: 0.2, ease: "easeInOut" }}
               className="overflow-hidden"
@@ -857,7 +857,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   onClick={copyOBSLink}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 
                            text-blue-600 dark:text-blue-400 border-2 border-blue-500/20 hover:border-blue-500/30
-                           transition-all duration-200"
+                           transition-all duration-200 w-28 justify-center whitespace-nowrap"
                   title="OBS 링크 복사"
                 >
                   <ClipboardDocumentIcon className="w-5 h-5" />

@@ -21,6 +21,7 @@ export default function OBSOverlayPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showOverlay, setShowOverlay] = useState(false);
   const [animationState, setAnimationState] = useState<'entering' | 'visible' | 'exiting' | 'hidden'>('hidden');
+  const [lastValidSong, setLastValidSong] = useState<CurrentSong | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -51,6 +52,11 @@ export default function OBSOverlayPage() {
         
         // 애니메이션 상태 관리 - 상태 변화가 있을 때만 실행
         const currentActive = data?.active && !!data?.currentSong;
+        
+        // 유효한 곡 정보가 있을 때 저장
+        if (currentActive && data?.currentSong) {
+          setLastValidSong(data.currentSong);
+        }
         
         if (previousActive !== null && previousActive !== currentActive) {
           // 상태가 변했을 때만 애니메이션 실행
@@ -127,7 +133,7 @@ export default function OBSOverlayPage() {
   return (
     <div className="min-h-screen bg-transparent flex items-end justify-start p-6">
       {shouldShowContent && (
-        <div className={`relative overflow-hidden transition-all duration-500 ease-out min-w-80 ${
+        <div className={`relative overflow-hidden transition-all duration-500 ease-out min-w-52 ${
           animationState === 'entering' 
             ? 'opacity-0 transform translate-y-8 scale-95' 
             : animationState === 'visible'
@@ -139,16 +145,16 @@ export default function OBSOverlayPage() {
           {/* 메인 컨테이너 - 사이트 컬러 팔레트 적용 */}
           <div className="relative bg-gradient-to-br from-light-primary/30 via-light-accent/25 to-light-purple/30 
                           dark:from-dark-secondary/30 dark:via-dark-accent/25 dark:to-dark-purple/30
-                          backdrop-blur-sm rounded-2xl px-6 py-4 min-w-80
+                          backdrop-blur-sm rounded-2xl px-6 py-4 min-w-52
                           border border-light-accent/20 dark:border-dark-accent/20 
                           shadow-xl shadow-light-accent/10 dark:shadow-dark-accent/10
-                          transform transition-all duration-300">
+                          transform transition-all duration-300 overflow-hidden">
             
-            {/* 배경 장식 요소들 - 사이트 컬러로 조정 */}
-            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-light-accent/8 to-light-purple/8 
-                            dark:from-dark-accent/8 dark:to-dark-purple/8 rounded-full blur-xl transform translate-x-12 -translate-y-12"></div>
-            <div className="absolute bottom-0 left-0 w-20 h-20 bg-gradient-to-tr from-light-purple/6 to-light-accent/6 
-                            dark:from-dark-purple/6 dark:to-dark-accent/6 rounded-full blur-lg transform -translate-x-10 translate-y-10"></div>
+            {/* 배경 장식 요소들 - 컨테이너 내부에 맞게 조정 */}
+            <div className="absolute top-1 right-1 w-16 h-16 bg-gradient-to-br from-light-accent/8 to-light-purple/8 
+                            dark:from-dark-accent/8 dark:to-dark-purple/8 rounded-full blur-lg transform translate-x-6 -translate-y-6"></div>
+            <div className="absolute bottom-1 left-1 w-14 h-14 bg-gradient-to-tr from-light-purple/6 to-light-accent/6 
+                            dark:from-dark-purple/6 dark:to-dark-accent/6 rounded-full blur-md transform -translate-x-6 translate-y-6"></div>
             
             {/* 음표 아이콘 - 빨간색 하이라이트 */}
             <div className="absolute top-3 right-3 text-dark-primary/40">
@@ -171,7 +177,7 @@ export default function OBSOverlayPage() {
               {/* 곡 제목 - 흰색 텍스트 */}
               <div className="mb-1">
                 <h2 className="text-xl font-bold leading-tight text-white drop-shadow-md">
-                  {obsData?.currentSong?.title || 'Loading...'}
+                  {(animationState === 'exiting' ? lastValidSong?.title : obsData?.currentSong?.title) || 'Loading...'}
                 </h2>
               </div>
               
@@ -179,7 +185,7 @@ export default function OBSOverlayPage() {
               <div className="flex items-center gap-2">
                 <div className="w-0.5 h-0.5 bg-white/70 rounded-full"></div>
                 <p className="text-white/90 text-base font-medium">
-                  {obsData?.currentSong?.artist || 'Artist'}
+                  {(animationState === 'exiting' ? lastValidSong?.artist : obsData?.currentSong?.artist) || 'Artist'}
                 </p>
               </div>
             </div>
