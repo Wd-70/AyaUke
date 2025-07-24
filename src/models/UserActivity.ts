@@ -19,8 +19,7 @@ const UserActivitySchema = new Schema<IUserActivity>({
   },
   date: {
     type: String,
-    required: true,
-    index: true
+    required: true
   },
   visitCount: {
     type: Number,
