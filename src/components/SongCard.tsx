@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { SongData } from '@/types';
-import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, TrashIcon, StarIcon, TvIcon, ClipboardDocumentIcon } from '@heroicons/react/24/outline';
+import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, TrashIcon, StarIcon, ComputerDesktopIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import { HeartIcon } from '@heroicons/react/24/solid';
 import YouTube from 'react-youtube';
 import { useLike } from '@/hooks/useLikes';
@@ -860,7 +860,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                            transition-all duration-200 w-28 justify-center whitespace-nowrap"
                   title="OBS 링크 복사"
                 >
-                  <ClipboardDocumentIcon className="w-5 h-5" />
+                  <DocumentDuplicateIcon className="w-5 h-5" />
                   <span className="text-sm font-medium">링크 복사</span>
                 </button>
               )}
@@ -885,7 +885,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                 />
               ) : (
                 <>
-                  <TvIcon className="w-5 h-5" />
+                  <ComputerDesktopIcon className="w-5 h-5" />
                   <span className="text-sm font-medium">OBS</span>
                 </>
               )}
@@ -1126,7 +1126,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                            transition-colors duration-200 text-blue-600 dark:text-blue-400"
                 title="OBS 링크 복사"
               >
-                <ClipboardDocumentIcon className="w-5 h-5" />
+                <DocumentDuplicateIcon className="w-5 h-5" />
               </motion.button>
             )}
             <button
@@ -1147,7 +1147,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                   className="w-5 h-5 border-2 border-light-accent/30 border-t-light-accent rounded-full dark:border-dark-accent/30 dark:border-t-dark-accent"
                 />
               ) : (
-                <TvIcon className="w-5 h-5" />
+                <ComputerDesktopIcon className="w-5 h-5" />
               )}
             </button>
           </>
