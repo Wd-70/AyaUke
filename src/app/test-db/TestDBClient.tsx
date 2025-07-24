@@ -12,9 +12,11 @@ import {
   Cog6ToothIcon,
   MusicalNoteIcon,
   DocumentDuplicateIcon,
-  ClockIcon
+  ClockIcon,
+  AdjustmentsHorizontalIcon
 } from '@heroicons/react/24/outline';
 import TimestampParserTab from './tabs/TimestampParserTab';
+import TimelineAdjusterTab from './tabs/TimelineAdjusterTab';
 
 interface SongWithId extends SongDetail {
   _id: string;
@@ -53,7 +55,7 @@ interface CollectionStats {
   }>;
 }
 
-type TabType = 'songs' | 'backup' | 'timestamp';
+type TabType = 'songs' | 'backup' | 'timestamp' | 'timeline';
 
 const tabs = [
   {
@@ -73,6 +75,12 @@ const tabs = [
     name: '타임스탬프 파서',
     icon: ClockIcon,
     description: '댓글 타임스탬프로 라이브 클립 일괄 등록'
+  },
+  {
+    id: 'timeline' as const,
+    name: '타임라인 조정',
+    icon: AdjustmentsHorizontalIcon,
+    description: '치지직-유튜브 시간차 보정 도구'
   }
 ];
 
@@ -596,6 +604,8 @@ export default function TestDBClient() {
   const renderTabContent = () => {
     if (activeTab === 'timestamp') {
       return <TimestampParserTab />;
+    } else if (activeTab === 'timeline') {
+      return <TimelineAdjusterTab />;
     } else if (activeTab === 'backup') {
       return renderBackupContent();
     } else {
