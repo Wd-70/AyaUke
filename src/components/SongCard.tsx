@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { SongData } from '@/types';
-import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, TrashIcon, StarIcon, ComputerDesktopIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
+import { MusicalNoteIcon, PlayIcon, PauseIcon, XMarkIcon, VideoCameraIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon, ListBulletIcon, PencilIcon, CheckIcon, PlusIcon, MinusIcon, ComputerDesktopIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import { HeartIcon } from '@heroicons/react/24/solid';
 import YouTube from 'react-youtube';
 import { useLike } from '@/hooks/useLikes';
@@ -23,16 +23,16 @@ interface YouTubePlayer {
 }
 
 interface SongCardProps {
-  song: Song;
-  onPlay?: (song: Song) => void;
+  song: SongData;
+  onPlay?: (song: SongData) => void;
   showNumber?: boolean;
   number?: number;
   onDialogStateChange?: (isOpen: boolean) => void;
 }
 
-export default function SongCard({ song, onPlay, showNumber = false, number, onDialogStateChange }: SongCardProps) {
+export default function SongCard({ song, showNumber = false, number, onDialogStateChange }: SongCardProps) {
   const { data: session } = useSession();
-  const { liked, isLoading: likeLoading, error: likeError, toggleLike } = useLike(song.id);
+  const { liked, isLoading: likeLoading, toggleLike } = useLike(song.id);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -46,7 +46,6 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   
   // 편집 모드 상태
   const [isEditMode, setIsEditMode] = useState(false);
-  const [forceUpdate, setForceUpdate] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   
   // 라이브 클립 데이터 상태 (LiveClipManager와 LiveClipEditor 공유)
@@ -218,16 +217,6 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
   };
 
   // 편집 저장 핸들러
-  const handleSaveEdit = (updatedSong: SongData) => {
-    Object.assign(song, updatedSong);
-    setForceUpdate(prev => prev + 1);
-    setIsEditMode(false);
-  };
-
-  // 편집 취소 핸들러
-  const handleCancelEdit = () => {
-    setIsEditMode(false);
-  };
 
   // 편집 데이터 저장
   const saveEditData = async () => {
@@ -245,9 +234,9 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
       const saveData = {
         ...editData,
         lyrics: lyricsText, // 최신 가사 텍스트 사용
-        titleAlias: (!editData.titleAlias.trim() || editData.titleAlias.trim() === song.title.trim()) ? null : editData.titleAlias.trim(),
-        artistAlias: (!editData.artistAlias.trim() || editData.artistAlias.trim() === song.artist.trim()) ? null : editData.artistAlias.trim(),
-        mrLinks: editData.mrLinks.filter(link => link.url.trim() !== ''),
+        titleAlias: (!editData.titleAlias?.trim() || editData.titleAlias.trim() === song.title.trim()) ? null : editData.titleAlias.trim(),
+        artistAlias: (!editData.artistAlias?.trim() || editData.artistAlias.trim() === song.artist.trim()) ? null : editData.artistAlias.trim(),
+        mrLinks: editData.mrLinks.filter((link: any) => link.url.trim() !== ''),
       };
       
       // 기본값은 제거 (수정 불가능)
@@ -362,7 +351,10 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
 
   // OBS 링크 복사 함수
   const copyOBSLink = async () => {
-    if (!session?.user?.userId) return;
+    if (!session?.user?.userId) {
+      alert('로그인이 필요합니다.');
+      return;
+    }
     
     const obsUrl = `${window.location.origin}/obs/overlay/${session.user.userId}`;
     
@@ -639,10 +631,6 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
     }
   }, [isExpanded, onDialogStateChange]);
 
-  // 스크롤 이벤트 전파 방지 핸들러 (다중 이벤트 처리)
-  const handleScrollPreventPropagation = (e: React.WheelEvent) => {
-    e.stopPropagation();
-  };
 
   // 다이얼로그 전체에서 스크롤 이벤트 완전 차단
   const handleDialogScroll = (e: React.WheelEvent) => {
@@ -839,8 +827,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
         </div>
         
         {/* XL 화면 전용 OBS 컨트롤 - 더 큰 크기와 명확한 레이블 */}
-        {session?.user?.userId && (
-          <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
             {/* OBS 링크 복사 버튼 - OBS 활성화 시에만 나타남 (왼쪽에 배치) */}
             <motion.div
               initial={false}
@@ -891,8 +878,8 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
               )}
             </button>
           </div>
-        )}
-      </div>
+        </div>
+      
       <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
         {isEditMode ? (
           <textarea
@@ -1112,8 +1099,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {/* OBS 토글 버튼 - 로그인한 사용자만, XL 화면에서는 숨김 */}
-        {session?.user?.userId && (
+        {/* OBS 토글 버튼 - XL 화면에서는 숨김 */}
           <>
             {obsActive && (
               <motion.button
@@ -1151,7 +1137,6 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
               )}
             </button>
           </>
-        )}
         {isAdmin && (
           <button
             onClick={toggleEditMode}
@@ -1241,7 +1226,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
               {/* Legacy Tags (if exists) */}
               {song.tags && song.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-2 sm:mb-4">
-                  {song.tags.map((tag, index) => (
+                  {song.tags.map((tag: string, index: number) => (
                     <span
                       key={index}
                       className="px-2 py-1 rounded-full text-xs 
