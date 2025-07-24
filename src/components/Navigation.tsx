@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { UserIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { isSuperAdmin, canManageSongs, UserRole } from '@/lib/permissions';
+import { getSelectedTitleInfo } from '@/lib/titleSystem';
 
 interface NavigationProps {
   currentPath?: string;
@@ -281,12 +282,9 @@ function AuthControls({ session, status, update }: { session: any, status: strin
           <div className="text-sm font-medium text-gray-900 dark:text-white">
             {session.user.name || session.user.channelName}
           </div>
-          {canManageSongs(session.user.role as UserRole) && (
-            <div className="text-xs text-light-accent dark:text-dark-primary font-medium">
-              {session.user.role === 'super_admin' ? '최고 관리자' : 
-               session.user.role === 'song_admin' ? '노래 관리자' : 
-               session.user.role === 'ayauke_admin' ? '노래책 관리자' :
-               session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
+          {session.user.selectedTitle && (
+            <div className={`text-xs font-medium px-3 pt-1.5 pb-1 rounded-full ${session.user.selectedTitle.colorClass}`}>
+              {session.user.selectedTitle.name}
             </div>
           )}
         </div>
@@ -302,12 +300,9 @@ function AuthControls({ session, status, update }: { session: any, status: strin
             <div className="text-xs text-gray-500 dark:text-gray-400">
               치지직 ID: {truncateChannelId(session.user.channelId || '미확인')}
             </div>
-            {canManageSongs(session.user.role as UserRole) && (
-              <div className="text-xs text-light-accent dark:text-dark-primary font-medium mt-1">
-                ✨ {session.user.role === 'super_admin' ? '최고 관리자' : 
-                    session.user.role === 'song_admin' ? '노래 관리자' : 
-                    session.user.role === 'ayauke_admin' ? '노래책 관리자' :
-                    session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
+            {session.user.selectedTitle && (
+              <div className={`text-xs font-medium mt-1 px-2 py-0.5 rounded-full inline-block ${session.user.selectedTitle.colorClass}`}>
+                ✨ {session.user.selectedTitle.name}
               </div>
             )}
           </div>
@@ -407,12 +402,9 @@ function MobileUserProfile({ session, status }: { session: any, status: string }
             <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
               {session.user.name || session.user.channelName}
             </div>
-            {canManageSongs(session.user.role as UserRole) && (
-              <div className="text-xs text-light-accent dark:text-dark-primary font-medium">
-                ✨ {session.user.role === 'super_admin' ? '최고 관리자' : 
-                    session.user.role === 'song_admin' ? '노래 관리자' : 
-                    session.user.role === 'ayauke_admin' ? '노래책 관리자' :
-                    session.user.role === 'song_editor' ? '노래 편집자' : '관리자'}
+            {session.user.selectedTitle && (
+              <div className={`text-xs font-medium px-2 py-0.5 rounded-full inline-block ${session.user.selectedTitle.colorClass}`}>
+                ✨ {session.user.selectedTitle.name}
               </div>
             )}
           </div>

@@ -12,6 +12,13 @@ declare module "next-auth" {
       followerCount: number
       isAdmin: boolean
       adminRole: string
+      selectedTitle: {
+        id: string
+        name: string
+        description: string
+        rarity: string
+        colorClass: string
+      } | null
     } & DefaultSession["user"]
   }
 

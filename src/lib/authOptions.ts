@@ -5,7 +5,9 @@ import { roleToIsAdmin } from '@/lib/permissions'
 import { createOrUpdateUser } from '@/lib/userService'
 import dbConnect from '@/lib/mongodb'
 import User from '@/models/User'
+import UserActivity from '@/models/UserActivity'
 import ChzzkProvider from '@/lib/chzzkOAuthProvider'
+import { getSelectedTitleInfo } from '@/lib/titleSystem'
 
 export const authOptions = {
   providers: [
@@ -152,9 +154,14 @@ export const authOptions = {
         // 데이터베이스에서 최신 사용자 정보 가져오기
         try {
           await dbConnect()
-          // console.log('🔍 세션 콜백 - 사용자 검색:', { channelId: token.channelId })
+          console.log('🔍 세션 콜백 - 사용자 검색:', { channelId: token.channelId })
           const user = await User.findOne({ channelId: token.channelId })
-          // console.log('🔍 세션 콜백 - 조회된 사용자:', user ? { ... } : null)
+          console.log('🔍 세션 콜백 - 조회된 사용자 칭호:', { 
+            found: !!user,
+            titlesCount: user?.titles?.length || 0,
+            selectedTitle: user?.selectedTitle || 'none',
+            hasTitlesField: user?.titles !== undefined
+          })
           
           if (user) {
             session.user.channelName = user.channelName
@@ -163,6 +170,18 @@ export const authOptions = {
             session.user.channelImageUrl = user.profileImageUrl || token.channelImageUrl as string
             session.user.role = user.role // DB에서 가져온 최신 권한 사용
             session.user.isAdmin = roleToIsAdmin(user.role as any) // 하위 호환성
+            
+            // 선택된 칭호 정보 추가
+            const selectedTitle = getSelectedTitleInfo(user)
+            session.user.selectedTitle = selectedTitle
+            console.log('🏆 세션 콜백 - 칭호 정보:', { 
+              userId: user._id, 
+              titlesCount: user.titles?.length || 0,
+              selectedTitle: selectedTitle?.name || 'none'
+            })
+            
+            // 자동 일일 체크인 처리
+            await performDailyCheckin(user)
             
             // console.log('🔍 세션 콜백 - 최종 세션 정보:', { ... })
           } else {
@@ -191,4 +210,100 @@ export const authOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: false, // 디버그 모드 비활성화
+}
+
+// 중복 체크인 방지를 위한 메모리 캐시 (userId:date -> timestamp)
+const checkinCache = new Map<string, number>()
+
+/**
+ * 세션 콜백에서 자동으로 일일 체크인 처리
+ */
+async function performDailyCheckin(user: any) {
+  try {
+    const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+    const now = new Date()
+    
+    // 중복 체크인 방지: 같은 사용자의 같은 날짜에 대해 5분 내 중복 호출 무시
+    const cacheKey = `${user._id}:${today}`
+    const lastCheckin = checkinCache.get(cacheKey)
+    const fiveMinutesAgo = now.getTime() - (5 * 60 * 1000)
+    
+    if (lastCheckin && lastCheckin > fiveMinutesAgo) {
+      // 5분 이내에 이미 체크인했으면 무시
+      return
+    }
+    
+    // 캐시 업데이트
+    checkinCache.set(cacheKey, now.getTime())
+    
+    // 캐시 정리: 1시간 이상 된 항목들 제거
+    const oneHourAgo = now.getTime() - (60 * 60 * 1000)
+    for (const [key, timestamp] of checkinCache.entries()) {
+      if (timestamp < oneHourAgo) {
+        checkinCache.delete(key)
+      }
+    }
+
+    // 기존 사용자의 activityStats가 없으면 초기화
+    if (!user.activityStats) {
+      user.activityStats = {
+        totalLoginDays: 0,
+        currentStreak: 0,
+        longestStreak: 0,
+        lastVisitDate: null,
+      }
+    }
+
+    // 오늘 이미 체크인했는지 확인
+    let todayActivity = await UserActivity.findOne({
+      userId: user._id,
+      date: today
+    })
+
+    if (!todayActivity) {
+      // 오늘 첫 방문
+      todayActivity = new UserActivity({
+        userId: user._id,
+        date: today,
+        visitCount: 1,
+        firstVisitAt: now,
+        lastVisitAt: now
+      })
+
+      // 연속 접속일 계산
+      const yesterday = new Date()
+      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+      if (user.activityStats.lastVisitDate === yesterdayStr) {
+        // 어제 방문했으면 연속 접속일 증가
+        user.activityStats.currentStreak += 1
+      } else if (user.activityStats.lastVisitDate !== today) {
+        // 어제 방문 안했으면 연속 접속일 초기화 (오늘부터 1일)
+        user.activityStats.currentStreak = 1
+      }
+
+      // 최장 연속 접속일 기록 업데이트
+      if (user.activityStats.currentStreak > user.activityStats.longestStreak) {
+        user.activityStats.longestStreak = user.activityStats.currentStreak
+      }
+
+      // 총 로그인 날 수 증가
+      user.activityStats.totalLoginDays += 1
+      user.activityStats.lastVisitDate = today
+
+      await todayActivity.save()
+      await user.save()
+
+      console.log(`🎯 자동 체크인: ${user.channelName} - 연속 ${user.activityStats.currentStreak}일`)
+    } else {
+      // 오늘 이미 방문한 기록이 있음 - 방문 횟수만 증가
+      todayActivity.visitCount += 1
+      todayActivity.lastVisitAt = now
+      await todayActivity.save()
+    }
+  } catch (error) {
+    console.error('자동 체크인 처리 오류:', error)
+    // 에러가 발생해도 세션 처리는 계속 진행
+  }
 }

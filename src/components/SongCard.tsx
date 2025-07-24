@@ -1163,14 +1163,6 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
           </button>
         )}
         <button
-          onClick={handlePlaylistClick}
-          className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                     transition-colors duration-200"
-          title="플레이리스트 관리"
-        >
-          <ListBulletIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
-        </button>
-        <button
           onClick={handleLike}
           disabled={likeLoading}
           className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
@@ -1546,7 +1538,7 @@ export default function SongCard({ song, onPlay, showNumber = false, number, onD
                       ) : (
                         <>
                           <PlayIcon className="w-5 h-5" />
-                          <span>재생</span>
+                          <span>MR 재생</span>
                         </>
                       )}
                     </button>
