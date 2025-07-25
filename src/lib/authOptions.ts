@@ -223,25 +223,15 @@ async function performDailyCheckin(user: any) {
     const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
     const now = new Date()
     
-    // 중복 체크인 방지: 같은 사용자의 같은 날짜에 대해 5분 내 중복 호출 무시
-    const cacheKey = `${user._id}:${today}`
-    const lastCheckin = checkinCache.get(cacheKey)
-    const fiveMinutesAgo = now.getTime() - (5 * 60 * 1000)
-    
-    if (lastCheckin && lastCheckin > fiveMinutesAgo) {
-      // 5분 이내에 이미 체크인했으면 무시
+    // 오늘 활동 기록이 있는지 확인 (세션에서는 첫 방문 생성만)
+    let todayActivity = await UserActivity.findOne({
+      userId: user._id,
+      date: today
+    })
+
+    // 오늘 활동 기록이 이미 있으면 아무것도 하지 않음
+    if (todayActivity) {
       return
-    }
-    
-    // 캐시 업데이트
-    checkinCache.set(cacheKey, now.getTime())
-    
-    // 캐시 정리: 1시간 이상 된 항목들 제거
-    const oneHourAgo = now.getTime() - (60 * 60 * 1000)
-    for (const [key, timestamp] of checkinCache.entries()) {
-      if (timestamp < oneHourAgo) {
-        checkinCache.delete(key)
-      }
     }
 
     // 기존 사용자의 activityStats가 없으면 초기화
@@ -254,54 +244,41 @@ async function performDailyCheckin(user: any) {
       }
     }
 
-    // 오늘 이미 체크인했는지 확인
-    let todayActivity = await UserActivity.findOne({
+    // 오늘 첫 방문 - 새로운 활동 기록 생성
+    todayActivity = new UserActivity({
       userId: user._id,
-      date: today
+      date: today,
+      visitCount: 1,
+      firstVisitAt: now,
+      lastVisitAt: now
     })
 
-    if (!todayActivity) {
-      // 오늘 첫 방문
-      todayActivity = new UserActivity({
-        userId: user._id,
-        date: today,
-        visitCount: 1,
-        firstVisitAt: now,
-        lastVisitAt: now
-      })
+    // 연속 접속일 계산
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    const yesterdayStr = yesterday.toISOString().split('T')[0]
 
-      // 연속 접속일 계산
-      const yesterday = new Date()
-      yesterday.setDate(yesterday.getDate() - 1)
-      const yesterdayStr = yesterday.toISOString().split('T')[0]
-
-      if (user.activityStats.lastVisitDate === yesterdayStr) {
-        // 어제 방문했으면 연속 접속일 증가
-        user.activityStats.currentStreak += 1
-      } else if (user.activityStats.lastVisitDate !== today) {
-        // 어제 방문 안했으면 연속 접속일 초기화 (오늘부터 1일)
-        user.activityStats.currentStreak = 1
-      }
-
-      // 최장 연속 접속일 기록 업데이트
-      if (user.activityStats.currentStreak > user.activityStats.longestStreak) {
-        user.activityStats.longestStreak = user.activityStats.currentStreak
-      }
-
-      // 총 로그인 날 수 증가
-      user.activityStats.totalLoginDays += 1
-      user.activityStats.lastVisitDate = today
-
-      await todayActivity.save()
-      await user.save()
-
-      console.log(`🎯 자동 체크인: ${user.channelName} - 연속 ${user.activityStats.currentStreak}일`)
-    } else {
-      // 오늘 이미 방문한 기록이 있음 - 방문 횟수만 증가
-      todayActivity.visitCount += 1
-      todayActivity.lastVisitAt = now
-      await todayActivity.save()
+    if (user.activityStats.lastVisitDate === yesterdayStr) {
+      // 어제 방문했으면 연속 접속일 증가
+      user.activityStats.currentStreak += 1
+    } else if (user.activityStats.lastVisitDate !== today) {
+      // 어제 방문 안했으면 연속 접속일 초기화 (오늘부터 1일)
+      user.activityStats.currentStreak = 1
     }
+
+    // 최장 연속 접속일 기록 업데이트
+    if (user.activityStats.currentStreak > user.activityStats.longestStreak) {
+      user.activityStats.longestStreak = user.activityStats.currentStreak
+    }
+
+    // 총 로그인 날 수 증가
+    user.activityStats.totalLoginDays += 1
+    user.activityStats.lastVisitDate = today
+
+    await todayActivity.save()
+    await user.save()
+
+    console.log(`🎯 첫 방문 기록 생성: ${user.channelName} - 연속 ${user.activityStats.currentStreak}일`)
   } catch (error) {
     console.error('자동 체크인 처리 오류:', error)
     // 에러가 발생해도 세션 처리는 계속 진행

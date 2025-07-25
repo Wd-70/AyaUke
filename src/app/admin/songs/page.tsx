@@ -92,9 +92,12 @@ export default function SongManagement() {
   })
 
   // 실제 데이터 로드
-  const loadSongs = useCallback(async () => {
+  const loadSongs = useCallback(async (showFullLoading = false) => {
     try {
-      setLoading(true)
+      // 초기 로딩이나 새로고침 버튼 클릭 시에만 전체 페이지 로딩 표시
+      if (showFullLoading) {
+        setLoading(true)
+      }
       console.log('🔄 관리자 노래 목록 로딩 시작...')
       
       const response = await fetch('/api/admin/songs', {
@@ -123,7 +126,9 @@ export default function SongManagement() {
       // 에러 시 사용자에게 알림
       alert('노래 목록을 불러오는 중 오류가 발생했습니다.')
     } finally {
-      setLoading(false)
+      if (showFullLoading) {
+        setLoading(false)
+      }
     }
   }, [])
 
@@ -141,7 +146,7 @@ export default function SongManagement() {
     }
 
     // 실제 데이터 로드 - 페이지 로딩 시 한 번만 실행
-    loadSongs()
+    loadSongs(true)
   }, [session, status, router])
 
   // 필터링 효과
@@ -241,7 +246,7 @@ export default function SongManagement() {
       if (result.success) {
         alert(`${result.message} (${result.affectedCount}곡 처리됨)`)
         setSelectedSongs(new Set()) // 선택 해제
-        // 데이터 다시 로드
+        // 데이터 다시 로드 (백그라운드에서 조용히)
         await loadSongs()
       } else {
         throw new Error(result.error || '작업 실패')
@@ -351,7 +356,7 @@ export default function SongManagement() {
       if (result.success) {
         alert(`${songData.title} 곡이 성공적으로 추가되었습니다!`)
         setShowAddModal(false)
-        // 데이터 다시 로드
+        // 데이터 다시 로드 (백그라운드에서 조용히)
         await loadSongs()
       } else {
         throw new Error(result.error || '곡 추가 실패')
@@ -566,7 +571,7 @@ export default function SongManagement() {
               </button>
 
               <button
-                onClick={loadSongs}
+                onClick={() => loadSongs(true)}
                 disabled={loading}
                 className="px-4 py-3 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
                            rounded-lg hover:border-light-accent/40 dark:hover:border-dark-accent/40 
@@ -960,7 +965,17 @@ export default function SongManagement() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-              onClick={() => setShowAddModal(false)}
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) {
+                  e.currentTarget.dataset.mouseDownOnBackdrop = 'true';
+                }
+              }}
+              onMouseUp={(e) => {
+                if (e.target === e.currentTarget && e.currentTarget.dataset.mouseDownOnBackdrop === 'true') {
+                  setShowAddModal(false);
+                }
+                delete e.currentTarget.dataset.mouseDownOnBackdrop;
+              }}
             >
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}

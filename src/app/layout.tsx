@@ -4,6 +4,7 @@ import "./globals.css";
 import ThemeScript from "@/components/ThemeScript";
 import { Analytics } from "@vercel/analytics/next";
 import AuthProvider from "@/contexts/AuthProvider";
+import ActivityTracker from "@/components/ActivityTracker";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -67,6 +68,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
+          <ActivityTracker />
           {children}
         </AuthProvider>
         <Analytics />
