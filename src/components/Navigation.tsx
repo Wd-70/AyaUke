@@ -283,7 +283,7 @@ function AuthControls({ session, status, update }: { session: any, status: strin
             {session.user.name || session.user.channelName}
           </div>
           {session.user.selectedTitle && (
-            <div className={`text-xs font-medium px-3 pt-1.5 pb-1 rounded-full ${session.user.selectedTitle.colorClass}`}>
+            <div className={`text-xs font-medium px-3 py-1 rounded-full ${session.user.selectedTitle.colorClass}`}>
               {session.user.selectedTitle.name}
             </div>
           )}
@@ -301,7 +301,7 @@ function AuthControls({ session, status, update }: { session: any, status: strin
               치지직 ID: {truncateChannelId(session.user.channelId || '미확인')}
             </div>
             {session.user.selectedTitle && (
-              <div className={`text-xs font-medium mt-1 px-2 py-0.5 rounded-full inline-block ${session.user.selectedTitle.colorClass}`}>
+              <div className={`text-xs font-medium mt-1 px-2 py-1 rounded-full inline-block ${session.user.selectedTitle.colorClass}`}>
                 ✨ {session.user.selectedTitle.name}
               </div>
             )}
@@ -403,7 +403,7 @@ function MobileUserProfile({ session, status }: { session: any, status: string }
               {session.user.name || session.user.channelName}
             </div>
             {session.user.selectedTitle && (
-              <div className={`text-xs font-medium px-2 py-0.5 rounded-full inline-block ${session.user.selectedTitle.colorClass}`}>
+              <div className={`text-xs font-medium px-2 py-1 rounded-full inline-block ${session.user.selectedTitle.colorClass}`}>
                 ✨ {session.user.selectedTitle.name}
               </div>
             )}
