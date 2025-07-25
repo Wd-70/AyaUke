@@ -675,7 +675,7 @@ export default function TimestampParserTab() {
           {parsedTimestamps.length > 0 && (
             <button
               onClick={verifyWithDB}
-              disabled={isVerifying || verificationComplete || !songsLoaded}
+              disabled={isVerifying || !songsLoaded}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isVerifying ? (
@@ -683,15 +683,15 @@ export default function TimestampParserTab() {
                   <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                   DB 검증 중...
                 </>
-              ) : verificationComplete ? (
-                <>
-                  <CheckIcon className="w-4 h-4" />
-                  검증 완료
-                </>
               ) : !songsLoaded ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                   곡 목록 로딩 중...
+                </>
+              ) : verificationComplete ? (
+                <>
+                  <MagnifyingGlassIcon className="w-4 h-4" />
+                  2. DB 재검증 ({allSongs.length}곡)
                 </>
               ) : (
                 <>

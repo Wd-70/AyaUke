@@ -990,6 +990,12 @@ export default function LiveClipManager({
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-light-text dark:text-dark-text truncate">
                             {new Date(video.sungDate).toLocaleDateString('ko-KR')}
+                            {/* 재생시간 표시 */}
+                            {video.startTime !== undefined && video.endTime !== undefined && video.endTime > video.startTime && (
+                              <span className="ml-2 text-blue-600 dark:text-blue-400">
+                                ({formatTime(video.endTime - video.startTime)})
+                              </span>
+                            )}
                           </div>
                           {video.description && (
                             <div className="text-xs text-light-text/60 dark:text-dark-text/60 mt-1 truncate">
