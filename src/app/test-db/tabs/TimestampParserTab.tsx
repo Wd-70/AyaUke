@@ -61,29 +61,30 @@ export default function TimestampParserTab() {
   const [showManualSearch, setShowManualSearch] = useState<{ [key: number]: boolean }>({});
   const [manualSearchQuery, setManualSearchQuery] = useState<{ [key: number]: string }>({});
 
-  // 전체 곡 목록 로드
-  useEffect(() => {
-    const loadAllSongs = async () => {
-      try {
-        console.log('🎵 전체 곡 목록 로딩 중...');
-        
-        // MongoDB의 searchTags만 사용
-        const response = await fetch('/api/songdetails?limit=1000');
-        const data = await response.json();
-        
-        if (data.success && data.songs) {
-          setAllSongs(data.songs);
-          console.log(`📊 ${data.songs.length}곡 로드 완료 (MongoDB)`);
-          console.log('📝 첫 번째 곡 searchTags 확인:', data.songs[0]?.searchTags || 'No searchTags');
-        }
-        
-        setSongsLoaded(true);
-      } catch (error) {
-        console.error('곡 목록 로드 실패:', error);
-        setSongsLoaded(true);
+  // 전체 곡 목록 로드 함수
+  const loadAllSongs = async () => {
+    try {
+      console.log('🎵 전체 곡 목록 로딩 중...');
+      
+      // MongoDB의 searchTags만 사용
+      const response = await fetch('/api/songdetails?limit=1000');
+      const data = await response.json();
+      
+      if (data.success && data.songs) {
+        setAllSongs(data.songs);
+        console.log(`📊 ${data.songs.length}곡 로드 완료 (MongoDB)`);
+        console.log('📝 첫 번째 곡 searchTags 확인:', data.songs[0]?.searchTags || 'No searchTags');
       }
-    };
+      
+      setSongsLoaded(true);
+    } catch (error) {
+      console.error('곡 목록 로드 실패:', error);
+      setSongsLoaded(true);
+    }
+  };
 
+  // 초기 로드
+  useEffect(() => {
     loadAllSongs();
   }, []);
 
@@ -498,6 +499,10 @@ export default function TimestampParserTab() {
     setVerificationComplete(false);
 
     try {
+      // 재검증 시 최신 DB 데이터 로드
+      console.log('🔄 DB 재검증: 최신 곡 목록 로딩 중...');
+      await loadAllSongs();
+      
       const verifiedTimestamps = await Promise.all(
         parsedTimestamps.map(async (timestamp) => {
           const dbMatch = await searchSongInDB(timestamp.title, timestamp.artist);

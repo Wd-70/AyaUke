@@ -143,6 +143,7 @@ export const authOptions = {
     async session({ session, token }) {
       if (token && session.user) {
         // 기본 토큰 정보 설정
+        session.user.id = token.userId as string // NextAuth 표준 필드
         session.user.naverId = token.naverId as string || null
         session.user.channelId = token.channelId as string
         session.user.userId = token.userId as string // MongoDB ObjectId 추가
@@ -154,14 +155,7 @@ export const authOptions = {
         // 데이터베이스에서 최신 사용자 정보 가져오기
         try {
           await dbConnect()
-          console.log('🔍 세션 콜백 - 사용자 검색:', { channelId: token.channelId })
           const user = await User.findOne({ channelId: token.channelId })
-          console.log('🔍 세션 콜백 - 조회된 사용자 칭호:', { 
-            found: !!user,
-            titlesCount: user?.titles?.length || 0,
-            selectedTitle: user?.selectedTitle || 'none',
-            hasTitlesField: user?.titles !== undefined
-          })
           
           if (user) {
             session.user.channelName = user.channelName
@@ -174,11 +168,6 @@ export const authOptions = {
             // 선택된 칭호 정보 추가
             const selectedTitle = getSelectedTitleInfo(user)
             session.user.selectedTitle = selectedTitle
-            console.log('🏆 세션 콜백 - 칭호 정보:', { 
-              userId: user._id, 
-              titlesCount: user.titles?.length || 0,
-              selectedTitle: selectedTitle?.name || 'none'
-            })
             
             // 자동 일일 체크인 처리
             await performDailyCheckin(user)

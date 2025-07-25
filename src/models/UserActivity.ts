@@ -43,4 +43,7 @@ UserActivitySchema.index({ userId: 1, date: 1 }, { unique: true })
 // 날짜별 인덱스: 오래된 데이터 정리 시 사용
 UserActivitySchema.index({ date: 1 })
 
-export default mongoose.models.UserActivity || mongoose.model<IUserActivity>('UserActivity', UserActivitySchema)
+const UserActivity = mongoose.models.UserActivity || mongoose.model<IUserActivity>('UserActivity', UserActivitySchema)
+
+export { UserActivity }
+export default UserActivity

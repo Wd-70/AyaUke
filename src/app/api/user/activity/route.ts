@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
-import { dbConnect } from '@/lib/mongodb'
+import { connectToDatabase } from '@/lib/mongodb'
 import { UserActivity } from '@/models/UserActivity'
 
 // 메모리 캐시 - 중복 요청 방지
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 })
     }
 
-    await dbConnect()
+    await connectToDatabase()
 
     const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
     const now = new Date()
