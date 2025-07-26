@@ -11,8 +11,10 @@ import {
   PencilIcon,
   ArrowRightIcon,
   TagIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  LinkIcon
 } from '@heroicons/react/24/outline';
+import TimelineParsingView from './TimelineParsingView';
 
 interface VideoData {
   videoId: string;
@@ -54,6 +56,7 @@ interface PaginationData {
 }
 
 export default function CommentAnalysisTab() {
+  const [viewMode, setViewMode] = useState<'comments' | 'timeline'>('comments');
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [videos, setVideos] = useState<VideoData[]>([]);
@@ -284,38 +287,68 @@ export default function CommentAnalysisTab() {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <button
-                onClick={testAPIConnection}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-2 transition-colors"
-              >
-                <CheckCircleIcon className="w-4 h-4" />
-                API 테스트
-              </button>
-              <button
-                onClick={() => loadChannelData(pagination.currentPage, searchQuery)}
-                disabled={loading}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors"
-              >
-                <ArrowPathIcon className="w-4 h-4" />
-                새로고침
-              </button>
-              <button
-                onClick={syncChannelData}
-                disabled={syncing}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg flex items-center gap-2 transition-colors"
-              >
-                {syncing ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    동기화 중...
-                  </>
-                ) : (
-                  <>
-                    <ChatBubbleBottomCenterTextIcon className="w-4 h-4" />
-                    전체 동기화
-                  </>
-                )}
-              </button>
+              {/* 뷰 모드 토글 */}
+              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('comments')}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    viewMode === 'comments'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <ChatBubbleBottomCenterTextIcon className="w-4 h-4 mr-2 inline" />
+                  댓글 분석
+                </button>
+                <button
+                  onClick={() => setViewMode('timeline')}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    viewMode === 'timeline'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <LinkIcon className="w-4 h-4 mr-2 inline" />
+                  타임라인 파싱
+                </button>
+              </div>
+              
+              {viewMode === 'comments' && (
+                <>
+                  <button
+                    onClick={testAPIConnection}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <CheckCircleIcon className="w-4 h-4" />
+                    API 테스트
+                  </button>
+                  <button
+                    onClick={() => loadChannelData(pagination.currentPage, searchQuery)}
+                    disabled={loading}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <ArrowPathIcon className="w-4 h-4" />
+                    새로고침
+                  </button>
+                  <button
+                    onClick={syncChannelData}
+                    disabled={syncing}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    {syncing ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        동기화 중...
+                      </>
+                    ) : (
+                      <>
+                        <ChatBubbleBottomCenterTextIcon className="w-4 h-4" />
+                        전체 동기화
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -340,9 +373,13 @@ export default function CommentAnalysisTab() {
           </div>
         </div>
 
-        <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0">
-        {/* 비디오 목록 */}
-        <div className="flex-1 xl:flex-[1] bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col h-full">
+        {/* 콘텐츠 영역 - 조건부 렌더링 */}
+        {viewMode === 'timeline' ? (
+          <TimelineParsingView />
+        ) : (
+          <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0">
+            {/* 비디오 목록 */}
+            <div className="flex-1 xl:flex-[1] bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col h-full">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -626,10 +663,11 @@ export default function CommentAnalysisTab() {
                 </div>
               ))
             )}
+            </div>
           </div>
-        </div>
+          </div>
+        )}
       </div>
-    </div>
     </div>
   );
 }
