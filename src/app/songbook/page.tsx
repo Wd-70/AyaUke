@@ -12,10 +12,8 @@ export const metadata: Metadata = {
 // 구글시트만 60초 캐싱
 const getCachedSheetSongs = unstable_cache(
   async () => {
-    const timestamp = new Date().toISOString();
-    console.log(`📊 [${timestamp}] 구글시트 캐시 갱신 중...`);
     const result = await fetchRawSongsFromSheet();
-    console.log(`📊 [${timestamp}] 구글시트 캐시 갱신 완료: ${result.length}곡`);
+    console.log(`📊 구글시트 캐시 갱신: ${result.length}곡`);
     return result;
   },
   ['sheet-only-v1'],
@@ -28,21 +26,18 @@ const getCachedSheetSongs = unstable_cache(
 // MongoDB는 실시간, 캐싱 없음
 async function getSongs(): Promise<{ songs: Song[]; error: string | null }> {
   try {
-    const timestamp = new Date().toISOString();
-    console.log(`🚀 [${timestamp}] 노래책 데이터 로딩 중...`);
+    console.log('🚀 노래책 데이터 로딩 중...');
     
     // 1. 구글시트 (60초 캐시 사용)
     const sheetSongs = await getCachedSheetSongs();
     
     // 2. MongoDB (실시간 조회)
-    console.log(`🗄️ [${timestamp}] MongoDB 실시간 조회 중...`);
     const mongoDetails = await fetchSongDetailsFromMongo();
-    console.log(`🗄️ [${timestamp}] MongoDB 조회 완료: ${mongoDetails.length}곡`);
+    console.log(`🗄️ MongoDB 조회: ${mongoDetails.length}곡`);
     
     // 3. 데이터 병합
-    console.log(`🔄 [${timestamp}] 데이터 병합 중...`);
     const mergedSongs = mergeSongsData(sheetSongs, mongoDetails);
-    console.log(`✅ [${timestamp}] 병합 완료: ${mergedSongs.length}곡`);
+    console.log(`✅ 병합 완료: ${mergedSongs.length}곡`);
     
     return { songs: mergedSongs, error: null };
   } catch (e) {

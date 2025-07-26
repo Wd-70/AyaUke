@@ -2,7 +2,8 @@
 
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState, useMemo, useCallback } from "react"
+import { useEffect, useState, useMemo, useCallback, useRef } from "react"
+import { useActivity } from '@/hooks/useActivity'
 import { motion, AnimatePresence } from "framer-motion"
 import { hasPermission, Permission, UserRole, canManageSongs } from "@/lib/permissions"
 import { 
@@ -61,8 +62,11 @@ interface AdminStats {
 }
 
 export default function SongManagement() {
+  // 노래관리 페이지 활동 추적
+  useActivity()
   const { data: session, status } = useSession()
   const router = useRouter()
+  const initializedRef = useRef(false)
   const [songs, setSongs] = useState<AdminSong[]>([])
   const [filteredSongs, setFilteredSongs] = useState<AdminSong[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -98,7 +102,6 @@ export default function SongManagement() {
       if (showFullLoading) {
         setLoading(true)
       }
-      console.log('🔄 관리자 노래 목록 로딩 시작...')
       
       const response = await fetch('/api/admin/songs', {
         method: 'GET',
@@ -114,7 +117,6 @@ export default function SongManagement() {
       const data = await response.json()
       
       if (data.success) {
-        console.log(`✅ 노래 목록 로딩 완료: ${data.songs.length}곡`)
         setSongs(data.songs)
         setFilteredSongs(data.songs)
         setStats(data.stats)
@@ -145,9 +147,14 @@ export default function SongManagement() {
       return
     }
 
+    // 이미 초기화되었으면 건너뛰기
+    if (initializedRef.current) return
+    
+    initializedRef.current = true
+
     // 실제 데이터 로드 - 페이지 로딩 시 한 번만 실행
     loadSongs(true)
-  }, [session, status, router])
+  }, [session, status]) // loadSongs 제거로 재실행 방지
 
   // 필터링 효과
   useEffect(() => {
@@ -227,7 +234,6 @@ export default function SongManagement() {
 
     try {
       setBulkActionLoading(true)
-      console.log(`🔧 일괄 작업 실행: ${action}, 대상: ${selectedSongs.size}곡`)
       
       const response = await fetch('/api/admin/songs', {
         method: 'POST',
@@ -338,7 +344,6 @@ export default function SongManagement() {
   }) => {
     try {
       setAddLoading(true)
-      console.log('🆕 새 곡 추가 시작:', songData.title)
       
       const response = await fetch('/api/admin/songs', {
         method: 'POST',
@@ -571,7 +576,10 @@ export default function SongManagement() {
               </button>
 
               <button
-                onClick={() => loadSongs(true)}
+                onClick={() => {
+                  initializedRef.current = false; // 재초기화 허용
+                  loadSongs(true);
+                }}
                 disabled={loading}
                 className="px-4 py-3 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
                            rounded-lg hover:border-light-accent/40 dark:hover:border-dark-accent/40 

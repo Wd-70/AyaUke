@@ -6,15 +6,17 @@ import { useEffect, useCallback, useRef } from 'react'
 export function useActivity() {
   const { data: session } = useSession()
   const lastUpdateRef = useRef<number>(0)
+  const initializedRef = useRef<boolean>(false)
 
-  const updateActivity = useCallback(async () => {
-    if (!session?.user) return
+  const updateActivity = useCallback(async (isFirstVisit = false) => {
+    const currentSession = session
+    if (!currentSession?.user) return
 
-    // 1시간 이내 중복 호출 방지 (클라이언트 사이드)
+    // 첫 방문이 아닌 경우에는 1시간 이내 중복 호출 방지
     const now = Date.now()
     const oneHour = 60 * 60 * 1000
     
-    if (now - lastUpdateRef.current < oneHour) {
+    if (!isFirstVisit && now - lastUpdateRef.current < oneHour) {
       return
     }
 
@@ -24,6 +26,7 @@ export function useActivity() {
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ isFirstVisit })
       })
 
       if (response.ok) {
@@ -37,47 +40,46 @@ export function useActivity() {
       // 에러가 발생해도 조용히 처리 (사용자 경험에 영향 없게)
       console.error('활동 업데이트 실패:', error)
     }
-  }, [session?.user])
+  }, []) // 의존성 완전 제거
 
   useEffect(() => {
-    if (!session?.user) return
+    // 이미 초기화되었거나 세션이 없으면 건너뛰기
+    if (initializedRef.current || !session?.user) return
+    
+    initializedRef.current = true
 
-    // 페이지 로드 시 업데이트
-    updateActivity()
+    // 페이지 로드 시 한 번만 업데이트 (첫 방문으로 처리)
+    updateActivity(true)
 
-    // 페이지 가시성 변경 시 업데이트 (탭 전환 등)
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+    // 사용자가 실제 의미있는 행동을 할 때만 업데이트
+    let lastActivityTime = 0
+    const minInterval = 10 * 60 * 1000 // 10분 간격
+
+    const handleSignificantActivity = () => {
+      const now = Date.now()
+      if (now - lastActivityTime > minInterval) {
         updateActivity()
+        lastActivityTime = now
       }
     }
 
-    // 페이지 포커스 시 업데이트
-    const handleFocus = () => {
-      updateActivity()
-    }
+    // 의미있는 사용자 행동만 감지
+    const significantEvents = [
+      'click', // 클릭
+      'submit', // 폼 제출
+      'keydown' // 키 입력
+    ]
 
-    // 페이지 떠나기 전 업데이트 (선택적)
-    const handleBeforeUnload = () => {
-      // sendBeacon으로 비동기 전송 (페이지 언로드 시에도 전송됨)
-      if (Date.now() - lastUpdateRef.current >= 60 * 60 * 1000) {
-        // FormData로 POST 요청 전송
-        const formData = new FormData()
-        formData.append('type', 'beforeunload')
-        navigator.sendBeacon('/api/user/activity', formData)
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    window.addEventListener('focus', handleFocus)
-    window.addEventListener('beforeunload', handleBeforeUnload)
+    significantEvents.forEach(event => {
+      document.addEventListener(event, handleSignificantActivity, { passive: true })
+    })
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      window.removeEventListener('focus', handleFocus)
-      window.removeEventListener('beforeunload', handleBeforeUnload)
+      significantEvents.forEach(event => {
+        document.removeEventListener(event, handleSignificantActivity)
+      })
     }
-  }, [session?.user, updateActivity])
+  }, [session?.user]) // session?.user가 처음 로드될 때만 실행
 
   return { updateActivity }
 }

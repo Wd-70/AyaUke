@@ -14,18 +14,15 @@ export async function fetchSongsFromSheet(): Promise<Song[]> {
 
   try {
     // 1. 구글시트에서 기본 데이터 가져오기
-    console.log('📋 구글시트에서 기본 데이터 가져오는 중...');
     const sheetSongs = await fetchRawSongsFromSheet();
     
     // 2. MongoDB에서 상세 데이터 가져오기
-    console.log('🗄️ MongoDB에서 상세 데이터 가져오는 중...');
     const songDetails = await fetchSongDetailsFromMongo();
     
     // 3. 두 데이터를 병합
-    console.log('🔄 데이터 병합 중...');
     const mergedSongs = mergeSongsData(sheetSongs, songDetails);
     
-    console.log(`✅ 병합 완료: 구글시트 ${sheetSongs.length}곡, MongoDB ${songDetails.length}곡, 최종 ${mergedSongs.length}곡`);
+    console.log(`✅ 노래 데이터 병합: ${mergedSongs.length}곡`);
     return mergedSongs;
     
   } catch (error) {
@@ -73,18 +70,14 @@ export async function fetchRawSongsFromSheet(): Promise<Song[]> {
 
 export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
   try {
-    console.log('🔌 MongoDB 연결 시도 중...');
     
     // 서버사이드에서는 직접 MongoDB 모델 사용
     const dbConnect = (await import('./mongodb')).default;
     const SongDetail = (await import('../models/SongDetail')).default;
     
-    console.log('📦 MongoDB 모듈 로드 완료');
     
     await dbConnect();
-    console.log('✅ MongoDB 연결 성공');
     
-    console.log('📊 MongoDB에서 데이터 조회 중...');
     const songDetails = await SongDetail.find({ 
       $and: [
         // 삭제된 곡 제외 (기존 데이터는 status 필드가 없으므로 null도 허용)
@@ -93,7 +86,6 @@ export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
         { $or: [{ sourceType: { $in: ['sheet', 'admin'] } }, { sourceType: { $exists: false } }] }
       ]
     }).sort({ updatedAt: -1 }).lean();
-    console.log(`📋 MongoDB에서 ${songDetails.length}곡 조회 완료 (삭제된 곡 제외)`);
     
     // Mongoose 문서를 일반 객체로 변환 (MongoDB _id 포함)
     return songDetails.map(doc => ({
@@ -168,28 +160,12 @@ export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[]): S
     normalizedToOriginalMap.set(songKey, `${detail.title} - ${detail.artist}`);
   });
 
-  console.log('🔍 병합 디버깅:', {
-    sheetSongs: sheetSongs.length,
-    mongoSongs: songDetails.length,
-    mongoTitles: Array.from(normalizedToOriginalMap.values()).slice(0, 5) // 처음 5개만 샘플 출력
-  });
 
   // 1. 구글시트 데이터에 MongoDB 데이터 병합
   const mergedSheetSongs = sheetSongs.map(song => {
     const sheetSongKey = createSongKey(song.title, song.artist);
     const detail = detailsMap.get(sheetSongKey);
     
-    // 디버깅: 몇 개 샘플만 출력
-    if (song.id === 'song-75' || song.id === 'song-1' || song.id === 'song-10') {
-      console.log(`🔍 "${song.title} - ${song.artist}" 매칭 결과:`, {
-        found: !!detail,
-        mongoTitle: detail?.title,
-        mongoArtist: detail?.artist,
-        sheetTitle: song.title,
-        sheetArtist: song.artist,
-        sheetKey: sheetSongKey
-      });
-    }
     
     if (!detail) {
       // MongoDB에 데이터가 없는 경우 구글시트 기본 데이터만 반환
@@ -270,21 +246,17 @@ export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[]): S
     const songKey = createSongKey(displayTitle, displayArtist);
     
     if (seenSongKeys.has(songKey)) {
-      console.log('🚫 중복 곡 발견, 제거:', displayTitle, '-', displayArtist, '(Key:', songKey, ')');
       return false;
     }
     seenSongKeys.add(songKey);
     return true;
   });
   
-  console.log('🔍 최종 병합 결과:', {
-    totalSongs: finalSongs.length,
-    afterDeduplication: deduplicatedSongs.length,
-    duplicatesRemoved: finalSongs.length - deduplicatedSongs.length,
-    sheetOnly: deduplicatedSongs.filter(s => s.source === 'sheet').length,
-    merged: deduplicatedSongs.filter(s => s.source === 'merged').length,
-    mongoOnly: deduplicatedSongs.filter(s => s.source === 'mongodb').length,
-  });
+  // 중복 제거 결과 로그
+  const duplicatesRemoved = finalSongs.length - deduplicatedSongs.length;
+  if (duplicatesRemoved > 0) {
+    console.log(`🚫 중복 곡 ${duplicatesRemoved}개 제거`);
+  }
 
   return deduplicatedSongs;
 }
@@ -314,16 +286,7 @@ function parseSheetData(values: string[][]): Song[] {
   // 헤더가 있으면 첫 번째 행을 건너뛰고, 없으면 모든 행을 데이터로 처리
   const dataRows = hasRealHeader ? values.slice(1) : values;
 
-  console.log('🔍 구글시트 헤더 분석:', {
-    firstRow: firstRow,
-    hasRealHeader: hasRealHeader,
-    titleIndex: titleIndex,
-    artistIndex: artistIndex,
-    totalRows: values.length,
-    dataRows: dataRows.length
-  });
 
-  console.log('🔍 첫 번째 데이터 행 샘플:', dataRows[0]);
 
   return dataRows
     .filter(row => row.length > 0 && (row[titleIndex] || row[0])) // 빈 행 제외
@@ -341,13 +304,6 @@ function parseSheetData(values: string[][]): Song[] {
         title = row[1] || 'Unknown Title';    // 두 번째 컬럼 = 제목
       }
 
-      // 디버깅: 처음 몇 개만 출력
-      if (index < 3) {
-        console.log(`🔍 Row ${index + 1}:`, {
-          raw: row.slice(0, 4),
-          parsed: { title, artist }
-        });
-      }
 
       const song: Song = {
         id: `song-${index + 1}`,
@@ -379,7 +335,6 @@ function parseSheetData(values: string[][]): Song[] {
       });
       
       if (isProblematic) {
-        console.log(`🚫 문제 곡 시트에서 제외: ${song.title} - ${song.artist}`);
         return false;
       }
       

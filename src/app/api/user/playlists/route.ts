@@ -81,11 +81,6 @@ export async function GET(request: NextRequest) {
     // 곡 수 정보 추가
     const playlistsWithCounts = playlists.map(playlist => {
       const playlistObj = playlist.toObject()
-      console.log('🔍 플레이리스트 응답 확인:', {
-        name: playlistObj.name,
-        songCount: playlistObj.songs.length,
-        firstSong: playlistObj.songs[0]
-      })
       return {
         ...playlistObj,
         songCount: playlistObj.songs.length

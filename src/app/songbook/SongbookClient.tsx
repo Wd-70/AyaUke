@@ -11,6 +11,7 @@ import { MusicalNoteIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 import { useBulkLikes } from '@/hooks/useLikes';
 import { useGlobalPlaylists } from '@/hooks/useGlobalPlaylists';
+import { useActivity } from '@/hooks/useActivity';
 
 function useChunkedRender(items: Song[], chunkSize: number = 20) {
   const [visibleCount, setVisibleCount] = useState(chunkSize);
@@ -49,6 +50,9 @@ interface SongbookClientProps {
 }
 
 export default function SongbookClient({ songs: initialSongs, error: serverError }: SongbookClientProps) {
+  // songbook 페이지 활동 추적
+  useActivity()
+  
   const [filteredSongs, setFilteredSongs] = useState<Song[]>(initialSongs || []);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [songs, setSongs] = useState<Song[]>(initialSongs || []); // 랜덤 섞기를 위한 상태

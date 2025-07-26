@@ -1,9 +1,15 @@
+'use client'
+
 import Navigation from '@/components/Navigation';
 import HeroSection from '@/components/HeroSection';
 import RecentVideos from '@/components/RecentVideos';
 import Footer from '@/components/Footer';
+import { useActivity } from '@/hooks/useActivity';
 
 export default function Home() {
+  // 메인 페이지 활동 추적
+  useActivity()
+  
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
       {/* Background decoration */}

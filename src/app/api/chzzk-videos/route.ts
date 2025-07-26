@@ -98,62 +98,42 @@ export async function GET() {
   } catch (error) {
     console.error('크롤링 에러:', error);
     
-    // 에러 시 폴백 데이터 반환
+    // 에러 시 실제 성공했을 때의 데이터를 하드코딩으로 반환
     const fallbackVideos = [
       {
         id: 1,
-        title: '🎤 노래방송 | J-pop 특집 + 신청곡 받아요!',
-        thumbnail: createDummyThumbnail('노래방송', '#8B5CF6'),
-        duration: '2:34:12',
-        publishDate: '2일 전',
-        viewCount: '1.2K',
-        url: 'https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc/videos'
+        title: "띠용&유이언니랑 LCK 같이보고 칼부림 하기 망내도 왔대",
+        thumbnail: "https://livecloud-thumb.akamaized.net/chzzk/kr/live-rewind-image/record/42772130/represent/thumbnail/image_13570137_720_0.jpg",
+        duration: "4:42:16",
+        publishDate: "1일 전",
+        viewCount: "1.3K",
+        url: "https://chzzk.naver.com/video/8419410"
       },
       {
         id: 2,
-        title: '🎮 게임방송 | 발로란트 랭크 올리기 도전!',
-        thumbnail: createDummyThumbnail('게임방송', '#EC4899'),
-        duration: '1:45:33',
-        publishDate: '5일 전',
-        viewCount: '856',
-        url: 'https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc/videos'
+        title: "언니들과 슈퍼바이브 + 싱크룸 쪼끔 + 노래 마니",
+        thumbnail: "https://livecloud-thumb.akamaized.net/chzzk/kr/live-rewind-image/record/42738725/represent/thumbnail/image_13551423_720_0.jpg",
+        duration: "6:46:18",
+        publishDate: "2일 전",
+        viewCount: "1.1K",
+        url: "https://chzzk.naver.com/video/8405352"
       },
       {
         id: 3,
-        title: '💬 저스트채팅 | 시청자분들과 수다타임',
-        thumbnail: createDummyThumbnail('저스트채팅', '#6366F1'),
-        duration: '1:12:44',
-        publishDate: '1주 전',
-        viewCount: '634',
-        url: 'https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc/videos'
+        title: "500년만의 아침노래방!",
+        thumbnail: "https://livecloud-thumb.akamaized.net/chzzk/kr/live-rewind-image/record/42695131/represent/thumbnail/image_13528379_720_0.jpg",
+        duration: "2:43:44",
+        publishDate: "3일 전",
+        viewCount: "1.8K",
+        url: "https://chzzk.naver.com/video/8381144"
       }
     ];
     
     return NextResponse.json({
       videos: fallbackVideos,
       success: false,
-      error: 'API 호출 실패 - 폴백 데이터 사용',
+      error: 'API 호출 실패 - 실제 데이터로 폴백',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-}
-
-// 더미 썸네일 생성 (SVG 데이터 URL)
-function createDummyThumbnail(type: string, color: string): string {
-  const svg = `
-    <svg width="320" height="180" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:${color};stop-opacity:0.8" />
-          <stop offset="100%" style="stop-color:${color};stop-opacity:0.4" />
-        </linearGradient>
-      </defs>
-      <rect width="320" height="180" fill="url(#grad)"/>
-      <circle cx="160" cy="90" r="30" fill="white" fill-opacity="0.9"/>
-      <polygon points="150,75 150,105 175,90" fill="${color}"/>
-      <text x="160" y="130" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">${type}</text>
-    </svg>
-  `;
-  
-  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
 }

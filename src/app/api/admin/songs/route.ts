@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    console.log('📋 관리자 노래 목록 조회 시작...');
     
     // 구글 시트와 MongoDB에서 병합된 데이터 가져오기
     const songs = await fetchSongsFromSheet();
@@ -91,8 +90,7 @@ export async function GET(request: NextRequest) {
       }
     };
 
-    console.log(`✅ 관리자 노래 목록 조회 완료: ${songsWithStatus.length}곡`);
-    console.log('📊 통계:', stats);
+    console.log(`📊 관리자 목록: ${songsWithStatus.length}곡 로드`);
 
     return NextResponse.json({
       success: true,
@@ -133,7 +131,6 @@ export async function POST(request: NextRequest) {
             { status: 403 }
           );
         }
-        console.log('📝 일괄 편집 데이터:', data);
         // TODO: 실제 일괄 편집 구현
         break;
         
@@ -144,7 +141,6 @@ export async function POST(request: NextRequest) {
             { status: 403 }
           );
         }
-        console.log('🔍 MR 자동 검색 시작');
         // TODO: YouTube API를 사용한 MR 자동 검색 구현
         break;
         
@@ -155,7 +151,6 @@ export async function POST(request: NextRequest) {
             { status: 403 }
           );
         }
-        console.log('📖 가사 일괄 추가');
         // TODO: 가사 일괄 추가 구현
         break;
         
@@ -166,7 +161,6 @@ export async function POST(request: NextRequest) {
             { status: 403 }
           );
         }
-        console.log('➕ 새 노래 추가:', songData);
         return await handleAddSong(songData);
         
       case 'create':
@@ -176,7 +170,6 @@ export async function POST(request: NextRequest) {
             { status: 403 }
           );
         }
-        console.log('➕ 새 노래 추가');
         // TODO: 새 노래 추가 구현
         break;
         
@@ -187,7 +180,6 @@ export async function POST(request: NextRequest) {
             { status: 403 }
           );
         }
-        console.log('🗑️ 곡 삭제:', songIds);
         return await handleDeleteSongs(songIds, session.user.channelId, data?.reason);
         
       case 'delete':
@@ -197,7 +189,6 @@ export async function POST(request: NextRequest) {
             { status: 403 }
           );
         }
-        console.log('🗑️ 곡 삭제');
         // TODO: 곡 삭제 구현 (신중하게!)
         break;
         
@@ -208,7 +199,6 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    console.log(`🔧 일괄 작업 실행: ${action}, 대상 곡: ${songIds?.length || 0}개, 권한: ${userRole}`);
 
     return NextResponse.json({
       success: true,
@@ -270,7 +260,7 @@ async function handleAddSong(songData: {
     
     await newSong.save();
     
-    console.log('✅ 새 곡 추가 완료:', songData.title);
+    console.log(`✅ 새 곡 추가: ${songData.title}`);
     
     return NextResponse.json({
       success: true,
@@ -328,7 +318,9 @@ async function handleDeleteSongs(songIds: string[], deletedBy: string, reason?: 
       }
     );
     
-    console.log(`✅ ${result.modifiedCount}곡 삭제 완료`);
+    if (result.modifiedCount > 0) {
+      console.log(`🗑️ ${result.modifiedCount}곡 삭제`);
+    }
     
     return NextResponse.json({
       success: true,

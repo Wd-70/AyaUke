@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { useActivity } from '@/hooks/useActivity'
 import { motion } from 'framer-motion'
 import { 
   UserIcon, 
@@ -25,6 +26,8 @@ import ProfileStats from './components/ProfileStats'
 import TitleManager from './components/TitleManager'
 
 export default function ProfileClient() {
+  // 프로필 페이지 활동 추적
+  useActivity()
   const { data: session, status } = useSession()
   const [activeTab, setActiveTab] = useState<'overview' | 'likes' | 'playlists' | 'titles'>('overview')
   const [isEditingProfile, setIsEditingProfile] = useState(false)

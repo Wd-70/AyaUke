@@ -16,6 +16,9 @@ export async function POST(request: NextRequest) {
     }
 
     await connectToDatabase()
+    
+    const body = await request.json().catch(() => ({}))
+    const isFirstVisit = body.isFirstVisit || false
 
     const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
     const now = new Date()
@@ -35,14 +38,76 @@ export async function POST(request: NextRequest) {
     }
 
     // 오늘 활동 기록 조회
-    const todayActivity = await UserActivity.findOne({
+    let todayActivity = await UserActivity.findOne({
       userId: session.user.id,
       date: today
     })
 
+    // 첫 방문인 경우 - 새로운 활동 기록 생성 (authOptions의 performDailyCheckin 로직 통합)
+    if (isFirstVisit && !todayActivity) {
+      const User = (await import('@/models/User')).default
+      const user = await User.findById(session.user.id)
+      
+      if (user) {
+        // 기존 사용자의 activityStats가 없으면 초기화
+        if (!user.activityStats) {
+          user.activityStats = {
+            totalLoginDays: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            lastVisitDate: null,
+          }
+        }
+
+        // 오늘 첫 방문 - 새로운 활동 기록 생성
+        todayActivity = new UserActivity({
+          userId: user._id,
+          date: today,
+          visitCount: 1,
+          firstVisitAt: now,
+          lastVisitAt: now
+        })
+
+        // 연속 접속일 계산
+        const yesterday = new Date()
+        yesterday.setDate(yesterday.getDate() - 1)
+        const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+        if (user.activityStats.lastVisitDate === yesterdayStr) {
+          // 어제 방문했으면 연속 접속일 증가
+          user.activityStats.currentStreak += 1
+        } else if (user.activityStats.lastVisitDate !== today) {
+          // 어제 방문 안했으면 연속 접속일 초기화 (오늘부터 1일)
+          user.activityStats.currentStreak = 1
+        }
+
+        // 최장 연속 접속일 기록 업데이트
+        if (user.activityStats.currentStreak > user.activityStats.longestStreak) {
+          user.activityStats.longestStreak = user.activityStats.currentStreak
+        }
+
+        // 총 로그인 날 수 증가
+        user.activityStats.totalLoginDays += 1
+        user.activityStats.lastVisitDate = today
+
+        await todayActivity.save()
+        await user.save()
+
+        console.log(`🎯 첫 방문 기록 생성: ${session.user.channelName} - 연속 ${user.activityStats.currentStreak}일`)
+        
+        return NextResponse.json({
+          success: true,
+          message: '첫 방문이 기록되었습니다',
+          visitCount: todayActivity.visitCount,
+          lastVisitAt: todayActivity.lastVisitAt,
+          isFirstVisit: true
+        })
+      }
+    }
+
     if (!todayActivity) {
       return NextResponse.json({ 
-        error: '오늘 활동 기록이 없습니다. 먼저 로그인해주세요.' 
+        error: '오늘 활동 기록이 없습니다. 페이지를 새로고침해주세요.' 
       }, { status: 400 })
     }
 
