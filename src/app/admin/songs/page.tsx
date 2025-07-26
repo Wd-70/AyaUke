@@ -15,15 +15,16 @@ import {
   LanguageIcon,
   LinkIcon,
   HeartIcon,
-  EyeIcon,
   PencilIcon,
   TrashIcon,
   ArrowLeftIcon,
   Bars3Icon,
   TableCellsIcon,
-  PlayIcon
+  PlayIcon,
+  TagIcon
 } from '@heroicons/react/24/outline'
 import Navigation from '@/components/Navigation'
+import SongEditModal from '@/components/admin/SongEditModal'
 
 interface AdminSong {
   id: string
@@ -39,7 +40,7 @@ interface AdminSong {
   sungCount: number
   likedCount: number
   addedDate: string
-  status: 'complete' | 'missing-mr' | 'missing-lyrics' | 'new'
+  status: 'complete' | 'missing-mr' | 'missing-lyrics' | 'incomplete'
   keyAdjustment?: number | null
   selectedMRIndex?: number
   personalNotes?: string
@@ -51,7 +52,7 @@ interface AdminStats {
   complete: number
   missingMR: number
   missingLyrics: number
-  newSongs: number
+  incomplete: number
   languages: {
     Korean: number
     English: number
@@ -80,12 +81,16 @@ export default function SongManagement() {
   const [itemsPerPage] = useState(24) // 그리드 뷰에서 보기 좋은 수 (3x8)
   const [showAddModal, setShowAddModal] = useState(false)
   const [addLoading, setAddLoading] = useState(false)
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false)
+  const [showTagAddModal, setShowTagAddModal] = useState(false)
+  const [showSongEditModal, setShowSongEditModal] = useState(false)
+  const [editingSong, setEditingSong] = useState<AdminSong | null>(null)
   const [stats, setStats] = useState<AdminStats>({
     total: 0,
     complete: 0,
     missingMR: 0,
     missingLyrics: 0,
-    newSongs: 0,
+    incomplete: 0,
     languages: {
       Korean: 0,
       English: 0,
@@ -274,42 +279,18 @@ export default function SongManagement() {
       if (userPermissions.canEdit) {
         actions.push(
           {
-            title: "MR 링크 추가",
-            description: "선택한 곡들에 MR 링크 추가",
-            icon: LinkIcon,
-            color: "bg-gradient-to-r from-blue-500 to-blue-600",
-            action: () => {
-              const mrLink = prompt('MR 링크를 입력하세요:')
-              if (mrLink) {
-                executeBulkAction('add-mr-link', { mrLink })
-              }
-            }
-          },
-          {
-            title: "가사 업데이트",
-            description: "선택한 곡들의 가사 상태 업데이트",
+            title: "일괄 편집",
+            description: "선택한 곡들의 정보 일괄 수정",
             icon: PencilIcon,
-            color: "bg-gradient-to-r from-green-500 to-green-600",
-            action: () => {
-              const lyrics = prompt('가사를 입력하세요:')
-              if (lyrics) {
-                executeBulkAction('update-lyrics', { lyrics })
-              }
-            }
+            color: "bg-gradient-to-r from-blue-500 to-blue-600",
+            action: () => setShowBulkEditModal(true)
           },
           {
-            title: "상태 변경",
-            description: "선택한 곡들의 상태 일괄 변경",
-            icon: CheckCircleIcon,
-            color: "bg-gradient-to-r from-purple-500 to-purple-600",
-            action: () => {
-              const newStatus = prompt('새 상태를 입력하세요 (complete/missing-mr/missing-lyrics/new):')
-              if (newStatus && ['complete', 'missing-mr', 'missing-lyrics', 'new'].includes(newStatus)) {
-                executeBulkAction('update-status', { status: newStatus })
-              } else if (newStatus) {
-                alert('유효하지 않은 상태입니다.')
-              }
-            }
+            title: "태그 추가",
+            description: "선택한 곡들에 태그 추가",
+            icon: TagIcon,
+            color: "bg-gradient-to-r from-green-500 to-green-600",
+            action: () => setShowTagAddModal(true)
           }
         )
       }
@@ -374,6 +355,96 @@ export default function SongManagement() {
     }
   }, [loadSongs])
 
+  // 개별 곡 편집 함수
+  const handleEditSong = useCallback((song: AdminSong) => {
+    setEditingSong(song)
+    setShowSongEditModal(true)
+  }, [])
+
+  // 개별 곡 삭제 함수
+  const handleDeleteSong = useCallback(async (song: AdminSong) => {
+    if (!confirm(`"${song.title} - ${song.artist}" 곡을 정말 삭제하시겠습니까?`)) {
+      return
+    }
+
+    try {
+      setBulkActionLoading(true)
+      
+      const response = await fetch('/api/admin/songs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'delete-songs',
+          songIds: [song.id],
+          data: { reason: '개별 삭제' }
+        })
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        alert(`"${song.title}" 곡이 성공적으로 삭제되었습니다.`)
+        // 데이터 다시 로드 (백그라운드에서 조용히)
+        await loadSongs()
+      } else {
+        throw new Error(result.error || '곡 삭제 실패')
+      }
+    } catch (error) {
+      console.error('❌ 곡 삭제 오류:', error)
+      alert('곡 삭제 중 오류가 발생했습니다.')
+    } finally {
+      setBulkActionLoading(false)
+    }
+  }, [loadSongs])
+
+  // 개별 곡 업데이트 함수
+  const handleUpdateSong = useCallback(async (songData: {
+    title?: string
+    artist?: string
+    language?: string
+    keyAdjustment?: number | null
+    lyrics?: string
+    mrLinks?: string[]
+    tags?: string[]
+  }) => {
+    if (!editingSong) return
+
+    try {
+      setBulkActionLoading(true)
+      
+      const response = await fetch('/api/admin/songs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'edit-song',
+          songIds: [editingSong.id],
+          data: songData
+        })
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        alert(`${editingSong.title} 곡이 성공적으로 수정되었습니다!`)
+        setShowSongEditModal(false)
+        setEditingSong(null)
+        // 데이터 다시 로드 (백그라운드에서 조용히)
+        await loadSongs()
+      } else {
+        throw new Error(result.error || '곡 수정 실패')
+      }
+    } catch (error) {
+      console.error('❌ 개별 곡 수정 오류:', error)
+      alert('곡 수정 중 오류가 발생했습니다.')
+    } finally {
+      setBulkActionLoading(false)
+    }
+  }, [editingSong, loadSongs])
+
   if (status === 'loading' || loading) {
     return (
       <div className="min-h-screen bg-light-background dark:bg-dark-background flex items-center justify-center">
@@ -395,14 +466,14 @@ export default function SongManagement() {
     complete: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
     'missing-mr': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
     'missing-lyrics': 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    new: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+    incomplete: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
   }
 
   const statusLabels = {
     complete: '완료',
     'missing-mr': 'MR 없음',
     'missing-lyrics': '가사 없음',
-    new: '신규'
+    incomplete: '미완성'
   }
 
 
@@ -426,10 +497,10 @@ export default function SongManagement() {
       color: "from-red-400 to-pink-500"
     },
     {
-      title: "신규 곡",
-      value: stats.newSongs,
-      icon: PlusIcon,
-      color: "from-blue-400 to-indigo-500"
+      title: "가사 없음",
+      value: stats.missingLyrics,
+      icon: PencilIcon,
+      color: "from-yellow-400 to-orange-500"
     }
   ]
 
@@ -563,7 +634,7 @@ export default function SongManagement() {
                 <option value="complete">완료</option>
                 <option value="missing-mr">MR 없음</option>
                 <option value="missing-lyrics">가사 없음</option>
-                <option value="new">신규</option>
+                <option value="incomplete">미완성</option>
               </select>
 
               <button
@@ -738,7 +809,7 @@ export default function SongManagement() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4 text-xs text-light-text/50 dark:text-dark-text/50 mb-4">
+                    <div className="flex items-center gap-4 text-xs text-light-text/50 dark:text-dark-text/50 mb-3">
                       <div className="flex items-center gap-1">
                         <LanguageIcon className="w-3 h-3" />
                         <span>{song.language}</span>
@@ -751,7 +822,40 @@ export default function SongManagement() {
                         <PlayIcon className="w-3 h-3" />
                         <span>{song.sungCount}</span>
                       </div>
+                      {song.keyAdjustment !== null && song.keyAdjustment !== undefined && (
+                        <div className="flex items-center gap-1">
+                          <MusicalNoteIcon className="w-3 h-3" />
+                          <span>
+                            {song.keyAdjustment === 0 ? '원본키' : `${song.keyAdjustment > 0 ? '+' : ''}${song.keyAdjustment}`}
+                          </span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* 검색 태그 */}
+                    {song.tags && song.tags.length > 0 && (
+                      <div className="mb-3">
+                        <div className="flex flex-wrap gap-1">
+                          {song.tags.slice(0, 3).map((tag, index) => (
+                            <span
+                              key={index}
+                              className="inline-flex items-center px-2 py-0.5 bg-light-accent/10 dark:bg-dark-accent/10 
+                                         text-light-accent dark:text-dark-accent rounded-full text-xs border 
+                                         border-light-accent/20 dark:border-dark-accent/20"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                          {song.tags.length > 3 && (
+                            <span className="inline-flex items-center px-2 py-0.5 bg-light-primary/10 dark:bg-dark-primary/10 
+                                           text-light-text/60 dark:text-dark-text/60 rounded-full text-xs border 
+                                           border-light-primary/20 dark:border-dark-primary/20">
+                              +{song.tags.length - 3}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <div className="flex gap-1">
@@ -768,15 +872,18 @@ export default function SongManagement() {
                           </div>
                         )}
                       </div>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          router.push(`/songbook?search=${encodeURIComponent(song.title)}`)
-                        }}
-                        className="p-1 rounded hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors"
-                      >
-                        <EyeIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60" />
-                      </button>
+                      {userPermissions.canEdit && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEditSong(song)
+                          }}
+                          className="p-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-200"
+                          title="곡 편집"
+                        >
+                          <PencilIcon className="w-5 h-5 text-blue-500" />
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -800,6 +907,8 @@ export default function SongManagement() {
                         <th className="px-6 py-4 text-left text-sm font-medium text-light-text dark:text-dark-text">제목</th>
                         <th className="px-6 py-4 text-left text-sm font-medium text-light-text dark:text-dark-text">아티스트</th>
                         <th className="px-6 py-4 text-left text-sm font-medium text-light-text dark:text-dark-text">언어</th>
+                        <th className="px-6 py-4 text-left text-sm font-medium text-light-text dark:text-dark-text">키</th>
+                        <th className="px-6 py-4 text-left text-sm font-medium text-light-text dark:text-dark-text">태그</th>
                         <th className="px-6 py-4 text-left text-sm font-medium text-light-text dark:text-dark-text">상태</th>
                         <th className="px-6 py-4 text-left text-sm font-medium text-light-text dark:text-dark-text">통계</th>
                         <th className="px-6 py-4 text-left text-sm font-medium text-light-text dark:text-dark-text">액션</th>
@@ -839,8 +948,43 @@ export default function SongManagement() {
                           <td className="px-6 py-4 text-sm text-light-text/70 dark:text-dark-text/70">
                             {song.language}
                           </td>
+                          <td className="px-6 py-4 text-sm text-light-text/70 dark:text-dark-text/70">
+                            {song.keyAdjustment !== null && song.keyAdjustment !== undefined ? (
+                              <span className="inline-flex items-center gap-1">
+                                <MusicalNoteIcon className="w-3 h-3" />
+                                {song.keyAdjustment === 0 ? '원본키' : `${song.keyAdjustment > 0 ? '+' : ''}${song.keyAdjustment}`}
+                              </span>
+                            ) : (
+                              <span className="text-light-text/40 dark:text-dark-text/40">-</span>
+                            )}
+                          </td>
                           <td className="px-6 py-4">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[song.status]}`}>
+                            {song.tags && song.tags.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {song.tags.slice(0, 2).map((tag, index) => (
+                                  <span
+                                    key={index}
+                                    className="inline-flex items-center px-2 py-0.5 bg-light-accent/10 dark:bg-dark-accent/10 
+                                               text-light-accent dark:text-dark-accent rounded-full text-xs border 
+                                               border-light-accent/20 dark:border-dark-accent/20"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                                {song.tags.length > 2 && (
+                                  <span className="inline-flex items-center px-2 py-0.5 bg-light-primary/10 dark:bg-dark-primary/10 
+                                                 text-light-text/60 dark:text-dark-text/60 rounded-full text-xs border 
+                                                 border-light-primary/20 dark:border-dark-primary/20">
+                                    +{song.tags.length - 2}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-light-text/40 dark:text-dark-text/40">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ${statusColors[song.status]}`}>
                               {statusLabels[song.status]}
                             </span>
                           </td>
@@ -852,22 +996,27 @@ export default function SongManagement() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex gap-2">
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  router.push(`/songbook?search=${encodeURIComponent(song.title)}`)
-                                }}
-                                className="p-1 rounded hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors"
-                              >
-                                <EyeIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60" />
-                              </button>
+                              {userPermissions.canEdit && (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditSong(song)
+                                  }}
+                                  className="p-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 transition-all duration-200"
+                                  title="곡 편집"
+                                >
+                                  <PencilIcon className="w-4 h-4 text-blue-500" />
+                                </button>
+                              )}
                               {userPermissions.canDelete && (
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    // TODO: 삭제 기능 구현
+                                    handleDeleteSong(song)
                                   }}
-                                  className="p-1 rounded hover:bg-red-500/20 transition-colors"
+                                  disabled={bulkActionLoading}
+                                  className="p-1 rounded hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                                  title="곡 삭제"
                                 >
                                   <TrashIcon className="w-4 h-4 text-red-500" />
                                 </button>
@@ -1002,8 +1151,529 @@ export default function SongManagement() {
           )}
         </AnimatePresence>
 
+        {/* 일괄 편집 모달 */}
+        <AnimatePresence>
+          {showBulkEditModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) {
+                  e.currentTarget.dataset.mouseDownOnBackdrop = 'true';
+                }
+              }}
+              onMouseUp={(e) => {
+                if (e.target === e.currentTarget && e.currentTarget.dataset.mouseDownOnBackdrop === 'true') {
+                  setShowBulkEditModal(false);
+                }
+                delete e.currentTarget.dataset.mouseDownOnBackdrop;
+              }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <BulkEditModal
+                  selectedCount={selectedSongs.size}
+                  onClose={() => setShowBulkEditModal(false)}
+                  onSubmit={(editData) => executeBulkAction('bulk-edit', editData)}
+                  loading={bulkActionLoading}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 태그 추가 모달 */}
+        <AnimatePresence>
+          {showTagAddModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) {
+                  e.currentTarget.dataset.mouseDownOnBackdrop = 'true';
+                }
+              }}
+              onMouseUp={(e) => {
+                if (e.target === e.currentTarget && e.currentTarget.dataset.mouseDownOnBackdrop === 'true') {
+                  setShowTagAddModal(false);
+                }
+                delete e.currentTarget.dataset.mouseDownOnBackdrop;
+              }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <TagAddModal
+                  selectedCount={selectedSongs.size}
+                  onClose={() => setShowTagAddModal(false)}
+                  onSubmit={(tagData) => executeBulkAction('add-tags', tagData)}
+                  loading={bulkActionLoading}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 개별 곡 편집 모달 */}
+        <AnimatePresence>
+          {showSongEditModal && editingSong && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start justify-center z-50 p-4 pt-20"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) {
+                  e.currentTarget.dataset.mouseDownOnBackdrop = 'true';
+                }
+              }}
+              onMouseUp={(e) => {
+                if (e.target === e.currentTarget && e.currentTarget.dataset.mouseDownOnBackdrop === 'true') {
+                  setShowSongEditModal(false);
+                  setEditingSong(null);
+                }
+                delete e.currentTarget.dataset.mouseDownOnBackdrop;
+              }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-white dark:bg-gray-900 rounded-xl p-6 w-full max-w-6xl max-h-[calc(100vh-6rem)] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SongEditModal
+                  song={editingSong}
+                  onClose={() => {
+                    setShowSongEditModal(false)
+                    setEditingSong(null)
+                  }}
+                  onSubmit={handleUpdateSong}
+                  loading={bulkActionLoading}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
       </div>
     </div>
+  )
+}
+
+// 일괄 편집 모달 컴포넌트
+interface BulkEditModalProps {
+  selectedCount: number
+  onClose: () => void
+  onSubmit: (editData: {
+    artist?: string
+    keyAdjustment?: number
+    language?: string
+  }) => void
+  loading: boolean
+}
+
+function BulkEditModal({ selectedCount, onClose, onSubmit, loading }: BulkEditModalProps) {
+  const [formData, setFormData] = useState({
+    artist: '',
+    keyAdjustment: '',
+    language: ''
+  })
+
+  // 배경 스크롤 방지 (노래책과 동일한 방식)
+  useEffect(() => {
+    // body 스크롤 완전 비활성화
+    document.body.style.overflow = 'hidden'
+    document.body.style.paddingRight = '0px' // 스크롤바 공간 보정
+    document.body.style.touchAction = 'none' // 터치 스크롤 방지
+    document.documentElement.style.overflow = 'hidden' // html 요소도 차단
+    
+    return () => {
+      document.body.style.overflow = ''
+      document.body.style.paddingRight = ''
+      document.body.style.touchAction = ''
+      document.documentElement.style.overflow = ''
+    }
+  }, [])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // 변경할 데이터만 전송
+    const editData: { artist?: string; keyAdjustment?: number; language?: string } = {}
+    
+    if (formData.artist.trim()) {
+      editData.artist = formData.artist.trim()
+    }
+    
+    if (formData.keyAdjustment.trim()) {
+      const keyValue = parseInt(formData.keyAdjustment)
+      if (!isNaN(keyValue)) {
+        editData.keyAdjustment = keyValue
+      }
+    }
+    
+    if (formData.language) {
+      editData.language = formData.language
+    }
+    
+    if (Object.keys(editData).length === 0) {
+      alert('변경할 항목을 선택해주세요.')
+      return
+    }
+
+    onSubmit(editData)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-light-text dark:text-dark-text">일괄 편집</h2>
+          <p className="text-sm text-light-text/60 dark:text-dark-text/60 mt-1">
+            선택된 {selectedCount}곡의 정보를 일괄 수정합니다
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-8 h-8 bg-light-primary/20 dark:bg-dark-primary/20 rounded-lg 
+                     hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-colors
+                     flex items-center justify-center"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            아티스트 (선택)
+          </label>
+          <input
+            type="text"
+            value={formData.artist}
+            onChange={(e) => setFormData(prev => ({ ...prev, artist: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                       text-light-text dark:text-dark-text"
+            placeholder="아티스트명 (비워두면 변경하지 않음)"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-3">
+            키 조절 (선택)
+          </label>
+          <div className="space-y-3">
+            {/* 상태 버튼들 */}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, keyAdjustment: '' }))}
+                className={`px-3 py-2 text-sm rounded-lg border transition-all duration-200 ${
+                  formData.keyAdjustment === '' 
+                    ? 'border-light-accent dark:border-dark-accent bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent' 
+                    : 'border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:border-light-accent/40 dark:hover:border-dark-accent/40'
+                }`}
+              >
+                변경 안함
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, keyAdjustment: '0' }))}
+                className={`px-3 py-2 text-sm rounded-lg border transition-all duration-200 ${
+                  formData.keyAdjustment === '0' 
+                    ? 'border-green-500 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400' 
+                    : 'border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:border-green-400'
+                }`}
+              >
+                원본 키
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, keyAdjustment: '999' }))}
+                className={`px-3 py-2 text-sm rounded-lg border transition-all duration-200 ${
+                  formData.keyAdjustment === '999' 
+                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' 
+                    : 'border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:border-red-400'
+                }`}
+              >
+                조절 해제
+              </button>
+            </div>
+            
+            {/* 키 조절 값 입력 */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  let current = 0;
+                  if (formData.keyAdjustment === '' || formData.keyAdjustment === '999') {
+                    current = 0; // 변경안함이나 조절해제 상태에서는 0부터 시작
+                  } else {
+                    current = parseInt(formData.keyAdjustment) || 0;
+                  }
+                  const newValue = Math.max(-12, current - 1);
+                  setFormData(prev => ({ ...prev, keyAdjustment: newValue.toString() }));
+                }}
+                className="w-10 h-10 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                          rounded-lg hover:border-light-accent/40 dark:hover:border-dark-accent/40 transition-all duration-200
+                          flex items-center justify-center text-light-text dark:text-dark-text font-medium"
+              >
+                -
+              </button>
+              
+              <div className="flex-1 relative">
+                <input
+                  type="number"
+                  min="-12"
+                  max="12"
+                  value={formData.keyAdjustment === '' || formData.keyAdjustment === '999' ? '' : formData.keyAdjustment}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setFormData(prev => ({ ...prev, keyAdjustment: '' }));
+                    } else if (parseInt(value) >= -12 && parseInt(value) <= 12) {
+                      setFormData(prev => ({ ...prev, keyAdjustment: value }));
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                            rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                            text-light-text dark:text-dark-text text-center"
+                  placeholder="키값"
+                />
+                {(formData.keyAdjustment !== '' && formData.keyAdjustment !== '999' && formData.keyAdjustment !== '0') && (
+                  <div className="absolute inset-y-0 right-8 flex items-center text-xs text-light-text/50 dark:text-dark-text/50">
+                    {parseInt(formData.keyAdjustment) > 0 ? '+' : ''}{formData.keyAdjustment}
+                  </div>
+                )}
+              </div>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  let current = 0;
+                  if (formData.keyAdjustment === '' || formData.keyAdjustment === '999') {
+                    current = 0; // 변경안함이나 조절해제 상태에서는 0부터 시작
+                  } else {
+                    current = parseInt(formData.keyAdjustment) || 0;
+                  }
+                  const newValue = Math.min(12, current + 1);
+                  setFormData(prev => ({ ...prev, keyAdjustment: newValue.toString() }));
+                }}
+                className="w-10 h-10 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                          rounded-lg hover:border-light-accent/40 dark:hover:border-dark-accent/40 transition-all duration-200
+                          flex items-center justify-center text-light-text dark:text-dark-text font-medium"
+              >
+                +
+              </button>
+            </div>
+            
+            {/* 상태 표시 */}
+            <div className="text-xs text-light-text/60 dark:text-dark-text/60 text-center">
+              {formData.keyAdjustment === '' && '키 조절 설정을 변경하지 않습니다'}
+              {formData.keyAdjustment === '0' && '원본 키로 설정됩니다'}
+              {formData.keyAdjustment === '999' && '키 조절 설정이 해제됩니다'}
+              {(formData.keyAdjustment !== '' && formData.keyAdjustment !== '0' && formData.keyAdjustment !== '999') && 
+                `키를 ${parseInt(formData.keyAdjustment) > 0 ? '+' : ''}${formData.keyAdjustment} 조절합니다`
+              }
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            언어 (선택)
+          </label>
+          <select
+            value={formData.language}
+            onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                       text-light-text dark:text-dark-text"
+          >
+            <option value="">변경하지 않음</option>
+            <option value="Korean">한국어</option>
+            <option value="English">영어</option>
+            <option value="Japanese">일본어</option>
+            <option value="Chinese">중국어</option>
+            <option value="Other">기타</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4 border-t border-light-primary/20 dark:border-dark-primary/20">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 text-light-text dark:text-dark-text hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                     rounded-lg transition-colors"
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 
+                     text-white rounded-lg hover:shadow-lg transition-all duration-300 
+                     disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {loading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              수정 중...
+            </>
+          ) : (
+            <>
+              <PencilIcon className="w-4 h-4" />
+              {selectedCount}곡 일괄 수정
+            </>
+          )}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+
+// 태그 추가 모달 컴포넌트
+interface TagAddModalProps {
+  selectedCount: number
+  onClose: () => void
+  onSubmit: (tagData: {
+    tags: string[]
+  }) => void
+  loading: boolean
+}
+
+function TagAddModal({ selectedCount, onClose, onSubmit, loading }: TagAddModalProps) {
+  const [formData, setFormData] = useState({
+    tags: ''
+  })
+
+  // 배경 스크롤 방지 (노래책과 동일한 방식)
+  useEffect(() => {
+    // body 스크롤 완전 비활성화
+    document.body.style.overflow = 'hidden'
+    document.body.style.paddingRight = '0px' // 스크롤바 공간 보정
+    document.body.style.touchAction = 'none' // 터치 스크롤 방지
+    document.documentElement.style.overflow = 'hidden' // html 요소도 차단
+    
+    return () => {
+      document.body.style.overflow = ''
+      document.body.style.paddingRight = ''
+      document.body.style.touchAction = ''
+      document.documentElement.style.overflow = ''
+    }
+  }, [])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!formData.tags.trim()) {
+      alert('추가할 태그를 입력해주세요.')
+      return
+    }
+
+    const tags = formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag)
+    
+    if (tags.length === 0) {
+      alert('유효한 태그를 입력해주세요.')
+      return
+    }
+
+    onSubmit({ tags })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-light-text dark:text-dark-text">태그 추가</h2>
+          <p className="text-sm text-light-text/60 dark:text-dark-text/60 mt-1">
+            선택된 {selectedCount}곡에 태그를 추가합니다
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-8 h-8 bg-light-primary/20 dark:bg-dark-primary/20 rounded-lg 
+                     hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-colors
+                     flex items-center justify-center"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            추가할 태그
+          </label>
+          <input
+            type="text"
+            value={formData.tags}
+            onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+                       text-light-text dark:text-dark-text"
+            placeholder="태그를 쉼표로 구분하여 입력하세요 (예: 발라드, 신나는, 인기곡)"
+            required
+          />
+          <p className="text-xs text-light-text/60 dark:text-dark-text/60 mt-1">
+            기존 태그는 유지되고 새로운 태그만 추가됩니다
+          </p>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4 border-t border-light-primary/20 dark:border-dark-primary/20">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 text-light-text dark:text-dark-text hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                     rounded-lg transition-colors"
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          disabled={loading}
+          className="px-6 py-2 bg-gradient-to-r from-green-500 to-green-600 
+                     text-white rounded-lg hover:shadow-lg transition-all duration-300 
+                     disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {loading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              추가 중...
+            </>
+          ) : (
+            <>
+              <TagIcon className="w-4 h-4" />
+              {selectedCount}곡에 태그 추가
+            </>
+          )}
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -1030,6 +1700,22 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
     mrLinks: '',
     tags: ''
   })
+
+  // 배경 스크롤 방지 (노래책과 동일한 방식)
+  useEffect(() => {
+    // body 스크롤 완전 비활성화
+    document.body.style.overflow = 'hidden'
+    document.body.style.paddingRight = '0px' // 스크롤바 공간 보정
+    document.body.style.touchAction = 'none' // 터치 스크롤 방지
+    document.documentElement.style.overflow = 'hidden' // html 요소도 차단
+    
+    return () => {
+      document.body.style.overflow = ''
+      document.body.style.paddingRight = ''
+      document.body.style.touchAction = ''
+      document.documentElement.style.overflow = ''
+    }
+  }, [])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

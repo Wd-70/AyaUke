@@ -13,10 +13,12 @@ import {
   MusicalNoteIcon,
   DocumentDuplicateIcon,
   ClockIcon,
-  AdjustmentsHorizontalIcon
+  AdjustmentsHorizontalIcon,
+  ChatBubbleBottomCenterTextIcon
 } from '@heroicons/react/24/outline';
 import TimestampParserTab from './tabs/TimestampParserTab';
 import TimelineAdjusterTab from './tabs/TimelineAdjusterTab';
+import CommentAnalysisTab from './tabs/CommentAnalysisTab';
 
 interface SongWithId extends SongDetail {
   _id: string;
@@ -55,7 +57,7 @@ interface CollectionStats {
   }>;
 }
 
-type TabType = 'songs' | 'backup' | 'timestamp' | 'timeline';
+type TabType = 'songs' | 'backup' | 'timestamp' | 'timeline' | 'comments';
 
 const tabs = [
   {
@@ -81,6 +83,12 @@ const tabs = [
     name: '타임라인 조정',
     icon: AdjustmentsHorizontalIcon,
     description: '치지직-유튜브 시간차 보정 도구'
+  },
+  {
+    id: 'comments' as const,
+    name: '댓글 분석',
+    icon: ChatBubbleBottomCenterTextIcon,
+    description: 'YouTube 댓글 수집 및 타임라인 분석'
   }
 ];
 
@@ -606,6 +614,8 @@ export default function TestDBClient() {
       return <TimestampParserTab />;
     } else if (activeTab === 'timeline') {
       return <TimelineAdjusterTab />;
+    } else if (activeTab === 'comments') {
+      return <CommentAnalysisTab />;
     } else if (activeTab === 'backup') {
       return renderBackupContent();
     } else {
@@ -2070,10 +2080,10 @@ export default function TestDBClient() {
 
   // 메인 return
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="h-screen bg-gray-50 dark:bg-gray-900 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+        <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
               <Cog6ToothIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
@@ -2088,8 +2098,8 @@ export default function TestDBClient() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex gap-8">
+      <div className="px-4 sm:px-6 lg:px-8 py-8 flex-1 min-h-0">
+        <div className="flex gap-8 h-full">
           {/* Sidebar */}
           <div className="w-64 flex-shrink-0">
             <nav className="space-y-2">
@@ -2123,8 +2133,8 @@ export default function TestDBClient() {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 min-w-0">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="flex-1 min-w-0 h-full">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 h-full overflow-hidden">
               {renderTabContent()}
             </div>
           </div>
