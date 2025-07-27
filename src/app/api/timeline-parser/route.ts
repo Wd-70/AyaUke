@@ -86,18 +86,18 @@ function parseTimelineComment(htmlText: string, videoTitle: string) {
         // 곡 정보 파싱
         const songInfo = parseSongInfo(songText);
         
-        if (songInfo.artist && songInfo.songTitle) {
-          rawMatches.push({
-            url,
-            timeSeconds,
-            artist: songInfo.artist,
-            songTitle: songInfo.songTitle
-          });
-          
-          console.log(`✅ 추가됨: ${timeSeconds}초 - ${songInfo.artist} - ${songInfo.songTitle}`);
-        } else {
-          console.log(`❌ 곡 정보 파싱 실패: "${songText}"`);
-        }
+        // 구분자로 나뉘는지 확인 (관련성 판단)
+        const isRelevant = songInfo.artist !== '알 수 없음';
+        
+        rawMatches.push({
+          url,
+          timeSeconds,
+          artist: songInfo.artist,
+          songTitle: songInfo.songTitle,
+          isRelevant: isRelevant
+        });
+        
+        console.log(`${isRelevant ? '✅' : '⚠️'} 추가됨: ${timeSeconds}초 - ${songInfo.artist} - ${songInfo.songTitle} ${isRelevant ? '(관련성 있음)' : '(관련성 없음)'}`);
       } else {
         console.log(`❌ 타임스탬프 없음 또는 곡 정보 없음`);
       }
@@ -131,7 +131,8 @@ function parseTimelineComment(htmlText: string, videoTitle: string) {
       endTimeSeconds: next ? next.timeSeconds : null,
       duration: next ? (next.timeSeconds - current.timeSeconds) : null,
       uploadedDate: dateInfo.date,
-      originalDateString: dateInfo.originalString
+      originalDateString: dateInfo.originalString,
+      isRelevant: current.isRelevant
     };
     
     songEntries.push(liveClip);
@@ -469,14 +470,14 @@ export async function POST(request: NextRequest) {
                       endTimeSeconds: clipData.endTimeSeconds,
                       duration: clipData.duration,
                       originalComment: comment.textContent,
-                      isRelevant: true,
+                      isRelevant: clipData.isRelevant,
                       isExcluded: false
                     });
 
                     await liveClip.save();
                     totalLiveClips++;
                     
-                    console.log(`✅ 저장: ${clipData.artist} - ${clipData.songTitle} (${formatSeconds(clipData.startTimeSeconds)}${clipData.endTimeSeconds ? ` ~ ${formatSeconds(clipData.endTimeSeconds)}` : ''})`);
+                    console.log(`💾 저장: ${clipData.artist} - ${clipData.songTitle} (${formatSeconds(clipData.startTimeSeconds)}${clipData.endTimeSeconds ? ` ~ ${formatSeconds(clipData.endTimeSeconds)}` : ''}) ${clipData.isRelevant ? '[관련성 있음]' : '[관련성 없음]'}`);
                   }
                 }
               }
@@ -651,6 +652,38 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           message: '곡 매칭이 해제되었습니다.'
+        });
+
+      case 'update-live-clip':
+        const { artist, songTitle, startTimeSeconds, endTimeSeconds } = body;
+        
+        if (!itemId) {
+          return NextResponse.json(
+            { success: false, error: 'itemId가 필요합니다.' },
+            { status: 400 }
+          );
+        }
+
+        const updateFields: any = { updatedAt: new Date() };
+        
+        if (artist !== undefined) updateFields.artist = artist.trim();
+        if (songTitle !== undefined) updateFields.songTitle = songTitle.trim();
+        if (startTimeSeconds !== undefined) updateFields.startTimeSeconds = startTimeSeconds;
+        if (endTimeSeconds !== undefined) updateFields.endTimeSeconds = endTimeSeconds;
+
+        // 지속 시간 재계산 (종료 시간이 있는 경우)
+        if (endTimeSeconds !== undefined && startTimeSeconds !== undefined) {
+          updateFields.duration = endTimeSeconds > startTimeSeconds ? endTimeSeconds - startTimeSeconds : null;
+        }
+
+        await LiveClip.updateOne(
+          { id: itemId },
+          updateFields
+        );
+
+        return NextResponse.json({
+          success: true,
+          message: '라이브 클립 정보가 업데이트되었습니다.'
         });
 
       default:

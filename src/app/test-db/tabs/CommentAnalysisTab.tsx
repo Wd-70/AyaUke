@@ -48,6 +48,15 @@ interface ChannelStats {
   processedComments: number;
 }
 
+interface TimelineStats {
+  totalVideos: number;
+  totalTimelineComments: number;
+  parsedItems: number;
+  relevantItems: number;
+  matchedSongs: number;
+  uniqueSongs: number;
+}
+
 interface PaginationData {
   currentPage: number;
   totalPages: number;
@@ -59,6 +68,7 @@ export default function CommentAnalysisTab() {
   const [viewMode, setViewMode] = useState<'comments' | 'timeline'>('comments');
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [timelineParsing, setTimelineParsing] = useState(false);
   const [videos, setVideos] = useState<VideoData[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<VideoData | null>(null);
   const [comments, setComments] = useState<CommentData[]>([]);
@@ -67,6 +77,14 @@ export default function CommentAnalysisTab() {
     totalComments: 0,
     timelineComments: 0,
     processedComments: 0
+  });
+  const [timelineStats, setTimelineStats] = useState<TimelineStats>({
+    totalVideos: 0,
+    totalTimelineComments: 0,
+    parsedItems: 0,
+    relevantItems: 0,
+    matchedSongs: 0,
+    uniqueSongs: 0
   });
   const [pagination, setPagination] = useState<PaginationData>({
     currentPage: 1,
@@ -257,6 +275,34 @@ export default function CommentAnalysisTab() {
     }
   });
 
+  // 타임라인 파싱 실행
+  const parseTimelineComments = async () => {
+    setTimelineParsing(true);
+    try {
+      const response = await fetch('/api/timeline-parser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'parse-timeline-comments'
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setTimelineStats(result.data.stats);
+        alert(result.message || '타임라인 파싱이 완료되었습니다.');
+      } else {
+        alert(result.error || '타임라인 파싱 실패');
+      }
+    } catch (error) {
+      console.error('타임라인 파싱 오류:', error);
+      alert('타임라인 파싱 중 오류가 발생했습니다.');
+    } finally {
+      setTimelineParsing(false);
+    }
+  };
+
   // 검색 핸들러
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -280,39 +326,16 @@ export default function CommentAnalysisTab() {
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div>
               <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                YouTube 댓글 분석
+                {viewMode === 'comments' ? 'YouTube 댓글 분석' : '타임라인 파싱 관리'}
               </h2>
               <p className="text-gray-600 dark:text-gray-400">
-                아야 다시보기 채널의 댓글을 수집하고 타임라인 정보를 분석합니다.
+                {viewMode === 'comments' 
+                  ? '아야 다시보기 채널의 댓글을 수집하고 타임라인 정보를 분석합니다.'
+                  : '타임라인 댓글에서 곡 정보를 파싱하고 라이브 클립 데이터를 관리합니다.'
+                }
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
-              {/* 뷰 모드 토글 */}
-              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('comments')}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    viewMode === 'comments'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <ChatBubbleBottomCenterTextIcon className="w-4 h-4 mr-2 inline" />
-                  댓글 분석
-                </button>
-                <button
-                  onClick={() => setViewMode('timeline')}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    viewMode === 'timeline'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <LinkIcon className="w-4 h-4 mr-2 inline" />
-                  타임라인 파싱
-                </button>
-              </div>
-              
+            <div className="flex flex-wrap items-center gap-3">
               {viewMode === 'comments' && (
                 <>
                   <button
@@ -349,33 +372,108 @@ export default function CommentAnalysisTab() {
                   </button>
                 </>
               )}
+              
+              {viewMode === 'timeline' && (
+                <button
+                  onClick={parseTimelineComments}
+                  disabled={timelineParsing}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  {timelineParsing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      파싱 중...
+                    </>
+                  ) : (
+                    <>
+                      <LinkIcon className="w-4 h-4" />
+                      타임라인 파싱
+                    </>
+                  )}
+                </button>
+              )}
+              
+              {/* 뷰 모드 토글 - 오른쪽 끝으로 이동 */}
+              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('comments')}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    viewMode === 'comments'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <ChatBubbleBottomCenterTextIcon className="w-4 h-4 mr-2 inline" />
+                  댓글 분석
+                </button>
+                <button
+                  onClick={() => setViewMode('timeline')}
+                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    viewMode === 'timeline'
+                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <LinkIcon className="w-4 h-4 mr-2 inline" />
+                  타임라인 파싱
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* 통계 */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg">
-              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.totalVideos}</div>
-              <div className="text-sm text-blue-700 dark:text-blue-300">총 비디오</div>
+          {/* 통계 - 모드에 따라 다르게 표시 */}
+          {viewMode === 'comments' ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg">
+                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.totalVideos}</div>
+                <div className="text-sm text-blue-700 dark:text-blue-300">총 비디오</div>
+              </div>
+              <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-lg">
+                <div className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.totalComments}</div>
+                <div className="text-sm text-green-700 dark:text-green-300">총 댓글</div>
+              </div>
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-6 rounded-lg">
+                <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.timelineComments}</div>
+                <div className="text-sm text-purple-700 dark:text-purple-300">타임라인 댓글</div>
+              </div>
+              <div className="bg-orange-50 dark:bg-orange-900/20 p-6 rounded-lg">
+                <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.processedComments}</div>
+                <div className="text-sm text-orange-700 dark:text-orange-300">처리 완료</div>
+              </div>
             </div>
-            <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-lg">
-              <div className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.totalComments}</div>
-              <div className="text-sm text-green-700 dark:text-green-300">총 댓글</div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mt-6">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{timelineStats.totalVideos}</div>
+                <div className="text-xs text-blue-700 dark:text-blue-300">비디오</div>
+              </div>
+              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{timelineStats.totalTimelineComments}</div>
+                <div className="text-xs text-purple-700 dark:text-purple-300">타임라인 댓글</div>
+              </div>
+              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{timelineStats.parsedItems}</div>
+                <div className="text-xs text-green-700 dark:text-green-300">파싱된 항목</div>
+              </div>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{timelineStats.relevantItems}</div>
+                <div className="text-xs text-yellow-700 dark:text-yellow-300">관련성 있음</div>
+              </div>
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{timelineStats.matchedSongs}</div>
+                <div className="text-xs text-indigo-700 dark:text-indigo-300">매칭된 곡</div>
+              </div>
+              <div className="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">{timelineStats.uniqueSongs}</div>
+                <div className="text-xs text-pink-700 dark:text-pink-300">고유 곡</div>
+              </div>
             </div>
-            <div className="bg-purple-50 dark:bg-purple-900/20 p-6 rounded-lg">
-              <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.timelineComments}</div>
-              <div className="text-sm text-purple-700 dark:text-purple-300">타임라인 댓글</div>
-            </div>
-            <div className="bg-orange-50 dark:bg-orange-900/20 p-6 rounded-lg">
-              <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.processedComments}</div>
-              <div className="text-sm text-orange-700 dark:text-orange-300">처리 완료</div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* 콘텐츠 영역 - 조건부 렌더링 */}
         {viewMode === 'timeline' ? (
-          <TimelineParsingView />
+          <TimelineParsingView onStatsUpdate={setTimelineStats} />
         ) : (
           <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0">
             {/* 비디오 목록 */}
