@@ -24,6 +24,8 @@ import {
   MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import SongMatchingDialog from '@/components/SongMatchingDialog';
+import TimeVerificationSection from '@/components/TimeVerificationSection';
+import { updateTimeVerification } from '@/utils/timeVerification';
 
 interface ParsedTimelineItem {
   id: string;
@@ -49,6 +51,11 @@ interface ParsedTimelineItem {
   commentAuthor: string;
   commentId: string;
   commentPublishedAt: string;
+  // 수동 검증 관련 필드
+  isTimeVerified?: boolean;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  verificationNotes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -117,6 +124,17 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   // 곡 매칭 다이얼로그 상태
   const [showMatchingDialog, setShowMatchingDialog] = useState(false);
   const [matchingTimelineItem, setMatchingTimelineItem] = useState<ParsedTimelineItem | null>(null);
+  
+  // 일괄 검색 상태
+  const [batchSearchLoading, setBatchSearchLoading] = useState(false);
+  const [batchSearchProgress, setBatchSearchProgress] = useState<{
+    current: number;
+    total: number;
+    message: string;
+  } | null>(null);
+  
+  // 일괄 검색 결과 저장 (메모리)
+  const [batchSearchResults, setBatchSearchResults] = useState<Map<string, any[]>>(new Map());
   
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState(1);
@@ -355,6 +373,120 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   };
 
   // 곡 매칭 처리
+  // 직접 타임라인 아이템을 받는 매칭 함수 (후보 클릭용)
+  const handleDirectSongMatch = async (timeline: ParsedTimelineItem, songId: string | null, confidence?: number) => {
+    try {
+      const response = await fetch('/api/timeline-parser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'match-timeline-song',
+          timelineId: timeline.id,
+          songId: songId,
+          confidence: confidence || 0
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // 로컬 상태 업데이트
+        setParsedTimelines(prev => prev.map(t => 
+          t.id === timeline.id 
+            ? { 
+                ...t, 
+                matchedSong: songId ? {
+                  songId: songId,
+                  title: result.data.matchInfo?.title || t.songTitle,
+                  artist: result.data.matchInfo?.artist || t.artist,
+                  confidence: confidence || 0
+                } : undefined
+              }
+            : t
+        ));
+        
+        // 매칭 완료 시 해당 타임라인의 후보 목록을 메모리에서 제거
+        if (songId) {
+          setBatchSearchResults(prev => {
+            const newResults = new Map(prev);
+            newResults.delete(timeline.id);
+            return newResults;
+          });
+        } else {
+          // 매칭 해제 시 개별 검색을 다시 실행하여 후보 목록 복원
+          try {
+            const searchResponse = await fetch('/api/timeline-parser', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'search-song-matches',
+                searchArtist: timeline.artist,
+                searchTitle: timeline.songTitle,
+              })
+            });
+
+            const searchResult = await searchResponse.json();
+            if (searchResult.success && searchResult.data.candidates.length > 0) {
+              setBatchSearchResults(prev => {
+                const newResults = new Map(prev);
+                newResults.set(timeline.id, searchResult.data.candidates);
+                return newResults;
+              });
+            }
+          } catch (searchError) {
+            console.error('매칭 해제 후 재검색 오류:', searchError);
+          }
+        }
+        
+        // 선택된 타임라인이 현재 수정된 타임라인이면 상태 업데이트
+        if (selectedTimeline && selectedTimeline.id === timeline.id) {
+          setSelectedTimeline(prev => prev ? {
+            ...prev,
+            matchedSong: songId ? {
+              songId: songId,
+              title: result.data.matchInfo?.title || prev.songTitle,
+              artist: result.data.matchInfo?.artist || prev.artist,
+              confidence: confidence || 0
+            } : undefined
+          } : null);
+        }
+        
+        // 통계 재계산
+        const updatedTimelines = parsedTimelines.map(t => 
+          t.id === timeline.id 
+            ? { 
+                ...t, 
+                matchedSong: songId ? {
+                  songId: songId,
+                  title: result.data.matchInfo?.title || t.songTitle,
+                  artist: result.data.matchInfo?.artist || t.artist,
+                  confidence: confidence || 0
+                } : undefined
+              }
+            : t
+        );
+        
+        const matchedItems = updatedTimelines.filter(t => t.matchedSong).length;
+        setStats(prev => ({
+          ...prev,
+          matchedSongs: matchedItems
+        }));
+        
+        if (onStatsUpdate) {
+          onStatsUpdate({
+            ...stats,
+            matchedSongs: matchedItems
+          });
+        }
+      } else {
+        alert(`매칭 ${songId ? '설정' : '해제'} 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('매칭 오류:', error);
+      alert(`매칭 ${songId ? '설정' : '해제'} 중 오류가 발생했습니다.`);
+    }
+  };
+
   const handleSongMatch = async (songId: string | null, confidence?: number) => {
     if (!matchingTimelineItem) return;
 
@@ -387,6 +519,15 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
               }
             : timeline
         ));
+        
+        // 매칭 완료 시 해당 타임라인의 후보 목록을 메모리에서 제거
+        if (songId) {
+          setBatchSearchResults(prev => {
+            const newResults = new Map(prev);
+            newResults.delete(matchingTimelineItem.id);
+            return newResults;
+          });
+        }
         
         // 통계 재계산
         const updatedTimelines = parsedTimelines.map(timeline => 
@@ -873,6 +1014,98 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
     };
   }, [isEditing, editingData, selectedTimeline]);
 
+  // 시간 검증 상태 업데이트 (컴포넌트용 래퍼)
+  const handleTimeVerificationUpdate = async (timeline: ParsedTimelineItem, isVerified: boolean, notes?: string) => {
+    const result = await updateTimeVerification(timeline, isVerified, notes);
+    
+    if (result.success && result.data) {
+      // 로컬 상태 업데이트
+      setParsedTimelines(prev => prev.map(t => 
+        t.id === timeline.id 
+          ? { 
+              ...t, 
+              isTimeVerified: result.data!.isTimeVerified,
+              verifiedBy: result.data!.verifiedBy,
+              verifiedAt: result.data!.verifiedAt,
+              verificationNotes: notes
+            }
+          : t
+      ));
+      
+      // 선택된 타임라인이 현재 수정된 타임라인이면 상태 업데이트
+      if (selectedTimeline && selectedTimeline.id === timeline.id) {
+        setSelectedTimeline(prev => prev ? {
+          ...prev,
+          isTimeVerified: result.data!.isTimeVerified,
+          verifiedBy: result.data!.verifiedBy,
+          verifiedAt: result.data!.verifiedAt,
+          verificationNotes: notes
+        } : null);
+      }
+    } else {
+      alert(`시간 검증 ${isVerified ? '완료' : '해제'} 실패: ${result.error}`);
+    }
+  };
+
+  // 전체 타임라인 일괄 검색
+  const performBatchSearch = async () => {
+    setBatchSearchLoading(true);
+    setBatchSearchProgress({
+      current: 0,
+      total: 0,
+      message: '일괄 검색 준비 중...'
+    });
+
+    try {
+      const response = await fetch('/api/timeline-parser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'batch-search-matches'
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setBatchSearchProgress({
+          current: result.data.processed,
+          total: result.data.processed,
+          message: `완료: ${result.data.matched}개 자동 매칭`
+        });
+
+        // 검색 결과를 메모리에 저장
+        const searchResultsMap = new Map();
+        result.data.results.forEach((item: any) => {
+          if (item.candidates && item.candidates.length > 0) {
+            searchResultsMap.set(item.timelineId, item.candidates);
+          }
+        });
+        setBatchSearchResults(searchResultsMap);
+
+        // 데이터 새로고침
+        await loadExistingDataOnMount();
+
+        const manualReviewCount = result.data.results.filter((item: any) => 
+          !item.autoMatched && item.candidates.length > 0
+        ).length;
+
+        alert(`일괄 검색 완료!\n` +
+              `처리된 항목: ${result.data.processed}개\n` +
+              `자동 매칭: ${result.data.matched}개\n` +
+              `수동 검토 필요: ${manualReviewCount}개`);
+      } else {
+        alert(`일괄 검색 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('일괄 검색 오류:', error);
+      alert('일괄 검색 중 오류가 발생했습니다.');
+    } finally {
+      setBatchSearchLoading(false);
+      setBatchSearchProgress(null);
+    }
+  };
+
   // 기존 파싱된 데이터 로드
   const loadExistingDataOnMount = async () => {
     try {
@@ -994,6 +1227,23 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                 </div>
               )}
               <button
+                onClick={performBatchSearch}
+                disabled={batchSearchLoading}
+                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed text-white rounded text-xs transition-colors flex items-center gap-1"
+              >
+                {batchSearchLoading ? (
+                  <>
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    일괄 검색 중...
+                  </>
+                ) : (
+                  <>
+                    <Square3Stack3DIcon className="w-3 h-3" />
+                    일괄 검색
+                  </>
+                )}
+              </button>
+              <button
                 onClick={toggleSelectAll}
                 className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs transition-colors"
               >
@@ -1014,6 +1264,30 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
               </select>
             </div>
           </div>
+          
+          {/* 일괄 검색 진행 상황 */}
+          {batchSearchProgress && (
+            <div className="px-4 py-3 bg-purple-50 dark:bg-purple-900/20 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-purple-700 dark:text-purple-300">
+                  {batchSearchProgress.message}
+                </span>
+                <span className="text-purple-600 dark:text-purple-400">
+                  {batchSearchProgress.current} / {batchSearchProgress.total}
+                </span>
+              </div>
+              {batchSearchProgress.total > 0 && (
+                <div className="mt-2 w-full bg-purple-200 dark:bg-purple-800 rounded-full h-2">
+                  <div 
+                    className="bg-purple-600 dark:bg-purple-400 h-2 rounded-full transition-all duration-300"
+                    style={{ 
+                      width: `${(batchSearchProgress.current / batchSearchProgress.total) * 100}%` 
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto">
           {(loading || initialLoading) ? (
@@ -1071,6 +1345,12 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                           {timeline.matchedSong && (
                             <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs">
                               매칭완료
+                            </span>
+                          )}
+                          {timeline.isTimeVerified && (
+                            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs flex items-center gap-1">
+                              <CheckCircleIcon className="w-3 h-3" />
+                              검증완료
                             </span>
                           )}
                         </div>
@@ -1429,29 +1709,122 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
               {selectedTimeline.matchedSong && (
                 <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-green-800 dark:text-green-200">매칭된 곡</h4>
-                    <button
-                      onClick={() => removeSongMatch(selectedTimeline.id)}
-                      className="text-xs text-red-600 hover:text-red-700 transition-colors"
-                    >
-                      매칭 해제
-                    </button>
+                    <h4 className="font-medium text-green-800 dark:text-green-200 flex items-center gap-2">
+                      <CheckCircleIcon className="w-5 h-5" />
+                      매칭 완료
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        selectedTimeline.matchedSong.confidence >= 0.95 
+                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                          : selectedTimeline.matchedSong.confidence >= 0.8
+                          ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'  
+                          : 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200'
+                      }`}>
+                        {selectedTimeline.matchedSong.confidence >= 0.95 ? '정확한 매칭' :
+                         selectedTimeline.matchedSong.confidence >= 0.8 ? '높은 신뢰도' : '수동 매칭'}
+                      </span>
+                      <button
+                        onClick={() => handleDirectSongMatch(selectedTimeline, null, 0)}
+                        className="text-xs text-red-600 hover:text-red-700 transition-colors flex items-center gap-1"
+                      >
+                        <XMarkIcon className="w-3 h-3" />
+                        해제
+                      </button>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">아티스트</label>
-                      <p className="text-sm text-green-800 dark:text-green-200">{selectedTimeline.matchedSong.artist}</p>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-green-200 dark:border-green-700">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">아티스트</label>
+                        <p className="text-sm font-medium text-green-800 dark:text-green-200">{selectedTimeline.matchedSong.artist}</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">곡명</label>
+                        <p className="text-sm font-medium text-green-800 dark:text-green-200">{selectedTimeline.matchedSong.title}</p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">제목</label>
-                      <p className="text-sm text-green-800 dark:text-green-200">{selectedTimeline.matchedSong.title}</p>
+                    <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-700">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-green-700 dark:text-green-300">매칭 신뢰도</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-20 bg-green-200 dark:bg-green-800 rounded-full h-2">
+                            <div 
+                              className="bg-green-600 dark:bg-green-400 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${selectedTimeline.matchedSong.confidence * 100}%` }}
+                            />
+                          </div>
+                          <span className="font-medium text-green-800 dark:text-green-200">
+                            {Math.round(selectedTimeline.matchedSong.confidence * 100)}%
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">신뢰도</label>
-                      <p className="text-sm text-green-800 dark:text-green-200">
-                        {Math.round(selectedTimeline.matchedSong.confidence * 100)}%
-                      </p>
-                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 일괄 검색 후보 목록 */}
+              {!selectedTimeline.matchedSong && batchSearchResults.has(selectedTimeline.id) && (
+                <div className="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-medium text-purple-800 dark:text-purple-200">검색 후보</h4>
+                    <span className="text-xs text-purple-600 dark:text-purple-400">
+                      {batchSearchResults.get(selectedTimeline.id)?.length || 0}개 후보
+                    </span>
+                  </div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {batchSearchResults.get(selectedTimeline.id)?.map((candidate: any, index: number) => (
+                      <div 
+                        key={candidate.song._id}
+                        className="bg-white dark:bg-gray-800 rounded p-3 border border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                        onClick={() => handleDirectSongMatch(selectedTimeline, candidate.song._id, candidate.overallSimilarity)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-gray-900 dark:text-white">
+                              {candidate.song.artist} - {candidate.song.title}
+                            </p>
+                            {(candidate.song.artistAlias || candidate.song.titleAlias) && (
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                {candidate.song.artistAlias && `아티스트 별명: ${candidate.song.artistAlias}`}
+                                {candidate.song.artistAlias && candidate.song.titleAlias && ' | '}
+                                {candidate.song.titleAlias && `곡명 별명: ${candidate.song.titleAlias}`}
+                              </p>
+                            )}
+                            {candidate.song.searchTags && candidate.song.searchTags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {candidate.song.searchTags.map((tag: string, tagIndex: number) => (
+                                  <span 
+                                    key={tagIndex}
+                                    className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded"
+                                  >
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="ml-3 text-right">
+                            <div className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                              {Math.round(candidate.overallSimilarity * 100)}%
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              A: {Math.round(candidate.artistSimilarity * 100)}% | 
+                              T: {Math.round(candidate.titleSimilarity * 100)}%
+                            </div>
+                            {candidate.isExactMatch && (
+                              <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded">
+                                완전 일치
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )) || []}
+                  </div>
+                  <div className="mt-3 text-xs text-purple-600 dark:text-purple-400">
+                    💡 후보를 클릭하면 해당 곡으로 매칭됩니다.
                   </div>
                 </div>
               )}
@@ -1479,6 +1852,12 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                   )}
                 </div>
               </div>
+
+              {/* 시간 검증 */}
+              <TimeVerificationSection 
+                timeline={selectedTimeline}
+                onVerificationUpdate={handleTimeVerificationUpdate}
+              />
 
               {/* YouTube 재생 */}
               <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">

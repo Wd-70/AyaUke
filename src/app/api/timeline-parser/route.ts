@@ -32,6 +32,11 @@ const ParsedTimelineSchema = new mongoose.Schema({
   commentAuthor: { type: String, required: true }, // 댓글 작성자
   commentId: { type: String, required: true }, // 원본 댓글 ID
   commentPublishedAt: { type: Date }, // 댓글 작성 시간
+  // 수동 검증 관련 필드
+  isTimeVerified: { type: Boolean, default: false }, // 시간 검증 완료 여부
+  verifiedBy: { type: String }, // 검증한 사용자 ID/이름
+  verifiedAt: { type: Date }, // 검증 완료 시간
+  verificationNotes: { type: String }, // 검증 관련 메모
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
@@ -210,6 +215,50 @@ function searchInTitleFields(song: any, normalizedQuery: string): number {
   }
   
   return maxSimilarity;
+}
+
+// 캐시된 곡 데이터를 사용한 매칭 함수 (DB 요청 최소화)
+function matchTimelineWithSongsFromCache(artist: string, title: string, allSongs: any[]) {
+  const normalizedArtist = normalizeText(artist);
+  const normalizedTitle = normalizeText(title);
+  
+  console.log(`🔍 캐시 검색: "${artist}" - "${title}"`);
+  
+  const candidates = [];
+  let processedCount = 0;
+  
+  for (const song of allSongs) {
+    const artistSimilarity = searchInArtistFields(song, normalizedArtist);
+    const titleSimilarity = searchInTitleFields(song, normalizedTitle);
+    
+    // 전체 일치율 = (아티스트 유사도 + 제목 유사도) / 2
+    const overallSimilarity = (artistSimilarity + titleSimilarity) / 2;
+    
+    // 높은 유사도 결과만 로그
+    if (overallSimilarity > 0.3) {
+      console.log(`🎯 매치: "${song.artist}" - "${song.title}" (${(overallSimilarity * 100).toFixed(1)}%)`);
+    }
+    
+    // 최소 임계값 이상인 경우만 후보로 추가
+    if (overallSimilarity > 0.1) {
+      candidates.push({
+        song,
+        artistSimilarity,
+        titleSimilarity,
+        overallSimilarity,
+        isExactMatch: overallSimilarity >= 0.95
+      });
+    }
+    
+    processedCount++;
+  }
+  
+  console.log(`✅ 캐시 검색 완료: ${candidates.length}개 후보 발견`);
+  
+  // 일치율 순으로 정렬
+  candidates.sort((a, b) => b.overallSimilarity - a.overallSimilarity);
+  
+  return candidates.slice(0, 10); // 상위 10개만 반환
 }
 
 // 타임라인 데이터와 노래 DB 매칭
@@ -1280,6 +1329,172 @@ export async function POST(request: NextRequest) {
           console.error('곡 매칭 오류:', error);
           return NextResponse.json(
             { success: false, error: '곡 매칭 중 오류가 발생했습니다.' },
+            { status: 500 }
+          );
+        }
+
+      case 'batch-search-matches':
+        console.log('🔍 전체 타임라인 일괄 검색 시작...');
+        
+        try {
+          // 매칭되지 않은 모든 타임라인 항목 조회
+          const unmatchedTimelines = await ParsedTimeline.find({
+            isRelevant: true,
+            isExcluded: false,
+            matchedSong: { $exists: false }
+          }).sort({ uploadedDate: -1, startTimeSeconds: 1 });
+
+          console.log(`📊 매칭되지 않은 타임라인 항목: ${unmatchedTimelines.length}개`);
+
+          if (unmatchedTimelines.length === 0) {
+            return NextResponse.json({
+              success: true,
+              message: '매칭되지 않은 타임라인 항목이 없습니다.',
+              data: { processed: 0, matched: 0, results: [] }
+            });
+          }
+
+          // 모든 곡 데이터를 한 번에 로드 (캐싱용)
+          const allSongs = await SongDetail.find({ 
+            $or: [
+              { status: 'active' },
+              { status: { $exists: false } },
+              { status: null }
+            ]
+          }).lean();
+
+          // 검색 대상이 적다면 모든 곡을 대상으로 검색
+          if (allSongs.length < 100) {
+            const allSongsNoFilter = await SongDetail.find({}).lean();
+            allSongs.push(...allSongsNoFilter);
+          }
+
+          console.log(`🎵 검색 대상 곡 수: ${allSongs.length}개`);
+
+          const results = [];
+          let matchedCount = 0;
+
+          // 각 타임라인 항목에 대해 검색 수행
+          for (const timeline of unmatchedTimelines) {
+            console.log(`🔍 검색 중: "${timeline.artist}" - "${timeline.songTitle}"`);
+            
+            const candidates = await matchTimelineWithSongsFromCache(
+              timeline.artist, 
+              timeline.songTitle, 
+              allSongs
+            );
+
+            // 자동 매칭 조건: 95% 이상 유사도의 후보가 있는 경우
+            const exactMatch = candidates.find(c => c.overallSimilarity >= 0.95);
+            
+            let matchResult = null;
+            if (exactMatch) {
+              // 자동 매칭 수행
+              await ParsedTimeline.updateOne(
+                { _id: timeline._id },
+                { 
+                  matchedSong: {
+                    songId: exactMatch.song._id.toString(),
+                    title: exactMatch.song.title,
+                    artist: exactMatch.song.artist,
+                    confidence: exactMatch.overallSimilarity
+                  },
+                  updatedAt: new Date()
+                }
+              );
+
+              matchResult = {
+                songId: exactMatch.song._id.toString(),
+                title: exactMatch.song.title,
+                artist: exactMatch.song.artist,
+                confidence: exactMatch.overallSimilarity
+              };
+              matchedCount++;
+              console.log(`✅ 자동 매칭: "${timeline.artist}" - "${timeline.songTitle}" → "${exactMatch.song.artist}" - "${exactMatch.song.title}" (${(exactMatch.overallSimilarity * 100).toFixed(1)}%)`);
+            }
+
+            results.push({
+              timelineId: timeline.id,
+              timelineItem: {
+                artist: timeline.artist,
+                songTitle: timeline.songTitle,
+                timeText: formatSeconds(timeline.startTimeSeconds),
+                videoTitle: timeline.videoTitle
+              },
+              candidates: candidates.slice(0, 5), // 상위 5개만 저장
+              autoMatched: !!exactMatch,
+              matchResult
+            });
+          }
+
+          console.log(`✅ 일괄 검색 완료: ${unmatchedTimelines.length}개 처리, ${matchedCount}개 자동 매칭`);
+
+          return NextResponse.json({
+            success: true,
+            message: `일괄 검색 완료: ${unmatchedTimelines.length}개 처리, ${matchedCount}개 자동 매칭`,
+            data: {
+              processed: unmatchedTimelines.length,
+              matched: matchedCount,
+              results
+            }
+          });
+
+        } catch (error) {
+          console.error('일괄 검색 오류:', error);
+          return NextResponse.json(
+            { success: false, error: '일괄 검색 중 오류가 발생했습니다.' },
+            { status: 500 }
+          );
+        }
+
+      case 'update-time-verification':
+        const { timelineId: verifyTimelineId, isVerified, verificationNotes } = body;
+        
+        if (!verifyTimelineId) {
+          return NextResponse.json(
+            { success: false, error: 'timelineId가 필요합니다.' },
+            { status: 400 }
+          );
+        }
+
+        try {
+          const updateData: any = { updatedAt: new Date() };
+          
+          if (isVerified) {
+            updateData.isTimeVerified = true;
+            updateData.verifiedBy = session?.user?.name || session?.user?.channelId || 'Unknown';
+            updateData.verifiedAt = new Date();
+            if (verificationNotes) {
+              updateData.verificationNotes = verificationNotes;
+            }
+          } else {
+            updateData.isTimeVerified = false;
+            updateData.$unset = { 
+              verifiedBy: "",
+              verifiedAt: "",
+              verificationNotes: ""
+            };
+          }
+
+          await ParsedTimeline.updateOne(
+            { id: verifyTimelineId },
+            updateData
+          );
+
+          return NextResponse.json({
+            success: true,
+            message: `시간 검증이 ${isVerified ? '완료' : '해제'}되었습니다.`,
+            data: {
+              isTimeVerified: isVerified,
+              verifiedBy: isVerified ? (session?.user?.name || session?.user?.channelId || 'Unknown') : null,
+              verifiedAt: isVerified ? new Date() : null
+            }
+          });
+
+        } catch (error) {
+          console.error('시간 검증 업데이트 오류:', error);
+          return NextResponse.json(
+            { success: false, error: '시간 검증 업데이트 중 오류가 발생했습니다.' },
             { status: 500 }
           );
         }
