@@ -39,9 +39,19 @@ const ParsedTimelineSchema = new mongoose.Schema({
   verificationNotes: { type: String }, // 검증 관련 메모
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+}, {
+  // 스키마 옵션
+  strict: true, // 스키마에 정의되지 않은 필드 허용하지 않음
+  timestamps: false, // createdAt, updatedAt을 수동으로 관리
+  versionKey: false // __v 필드 제거
 });
 
-const ParsedTimeline = mongoose.models.ParsedTimeline || mongoose.model('ParsedTimeline', ParsedTimelineSchema);
+// 기존 모델이 있다면 삭제 후 재생성 (개발 환경에서만)
+if (mongoose.models.ParsedTimeline) {
+  delete mongoose.models.ParsedTimeline;
+}
+
+const ParsedTimeline = mongoose.model('ParsedTimeline', ParsedTimelineSchema);
 
 // 텍스트 정규화 함수 (공백/특수문자 제거, 소문자 변환)
 function normalizeText(text: string): string {

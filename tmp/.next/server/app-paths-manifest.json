@@ -1,6 +1,8 @@
 {
+  "/api/songdetails/route": "app/api/songdetails/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/api/timeline-parser/route": "app/api/timeline-parser/route.js",
+  "/api/songdetails/[id]/route": "app/api/songdetails/[id]/route.js",
   "/test-db/page": "app/test-db/page.js",
-  "/songbook/page": "app/songbook/page.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js"
+  "/songbook/page": "app/songbook/page.js"
 }

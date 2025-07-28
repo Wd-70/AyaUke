@@ -50,12 +50,11 @@ interface ChannelStats {
 }
 
 interface TimelineStats {
-  totalVideos: number;
-  totalTimelineComments: number;
   parsedItems: number;
   relevantItems: number;
   matchedSongs: number;
-  uniqueSongs: number;
+  uniqueMatchedSongs: number;
+  verifiedItems: number;
 }
 
 interface PaginationData {
@@ -100,12 +99,11 @@ export default function CommentAnalysisTab() {
     processedComments: 0
   });
   const [timelineStats, setTimelineStats] = useState<TimelineStats>({
-    totalVideos: 0,
-    totalTimelineComments: 0,
     parsedItems: 0,
     relevantItems: 0,
     matchedSongs: 0,
-    uniqueSongs: 0
+    uniqueMatchedSongs: 0,
+    verifiedItems: 0
   });
   const [pagination, setPagination] = useState<PaginationData>({
     currentPage: 1,
@@ -483,15 +481,7 @@ export default function CommentAnalysisTab() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mt-6">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{timelineStats.totalVideos}</div>
-                <div className="text-xs text-blue-700 dark:text-blue-300">비디오</div>
-              </div>
-              <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{timelineStats.totalTimelineComments}</div>
-                <div className="text-xs text-purple-700 dark:text-purple-300">타임라인 댓글</div>
-              </div>
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
               <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">{timelineStats.parsedItems}</div>
                 <div className="text-xs text-green-700 dark:text-green-300">파싱된 항목</div>
@@ -505,8 +495,12 @@ export default function CommentAnalysisTab() {
                 <div className="text-xs text-indigo-700 dark:text-indigo-300">매칭된 곡</div>
               </div>
               <div className="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">{timelineStats.uniqueSongs}</div>
+                <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">{timelineStats.uniqueMatchedSongs}</div>
                 <div className="text-xs text-pink-700 dark:text-pink-300">고유 곡</div>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{timelineStats.verifiedItems}</div>
+                <div className="text-xs text-blue-700 dark:text-blue-300">검증완료</div>
               </div>
             </div>
           )}

@@ -57,7 +57,7 @@ export default function SongMatchingDialog({
       setCustomTitle(timelineItem.songTitle);
       setIsCustomSearch(false);
     }
-  }, [isOpen, timelineItem]);
+  }, [isOpen, timelineItem.id, timelineItem.artist, timelineItem.songTitle]);
 
   const searchSongs = async (artist: string, title: string) => {
     if (!artist.trim() || !title.trim()) return;

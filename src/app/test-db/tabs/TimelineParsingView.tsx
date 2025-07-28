@@ -21,7 +21,13 @@ import {
   PencilIcon,
   CheckIcon,
   Square3Stack3DIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  ForwardIcon,
+  BackwardIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon
 } from '@heroicons/react/24/outline';
 import SongMatchingDialog from '@/components/SongMatchingDialog';
 import TimeVerificationSection from '@/components/TimeVerificationSection';
@@ -61,12 +67,11 @@ interface ParsedTimelineItem {
 }
 
 interface TimelineStats {
-  totalVideos: number;
-  totalTimelineComments: number;
   parsedItems: number;
   relevantItems: number;
   matchedSongs: number;
-  uniqueSongs: number;
+  uniqueMatchedSongs: number;
+  verifiedItems: number;
 }
 
 interface TimelineParsingViewProps {
@@ -98,22 +103,22 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   const [initialLoading, setInitialLoading] = useState(true);
   const [parsedTimelines, setParsedTimelines] = useState<ParsedTimelineItem[]>([]);
   const [stats, setStats] = useState<TimelineStats>({
-    totalVideos: 0,
-    totalTimelineComments: 0,
     parsedItems: 0,
     relevantItems: 0,
     matchedSongs: 0,
-    uniqueSongs: 0
+    uniqueMatchedSongs: 0,
+    verifiedItems: 0
   });
   const [selectedTimeline, setSelectedTimeline] = useState<ParsedTimelineItem | null>(null);
   const [selectedTimelineIds, setSelectedTimelineIds] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number>(-1);
-  const [filterType, setFilterType] = useState<'all' | 'relevant' | 'irrelevant' | 'excluded' | 'matched' | 'unmatched'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'relevant' | 'irrelevant' | 'excluded' | 'matched' | 'unmatched'>('relevant');
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchingTimeline, setMatchingTimeline] = useState<ParsedTimelineItem | null>(null);
   const [songMatches, setSongMatches] = useState<any[]>([]);
   const [matchingLoading, setMatchingLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  // 항상 편집 모드로 유지 (isEditing 제거)
+  // const [isEditing, setIsEditing] = useState(false);
   const [editingData, setEditingData] = useState<{
     artist: string;
     songTitle: string;
@@ -221,13 +226,19 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         // 통계 재계산
         const relevantItems = updatedTimelines.filter(timeline => timeline.isRelevant && !timeline.isExcluded).length;
         const matchedItems = updatedTimelines.filter(timeline => timeline.matchedSong).length;
-        const uniqueSongs = new Set(updatedTimelines.map(timeline => `${timeline.artist}_${timeline.songTitle}`)).size;
+        const uniqueMatchedSongs = new Set(
+          updatedTimelines
+            .filter((timeline: ParsedTimelineItem) => timeline.matchedSong?.songId)
+            .map((timeline: ParsedTimelineItem) => timeline.matchedSong!.songId)
+        ).size;
+        const verifiedItems = updatedTimelines.filter(timeline => timeline.isTimeVerified).length;
         
         setStats(prev => ({
           ...prev,
           relevantItems: relevantItems,
           matchedSongs: matchedItems,
-          uniqueSongs: uniqueSongs
+          uniqueMatchedSongs: uniqueMatchedSongs,
+          verifiedItems: verifiedItems
         }));
       } else {
         alert(result.error || '업데이트 실패');
@@ -267,13 +278,19 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         // 통계 재계산
         const relevantItems = updatedTimelines.filter(timeline => timeline.isRelevant && !timeline.isExcluded).length;
         const matchedItems = updatedTimelines.filter(timeline => timeline.matchedSong).length;
-        const uniqueSongs = new Set(updatedTimelines.map(timeline => `${timeline.artist}_${timeline.songTitle}`)).size;
+        const uniqueMatchedSongs = new Set(
+          updatedTimelines
+            .filter((timeline: ParsedTimelineItem) => timeline.matchedSong?.songId)
+            .map((timeline: ParsedTimelineItem) => timeline.matchedSong!.songId)
+        ).size;
+        const verifiedItems = updatedTimelines.filter(timeline => timeline.isTimeVerified).length;
         
         setStats(prev => ({
           ...prev,
           relevantItems: relevantItems,
           matchedSongs: matchedItems,
-          uniqueSongs: uniqueSongs
+          uniqueMatchedSongs: uniqueMatchedSongs,
+          verifiedItems: verifiedItems
         }));
       } else {
         alert(result.error || '업데이트 실패');
@@ -602,8 +619,8 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
     }
   };
 
-  // 편집 시작
-  const startEdit = useCallback(() => {
+  // 편집 데이터 초기화 (항상 편집 모드)
+  const initializeEditingData = useCallback(() => {
     if (!selectedTimeline) return;
     setEditingData({
       artist: selectedTimeline.artist,
@@ -611,14 +628,18 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
       startTimeSeconds: selectedTimeline.startTimeSeconds,
       endTimeSeconds: selectedTimeline.endTimeSeconds
     });
-    setIsEditing(true);
   }, [selectedTimeline]);
 
-  // 편집 취소
-  const cancelEdit = useCallback(() => {
-    setIsEditing(false);
-    setEditingData(null);
-  }, []);
+  // 편집 취소 (원래 데이터로 되돌리기)
+  const resetEdit = useCallback(() => {
+    if (!selectedTimeline) return;
+    setEditingData({
+      artist: selectedTimeline.artist,
+      songTitle: selectedTimeline.songTitle,
+      startTimeSeconds: selectedTimeline.startTimeSeconds,
+      endTimeSeconds: selectedTimeline.endTimeSeconds
+    });
+  }, [selectedTimeline]);
 
   // 입력 핸들러들 (성능 최적화) - 함수형 업데이트로 의존성 제거
   const handleArtistChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -638,6 +659,30 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
     const value = e.target.value ? parseInt(e.target.value) : undefined;
     setEditingData(prev => prev ? {...prev, endTimeSeconds: value} : null);
   }, []);
+
+  // 아티스트와 곡제목 교환
+  const swapArtistAndTitle = useCallback(() => {
+    if (!editingData) return;
+    setEditingData(prev => prev ? {
+      ...prev,
+      artist: prev.songTitle,
+      songTitle: prev.artist
+    } : null);
+  }, [editingData]);
+
+  // selectedTimeline이 변경될 때 editingData 초기화 (항상 편집 모드)
+  useEffect(() => {
+    if (selectedTimeline) {
+      setEditingData({
+        artist: selectedTimeline.artist,
+        songTitle: selectedTimeline.songTitle,
+        startTimeSeconds: selectedTimeline.startTimeSeconds,
+        endTimeSeconds: selectedTimeline.endTimeSeconds
+      });
+    } else {
+      setEditingData(null);
+    }
+  }, [selectedTimeline]);
 
   // 편집 저장
   const saveEdit = async () => {
@@ -707,8 +752,9 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
             : prev.duration
         } : null);
 
-        setIsEditing(false);
-        setEditingData(null);
+        // 저장 후에도 편집 상태 유지 (항상 편집 모드)
+        // setIsEditing(false);
+        // setEditingData(null);
         
         console.log('편집 내용이 데이터베이스에 저장되었습니다.');
       } else {
@@ -779,6 +825,30 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
     if (youtubePlayer && editingData) {
       const currentTime = Math.floor(youtubePlayer.getCurrentTime());
       setEditingData(prev => prev ? { ...prev, endTimeSeconds: currentTime } : null);
+    }
+  }, [youtubePlayer, editingData]);
+
+  // 플레이어 시간 이동 함수들
+  const seekToTime = useCallback((seconds: number) => {
+    if (youtubePlayer) {
+      const currentTime = youtubePlayer.getCurrentTime();
+      const newTime = Math.max(0, currentTime + seconds);
+      youtubePlayer.seekTo(newTime, true);
+    }
+  }, [youtubePlayer]);
+
+  const seekForward1s = useCallback(() => seekToTime(1), [seekToTime]);
+  const seekBackward1s = useCallback(() => seekToTime(-1), [seekToTime]);
+  const seekForward10s = useCallback(() => seekToTime(10), [seekToTime]);
+  const seekBackward10s = useCallback(() => seekToTime(-10), [seekToTime]);
+  const seekForward1m = useCallback(() => seekToTime(60), [seekToTime]);
+  const seekBackward1m = useCallback(() => seekToTime(-60), [seekToTime]);
+
+  // 종료시간 3초 전으로 이동
+  const seekToEndMinus3s = useCallback(() => {
+    if (youtubePlayer && editingData?.endTimeSeconds) {
+      const targetTime = Math.max(0, editingData.endTimeSeconds - 3);
+      youtubePlayer.seekTo(targetTime, true);
     }
   }, [youtubePlayer, editingData]);
 
@@ -924,13 +994,19 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
       // 통계 재계산
       const relevantItems = updatedTimelines.filter(timeline => timeline.isRelevant && !timeline.isExcluded).length;
       const matchedItems = updatedTimelines.filter(timeline => timeline.matchedSong).length;
-      const uniqueSongs = new Set(updatedTimelines.map(timeline => `${timeline.artist}_${timeline.songTitle}`)).size;
+      const uniqueMatchedSongs = new Set(
+        updatedTimelines
+          .filter((timeline: ParsedTimelineItem) => timeline.matchedSong?.songId)
+          .map((timeline: ParsedTimelineItem) => timeline.matchedSong!.songId)
+      ).size;
+      const verifiedItems = updatedTimelines.filter(timeline => timeline.isTimeVerified).length;
       
       setStats(prev => ({
         ...prev,
         relevantItems: relevantItems,
         matchedSongs: matchedItems,
-        uniqueSongs: uniqueSongs
+        uniqueMatchedSongs: uniqueMatchedSongs,
+        verifiedItems: verifiedItems
       }));
 
       setSelectedTimelineIds(new Set());
@@ -970,13 +1046,19 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
       // 통계 재계산
       const relevantItems = updatedTimelines.filter(timeline => timeline.isRelevant && !timeline.isExcluded).length;
       const matchedItems = updatedTimelines.filter(timeline => timeline.matchedSong).length;
-      const uniqueSongs = new Set(updatedTimelines.map(timeline => `${timeline.artist}_${timeline.songTitle}`)).size;
+      const uniqueMatchedSongs = new Set(
+        updatedTimelines
+          .filter((timeline: ParsedTimelineItem) => timeline.matchedSong?.songId)
+          .map((timeline: ParsedTimelineItem) => timeline.matchedSong!.songId)
+      ).size;
+      const verifiedItems = updatedTimelines.filter(timeline => timeline.isTimeVerified).length;
       
       setStats(prev => ({
         ...prev,
         relevantItems: relevantItems,
         matchedSongs: matchedItems,
-        uniqueSongs: uniqueSongs
+        uniqueMatchedSongs: uniqueMatchedSongs,
+        verifiedItems: verifiedItems
       }));
 
       setSelectedTimelineIds(new Set());
@@ -1003,7 +1085,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
 
   // 편집 중 미리보기 데이터 (메모이제이션으로 성능 최적화)
   const editingPreview = useMemo(() => {
-    if (!isEditing || !editingData || !selectedTimeline) return null;
+    if (!editingData || !selectedTimeline) return null;
     
     return {
       duration: editingData.endTimeSeconds && editingData.startTimeSeconds && editingData.endTimeSeconds > editingData.startTimeSeconds
@@ -1012,35 +1094,30 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
       isValidDuration: editingData.endTimeSeconds ? editingData.endTimeSeconds > editingData.startTimeSeconds : true,
       startTimeChanged: editingData.startTimeSeconds !== selectedTimeline.startTimeSeconds
     };
-  }, [isEditing, editingData, selectedTimeline]);
+  }, [editingData, selectedTimeline]);
 
   // 시간 검증 상태 업데이트 (컴포넌트용 래퍼)
   const handleTimeVerificationUpdate = async (timeline: ParsedTimelineItem, isVerified: boolean, notes?: string) => {
     const result = await updateTimeVerification(timeline, isVerified, notes);
     
     if (result.success && result.data) {
-      // 로컬 상태 업데이트
+      const updatedTimeline = { 
+        ...timeline, 
+        isTimeVerified: result.data!.isTimeVerified,
+        verifiedBy: result.data!.verifiedBy,
+        verifiedAt: result.data!.verifiedAt,
+        verificationNotes: notes,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // parsedTimelines 배열 업데이트
       setParsedTimelines(prev => prev.map(t => 
-        t.id === timeline.id 
-          ? { 
-              ...t, 
-              isTimeVerified: result.data!.isTimeVerified,
-              verifiedBy: result.data!.verifiedBy,
-              verifiedAt: result.data!.verifiedAt,
-              verificationNotes: notes
-            }
-          : t
+        t.id === timeline.id ? updatedTimeline : t
       ));
       
-      // 선택된 타임라인이 현재 수정된 타임라인이면 상태 업데이트
+      // selectedTimeline이 현재 업데이트된 타임라인과 같다면 selectedTimeline도 업데이트
       if (selectedTimeline && selectedTimeline.id === timeline.id) {
-        setSelectedTimeline(prev => prev ? {
-          ...prev,
-          isTimeVerified: result.data!.isTimeVerified,
-          verifiedBy: result.data!.verifiedBy,
-          verifiedAt: result.data!.verifiedAt,
-          verificationNotes: notes
-        } : null);
+        setSelectedTimeline(updatedTimeline);
       }
     } else {
       alert(`시간 검증 ${isVerified ? '완료' : '해제'} 실패: ${result.error}`);
@@ -1118,15 +1195,23 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         const totalItems = result.data.length;
         const relevantItems = result.data.filter((timeline: ParsedTimelineItem) => timeline.isRelevant && !timeline.isExcluded).length;
         const matchedItems = result.data.filter((timeline: ParsedTimelineItem) => timeline.matchedSong).length;
-        const uniqueSongs = new Set(result.data.map((timeline: ParsedTimelineItem) => `${timeline.artist}_${timeline.songTitle}`)).size;
+        
+        // 매칭완료된 곡들 중 곡DB 기준으로 고유한 곡 개수 계산
+        const uniqueMatchedSongs = new Set(
+          result.data
+            .filter((timeline: ParsedTimelineItem) => timeline.matchedSong?.songId)
+            .map((timeline: ParsedTimelineItem) => timeline.matchedSong!.songId)
+        ).size;
+        
+        // 검증완료된 항목 개수 계산
+        const verifiedItems = result.data.filter((timeline: ParsedTimelineItem) => timeline.isTimeVerified).length;
         
         const newStats = {
-          totalVideos: 0,
-          totalTimelineComments: 0,
           parsedItems: totalItems,
           relevantItems: relevantItems,
           matchedSongs: matchedItems,
-          uniqueSongs: uniqueSongs
+          uniqueMatchedSongs: uniqueMatchedSongs,
+          verifiedItems: verifiedItems
         };
         
         setStats(newStats);
@@ -1500,35 +1585,22 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
             </h3>
             {selectedTimeline && (
               <div className="flex gap-2">
-                {isEditing ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-orange-600 dark:text-orange-400">
-                        편집 모드 - 저장 버튼을 눌러 변경사항을 적용하세요
-                      </span>
-                    </div>
-                    <button
-                      onClick={saveEdit}
-                      className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors"
-                    >
-                      저장
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm transition-colors"
-                    >
-                      취소
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={startEdit}
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors flex items-center gap-1"
-                  >
-                    <PencilIcon className="w-4 h-4" />
-                    편집
-                  </button>
-                )}
+                <button
+                  onClick={saveEdit}
+                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors flex items-center gap-1"
+                  disabled={!editingData}
+                >
+                  <CheckIcon className="w-4 h-4" />
+                  저장
+                </button>
+                <button
+                  onClick={resetEdit}
+                  className="px-3 py-1 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+                  disabled={!editingData}
+                >
+                  <ArrowPathIcon className="w-4 h-4" />
+                  원래대로
+                </button>
               </div>
             )}
           </div>
@@ -1550,11 +1622,11 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
               <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 dark:text-white mb-3">기본 정보</h4>
                 <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      아티스트
-                    </label>
-                    {isEditing ? (
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        아티스트
+                      </label>
                       <input
                         type="text"
                         value={editingData?.artist || ''}
@@ -1563,15 +1635,21 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                                    bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         placeholder="아티스트 이름을 입력하세요"
                       />
-                    ) : (
-                      <p className="text-sm text-gray-900 dark:text-white">{selectedTimeline.artist}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      곡명
-                    </label>
-                    {isEditing ? (
+                    </div>
+                    <button
+                      type="button"
+                      onClick={swapArtistAndTitle}
+                      className="px-2 py-2 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
+                                 text-blue-600 dark:text-blue-300 rounded transition-colors text-xs flex items-center gap-1"
+                      title="아티스트와 곡제목 교환"
+                      disabled={!editingData}
+                    >
+                      ⇄
+                    </button>
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        곡명
+                      </label>
                       <input
                         type="text"
                         value={editingData?.songTitle || ''}
@@ -1580,77 +1658,63 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                                    bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         placeholder="곡명을 입력하세요"
                       />
-                    ) : (
-                      <p className="text-sm text-gray-900 dark:text-white">{selectedTimeline.songTitle}</p>
-                    )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         시작 시간 (초)
                       </label>
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <input
-                            type="number"
-                            min="0"
-                            value={editingData?.startTimeSeconds || 0}
-                            onChange={handleStartTimeChange}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
-                                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            placeholder="초 단위"
-                          />
-                          {youtubePlayer && showPlayer && (
-                            <button
-                              type="button"
-                              onClick={setCurrentTimeAsStart}
-                              className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
-                            >
-                              <ClockIcon className="w-3 h-3" />
-                              현재 시간으로 설정
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-900 dark:text-white">
-                          {selectedTimeline.startTimeSeconds} ({formatSeconds(selectedTimeline.startTimeSeconds)})
-                        </p>
-                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={editingData?.startTimeSeconds || 0}
+                          onChange={handleStartTimeChange}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
+                                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          placeholder="초 단위"
+                        />
+                        {youtubePlayer && showPlayer && (
+                          <button
+                            type="button"
+                            onClick={setCurrentTimeAsStart}
+                            className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
+                          >
+                            <ClockIcon className="w-3 h-3" />
+                            현재 시간으로 설정
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         종료 시간 (초)
                       </label>
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <input
-                            type="number"
-                            min="0"
-                            value={editingData?.endTimeSeconds || ''}
-                            onChange={handleEndTimeChange}
-                            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
-                                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                            placeholder="선택사항 (초 단위)"
-                          />
-                          {youtubePlayer && showPlayer && (
-                            <button
-                              type="button"
-                              onClick={setCurrentTimeAsEnd}
-                              className="w-full px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
-                            >
-                              <ClockIcon className="w-3 h-3" />
-                              현재 시간으로 설정
-                            </button>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-sm text-gray-900 dark:text-white">
-                          {selectedTimeline.endTimeSeconds ? `${selectedTimeline.endTimeSeconds} (${formatSeconds(selectedTimeline.endTimeSeconds)})` : '없음'}
-                        </p>
-                      )}
+                      <div className="space-y-2">
+                        <input
+                          type="number"
+                          min="0"
+                          value={editingData?.endTimeSeconds || ''}
+                          onChange={handleEndTimeChange}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
+                                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          placeholder="선택사항 (초 단위)"
+                        />
+                        {youtubePlayer && showPlayer && (
+                          <button
+                            type="button"
+                            onClick={setCurrentTimeAsEnd}
+                            className="w-full px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
+                          >
+                            <ClockIcon className="w-3 h-3" />
+                            현재 시간으로 설정
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  {(selectedTimeline.duration || (isEditing && editingData?.endTimeSeconds && editingData?.startTimeSeconds)) && (
+                  {(selectedTimeline.duration || (editingData?.endTimeSeconds && editingData?.startTimeSeconds)) && (
                     <div>
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         지속 시간
@@ -1673,6 +1737,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                   )}
                 </div>
               </div>
+
 
               {/* 비디오 정보 */}
               <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
@@ -1936,6 +2001,121 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                                 </button>
                               </div>
                             </div>
+                            
+                            {/* 플레이어 시간 제어 */}
+                            {youtubePlayer && (
+                              <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-3 mt-3">
+                                <h5 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3 text-center">플레이어 제어</h5>
+                                <div className="grid grid-cols-3 gap-2">
+                                  {/* 뒤로 이동 */}
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-center text-blue-600 dark:text-blue-400">뒤로</p>
+                                    <div className="flex flex-col gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={seekBackward1m}
+                                        className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
+                                                   text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                        title="1분 뒤로"
+                                      >
+                                        <ChevronDoubleLeftIcon className="w-3 h-3" />
+                                        1분
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={seekBackward10s}
+                                        className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
+                                                   text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                        title="10초 뒤로"
+                                      >
+                                        <ChevronLeftIcon className="w-3 h-3" />
+                                        10초
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={seekBackward1s}
+                                        className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
+                                                   text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                        title="1초 뒤로"
+                                      >
+                                        <BackwardIcon className="w-3 h-3" />
+                                        1초
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 특수 이동 */}
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-center text-blue-600 dark:text-blue-400">특수</p>
+                                    <div className="flex flex-col gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (youtubePlayer && editingData?.startTimeSeconds !== undefined) {
+                                            youtubePlayer.seekTo(editingData.startTimeSeconds, true);
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 
+                                                   text-green-700 dark:text-green-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                        title="시작시간으로 이동"
+                                      >
+                                        <PlayIcon className="w-3 h-3" />
+                                        시작
+                                      </button>
+                                      {editingData?.endTimeSeconds && (
+                                        <button
+                                          type="button"
+                                          onClick={seekToEndMinus3s}
+                                          className="px-2 py-1 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 
+                                                     text-purple-700 dark:text-purple-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                          title="종료시간 3초 전으로 이동"
+                                        >
+                                          <ClockIcon className="w-3 h-3" />
+                                          종료-3초
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                  
+                                  {/* 앞으로 이동 */}
+                                  <div className="space-y-1">
+                                    <p className="text-xs text-center text-blue-600 dark:text-blue-400">앞으로</p>
+                                    <div className="flex flex-col gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={seekForward1m}
+                                        className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
+                                                   text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                        title="1분 앞으로"
+                                      >
+                                        <ChevronDoubleRightIcon className="w-3 h-3" />
+                                        1분
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={seekForward10s}
+                                        className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
+                                                   text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                        title="10초 앞으로"
+                                      >
+                                        <ChevronRightIcon className="w-3 h-3" />
+                                        10초
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={seekForward1s}
+                                        className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
+                                                   text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                        title="1초 앞으로"
+                                      >
+                                        <ForwardIcon className="w-3 h-3" />
+                                        1초
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           /* 썸네일과 재생 버튼 */
