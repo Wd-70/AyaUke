@@ -12,6 +12,7 @@ interface BackupDocument {
   metadata: {
     totalDocuments: number;
     totalCollections: number;
+    totalChunks?: number;
     version: string;
   };
 }
@@ -24,9 +25,11 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get('action');
 
     if (action === 'list-backups') {
-      // 백업 목록 조회
+      // 백업 목록 조회 (청크 파일 제외)
       const backupsCollection = db?.collection('backups');
-      const backups = await backupsCollection?.find({})
+      const backups = await backupsCollection?.find({ 
+        isChunk: { $ne: true }  // 청크가 아닌 메인 백업만 조회
+      })
         .sort({ timestamp: -1 })
         .limit(20)
         .toArray();
@@ -107,19 +110,87 @@ export async function POST(request: NextRequest) {
       const timestamp = new Date();
       const name = backupName || `backup_${timestamp.toISOString().slice(0, 19).replace(/[:.]/g, '-')}`;
       
+      const backupsCollection = db?.collection('backups');
+      
+      // 백업을 더 작은 청크로 분할하여 저장
+      const MAX_CHUNK_SIZE = 5 * 1024 * 1024; // 5MB 제한 (더 안전하게)
+      const chunks: any[] = [];
+      let chunkIndex = 0;
+
+      for (const [collectionName, documents] of Object.entries(backupData)) {
+        const documentsArray = documents as any[];
+        
+        // 컬렉션이 비어있으면 건너뛰기
+        if (documentsArray.length === 0) {
+          chunks.push({
+            name: `${name}_chunk_${chunkIndex}`,
+            timestamp,
+            chunkIndex,
+            isChunk: true,
+            collections: { [collectionName]: [] }
+          });
+          chunkIndex++;
+          continue;
+        }
+
+        // 큰 컬렉션은 문서 단위로 분할
+        const collectionSize = JSON.stringify(documentsArray).length;
+        
+        if (collectionSize > MAX_CHUNK_SIZE) {
+          console.log(`큰 컬렉션 분할: ${collectionName} (${Math.round(collectionSize / 1024 / 1024)}MB)`);
+          
+          // 문서를 작은 배치로 나누기
+          const batchSize = Math.max(1, Math.floor(documentsArray.length * MAX_CHUNK_SIZE / collectionSize));
+          
+          for (let i = 0; i < documentsArray.length; i += batchSize) {
+            const batch = documentsArray.slice(i, i + batchSize);
+            chunks.push({
+              name: `${name}_chunk_${chunkIndex}`,
+              timestamp,
+              chunkIndex,
+              isChunk: true,
+              collections: { [collectionName]: batch },
+              partialCollection: true, // 부분 컬렉션 표시
+              partInfo: { 
+                collectionName, 
+                partIndex: Math.floor(i / batchSize),
+                totalParts: Math.ceil(documentsArray.length / batchSize)
+              }
+            });
+            chunkIndex++;
+          }
+        } else {
+          // 작은 컬렉션은 그대로 저장
+          chunks.push({
+            name: `${name}_chunk_${chunkIndex}`,
+            timestamp,
+            chunkIndex,
+            isChunk: true,
+            collections: { [collectionName]: documentsArray }
+          });
+          chunkIndex++;
+        }
+      }
+
+      // 각 청크를 개별 문서로 저장
+      for (const chunk of chunks) {
+        await backupsCollection?.insertOne(chunk);
+      }
+
+      // 메인 백업 문서 (메타데이터만)
       const backupDocument: BackupDocument = {
         name,
         timestamp,
-        collections: backupData,
+        collections: {}, // 빈 객체로 설정
         metadata: {
           totalDocuments,
           totalCollections: dataCollections.length,
-          version: '1.0'
+          totalChunks: chunks.length,
+          version: '2.0' // 새 버전으로 표시
         }
       };
 
-      // 백업 저장
-      const backupsCollection = db?.collection('backups');
+      // 메인 백업 문서 저장
       await backupsCollection?.insertOne(backupDocument);
 
       // 백업 로그 저장
@@ -164,9 +235,40 @@ export async function POST(request: NextRequest) {
       }
 
       const restoreResults = [];
+      let allBackupData: { [key: string]: any[] } = {};
+
+      // 버전 2.0 백업 (청크 방식)인지 확인
+      if (backup.metadata?.version === '2.0' && backup.metadata?.totalChunks > 0) {
+        console.log(`청크 방식 백업 복원 시작: ${backup.metadata.totalChunks}개 청크`);
+        
+        // 모든 청크 데이터 수집
+        const allChunks = await backupsCollection?.find({ 
+          name: { $regex: `^${restoreBackupName}_chunk_` }, 
+          isChunk: true 
+        }).toArray();
+
+        console.log(`총 ${allChunks?.length || 0}개 청크 발견`);
+
+        if (allChunks) {
+          for (const chunk of allChunks) {
+            if (chunk.collections) {
+              // 청크의 컬렉션 데이터를 통합
+              for (const [collectionName, documents] of Object.entries(chunk.collections)) {
+                if (!allBackupData[collectionName]) {
+                  allBackupData[collectionName] = [];
+                }
+                allBackupData[collectionName].push(...(documents as any[]));
+              }
+            }
+          }
+        }
+      } else {
+        // 기존 방식 백업 (v1.0)
+        allBackupData = backup.collections;
+      }
 
       // 각 컬렉션 복원
-      for (const [collectionName, documents] of Object.entries(backup.collections)) {
+      for (const [collectionName, documents] of Object.entries(allBackupData)) {
         const typedDocuments = documents as mongoose.mongo.OptionalId<mongoose.mongo.Document>[];
         try {
           const collection = db?.collection(collectionName);

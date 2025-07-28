@@ -15,6 +15,7 @@ import {
   LinkIcon
 } from '@heroicons/react/24/outline';
 import TimelineParsingView from './TimelineParsingView';
+import SyncResultDialog from '@/components/SyncResultDialog';
 
 interface VideoData {
   videoId: string;
@@ -67,6 +68,26 @@ interface PaginationData {
 export default function CommentAnalysisTab() {
   const [viewMode, setViewMode] = useState<'comments' | 'timeline'>('comments');
   const [loading, setLoading] = useState(false);
+  
+  // 다이얼로그 상태
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogTitle, setDialogTitle] = useState('');
+  const [dialogMessage, setDialogMessage] = useState('');
+  const [dialogResult, setDialogResult] = useState<any>(null);
+  const [dialogIsError, setDialogIsError] = useState(false);
+
+  // HTML 태그 제거 함수 (줄바꿈 유지)
+  const stripHtmlTags = (html: string): string => {
+    return html
+      .replace(/<br\s*\/?>/gi, '\n') // <br> 태그를 줄바꿈으로 변환
+      .replace(/<[^>]*>/g, '') // 다른 HTML 태그 제거
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#x27;/g, "'")
+      .replace(/&#x2F;/g, '/');
+  };
   const [syncing, setSyncing] = useState(false);
   const [timelineParsing, setTimelineParsing] = useState(false);
   const [videos, setVideos] = useState<VideoData[]>([]);
@@ -124,28 +145,14 @@ export default function CommentAnalysisTab() {
     }
   };
 
-  // API 연결 테스트
-  const testAPIConnection = async () => {
-    try {
-      const response = await fetch('/api/youtube-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: 'test',
-          artist: 'test'
-        })
-      });
 
-      const result = await response.json();
-      if (result.success) {
-        alert('YouTube API 연결 성공!');
-      } else {
-        alert(`API 테스트 실패: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('API 테스트 오류:', error);
-      alert('API 테스트 중 오류가 발생했습니다.');
-    }
+  // 다이얼로그 열기 헬퍼 함수
+  const showDialog = (title: string, message: string, result?: any, isError = false) => {
+    setDialogTitle(title);
+    setDialogMessage(message);
+    setDialogResult(result);
+    setDialogIsError(isError);
+    setDialogOpen(true);
   };
 
   // 전체 채널 동기화
@@ -165,14 +172,14 @@ export default function CommentAnalysisTab() {
       const result = await response.json();
       
       if (result.success) {
-        alert(result.message);
+        showDialog('동기화 완료', result.message, result.data);
         await loadChannelData(pagination.currentPage, searchQuery);
       } else {
-        alert(result.error || '동기화 실패');
+        showDialog('동기화 실패', result.error || '동기화 중 오류가 발생했습니다.', null, true);
       }
     } catch (error) {
       console.error('채널 동기화 오류:', error);
-      alert('동기화 중 오류가 발생했습니다.');
+      showDialog('동기화 오류', '동기화 중 네트워크 오류가 발생했습니다.', null, true);
     } finally {
       setSyncing(false);
     }
@@ -193,17 +200,17 @@ export default function CommentAnalysisTab() {
       const result = await response.json();
       
       if (result.success) {
-        alert(result.message);
+        showDialog('비디오 새로고침 완료', result.message, result.data);
         await loadChannelData(pagination.currentPage, searchQuery);
         if (selectedVideo && selectedVideo.videoId === videoId) {
           await loadVideoComments(videoId);
         }
       } else {
-        alert(result.error || '새로고침 실패');
+        showDialog('새로고침 실패', result.error || '새로고침 중 오류가 발생했습니다.', null, true);
       }
     } catch (error) {
       console.error('비디오 새로고침 오류:', error);
-      alert('새로고침 중 오류가 발생했습니다.');
+      showDialog('새로고침 오류', '새로고침 중 네트워크 오류가 발생했습니다.', null, true);
     }
   };
 
@@ -217,11 +224,11 @@ export default function CommentAnalysisTab() {
         setComments(result.data.comments);
         setSelectedVideo(result.data.video);
       } else {
-        alert(result.error || '댓글 로드 실패');
+        showDialog('댓글 로드 실패', result.error || '댓글 로드 중 오류가 발생했습니다.', null, true);
       }
     } catch (error) {
       console.error('댓글 로드 오류:', error);
-      alert('댓글 로드 중 오류가 발생했습니다.');
+      showDialog('댓글 로드 오류', '댓글 로드 중 네트워크 오류가 발생했습니다.', null, true);
     }
   };
 
@@ -248,11 +255,11 @@ export default function CommentAnalysisTab() {
             : comment
         ));
       } else {
-        alert(result.error || '업데이트 실패');
+        showDialog('업데이트 실패', result.error || '업데이트 중 오류가 발생했습니다.', null, true);
       }
     } catch (error) {
       console.error('댓글 업데이트 오류:', error);
-      alert('업데이트 중 오류가 발생했습니다.');
+      showDialog('업데이트 오류', '업데이트 중 네트워크 오류가 발생했습니다.', null, true);
     }
   };
 
@@ -291,13 +298,43 @@ export default function CommentAnalysisTab() {
       
       if (result.success) {
         setTimelineStats(result.data.stats);
-        alert(result.message || '타임라인 파싱이 완료되었습니다.');
+        showDialog('타임라인 파싱 완료', result.message || '타임라인 파싱이 완료되었습니다.');
       } else {
-        alert(result.error || '타임라인 파싱 실패');
+        showDialog('타임라인 파싱 실패', result.error || '타임라인 파싱 중 오류가 발생했습니다.', null, true);
       }
     } catch (error) {
       console.error('타임라인 파싱 오류:', error);
-      alert('타임라인 파싱 중 오류가 발생했습니다.');
+      showDialog('타임라인 파싱 오류', '타임라인 파싱 중 네트워크 오류가 발생했습니다.', null, true);
+    } finally {
+      setTimelineParsing(false);
+    }
+  };
+
+
+  // 기존 데이터를 개선된 파싱 방식으로 업데이트
+  const reprocessAllTimelines = async () => {
+    if (!confirm('기존 파싱된 타임라인 데이터를 개선된 멀티라인 파싱 방식으로 업데이트하시겠습니까?\n새로운 요소는 추가되지 않고 기존 데이터만 업데이트됩니다.')) return;
+    
+    setTimelineParsing(true);
+    try {
+      const response = await fetch('/api/timeline-parser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reprocess-timeline-comments'
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        showDialog('데이터 업데이트 완료', result.message, result.data);
+      } else {
+        showDialog('업데이트 실패', result.error || '데이터 업데이트 중 오류가 발생했습니다.', null, true);
+      }
+    } catch (error) {
+      console.error('데이터 업데이트 오류:', error);
+      showDialog('업데이트 오류', '데이터 업데이트 중 네트워크 오류가 발생했습니다.', null, true);
     } finally {
       setTimelineParsing(false);
     }
@@ -339,13 +376,6 @@ export default function CommentAnalysisTab() {
               {viewMode === 'comments' && (
                 <>
                   <button
-                    onClick={testAPIConnection}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-2 transition-colors"
-                  >
-                    <CheckCircleIcon className="w-4 h-4" />
-                    API 테스트
-                  </button>
-                  <button
                     onClick={() => loadChannelData(pagination.currentPage, searchQuery)}
                     disabled={loading}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors"
@@ -374,23 +404,34 @@ export default function CommentAnalysisTab() {
               )}
               
               {viewMode === 'timeline' && (
-                <button
-                  onClick={parseTimelineComments}
-                  disabled={timelineParsing}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors"
-                >
-                  {timelineParsing ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      파싱 중...
-                    </>
-                  ) : (
-                    <>
-                      <LinkIcon className="w-4 h-4" />
-                      타임라인 파싱
-                    </>
-                  )}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={parseTimelineComments}
+                    disabled={timelineParsing}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    {timelineParsing ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        처리 중...
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon className="w-4 h-4" />
+                        타임라인 파싱
+                      </>
+                    )}
+                  </button>
+                  
+                  <button
+                    onClick={reprocessAllTimelines}
+                    disabled={timelineParsing}
+                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <ChatBubbleBottomCenterTextIcon className="w-4 h-4" />
+                    데이터 업데이트
+                  </button>
+                </div>
               )}
               
               {/* 뷰 모드 토글 - 오른쪽 끝으로 이동 */}
@@ -704,8 +745,8 @@ export default function CommentAnalysisTab() {
                           )}
                         </div>
                       </div>
-                      <p className="text-gray-700 dark:text-gray-300 text-sm mb-2">
-                        {comment.textContent}
+                      <p className="text-gray-700 dark:text-gray-300 text-sm mb-2 whitespace-pre-wrap leading-relaxed">
+                        {stripHtmlTags(comment.textContent)}
                       </p>
                       {comment.extractedTimestamps.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-2">
@@ -765,6 +806,16 @@ export default function CommentAnalysisTab() {
           </div>
           </div>
         )}
+        
+        {/* 결과 다이얼로그 */}
+        <SyncResultDialog
+          isOpen={dialogOpen}
+          onClose={() => setDialogOpen(false)}
+          title={dialogTitle}
+          message={dialogMessage}
+          result={dialogResult}
+          isError={dialogIsError}
+        />
       </div>
     </div>
   );

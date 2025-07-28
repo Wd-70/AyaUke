@@ -7,8 +7,8 @@ import { YouTubeComment, YouTubeVideo } from '@/models/YouTubeComment';
 import SongDetail from '@/models/SongDetail';
 import mongoose from 'mongoose';
 
-// 라이브 클립 데이터를 위한 MongoDB 스키마
-const LiveClipSchema = new mongoose.Schema({
+// 파싱된 타임라인 데이터를 위한 MongoDB 스키마
+const ParsedTimelineSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   videoId: { type: String, required: true },
   videoTitle: { type: String, required: true },
@@ -29,171 +29,23 @@ const LiveClipSchema = new mongoose.Schema({
     confidence: { type: Number }
   },
   originalComment: { type: String, required: true }, // 원본 댓글
+  commentAuthor: { type: String, required: true }, // 댓글 작성자
+  commentId: { type: String, required: true }, // 원본 댓글 ID
+  commentPublishedAt: { type: Date }, // 댓글 작성 시간
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
 
-const LiveClip = mongoose.models.LiveClip || mongoose.model('LiveClip', LiveClipSchema);
+const ParsedTimeline = mongoose.models.ParsedTimeline || mongoose.model('ParsedTimeline', ParsedTimelineSchema);
 
-// HTML 엔티티 디코딩 함수
-function decodeHtmlEntities(text: string): string {
-  const entities: { [key: string]: string } = {
-    '&amp;': '&',
-    '&lt;': '<',
-    '&gt;': '>',
-    '&quot;': '"',
-    '&#x27;': "'",
-    '&#x2F;': '/',
-    '&#x60;': '`',
-    '&#x3D;': '='
-  };
-  
-  return text.replace(/&[#\w]+;/g, (entity) => {
-    return entities[entity] || entity;
-  });
-}
-
-// 개선된 타임라인 파싱 함수
-function parseTimelineComment(htmlText: string, videoTitle: string) {
-  console.log(`🔍 원본 HTML: ${htmlText.substring(0, 300)}...`);
-  
-  // HTML 엔티티 디코딩
-  const decodedHtml = decodeHtmlEntities(htmlText);
-  console.log(`🔧 디코딩 후: ${decodedHtml.substring(0, 300)}...`);
-  
-  // 새로운 패턴: <a>태그와 그 다음에 오는 텍스트를 함께 매칭
-  // 패턴: <a href="...">시간</a> 아티스트 - 곡명 <br>
-  const fullPattern = /<a[^>]*href="([^"]*)"[^>]*>[^<]*<\/a>\s*([^<]*?)(?:<br>|$)/gi;
-  const songEntries = [];
-  let match;
-
-  const rawMatches = [];
-  while ((match = fullPattern.exec(decodedHtml)) !== null) {
-    const url = match[1];
-    const songText = match[2].trim();
-    
-    console.log(`🔗 발견된 링크: ${url}`);
-    console.log(`🎵 곡 정보 텍스트: "${songText}"`);
-    
-    // YouTube 링크인지 확인
-    if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
-      // 타임스탬프 추출 (t= 파라미터)
-      const timestampMatch = url.match(/[?&]t=(\d+)/);
-      
-      if (timestampMatch && songText) {
-        const timeSeconds = parseInt(timestampMatch[1]);
-        
-        // 곡 정보 파싱
-        const songInfo = parseSongInfo(songText);
-        
-        // 구분자로 나뉘는지 확인 (관련성 판단)
-        const isRelevant = songInfo.artist !== '알 수 없음';
-        
-        rawMatches.push({
-          url,
-          timeSeconds,
-          artist: songInfo.artist,
-          songTitle: songInfo.songTitle,
-          isRelevant: isRelevant
-        });
-        
-        console.log(`${isRelevant ? '✅' : '⚠️'} 추가됨: ${timeSeconds}초 - ${songInfo.artist} - ${songInfo.songTitle} ${isRelevant ? '(관련성 있음)' : '(관련성 없음)'}`);
-      } else {
-        console.log(`❌ 타임스탬프 없음 또는 곡 정보 없음`);
-      }
-    } else {
-      console.log(`❌ YouTube 링크 아님: ${url}`);
-    }
-  }
-  
-  console.log(`📊 총 ${rawMatches.length}개 유효한 곡 발견`);
-
-  // 시간순 정렬
-  rawMatches.sort((a, b) => a.timeSeconds - b.timeSeconds);
-
-  // 기본 비디오 URL 추출 (t 파라미터 제거)
-  const baseVideoUrl = rawMatches.length > 0 ? 
-    rawMatches[0].url.replace(/[?&]t=\d+/, '').replace(/[?&]$/, '') : '';
-
-  // 날짜 추출
-  const dateInfo = extractDateFromTitle(videoTitle);
-
-  // 각 곡 정보와 시작/종료 시간 계산
-  for (let i = 0; i < rawMatches.length; i++) {
-    const current = rawMatches[i];
-    const next = rawMatches[i + 1];
-    
-    const liveClip = {
-      videoUrl: baseVideoUrl,
-      artist: current.artist,
-      songTitle: current.songTitle,
-      startTimeSeconds: current.timeSeconds,
-      endTimeSeconds: next ? next.timeSeconds : null,
-      duration: next ? (next.timeSeconds - current.timeSeconds) : null,
-      uploadedDate: dateInfo.date,
-      originalDateString: dateInfo.originalString,
-      isRelevant: current.isRelevant
-    };
-    
-    songEntries.push(liveClip);
-  }
-
-  return songEntries;
-}
-
-// 곡 정보 파싱 함수 (아티스트와 곡명 분리)
-function parseSongInfo(songText: string) {
-  console.log(`🎵 파싱할 곡 정보: "${songText}"`);
-  
-  const cleanText = songText.trim();
-  
-  // 다양한 구분자로 분리 시도
-  const separators = [' - ', ' – ', ' — ', ' | ', ' / '];
-  
-  for (const separator of separators) {
-    if (cleanText.includes(separator)) {
-      const parts = cleanText.split(separator);
-      if (parts.length >= 2 && parts[0].trim() && parts[1].trim()) {
-        const result = {
-          artist: parts[0].trim(),
-          songTitle: parts.slice(1).join(separator).trim()
-        };
-        console.log(`✅ 분리 성공 (구분자: "${separator}"): ${result.artist} - ${result.songTitle}`);
-        return result;
-      }
-    }
-  }
-  
-  // 구분자가 없는 경우, 전체를 곡명으로 처리
-  const result = {
-    artist: '알 수 없음',
-    songTitle: cleanText
-  };
-  console.log(`⚠️ 구분자 없음, 곡명만: ${result.songTitle}`);
-  return result;
-}
-
-// 초를 MM:SS 형식으로 변환
-function formatSeconds(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
-}
-
-// 문자열 유사도 계산 (Levenshtein distance 기반)
-function calculateSimilarity(str1: string, str2: string): number {
-  if (!str1 || !str2) return 0;
-  
-  const s1 = str1.toLowerCase().trim();
-  const s2 = str2.toLowerCase().trim();
-  
-  if (s1 === s2) return 1;
-  
-  const maxLen = Math.max(s1.length, s2.length);
-  if (maxLen === 0) return 1;
-  
-  const distance = levenshteinDistance(s1, s2);
-  return (maxLen - distance) / maxLen;
+// 텍스트 정규화 함수 (공백/특수문자 제거, 소문자 변환)
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '') // 모든 공백 제거
+    .replace(/[-_.,!?()[\]{}]/g, '') // 기본 구두점만 제거
+    .replace(/[^\w가-힣]/g, ''); // 한글, 영문, 숫자만 유지
 }
 
 // Levenshtein distance 계산
@@ -225,16 +77,539 @@ function levenshteinDistance(str1: string, str2: string): number {
   return matrix[str2.length][str1.length];
 }
 
-// 텍스트 정규화 (매칭 정확도 향상을 위해)
-function normalizeText(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[\(\)\[\]{}]/g, '') // 괄호 제거
-    .replace(/\s+/g, ' ') // 연속 공백을 하나로
-    .replace(/[^\w\s가-힣]/g, '') // 특수문자 제거 (한글, 영문, 숫자, 공백만 유지)
-    .trim();
+// 개선된 문자열 유사도 계산
+function calculateSimilarity(str1: string, str2: string): number {
+  if (!str1 || !str2) return 0;
+  
+  const s1 = str1.toLowerCase().trim();
+  const s2 = str2.toLowerCase().trim();
+  
+  if (s1 === s2) return 1;
+  
+  // 1. 포함 관계 체크 (높은 점수)
+  if (s1.includes(s2) || s2.includes(s1)) {
+    const longer = s1.length > s2.length ? s1 : s2;
+    const shorter = s1.length > s2.length ? s2 : s1;
+    return 0.8 + (shorter.length / longer.length) * 0.2; // 0.8~1.0
+  }
+  
+  // 2. 공통 부분 문자열 찾기
+  let commonLength = 0;
+  const minLen = Math.min(s1.length, s2.length);
+  
+  // 시작 부분 공통 문자열
+  for (let i = 0; i < minLen; i++) {
+    if (s1[i] === s2[i]) {
+      commonLength++;
+    } else {
+      break;
+    }
+  }
+  
+  // 끝 부분 공통 문자열
+  for (let i = 1; i <= minLen - commonLength; i++) {
+    if (s1[s1.length - i] === s2[s2.length - i]) {
+      commonLength++;
+    } else {
+      break;
+    }
+  }
+  
+  if (commonLength > 0) {
+    const maxLen = Math.max(s1.length, s2.length);
+    const similarity = commonLength / maxLen;
+    if (similarity >= 0.3) return similarity;
+  }
+  
+  // 3. Levenshtein distance 기반 계산
+  const maxLen = Math.max(s1.length, s2.length);
+  if (maxLen === 0) return 1;
+  
+  const distance = levenshteinDistance(s1, s2);
+  return Math.max(0, (maxLen - distance) / maxLen);
 }
+
+
+// 아티스트 검색 (아티스트, artistAlias, searchTags)
+function searchInArtistFields(song: any, normalizedQuery: string): number {
+  const fields = [
+    song.artist,
+    song.artistAlias,
+    ...(song.searchTags || [])
+  ].filter(Boolean);
+  
+  let maxSimilarity = 0;
+  let exactMatch = false;
+  
+  for (const field of fields) {
+    const normalizedField = normalizeText(field);
+    
+    // 1. 완전 일치 체크
+    if (normalizedField === normalizedQuery) {
+      exactMatch = true;
+      maxSimilarity = 1.0;
+      break;
+    }
+    
+    // 2. 포함 관계 체크 (양방향)
+    if (normalizedField.includes(normalizedQuery) || normalizedQuery.includes(normalizedField)) {
+      maxSimilarity = Math.max(maxSimilarity, 0.8);
+    }
+    
+    // 3. 유사도 계산
+    const similarity = calculateSimilarity(normalizedQuery, normalizedField);
+    maxSimilarity = Math.max(maxSimilarity, similarity);
+    
+    // 4. 짧은 문자열 특별 처리 (3글자 이하)
+    if (normalizedQuery.length <= 3 || normalizedField.length <= 3) {
+      if (normalizedField.includes(normalizedQuery) || normalizedQuery.includes(normalizedField)) {
+        maxSimilarity = Math.max(maxSimilarity, 0.7);
+      }
+    }
+  }
+  
+  return maxSimilarity;
+}
+
+// 제목 검색 (title, titleAlias, searchTags)
+function searchInTitleFields(song: any, normalizedQuery: string): number {
+  const fields = [
+    song.title,
+    song.titleAlias,
+    ...(song.searchTags || [])
+  ].filter(Boolean);
+  
+  let maxSimilarity = 0;
+  let exactMatch = false;
+  
+  for (const field of fields) {
+    const normalizedField = normalizeText(field);
+    
+    // 1. 완전 일치 체크
+    if (normalizedField === normalizedQuery) {
+      exactMatch = true;
+      maxSimilarity = 1.0;
+      break;
+    }
+    
+    // 2. 포함 관계 체크 (양방향)
+    if (normalizedField.includes(normalizedQuery) || normalizedQuery.includes(normalizedField)) {
+      maxSimilarity = Math.max(maxSimilarity, 0.8);
+    }
+    
+    // 3. 유사도 계산
+    const similarity = calculateSimilarity(normalizedQuery, normalizedField);
+    maxSimilarity = Math.max(maxSimilarity, similarity);
+    
+    // 4. 짧은 문자열 특별 처리 (3글자 이하)
+    if (normalizedQuery.length <= 3 || normalizedField.length <= 3) {
+      if (normalizedField.includes(normalizedQuery) || normalizedQuery.includes(normalizedField)) {
+        maxSimilarity = Math.max(maxSimilarity, 0.7);
+      }
+    }
+  }
+  
+  return maxSimilarity;
+}
+
+// 타임라인 데이터와 노래 DB 매칭
+async function matchTimelineWithSongs(artist: string, title: string) {
+  await dbConnect();
+  
+  const normalizedArtist = normalizeText(artist);
+  const normalizedTitle = normalizeText(title);
+  
+  // 기본 로그만 유지
+  console.log(`🔍 검색 시작: "${artist}" - "${title}"`);
+  
+  // 모든 곡 또는 활성+상태없는 곡 가져오기
+  let allSongs = await SongDetail.find({ 
+    $or: [
+      { status: 'active' },
+      { status: { $exists: false } },
+      { status: null }
+    ]
+  }).lean();
+  
+  // 검색 대상이 적다면 모든 곡을 대상으로 검색
+  if (allSongs.length < 100) {
+    allSongs = await SongDetail.find({}).lean();
+  }
+  
+  console.log(`🔍 검색 대상 곡 수: ${allSongs.length}개`);
+  
+  const candidates = [];
+  let processedCount = 0;
+  
+  for (const song of allSongs) {
+    const artistSimilarity = searchInArtistFields(song, normalizedArtist);
+    const titleSimilarity = searchInTitleFields(song, normalizedTitle);
+    
+    // 전체 일치율 = (아티스트 유사도 + 제목 유사도) / 2
+    const overallSimilarity = (artistSimilarity + titleSimilarity) / 2;
+    
+    // 높은 유사도 결과만 로그
+    if (overallSimilarity > 0.3) {
+      console.log(`🎯 매치: "${song.artist}" - "${song.title}" (${(overallSimilarity * 100).toFixed(1)}%)`);
+    }
+    
+    // 최소 임계값 이상인 경우만 후보로 추가 (임계값 낮춤)
+    if (overallSimilarity > 0.1) {
+      candidates.push({
+        song,
+        artistSimilarity,
+        titleSimilarity,
+        overallSimilarity,
+        isExactMatch: overallSimilarity >= 0.95
+      });
+    }
+    
+    processedCount++;
+  }
+  
+  console.log(`✅ 검색 완료: ${candidates.length}개 후보 발견`);
+  
+  // 일치율 순으로 정렬
+  candidates.sort((a, b) => b.overallSimilarity - a.overallSimilarity);
+  
+  return candidates.slice(0, 10); // 상위 10개만 반환
+}
+
+// 시간 파라미터를 초로 변환하는 함수 (콜론 형태 우선 처리)
+function parseTimeToSeconds(timeParam: string): number {
+  // 콜론 형태 처리 (최우선)
+  // h:m:s 형식 (예: 1:23:45)
+  const colonHmsMatch = timeParam.match(/^(\d{1,2}):(\d{2}):(\d{2})$/);
+  if (colonHmsMatch) {
+    const hours = parseInt(colonHmsMatch[1]);
+    const minutes = parseInt(colonHmsMatch[2]);
+    const seconds = parseInt(colonHmsMatch[3]);
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+  
+  // m:s 형식 (예: 23:45)
+  const colonMsMatch = timeParam.match(/^(\d{1,2}):(\d{2})$/);
+  if (colonMsMatch) {
+    const minutes = parseInt(colonMsMatch[1]);
+    const seconds = parseInt(colonMsMatch[2]);
+    return minutes * 60 + seconds;
+  }
+  
+  // 숫자만 있는 경우 (초)
+  if (/^\d+$/.test(timeParam)) {
+    return parseInt(timeParam);
+  }
+  
+  // h:m:s 형식 (예: 1h23m45s)
+  const hmsMatch = timeParam.match(/(\d+)h(\d+)m(\d+)s/);
+  if (hmsMatch) {
+    const hours = parseInt(hmsMatch[1]);
+    const minutes = parseInt(hmsMatch[2]);
+    const seconds = parseInt(hmsMatch[3]);
+    return hours * 3600 + minutes * 60 + seconds;
+  }
+  
+  // m:s 형식 (예: 23m45s)
+  const msMatch = timeParam.match(/(\d+)m(\d+)s/);
+  if (msMatch) {
+    const minutes = parseInt(msMatch[1]);
+    const seconds = parseInt(msMatch[2]);
+    return minutes * 60 + seconds;
+  }
+  
+  // h:m 형식 (예: 1h23m)
+  const hmMatch = timeParam.match(/(\d+)h(\d+)m/);
+  if (hmMatch) {
+    const hours = parseInt(hmMatch[1]);
+    const minutes = parseInt(hmMatch[2]);
+    return hours * 3600 + minutes * 60;
+  }
+  
+  // m 형식 (예: 23m)
+  const mMatch = timeParam.match(/(\d+)m/);
+  if (mMatch) {
+    const minutes = parseInt(mMatch[1]);
+    return minutes * 60;
+  }
+  
+  // s 형식 (예: 45s)
+  const sMatch = timeParam.match(/(\d+)s/);
+  if (sMatch) {
+    return parseInt(sMatch[1]);
+  }
+  
+  return 0;
+}
+
+// 개선된 HTML 엔티티 디코딩 함수
+function decodeHtmlEntities(text: string): string {
+  // 기본 HTML 엔티티 매핑
+  const namedEntities: { [key: string]: string } = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&apos;': "'",
+    '&nbsp;': ' ',
+    '&copy;': '©',
+    '&reg;': '®',
+    '&trade;': '™'
+  };
+  
+  return text
+    // 1. 숫자 형태의 HTML 엔티티 디코딩 (&#39; → ')
+    .replace(/&#(\d+);/g, (match, code) => {
+      try {
+        return String.fromCharCode(parseInt(code, 10));
+      } catch (e) {
+        return match; // 변환 실패 시 원본 반환
+      }
+    })
+    // 2. 16진수 형태의 HTML 엔티티 디코딩 (&#x27; → ')
+    .replace(/&#x([0-9a-fA-F]+);/g, (match, code) => {
+      try {
+        return String.fromCharCode(parseInt(code, 16));
+      } catch (e) {
+        return match; // 변환 실패 시 원본 반환
+      }
+    })
+    // 3. 이름 기반 HTML 엔티티 디코딩
+    .replace(/&[a-zA-Z][a-zA-Z0-9]*;/g, (entity) => {
+      return namedEntities[entity] || entity;
+    });
+}
+
+// 음악 컨텐츠 여부 판단 함수 (모든 것 포함)
+function isMusicContent(text: string): boolean {
+  // 완전히 빈 텍스트나 의미없는 기호만 제외
+  if (!text || text.trim() === '' || /^[?!.~\s]*$/.test(text)) {
+    return false;
+  }
+  
+  // 그 외 모든 내용 포함
+  return true;
+}
+
+// 범용 타임라인 파싱 함수 - 모든 타임스탬프 패턴을 캐치
+function splitCommentByTimestamps(decodedHtml: string) {
+  console.log('🔍 범용 타임라인 파싱 시작...');
+  
+  const results = [];
+  let baseVideoUrl = '';
+  
+  // 첫 번째 유튜브 링크에서 기본 URL 추출
+  const linkMatch = decodedHtml.match(/<a[^>]*href="([^"]*youtube[^"]*)"[^>]*>/);
+  if (linkMatch) {
+    baseVideoUrl = linkMatch[1].replace(/[?&]t=\d+/, '').replace(/[?&]$/, '');
+  }
+  
+  // 1단계: 모든 타임스탬프 링크를 찾고 주변 텍스트 추출
+  const allTimestampPattern = /<a[^>]*>(\d{1,2}:\d{2}(?::\d{2})?)<\/a>/g;
+  let match;
+  const timestampPositions = [];
+  
+  while ((match = allTimestampPattern.exec(decodedHtml)) !== null) {
+    timestampPositions.push({
+      timeText: match[1],
+      timeSeconds: parseTimeToSeconds(match[1]),
+      startPos: match.index,
+      endPos: match.index + match[0].length,
+      fullMatch: match[0]
+    });
+  }
+  
+  console.log(`🕐 총 ${timestampPositions.length}개 타임스탬프 발견`);
+  
+  // 2단계: 각 타임스탬프 주변의 컨텍스트 추출
+  timestampPositions.forEach((timestamp, index) => {
+    // 현재 타임스탬프 이후부터 다음 타임스탬프 전까지의 텍스트
+    const nextStartPos = index < timestampPositions.length - 1 ? 
+                        timestampPositions[index + 1].startPos : 
+                        decodedHtml.length;
+    
+    const contextText = decodedHtml.substring(timestamp.endPos, nextStartPos);
+    
+    // 텍스트 정리 및 추출
+    let cleanText = contextText
+      .replace(/<br\s*\/?>/gi, ' ')  // <br> 태그를 공백으로
+      .replace(/<[^>]*>/g, ' ')      // 모든 HTML 태그 제거
+      .replace(/\s+/g, ' ')          // 연속 공백을 하나로
+      .trim();
+    
+    // 특수 마커나 브래킷 정보 제거
+    cleanText = cleanText
+      .replace(/^[🎵🪻]\s*/, '')     // 이모지 마커 제거
+      .replace(/^\[.*?\]\s*/, '')     // 브래킷 정보 제거 ([저챗], [노래타임] 등)
+      .replace(/^\s*-\s*/, '')        // 시작 대시 제거
+      .replace(/^\s*~\s*/, '')        // 시작 틸드 제거
+      .trim();
+    
+    // VS 패턴 처리 - "곡1 VS 시간 곡2" 형태를 분리
+    const vsMatch = cleanText.match(/^(.*?)\s+VS\s+(\d{1,2}:\d{2}(?::\d{2})?)\s+(.*?)$/);
+    if (vsMatch) {
+      // VS 앞부분만 현재 타임스탬프에 연결
+      cleanText = vsMatch[1].trim();
+    }
+    
+    // 빈 텍스트나 너무 짧은 텍스트 스킵
+    if (!cleanText || cleanText.length < 2) {
+      return;
+    }
+    
+    // 음악 관련 여부 판단
+    const isLikelyMusic = isMusicContent(cleanText);
+    
+    if (isLikelyMusic) {
+      results.push({
+        timeText: timestamp.timeText,
+        timeSeconds: timestamp.timeSeconds,
+        content: cleanText,
+        baseVideoUrl,
+        source: 'general'
+      });
+      console.log(`🎶 발견: ${timestamp.timeText} → "${cleanText}"`);
+    } else {
+      console.log(`❌ 제외: ${timestamp.timeText} → "${cleanText.substring(0, 50)}..."`);
+    }
+  });
+  
+  // 시간순 정렬
+  results.sort((a, b) => a.timeSeconds - b.timeSeconds);
+  console.log(`📍 총 ${results.length}개 음악 항목 발견`);
+  
+  return results;
+}
+
+// 기본 비디오 URL 추출
+function extractBaseVideoUrl(timelines: any[]) {
+  const linkTimeline = timelines.find(t => t.type === 'link' && t.url);
+  if (linkTimeline) {
+    return linkTimeline.url.replace(/[?&]t=\d+/, '').replace(/[?&]$/, '');
+  }
+  return '';
+}
+
+// 완전히 새로운 타임라인 파싱 함수
+function parseTimelineComment(htmlText: string, videoTitle: string) {
+  console.log(`🔍 원본 댓글 파싱 시작...`);
+  
+  // HTML 엔티티 디코딩
+  const decodedHtml = decodeHtmlEntities(htmlText);
+  
+  // 1단계: 타임스탬프 기준으로 댓글을 완전히 분할
+  const sections = splitCommentByTimestamps(decodedHtml);
+  
+  if (sections.length === 0) {
+    console.log(`❌ 타임스탬프가 발견되지 않음`);
+    return [];
+  }
+  
+  console.log(`📊 총 ${sections.length}개 구간으로 분할됨`);
+  
+  // 2단계: 각 분할된 구간을 개별적으로 파싱 (원본 댓글은 더 이상 보지 않음)
+  const rawMatches = [];
+  
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i];
+    
+    console.log(`\n🔄 구간 ${i + 1} 개별 파싱: ${section.timeText}`);
+    console.log(`📝 구간 내용: "${section.content}"`);
+    
+    // 3단계: 분할된 구간만 사용하여 곡 정보 파싱
+    const songInfo = parseSongInfo(section.content);
+    const isRelevant = songInfo.artist !== '알 수 없음';
+    
+    rawMatches.push({
+      url: section.baseVideoUrl || '', // 구간에서 추출된 비디오 URL 사용
+      timeSeconds: section.timeSeconds,
+      timeText: section.timeText,
+      sectionText: section.content,
+      artist: songInfo.artist,
+      songTitle: songInfo.songTitle,
+      isRelevant: isRelevant
+    });
+    
+    console.log(`${isRelevant ? '✅' : '⚠️'} 구간 파싱 완료: ${section.timeText} - ${songInfo.artist} - ${songInfo.songTitle}`);
+  }
+  
+  console.log(`📊 총 ${rawMatches.length}개 유효한 곡 발견`);
+
+  // 시간순 정렬
+  rawMatches.sort((a, b) => a.timeSeconds - b.timeSeconds);
+
+  // 기본 비디오 URL 추출 (t 파라미터 제거)
+  const baseVideoUrl = rawMatches.length > 0 ? 
+    rawMatches[0].url.replace(/[?&]t=\d+/, '').replace(/[?&]$/, '') : '';
+
+  // 날짜 추출
+  const dateInfo = extractDateFromTitle(videoTitle);
+
+  // 결과 배열 초기화
+  const songEntries = [];
+
+  // 각 곡 정보와 시작/종료 시간 계산
+  for (let i = 0; i < rawMatches.length; i++) {
+    const current = rawMatches[i];
+    const next = rawMatches[i + 1];
+    
+    const liveClip = {
+      videoUrl: baseVideoUrl,
+      artist: current.artist,
+      songTitle: current.songTitle,
+      startTimeSeconds: current.timeSeconds,
+      endTimeSeconds: next ? next.timeSeconds : null,
+      duration: next ? (next.timeSeconds - current.timeSeconds) : null,
+      uploadedDate: dateInfo.date,
+      originalDateString: dateInfo.originalString,
+      isRelevant: current.isRelevant
+    };
+    
+    songEntries.push(liveClip);
+  }
+
+  return songEntries;
+}
+
+// 곡 정보 파싱 함수 (아티스트와 곡명 분리)
+function parseSongInfo(songText: string) {
+  const cleanText = songText.trim();
+  
+  // 다양한 구분자로 분리 시도
+  const separators = [' - ', ' – ', ' — ', ' | ', ' / '];
+  
+  for (const separator of separators) {
+    if (cleanText.includes(separator)) {
+      const parts = cleanText.split(separator);
+      if (parts.length >= 2 && parts[0].trim() && parts[1].trim()) {
+        return {
+          artist: parts[0].trim(),
+          songTitle: parts.slice(1).join(separator).trim()
+        };
+      }
+    }
+  }
+  
+  // 구분자가 없는 경우, 전체를 곡명으로 처리
+  return {
+    artist: '알 수 없음',
+    songTitle: cleanText
+  };
+}
+
+// 초를 HH:MM:SS 또는 MM:SS 형식으로 변환
+function formatSeconds(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  } else {
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  }
+}
+
+
 
 // 노래 데이터베이스에서 매칭 찾기
 async function findSongMatches(artist: string, songTitle: string) {
@@ -402,20 +777,145 @@ export async function POST(request: NextRequest) {
     const { action, itemId, isRelevant, isExcluded } = body;
 
     switch (action) {
-      case 'parse-timeline-comments':
-        console.log('🔄 타임라인 댓글 파싱 시작...');
+      case 'reprocess-timeline-comments':
+        // 기존 데이터를 개선된 멀티라인 파싱 방식으로 업데이트
+        console.log('🔄 기존 파싱된 타임라인 데이터를 개선된 방식으로 업데이트 시작...');
         
-        // 타임라인 댓글만 조회
-        const timelineComments = await YouTubeComment.find({ 
+        // 모든 타임라인 댓글 조회 (처리완료 여부 무관)
+        const allTimelineComments = await YouTubeComment.find({ 
           isTimeline: true 
         });
 
+        console.log(`📝 총 ${allTimelineComments.length}개 타임라인 댓글 발견`);
+
+        let reprocessedCount = 0;
+        let dataUpdatedCount = 0;
+        let newItemsCount = 0;
+
+        for (const comment of allTimelineComments) {
+          try {
+            // 비디오 정보 조회
+            const video = await YouTubeVideo.findOne({ videoId: comment.videoId });
+            if (!video) continue;
+
+            console.log(`🔍 재처리 중: ${comment.commentId}`);
+            
+            const hasHtmlLinks = comment.textContent.includes('<a ');
+            
+            if (hasHtmlLinks) {
+              // 개선된 멀티라인 타임라인 댓글 파싱
+              const liveClips = parseTimelineComment(comment.textContent, video.title);
+              
+              if (liveClips.length > 0) {
+                // 이 댓글에서 기존에 파싱된 타임라인들 조회
+                const existingTimelines = await ParsedTimeline.find({
+                  commentId: comment.commentId
+                });
+
+                // 기존 파싱 결과와 새 파싱 결과 비교
+                console.log(`🔍 새로 파싱된 클립 개수: ${liveClips.length}개`);
+                console.log(`🔍 기존 타임라인 개수: ${existingTimelines.length}개`);
+                
+                for (const clipData of liveClips) {
+                  console.log(`🔍 새 클립 - 시작시간: ${clipData.startTimeSeconds}초, 아티스트: ${clipData.artist}, 곡명: ${clipData.songTitle}`);
+                  
+                  // 먼저 startTimeSeconds로 매칭 시도
+                  let existingClip = existingTimelines.find(
+                    timeline => timeline.startTimeSeconds === clipData.startTimeSeconds
+                  );
+                  
+                  // startTimeSeconds로 매칭되지 않는 경우, 아티스트-곡명으로 매칭 시도
+                  if (!existingClip) {
+                    existingClip = existingTimelines.find(
+                      timeline => timeline.artist === clipData.artist && timeline.songTitle === clipData.songTitle
+                    );
+                    if (existingClip) {
+                      console.log(`🔄 아티스트-곡명으로 매칭됨: ${existingClip.artist} - ${existingClip.songTitle} (기존 시간: ${existingClip.startTimeSeconds}초 → 새 시간: ${clipData.startTimeSeconds}초)`);
+                    }
+                  } else {
+                    console.log(`✅ 시작시간으로 매칭됨: ${clipData.startTimeSeconds}초`);
+                  }
+
+                  if (existingClip) {
+                    // 기존 데이터를 새로운 파싱 결과로 업데이트
+                    const updateData: any = {
+                      artist: clipData.artist,
+                      songTitle: clipData.songTitle,
+                      startTimeSeconds: clipData.startTimeSeconds, // 수정된 시작시간도 업데이트
+                      endTimeSeconds: clipData.endTimeSeconds,
+                      duration: clipData.duration,
+                      isRelevant: clipData.isRelevant,
+                      originalComment: comment.textContent,
+                      updatedAt: new Date()
+                    };
+
+                    // 댓글 작성자 정보가 없는 경우에만 추가
+                    if (!existingClip.commentAuthor) {
+                      updateData.commentAuthor = comment.authorName;
+                      updateData.commentId = comment.commentId;
+                      updateData.commentPublishedAt = comment.publishedAt;
+                    }
+
+                    await ParsedTimeline.updateOne(
+                      { _id: existingClip._id },
+                      updateData
+                    );
+
+                    dataUpdatedCount++;
+                    console.log(`🔄 업데이트됨: ${clipData.startTimeSeconds}초 - ${clipData.artist} - ${clipData.songTitle}`);
+                  } else {
+                    // 새로운 데이터는 생성하지 않음 (기존 데이터 업데이트만)
+                    console.log(`⏭️ 새로운 타임라인 발견했지만 생성하지 않음: ${clipData.startTimeSeconds}초 - ${clipData.artist} - ${clipData.songTitle}`);
+                  }
+                }
+              }
+              
+              reprocessedCount++;
+            }
+          } catch (error) {
+            console.error(`댓글 재처리 오류 (${comment.commentId}):`, error);
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `기존 데이터 업데이트 완료: ${reprocessedCount}개 댓글 처리, ${dataUpdatedCount}개 기존 데이터 업데이트 (새로운 데이터 생성 없음)`,
+          data: { reprocessedCount, dataUpdatedCount, newItemsSkipped: newItemsCount }
+        });
+
+      case 'parse-timeline-comments':
+        console.log('🔄 타임라인 댓글 파싱 시작...');
+        
+        // 모든 타임라인 댓글 조회 (처리완료 여부 무관)
+        const timelineComments = await YouTubeComment.find({ 
+          isTimeline: true
+        });
+        
         console.log(`📝 총 ${timelineComments.length}개 타임라인 댓글 발견`);
+        
+        // 이미 파싱된 commentId 목록 조회
+        const existingCommentIds = await ParsedTimeline.distinct('commentId');
+        console.log(`📊 기존에 파싱된 댓글: ${existingCommentIds.length}개`);
+        
+        // 새로운 댓글만 필터링
+        const newTimelineComments = timelineComments.filter(
+          comment => !existingCommentIds.includes(comment.commentId)
+        );
+
+        console.log(`📝 새로 처리할 댓글: ${newTimelineComments.length}개`);
+
+        if (newTimelineComments.length === 0) {
+          return NextResponse.json({
+            success: true,
+            message: '새로 파싱할 타임라인 댓글이 없습니다.',
+            data: { newComments: 0, totalComments: timelineComments.length }
+          });
+        }
 
         // 처음 몇 개 댓글의 샘플 출력
         console.log('\n📋 첫 3개 댓글 샘플:');
-        for (let i = 0; i < Math.min(3, timelineComments.length); i++) {
-          const sample = timelineComments[i];
+        for (let i = 0; i < Math.min(3, newTimelineComments.length); i++) {
+          const sample = newTimelineComments[i];
           console.log(`\n샘플 ${i + 1} (${sample.commentId}):`);
           console.log(`내용: ${sample.textContent.substring(0, 300)}`);
           console.log(`HTML 링크 포함: ${sample.textContent.includes('<a ')}`);
@@ -425,7 +925,7 @@ export async function POST(request: NextRequest) {
         let processedCount = 0;
         let totalLiveClips = 0;
 
-        for (const comment of timelineComments) {
+        for (const comment of newTimelineComments) {
           try {
             // 비디오 정보 조회
             const video = await YouTubeVideo.findOne({ videoId: comment.videoId });
@@ -450,14 +950,14 @@ export async function POST(request: NextRequest) {
                 for (const clipData of liveClips) {
                   const clipId = `${comment.commentId}_${clipData.startTimeSeconds}`;
                   
-                  // 기존 라이브 클립이 있는지 확인
-                  const existingClip = await LiveClip.findOne({
+                  // 기존 파싱된 타임라인이 있는지 확인
+                  const existingClip = await ParsedTimeline.findOne({
                     videoId: comment.videoId,
                     startTimeSeconds: clipData.startTimeSeconds
                   });
 
                   if (!existingClip) {
-                    const liveClip = new LiveClip({
+                    const parsedTimeline = new ParsedTimeline({
                       id: clipId,
                       videoId: comment.videoId,
                       videoTitle: video.title,
@@ -470,17 +970,30 @@ export async function POST(request: NextRequest) {
                       endTimeSeconds: clipData.endTimeSeconds,
                       duration: clipData.duration,
                       originalComment: comment.textContent,
+                      commentAuthor: comment.authorName,
+                      commentId: comment.commentId,
+                      commentPublishedAt: comment.publishedAt,
                       isRelevant: clipData.isRelevant,
                       isExcluded: false
                     });
 
-                    await liveClip.save();
+                    await parsedTimeline.save();
                     totalLiveClips++;
                     
                     console.log(`💾 저장: ${clipData.artist} - ${clipData.songTitle} (${formatSeconds(clipData.startTimeSeconds)}${clipData.endTimeSeconds ? ` ~ ${formatSeconds(clipData.endTimeSeconds)}` : ''}) ${clipData.isRelevant ? '[관련성 있음]' : '[관련성 없음]'}`);
                   }
                 }
               }
+              
+              // 댓글을 처리완료로 표시
+              await YouTubeComment.updateOne(
+                { commentId: comment.commentId },
+                { 
+                  isProcessed: true,
+                  processedAt: new Date(),
+                  processedBy: 'timeline-parser'
+                }
+              );
               
               processedCount++;
             } else {
@@ -494,34 +1007,34 @@ export async function POST(request: NextRequest) {
         // 통계 계산
         const totalVideos = await YouTubeVideo.countDocuments();
         const totalTimelineComments = await YouTubeComment.countDocuments({ isTimeline: true });
-        const allLiveClips = await LiveClip.find().sort({ uploadedDate: -1, startTimeSeconds: 1 });
-        const relevantClips = allLiveClips.filter(clip => clip.isRelevant && !clip.isExcluded).length;
-        const matchedClips = allLiveClips.filter(clip => clip.matchedSong).length;
+        const allParsedTimelines = await ParsedTimeline.find().sort({ uploadedDate: -1, startTimeSeconds: 1 });
+        const relevantClips = allParsedTimelines.filter(clip => clip.isRelevant && !clip.isExcluded).length;
+        const matchedClips = allParsedTimelines.filter(clip => clip.matchedSong).length;
         
         // 고유 곡 수 계산
         const uniqueSongsSet = new Set();
-        allLiveClips.forEach(clip => {
+        allParsedTimelines.forEach(clip => {
           uniqueSongsSet.add(`${clip.artist}_${clip.songTitle}`);
         });
 
         const stats = {
           totalVideos,
           totalTimelineComments,
-          parsedItems: allLiveClips.length,
+          parsedItems: allParsedTimelines.length,
           relevantItems: relevantClips,
           matchedSongs: matchedClips,
           uniqueSongs: uniqueSongsSet.size
         };
 
-        console.log(`✅ 타임라인 파싱 완료: ${processedCount}개 댓글에서 ${totalLiveClips}개 라이브 클립 생성`);
+        console.log(`✅ 타임라인 파싱 완료: ${processedCount}개 댓글에서 ${totalLiveClips}개 파싱된 타임라인 생성`);
 
         return NextResponse.json({
           success: true,
           data: {
-            items: allLiveClips,
+            items: allParsedTimelines,
             stats
           },
-          message: `타임라인 파싱 완료: ${totalLiveClips}개 라이브 클립 생성`
+          message: `타임라인 파싱 완료: ${totalLiveClips}개 파싱된 타임라인 생성`
         });
 
       case 'update-item-relevance':
@@ -532,7 +1045,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        await LiveClip.updateOne(
+        await ParsedTimeline.updateOne(
           { id: itemId },
           { 
             isRelevant: isRelevant,
@@ -553,7 +1066,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        await LiveClip.updateOne(
+        await ParsedTimeline.updateOne(
           { id: itemId },
           { 
             isExcluded: isExcluded,
@@ -574,23 +1087,23 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const liveClip = await LiveClip.findOne({ id: itemId });
-        if (!liveClip) {
+        const parsedTimeline = await ParsedTimeline.findOne({ id: itemId });
+        if (!parsedTimeline) {
           return NextResponse.json(
-            { success: false, error: '라이브 클립을 찾을 수 없습니다.' },
+            { success: false, error: '파싱된 타임라인을 찾을 수 없습니다.' },
             { status: 404 }
           );
         }
 
-        const songMatches = await findSongMatches(liveClip.artist, liveClip.songTitle);
+        const songMatches = await findSongMatches(parsedTimeline.artist, parsedTimeline.songTitle);
         
         return NextResponse.json({
           success: true,
           data: {
-            liveClip: {
-              id: liveClip.id,
-              artist: liveClip.artist,
-              songTitle: liveClip.songTitle
+            parsedTimeline: {
+              id: parsedTimeline.id,
+              artist: parsedTimeline.artist,
+              songTitle: parsedTimeline.songTitle
             },
             matches: songMatches
           }
@@ -615,7 +1128,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        await LiveClip.updateOne(
+        await ParsedTimeline.updateOne(
           { id: itemId },
           { 
             matchedSong: {
@@ -641,7 +1154,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        await LiveClip.updateOne(
+        await ParsedTimeline.updateOne(
           { id: itemId },
           { 
             $unset: { matchedSong: "" },
@@ -676,15 +1189,100 @@ export async function POST(request: NextRequest) {
           updateFields.duration = endTimeSeconds > startTimeSeconds ? endTimeSeconds - startTimeSeconds : null;
         }
 
-        await LiveClip.updateOne(
+        await ParsedTimeline.updateOne(
           { id: itemId },
           updateFields
         );
 
         return NextResponse.json({
           success: true,
-          message: '라이브 클립 정보가 업데이트되었습니다.'
+          message: '파싱된 타임라인 정보가 업데이트되었습니다.'
         });
+
+      case 'search-song-matches':
+        const { searchArtist, searchTitle } = body;
+        
+        if (!searchArtist || !searchTitle) {
+          return NextResponse.json(
+            { success: false, error: 'searchArtist와 searchTitle이 필요합니다.' },
+            { status: 400 }
+          );
+        }
+
+        try {
+          const candidates = await matchTimelineWithSongs(searchArtist, searchTitle);
+          
+          return NextResponse.json({
+            success: true,
+            data: {
+              query: { artist: searchArtist, title: searchTitle },
+              candidates: candidates || []
+            }
+          });
+        } catch (error) {
+          console.error('곡 검색 오류:', error);
+          return NextResponse.json(
+            { success: false, error: '곡 검색 중 오류가 발생했습니다.' },
+            { status: 500 }
+          );
+        }
+
+      case 'match-timeline-song':
+        const { timelineId, songId: matchSongId, confidence: matchConfidence } = body;
+        
+        if (!timelineId) {
+          return NextResponse.json(
+            { success: false, error: 'timelineId가 필요합니다.' },
+            { status: 400 }
+          );
+        }
+
+        try {
+          const updateData: any = { updatedAt: new Date() };
+          
+          if (matchSongId) {
+            // 곡 매칭
+            const matchedSong = await SongDetail.findById(matchSongId);
+            if (!matchedSong) {
+              return NextResponse.json(
+                { success: false, error: '해당 곡을 찾을 수 없습니다.' },
+                { status: 404 }
+              );
+            }
+            
+            updateData.matchedSong = {
+              songId: matchedSong._id.toString(),
+              title: matchedSong.title,
+              artist: matchedSong.artist,
+              confidence: matchConfidence || 0.9
+            };
+          } else {
+            // 매칭 해제
+            updateData.$unset = { matchedSong: "" };
+          }
+
+          await ParsedTimeline.updateOne(
+            { id: timelineId },
+            updateData
+          );
+
+          return NextResponse.json({
+            success: true,
+            message: matchSongId ? '곡이 매칭되었습니다.' : '곡 매칭이 해제되었습니다.',
+            data: {
+              matchInfo: matchSongId ? {
+                title: updateData.matchedSong?.title,
+                artist: updateData.matchedSong?.artist
+              } : null
+            }
+          });
+        } catch (error) {
+          console.error('곡 매칭 오류:', error);
+          return NextResponse.json(
+            { success: false, error: '곡 매칭 중 오류가 발생했습니다.' },
+            { status: 500 }
+          );
+        }
 
       default:
         return NextResponse.json(
@@ -725,7 +1323,7 @@ export async function GET(request: NextRequest) {
 
     switch (action) {
       case 'get-parsed-items':
-        const items = await LiveClip.find().sort({ uploadedDate: -1, startTimeSeconds: 1 });
+        const items = await ParsedTimeline.find().sort({ uploadedDate: -1, startTimeSeconds: 1 });
         
         return NextResponse.json({
           success: true,

@@ -1,0 +1,25 @@
+"use strict";
+/*
+ * ATTENTION: An "eval-source-map" devtool has been used.
+ * This devtool is neither made for production nor for readable output files.
+ * It uses "eval()" calls to create a separate source file with attached SourceMaps in the browser devtools.
+ * If you are trying to read the output file, select a different devtool (https://webpack.js.org/configuration/devtool/)
+ * or disable the default devtool with "devtool: false".
+ * If you are looking for production-ready output files, see mode: "production" (https://webpack.js.org/configuration/mode/).
+ */
+exports.id = "_rsc_src_models_Like_ts";
+exports.ids = ["_rsc_src_models_Like_ts"];
+exports.modules = {
+
+/***/ "(rsc)/./src/models/Like.ts":
+/*!****************************!*\
+  !*** ./src/models/Like.ts ***!
+  \****************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpack_require__.d(__webpack_exports__, {\n/* harmony export */   \"default\": () => (__WEBPACK_DEFAULT_EXPORT__)\n/* harmony export */ });\n/* harmony import */ var mongoose__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! mongoose */ \"mongoose\");\n/* harmony import */ var mongoose__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(mongoose__WEBPACK_IMPORTED_MODULE_0__);\n\nconst likeSchema = new (mongoose__WEBPACK_IMPORTED_MODULE_0___default().Schema)({\n    userId: {\n        type: (mongoose__WEBPACK_IMPORTED_MODULE_0___default().Schema).Types.ObjectId,\n        ref: 'User',\n        required: true\n    },\n    channelId: {\n        type: String,\n        required: true\n    },\n    songId: {\n        type: (mongoose__WEBPACK_IMPORTED_MODULE_0___default().Schema).Types.ObjectId,\n        ref: 'SongDetail',\n        required: true\n    }\n}, {\n    timestamps: true\n});\n// 복합 인덱스: 한 사용자가 같은 곡을 중복 좋아요할 수 없음\nlikeSchema.index({\n    channelId: 1,\n    songId: 1\n}, {\n    unique: true\n});\nlikeSchema.index({\n    userId: 1,\n    songId: 1\n}, {\n    unique: true\n});\nlikeSchema.index({\n    userId: 1,\n    createdAt: -1\n});\nlikeSchema.index({\n    songId: 1\n});\n/* harmony default export */ const __WEBPACK_DEFAULT_EXPORT__ = ((mongoose__WEBPACK_IMPORTED_MODULE_0___default().models).Like || mongoose__WEBPACK_IMPORTED_MODULE_0___default().model('Like', likeSchema));\n//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9zcmMvbW9kZWxzL0xpa2UudHMiLCJtYXBwaW5ncyI6Ijs7Ozs7O0FBQStCO0FBUy9CLE1BQU1DLGFBQWEsSUFBSUQsd0RBQWUsQ0FBUTtJQUM1Q0csUUFBUTtRQUNOQyxNQUFNSix3REFBZSxDQUFDSyxLQUFLLENBQUNDLFFBQVE7UUFDcENDLEtBQUs7UUFDTEMsVUFBVTtJQUNaO0lBQ0FDLFdBQVc7UUFDVEwsTUFBTU07UUFDTkYsVUFBVTtJQUNaO0lBQ0FHLFFBQVE7UUFDTlAsTUFBTUosd0RBQWUsQ0FBQ0ssS0FBSyxDQUFDQyxRQUFRO1FBQ3BDQyxLQUFLO1FBQ0xDLFVBQVU7SUFDWjtBQUNGLEdBQUc7SUFDREksWUFBWTtBQUNkO0FBRUEsb0NBQW9DO0FBQ3BDWCxXQUFXWSxLQUFLLENBQUM7SUFBRUosV0FBVztJQUFHRSxRQUFRO0FBQUUsR0FBRztJQUFFRyxRQUFRO0FBQUs7QUFDN0RiLFdBQVdZLEtBQUssQ0FBQztJQUFFVixRQUFRO0lBQUdRLFFBQVE7QUFBRSxHQUFHO0lBQUVHLFFBQVE7QUFBSztBQUMxRGIsV0FBV1ksS0FBSyxDQUFDO0lBQUVWLFFBQVE7SUFBR1ksV0FBVyxDQUFDO0FBQUU7QUFDNUNkLFdBQVdZLEtBQUssQ0FBQztJQUFFRixRQUFRO0FBQUU7QUFFN0IsaUVBQWVYLHdEQUFlLENBQUNpQixJQUFJLElBQUlqQixxREFBYyxDQUFRLFFBQVFDLFdBQVdBLEVBQUEiLCJzb3VyY2VzIjpbIi9tbnQvZi9kYXRhL2dpdC9jbGF1ZGUtY29kZS9heWF1a2UtcGFnZS9heWF1a2UtcGFnZS9zcmMvbW9kZWxzL0xpa2UudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IG1vbmdvb3NlIGZyb20gJ21vbmdvb3NlJ1xuXG5leHBvcnQgaW50ZXJmYWNlIElMaWtlIGV4dGVuZHMgbW9uZ29vc2UuRG9jdW1lbnQge1xuICB1c2VySWQ6IG1vbmdvb3NlLlR5cGVzLk9iamVjdElkXG4gIGNoYW5uZWxJZDogc3RyaW5nXG4gIHNvbmdJZDogbW9uZ29vc2UuVHlwZXMuT2JqZWN0SWQgLy8gTW9uZ29EQiBTb25nIERvY3VtZW50IElEXG4gIGNyZWF0ZWRBdDogRGF0ZVxufVxuXG5jb25zdCBsaWtlU2NoZW1hID0gbmV3IG1vbmdvb3NlLlNjaGVtYTxJTGlrZT4oe1xuICB1c2VySWQ6IHtcbiAgICB0eXBlOiBtb25nb29zZS5TY2hlbWEuVHlwZXMuT2JqZWN0SWQsXG4gICAgcmVmOiAnVXNlcicsXG4gICAgcmVxdWlyZWQ6IHRydWVcbiAgfSxcbiAgY2hhbm5lbElkOiB7XG4gICAgdHlwZTogU3RyaW5nLFxuICAgIHJlcXVpcmVkOiB0cnVlXG4gIH0sXG4gIHNvbmdJZDoge1xuICAgIHR5cGU6IG1vbmdvb3NlLlNjaGVtYS5UeXBlcy5PYmplY3RJZCxcbiAgICByZWY6ICdTb25nRGV0YWlsJyxcbiAgICByZXF1aXJlZDogdHJ1ZVxuICB9XG59LCB7XG4gIHRpbWVzdGFtcHM6IHRydWVcbn0pXG5cbi8vIOuzte2VqSDsnbjrjbHsiqQ6IO2VnCDsgqzsmqnsnpDqsIAg6rCZ7J2AIOqzoeydhCDspJHrs7Ug7KKL7JWE7JqU7ZWgIOyImCDsl4bsnYxcbmxpa2VTY2hlbWEuaW5kZXgoeyBjaGFubmVsSWQ6IDEsIHNvbmdJZDogMSB9LCB7IHVuaXF1ZTogdHJ1ZSB9KVxubGlrZVNjaGVtYS5pbmRleCh7IHVzZXJJZDogMSwgc29uZ0lkOiAxIH0sIHsgdW5pcXVlOiB0cnVlIH0pXG5saWtlU2NoZW1hLmluZGV4KHsgdXNlcklkOiAxLCBjcmVhdGVkQXQ6IC0xIH0pXG5saWtlU2NoZW1hLmluZGV4KHsgc29uZ0lkOiAxIH0pXG5cbmV4cG9ydCBkZWZhdWx0IG1vbmdvb3NlLm1vZGVscy5MaWtlIHx8IG1vbmdvb3NlLm1vZGVsPElMaWtlPignTGlrZScsIGxpa2VTY2hlbWEpIl0sIm5hbWVzIjpbIm1vbmdvb3NlIiwibGlrZVNjaGVtYSIsIlNjaGVtYSIsInVzZXJJZCIsInR5cGUiLCJUeXBlcyIsIk9iamVjdElkIiwicmVmIiwicmVxdWlyZWQiLCJjaGFubmVsSWQiLCJTdHJpbmciLCJzb25nSWQiLCJ0aW1lc3RhbXBzIiwiaW5kZXgiLCJ1bmlxdWUiLCJjcmVhdGVkQXQiLCJtb2RlbHMiLCJMaWtlIiwibW9kZWwiXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZVJvb3QiOiIifQ==\n//# sourceURL=webpack-internal:///(rsc)/./src/models/Like.ts\n");
+
+/***/ })
+
+};
+;
