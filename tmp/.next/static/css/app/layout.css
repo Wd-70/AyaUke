@@ -1132,6 +1132,9 @@ video {
 .max-w-full{
   max-width: 100%;
 }
+.max-w-\[98\%\]{
+  max-width: 98%;
+}
 .flex-1{
   flex: 1 1 0%;
 }
@@ -5355,6 +5358,10 @@ body {
 
   .sm\:w-80{
     width: 20rem;
+  }
+
+  .sm\:max-w-\[95\%\]{
+    max-width: 95%;
   }
 
   .sm\:grid-cols-2{

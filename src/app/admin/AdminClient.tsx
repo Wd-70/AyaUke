@@ -291,7 +291,7 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
                         rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
       </div>
 
-      <div className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-[95%] 2xl:max-w-[90%] mx-auto">
+      <div className="relative z-10 pt-24 pb-12 px-2 sm:px-4 lg:px-8 max-w-[98%] sm:max-w-[95%] 2xl:max-w-[90%] mx-auto">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

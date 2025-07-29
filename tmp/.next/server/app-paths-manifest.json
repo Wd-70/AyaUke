@@ -1,7 +1,10 @@
 {
+  "/api/songdetails/route": "app/api/songdetails/route.js",
+  "/api/timeline-parser/route": "app/api/timeline-parser/route.js",
+  "/api/youtube-comments/route": "app/api/youtube-comments/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/page": "app/page.js",
   "/songbook/page": "app/songbook/page.js",
   "/admin/page": "app/admin/page.js",
+  "/page": "app/page.js",
   "/auth/signin/page": "app/auth/signin/page.js"
 }
