@@ -1,5 +1,10 @@
 {
   "pages": {
+    "/api/auth/[...nextauth]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/[...nextauth]/route.js"
+    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -11,15 +16,40 @@
       "static/chunks/main-app.js",
       "static/chunks/app/error.js"
     ],
-    "/test-db/page": [
+    "/songbook/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/test-db/page.js"
+      "static/chunks/app/songbook/page.js"
     ],
-    "/api/auth/[...nextauth]/route": [
+    "/api/likes-bulk/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/[...nextauth]/route.js"
+      "static/chunks/app/api/likes-bulk/route.js"
+    ],
+    "/api/user/playlists/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/user/playlists/route.js"
+    ],
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
+    ],
+    "/api/user/activity/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/user/activity/route.js"
+    ],
+    "/api/chzzk-videos/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/chzzk-videos/route.js"
+    ],
+    "/admin/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/admin/page.js"
     ],
     "/api/songdetails/route": [
       "static/chunks/webpack.js",
@@ -36,16 +66,6 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/timeline-parser/route.js"
     ],
-    "/api/test-db/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/test-db/route.js"
-    ],
-    "/auth/signin/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/auth/signin/page.js"
-    ],
     "/api/youtube-search/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -56,40 +76,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/songdetails/[id]/route.js"
     ],
-    "/page": [
+    "/auth/signin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
-    ],
-    "/songbook/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/songbook/page.js"
-    ],
-    "/api/chzzk-videos/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/chzzk-videos/route.js"
-    ],
-    "/api/likes-bulk/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/likes-bulk/route.js"
-    ],
-    "/api/user/playlists/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/user/playlists/route.js"
-    ],
-    "/api/songs/[songId]/videos/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/songs/[songId]/videos/route.js"
-    ],
-    "/api/user/[userId]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/user/[userId]/route.js"
+      "static/chunks/app/auth/signin/page.js"
     ]
   }
 }

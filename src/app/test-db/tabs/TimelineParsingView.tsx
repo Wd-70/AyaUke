@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import YouTube from 'react-youtube';
 import { 
@@ -83,7 +83,16 @@ interface YouTubePlayer {
   playVideo(): void;
   pauseVideo(): void;
   getCurrentTime(): number;
-  seekTo(seconds: number): void;
+  seekTo(seconds: number, allowSeekAhead?: boolean): void;
+  loadVideoById(options: { videoId: string; startSeconds?: number; endSeconds?: number }): void;
+}
+
+// YouTube API 타입 정의
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+  }
 }
 
 // requestIdleCallback 타입 정의 추가
@@ -113,6 +122,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   const [selectedTimelineIds, setSelectedTimelineIds] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number>(-1);
   const [filterType, setFilterType] = useState<'all' | 'relevant' | 'irrelevant' | 'excluded' | 'matched' | 'unmatched'>('relevant');
+  const [autoPlay, setAutoPlay] = useState(true); // 자동 재생 옵션
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchingTimeline, setMatchingTimeline] = useState<ParsedTimelineItem | null>(null);
   const [songMatches, setSongMatches] = useState<any[]>([]);
@@ -145,10 +155,13 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(100);
   
+  // 모바일 화면 상태 관리
+  const [isMobile, setIsMobile] = useState(false);
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
+  
   // YouTube 플레이어 상태
   const [youtubePlayer, setYoutubePlayer] = useState<YouTubePlayer | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showPlayer, setShowPlayer] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
 
   // 타임라인 파싱 실행
@@ -791,15 +804,191 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   }, []);
 
   const onYouTubeStateChange = useCallback((event: { data: number }) => {
+    console.log('YouTube Player 상태 변경:', event.data);
+    const stateNames = {
+      '-1': 'UNSTARTED',
+      '0': 'ENDED',
+      '1': 'PLAYING',
+      '2': 'PAUSED',
+      '3': 'BUFFERING',
+      '5': 'CUED'
+    };
+    console.log('상태명:', stateNames[event.data as keyof typeof stateNames] || 'UNKNOWN');
+    
     // 1 = playing, 2 = paused
     setIsPlaying(event.data === 1);
   }, []);
 
   // 비디오 재생 함수
   const playVideoAtTime = useCallback((videoId: string, startTime: number, endTime?: number) => {
-    setShowPlayer(true);
-    // 플레이어가 로드되면 자동으로 재생됨
-  }, []);
+    console.log('=== 수동 비디오 재생 요청 ===');
+    console.log('비디오 ID:', videoId, '시작 시간:', startTime, '종료 시간:', endTime);
+    
+    // 자동 로딩 중이면 수동 로딩을 건너뛰어 충돌 방지
+    if (autoLoadingRef.current) {
+      console.log('⚠️ 자동 로딩 진행 중이므로 수동 로딩을 건너뜀');
+      return;
+    }
+    
+    // 기존 플레이어 즉시 파괴 (React 상태와 무관하게)
+    const playerContainer = document.getElementById('youtube-player');
+    if (playerContainer) {
+      console.log('기존 플레이어 컨테이너 내용 제거');
+      playerContainer.innerHTML = '';
+    }
+    
+    // React 상태 초기화
+    if (youtubePlayer) {
+      try {
+        youtubePlayer.destroy();
+      } catch (e) {
+        console.log('플레이어 파괴 중 오류:', e);
+      }
+    }
+    setYoutubePlayer(null);
+    
+    // 즉시 새 플레이어 생성
+    setTimeout(() => {
+      // YouTube API 확인 및 로드 (자동 로딩과 동일한 로직)
+      const ensureYouTubeAPI = () => {
+        return new Promise<void>((resolve, reject) => {
+          // 이미 로드되어 있으면 즉시 resolve
+          if (window.YT && window.YT.Player) {
+            console.log('✅ YouTube API 이미 로드됨 (수동)');
+            resolve();
+            return;
+          }
+          
+          console.log('📥 YouTube API 로드 시작 (수동)');
+          
+          // 기존 스크립트 제거
+          const existingScript = document.querySelector('script[src*="youtube.com/iframe_api"]');
+          if (existingScript) {
+            existingScript.remove();
+          }
+          
+          // 새 스크립트 추가
+          const script = document.createElement('script');
+          script.src = 'https://www.youtube.com/iframe_api';
+          script.async = true;
+          
+          // 글로벌 onYouTubeIframeAPIReady 콜백 설정
+          (window as any).onYouTubeIframeAPIReady = () => {
+            console.log('✅ YouTube API 로드 완료 (수동)');
+            resolve();
+          };
+          
+          script.onerror = () => {
+            console.error('❌ YouTube API 로드 실패 (수동)');
+            reject(new Error('YouTube API 로드 실패'));
+          };
+          
+          document.head.appendChild(script);
+          
+          // 타임아웃 설정 (10초)
+          setTimeout(() => {
+            reject(new Error('YouTube API 로드 타임아웃'));
+          }, 10000);
+        });
+      };
+      
+      // API 로드 후 플레이어 생성
+      ensureYouTubeAPI()
+        .then(() => {
+          console.log('🚀 플레이어 초기화 시작 (수동)');
+          initializePlayer(videoId, startTime, endTime);
+        })
+        .catch((error) => {
+          console.error('YouTube API 로드 오류 (수동):', error);
+          alert('YouTube 플레이어 로드에 실패했습니다. 페이지를 새로고침해주세요.');
+        });
+    }, 100); // DOM 업데이트 대기
+  }, [youtubePlayer]);
+
+  // 간단한 플레이어 생성 함수
+  const initializePlayer = useCallback((videoId: string, startTime: number, endTime?: number) => {
+    console.log('=== 강제 플레이어 재생성 ===');
+    console.log('비디오 ID:', videoId, '시작 시간:', startTime, '종료 시간:', endTime);
+    
+    // 컨테이너 확인
+    const playerContainer = document.getElementById('youtube-player');
+    if (!playerContainer) {
+      console.error('플레이어 컨테이너를 찾을 수 없습니다!');
+      return;
+    }
+    
+    // 컨테이너 완전 초기화
+    playerContainer.innerHTML = '';
+    playerContainer.style.width = '100%';
+    playerContainer.style.height = isMobile ? '250px' : '360px';
+    playerContainer.style.backgroundColor = '#000';
+    
+    // 플레이어 변수 설정
+    const playerVars: any = {
+      start: startTime,
+      end: endTime,
+      controls: 1,
+      rel: 0,
+      modestbranding: 1,
+      playsinline: 1,
+      fs: 1,
+      origin: window.location.origin,
+      enablejsapi: 1
+    };
+    
+    console.log('새 플레이어 생성 중...');
+    
+    try {
+      const player = new window.YT.Player('youtube-player', {
+        height: isMobile ? '250' : '360',
+        width: isMobile ? '100%' : '640',
+        videoId: videoId,
+        playerVars: playerVars,
+        events: {
+          onReady: (event: any) => {
+            console.log('✅ 새 플레이어 준비 완료!');
+            console.log('로드된 비디오 ID:', videoId);
+            setYoutubePlayer(event.target);
+            
+            // iFrame 스타일링
+            const iframe = playerContainer.querySelector('iframe');
+            if (iframe) {
+              iframe.style.width = '100%';
+              iframe.style.height = '100%';
+              iframe.style.border = 'none';
+            }
+            
+            // 자동 재생 옵션이 활성화된 경우에만 재생 시작
+            if (autoPlay) {
+              try {
+                console.log('🎬 자동 재생 시작:', { videoId, startTime });
+                event.target.playVideo();
+              } catch (error) {
+                console.error('자동 재생 오류:', error);
+              }
+            } else {
+              console.log('🔇 자동 재생이 비활성화됨');
+            }
+          },
+          onStateChange: onYouTubeStateChange,
+          onError: (event: any) => {
+            console.error('YouTube Player Error:', event.data);
+            const errorMessages: { [key: number]: string } = {
+              2: '잘못된 비디오 ID입니다.',
+              5: 'HTML5 플레이어 오류가 발생했습니다.',
+              100: '비디오를 찾을 수 없습니다.',
+              101: '비디오 소유자가 재생을 제한했습니다.',
+              150: '비디오 소유자가 재생을 제한했습니다.'
+            };
+            const message = errorMessages[event.data] || '알 수 없는 플레이어 오류가 발생했습니다.';
+            alert(`YouTube 플레이어 오류: ${message}`);
+          }
+        }
+      });
+    } catch (error) {
+      console.error('플레이어 생성 실패:', error);
+    }
+  }, [isMobile, onYouTubeStateChange, autoPlay]);
 
   // 재생/일시정지 토글
   const togglePlayback = useCallback(() => {
@@ -862,6 +1051,13 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   const handleTimelineSelection = (timeline: ParsedTimelineItem, pageIndex: number, event: React.MouseEvent) => {
     // 기본 브라우저 동작 방지 (텍스트 선택 등)
     event.preventDefault();
+    
+    // 모바일에서는 상세 화면으로 전환
+    if (isMobile) {
+      loadTimelineDetails(timeline);
+      setShowMobileDetail(true);
+      return;
+    }
     
     if (event.shiftKey && lastSelectedIndex !== -1) {
       // Shift + 클릭: 현재 페이지 내에서 범위 선택
@@ -1228,6 +1424,18 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
     loadExistingDataOnMount();
   }, []);
 
+  // 모바일 화면 감지
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 1024); // lg 브레이크포인트 미만을 모바일로 간주
+    };
+
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
+
   // 통계 업데이트를 위한 별도 useEffect
   useEffect(() => {
     onStatsUpdate?.(stats);
@@ -1255,13 +1463,672 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
     };
   }, [youtubePlayer, isPlaying]);
 
+  // 자동 로딩을 제어하는 ref 추가
+  const autoLoadingRef = useRef(false);
+  const lastLoadedRef = useRef<string>('');
+
+  // 선택된 타임라인이 변경될 때 자동으로 플레이어 로드 (무한 루프 방지)
+  useEffect(() => {
+    if (selectedTimeline && !autoLoadingRef.current) {
+      const videoId = extractVideoId(selectedTimeline.videoUrl);
+      
+      if (videoId) {
+        const startTime = selectedTimeline.startTimeSeconds;
+        const endTime = selectedTimeline.endTimeSeconds;
+        const loadKey = `${videoId}-${startTime}-${endTime}`;
+        
+        // 이전에 로드한 것과 같으면 스킵
+        if (lastLoadedRef.current === loadKey) {
+          return;
+        }
+        
+        console.log('🚀 자동 플레이어 로드:', { videoId, startTime, endTime });
+        
+        autoLoadingRef.current = true;
+        lastLoadedRef.current = loadKey;
+        
+        // DOM이 준비될 때까지 기다린 후 플레이어 로드
+        const loadPlayerWhenReady = () => {
+          const container = document.getElementById('youtube-player');
+          if (container) {
+            console.log('📦 컨테이너 발견, 기존 플레이어 완전 정리');
+            
+            // 기존 플레이어 완전 정리
+            container.innerHTML = '';
+            if (youtubePlayer) {
+              try {
+                youtubePlayer.destroy();
+              } catch (e) {
+                console.log('기존 플레이어 파괴 오류:', e);
+              }
+              setYoutubePlayer(null);
+            }
+            
+            // 잠시 기다린 후 새 플레이어 생성
+            setTimeout(() => {
+              console.log('🎬 새 플레이어 생성:', { videoId, startTime, endTime });
+              
+              // YouTube API 확인 및 로드
+              const ensureYouTubeAPI = () => {
+                return new Promise<void>((resolve, reject) => {
+                  // 이미 로드되어 있으면 즉시 resolve
+                  if (window.YT && window.YT.Player) {
+                    console.log('✅ YouTube API 이미 로드됨');
+                    resolve();
+                    return;
+                  }
+                  
+                  console.log('📥 YouTube API 로드 시작');
+                  
+                  // 기존 스크립트 제거
+                  const existingScript = document.querySelector('script[src*="youtube.com/iframe_api"]');
+                  if (existingScript) {
+                    existingScript.remove();
+                  }
+                  
+                  // 새 스크립트 추가
+                  const script = document.createElement('script');
+                  script.src = 'https://www.youtube.com/iframe_api';
+                  script.async = true;
+                  
+                  // 글로벌 onYouTubeIframeAPIReady 콜백 설정
+                  (window as any).onYouTubeIframeAPIReady = () => {
+                    console.log('✅ YouTube API 로드 완료');
+                    resolve();
+                  };
+                  
+                  script.onerror = () => {
+                    console.error('❌ YouTube API 로드 실패');
+                    reject(new Error('YouTube API 로드 실패'));
+                  };
+                  
+                  document.head.appendChild(script);
+                  
+                  // 타임아웃 설정 (10초)
+                  setTimeout(() => {
+                    reject(new Error('YouTube API 로드 타임아웃'));
+                  }, 10000);
+                });
+              };
+              
+              // API 로드 후 플레이어 생성
+              ensureYouTubeAPI()
+                .then(() => {
+                  console.log('🚀 플레이어 초기화 시작');
+                  initializePlayer(videoId, startTime, endTime);
+                })
+                .catch((error) => {
+                  console.error('YouTube API 로드 오류:', error);
+                  alert('YouTube 플레이어 로드에 실패했습니다. 페이지를 새로고침해주세요.');
+                })
+                .finally(() => {
+                  // 로딩 완료 후 플래그 리셋
+                  setTimeout(() => {
+                    autoLoadingRef.current = false;
+                  }, 1000);
+                });
+            }, 500);
+          } else {
+            requestAnimationFrame(loadPlayerWhenReady);
+          }
+        };
+        
+        requestAnimationFrame(loadPlayerWhenReady);
+      }
+    }
+  }, [selectedTimeline?.id, selectedTimeline?.videoUrl, selectedTimeline?.startTimeSeconds, selectedTimeline?.endTimeSeconds, extractVideoId, initializePlayer]);
+
+  // 상세 화면 내용 렌더링 함수 (데스크톱과 모바일에서 공통 사용)
+  const renderDetailContent = () => {
+    if (!selectedTimeline) {
+      return (
+        <div className="p-8 text-center">
+          <EyeIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">항목을 선택해주세요.</p>
+          {selectedTimelineIds.size > 1 && (
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+              {selectedTimelineIds.size}개 항목이 선택되었습니다. 일괄 작업을 사용하세요.
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {/* 기본 정보 */}
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+          <h4 className="font-medium text-gray-900 dark:text-white mb-3">기본 정보</h4>
+          <div className="space-y-3">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  아티스트
+                </label>
+                <input
+                  type="text"
+                  value={editingData?.artist || ''}
+                  onChange={handleArtistChange}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
+                             bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="아티스트 이름을 입력하세요"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={swapArtistAndTitle}
+                className="px-2 py-2 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
+                           text-blue-600 dark:text-blue-300 rounded transition-colors text-xs flex items-center gap-1"
+                title="아티스트와 곡제목 교환"
+                disabled={!editingData}
+              >
+                ⇄
+              </button>
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  곡명
+                </label>
+                <input
+                  type="text"
+                  value={editingData?.songTitle || ''}
+                  onChange={handleSongTitleChange}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
+                             bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="곡명을 입력하세요"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  시작 시간 (초)
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingData?.startTimeSeconds || 0}
+                    onChange={handleStartTimeChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
+                               bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="초 단위"
+                  />
+                  {youtubePlayer && (
+                    <button
+                      type="button"
+                      onClick={setCurrentTimeAsStart}
+                      className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
+                    >
+                      <ClockIcon className="w-3 h-3" />
+                      현재 시간으로 설정
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  종료 시간 (초)
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingData?.endTimeSeconds || ''}
+                    onChange={handleEndTimeChange}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
+                               bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="선택사항 (초 단위)"
+                  />
+                  {youtubePlayer && (
+                    <button
+                      type="button"
+                      onClick={setCurrentTimeAsEnd}
+                      className="w-full px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
+                    >
+                      <ClockIcon className="w-3 h-3" />
+                      현재 시간으로 설정
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            {(selectedTimeline.duration || (editingData?.endTimeSeconds && editingData?.startTimeSeconds)) && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  지속 시간
+                </label>
+                <p className="text-sm text-gray-900 dark:text-white">
+                  {editingPreview && editingData?.endTimeSeconds && editingData?.startTimeSeconds ? (
+                    <>
+                      {editingData.endTimeSeconds - editingData.startTimeSeconds}초 ({formatDuration(editingData.endTimeSeconds - editingData.startTimeSeconds)})
+                    </>
+                  ) : editingPreview && !editingPreview.isValidDuration ? (
+                    <span className="text-red-600 dark:text-red-400">종료 시간이 시작 시간보다 작습니다</span>
+                  ) : selectedTimeline.duration ? (
+                    `${selectedTimeline.duration}초 (${formatDuration(selectedTimeline.duration)})`
+                  ) : (
+                    '없음'
+                  )}
+                </p>
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">시간 표시</label>
+              <p className="text-sm text-gray-900 dark:text-white">
+                {formatSeconds(editingPreview && editingData ? editingData.startTimeSeconds : selectedTimeline.startTimeSeconds)}
+                {(editingPreview && editingData?.endTimeSeconds) || selectedTimeline.endTimeSeconds ? 
+                  ` ~ ${formatSeconds(editingPreview && editingData?.endTimeSeconds ? editingData.endTimeSeconds : selectedTimeline.endTimeSeconds!)}` : 
+                  ''}
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">링크</label>
+              <a 
+                href={`${selectedTimeline.videoUrl}&t=${editingPreview && editingData ? editingData.startTimeSeconds : selectedTimeline.startTimeSeconds}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                YouTube에서 보기
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* 곡 매칭 정보 */}
+        <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-medium text-green-800 dark:text-green-200">곡 매칭</h4>
+            <button
+              onClick={() => openMatchingDialog(selectedTimeline)}
+              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition-colors"
+            >
+              매칭 검색
+            </button>
+          </div>
+          {selectedTimeline.matchedSong ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                  {selectedTimeline.matchedSong.artist} - {selectedTimeline.matchedSong.title}
+                </span>
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  selectedTimeline.matchedSong.confidence >= 0.95 
+                    ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+                    : selectedTimeline.matchedSong.confidence >= 0.8 
+                    ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'  
+                    : 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200'
+                }`}>
+                  {selectedTimeline.matchedSong.confidence >= 0.95 ? '정확한 매칭' :
+                   selectedTimeline.matchedSong.confidence >= 0.8 ? '높은 신뢰도' : '수동 매칭'}
+                </span>
+              </div>
+              <button
+                onClick={() => handleDirectSongMatch(selectedTimeline, null, 0)}
+                className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
+                           text-red-700 dark:text-red-300 rounded text-xs transition-colors"
+              >
+                매칭 해제
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-green-700 dark:text-green-300">매칭된 곡이 없습니다.</p>
+          )}
+        </div>
+
+        {/* 검색 후보 (일괄 검색 결과가 있는 경우만) */}
+        {batchSearchResults.has(selectedTimeline.id) && batchSearchResults.get(selectedTimeline.id)!.length > 0 && (
+          <div className="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-purple-800 dark:text-purple-200">검색 후보</h4>
+              <span className="text-xs text-purple-600 dark:text-purple-400">
+                {batchSearchResults.get(selectedTimeline.id)?.length || 0}개 후보
+              </span>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {batchSearchResults.get(selectedTimeline.id)?.map((candidate: any, index: number) => (
+                <div 
+                  key={candidate.song._id}
+                  className="bg-white dark:bg-gray-800 rounded p-3 border border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
+                  onClick={() => handleDirectSongMatch(selectedTimeline, candidate.song._id, candidate.overallSimilarity)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium text-purple-900 dark:text-purple-100 text-sm">
+                        {candidate.song.artist} - {candidate.song.title}
+                      </div>
+                      {candidate.song.artistAlias && (
+                        <div className="text-xs text-purple-600 dark:text-purple-400 mt-1">
+                          별명: {candidate.song.artistAlias}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right ml-3">
+                      <div className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                        {Math.round(candidate.overallSimilarity * 100)}%
+                      </div>
+                      <div className="text-xs text-purple-600 dark:text-purple-400">
+                        A: {Math.round(candidate.artistSimilarity * 100)}% | T: {Math.round(candidate.titleSimilarity * 100)}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 상태 정보 */}
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+          <h4 className="font-medium text-gray-900 dark:text-white mb-3">상태</h4>
+          <div className="flex flex-wrap gap-2">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+              selectedTimeline.isRelevant 
+                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
+                : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200'
+            }`}>
+              {selectedTimeline.isRelevant ? '관련성 있음' : '관련성 없음'}
+            </span>
+            {selectedTimeline.isExcluded && (
+              <span className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-full text-xs font-medium">
+                제외됨
+              </span>
+            )}
+            {selectedTimeline.isTimeVerified && (
+              <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs flex items-center gap-1">
+                <CheckCircleIcon className="w-3 h-3" />
+                검증완료
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* 시간 검증 */}
+        <TimeVerificationSection 
+          timeline={selectedTimeline}
+          onVerificationUpdate={handleTimeVerificationUpdate}
+        />
+
+        {/* YouTube 재생 */}
+        <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
+          <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-3">YouTube 재생</h4>
+          <div className="space-y-3">
+            {(() => {
+              const videoId = extractVideoId(selectedTimeline.videoUrl);
+              const startTime = editingData?.startTimeSeconds || selectedTimeline.startTimeSeconds;
+              const endTime = editingData?.endTimeSeconds || selectedTimeline.endTimeSeconds;
+              
+              if (!videoId) {
+                return (
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    유효하지 않은 YouTube URL입니다.
+                  </p>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  {/* YouTube 플레이어 - 항상 표시 */}
+                  <div className="bg-black rounded-lg overflow-hidden">
+                    <div 
+                      id="youtube-player"
+                      className={`w-full ${isMobile ? 'h-[250px]' : 'h-[360px]'}`}
+                      style={{
+                        minHeight: isMobile ? '250px' : '360px',
+                        width: '100%'
+                      }}
+                    />
+                    
+                    {/* 플레이어 시간 제어 */}
+                    {youtubePlayer && (
+                        <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-3 mt-3">
+                          {/* 자동 재생 옵션 */}
+                          <div className="mb-3 flex items-center justify-center gap-2 pb-2 border-b border-blue-200 dark:border-blue-700">
+                            <label className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={autoPlay}
+                                onChange={(e) => setAutoPlay(e.target.checked)}
+                                className="rounded border-blue-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                              />
+                              <span>타임라인 변경시 자동 재생</span>
+                            </label>
+                          </div>
+                          
+                          <h5 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3 text-center">플레이어 제어</h5>
+                          <div className="grid grid-cols-3 gap-2">
+                            {/* 뒤로 이동 */}
+                            <div className="space-y-1">
+                              <p className="text-xs text-center text-blue-600 dark:text-blue-400">뒤로</p>
+                              <div className="flex flex-col gap-1">
+                                <button
+                                  type="button"
+                                  onClick={seekBackward1m}
+                                  className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
+                                             text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                  title="1분 뒤로"
+                                >
+                                  <ChevronDoubleLeftIcon className="w-3 h-3" />
+                                  1분
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={seekBackward10s}
+                                  className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
+                                             text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                  title="10초 뒤로"
+                                >
+                                  <ChevronLeftIcon className="w-3 h-3" />
+                                  10초
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={seekBackward1s}
+                                  className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
+                                             text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                  title="1초 뒤로"
+                                >
+                                  <BackwardIcon className="w-3 h-3" />
+                                  1초
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* 특수 이동 */}
+                            <div className="space-y-1">
+                              <p className="text-xs text-center text-blue-600 dark:text-blue-400">특수</p>
+                              <div className="flex flex-col gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (youtubePlayer && editingData?.startTimeSeconds !== undefined) {
+                                      youtubePlayer.seekTo(editingData.startTimeSeconds, true);
+                                    }
+                                  }}
+                                  className="px-2 py-1 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 
+                                             text-green-700 dark:text-green-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                  title="시작시간으로 이동"
+                                >
+                                  <PlayIcon className="w-3 h-3" />
+                                  시작
+                                </button>
+                                {editingData?.endTimeSeconds && (
+                                  <button
+                                    type="button"
+                                    onClick={seekToEndMinus3s}
+                                    className="px-2 py-1 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 
+                                               text-purple-700 dark:text-purple-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                    title="종료시간 3초 전으로 이동"
+                                  >
+                                    <ClockIcon className="w-3 h-3" />
+                                    종료-3초
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* 앞으로 이동 */}
+                            <div className="space-y-1">
+                              <p className="text-xs text-center text-blue-600 dark:text-blue-400">앞으로</p>
+                              <div className="flex flex-col gap-1">
+                                <button
+                                  type="button"
+                                  onClick={seekForward1m}
+                                  className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
+                                             text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                  title="1분 앞으로"
+                                >
+                                  <ChevronDoubleRightIcon className="w-3 h-3" />
+                                  1분
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={seekForward10s}
+                                  className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
+                                             text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                  title="10초 앞으로"
+                                >
+                                  <ChevronRightIcon className="w-3 h-3" />
+                                  10초
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={seekForward1s}
+                                  className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
+                                             text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
+                                  title="1초 앞으로"
+                                >
+                                  <ForwardIcon className="w-3 h-3" />
+                                  1초
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  
+                  {/* 구간 정보 표시 */}
+                  <div className="text-sm text-blue-700 dark:text-blue-300 mt-3">
+                    <p>구간: {formatSeconds(startTime)} {endTime ? `~ ${formatSeconds(endTime)}` : ''}</p>
+                    {endTime && (
+                      <p>지속시간: {formatDuration(endTime - startTime)}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+
+        {/* 비디오 정보 */}
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+          <h4 className="font-medium text-gray-900 dark:text-white mb-3">비디오 정보</h4>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">제목</label>
+              <p className="text-sm text-gray-900 dark:text-white">{selectedTimeline.videoTitle}</p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">URL</label>
+              <a 
+                href={selectedTimeline.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline break-all"
+              >
+                {selectedTimeline.videoUrl}
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* 원본 댓글 */}
+        <div className="bg-yellow-50 dark:bg-yellow-900/30 rounded-lg p-4">
+          <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-3">원본 댓글</h4>
+          {/* 댓글 작성자 정보 */}
+          {selectedTimeline.commentAuthor && (
+            <div className="mb-3 text-xs text-yellow-600 dark:text-yellow-400">
+              <span className="font-medium">작성자:</span> {selectedTimeline.commentAuthor}
+              {selectedTimeline.commentPublishedAt && (
+                <span className="ml-3">
+                  <span className="font-medium">작성일:</span> {new Date(selectedTimeline.commentPublishedAt).toLocaleString('ko-KR')}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="text-sm text-yellow-700 dark:text-yellow-300 bg-white dark:bg-gray-800 rounded p-3 border border-yellow-200 dark:border-yellow-800">
+            <p className="whitespace-pre-wrap leading-relaxed">
+              {stripHtmlTags(selectedTimeline.originalComment)}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0">
+    <div className={`flex flex-col lg:flex-row ${isMobile ? 'gap-2' : 'gap-6'} ${isMobile ? 'overflow-auto' : 'h-[calc(100vh-200px)]'}`}>
+      {/* 모바일 상세 화면 */}
+      {isMobile && showMobileDetail && selectedTimeline && (
+        <div className="fixed inset-0 bg-white dark:bg-gray-900 z-50 flex flex-col">
+          {/* 모바일 헤더 */}
+          <div className="flex items-center justify-between p-4 pt-20 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+            <button
+              onClick={() => {
+                setShowMobileDetail(false);
+                // 모바일에서 뒤로 가기 시 플레이어 일시정지
+                if (youtubePlayer) {
+                  try {
+                    youtubePlayer.pauseVideo();
+                  } catch (e) {
+                    console.log('플레이어 일시정지 중 오류:', e);
+                  }
+                }
+              }}
+              className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+            >
+              <ChevronLeftIcon className="w-5 h-5" />
+              타임라인 목록
+            </button>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">상세 정보</h2>
+            <div className="w-20" /> {/* 균형을 위한 빈 공간 */}
+          </div>
+          
+          {/* 모바일 상세 내용 */}
+          <div className="flex-1 overflow-y-auto p-4">
+            {/* 모바일에서 저장 버튼 표시 */}
+            {selectedTimeline && (
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={saveEdit}
+                  className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors flex items-center justify-center gap-1"
+                  disabled={!editingData}
+                >
+                  <CheckIcon className="w-4 h-4" />
+                  저장
+                </button>
+                <button
+                  onClick={resetEdit}
+                  className="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded text-sm transition-colors"
+                  disabled={!editingData}
+                >
+                  초기화
+                </button>
+              </div>
+            )}
+            {renderDetailContent()}
+          </div>
+        </div>
+      )}
       {/* 파싱된 타임라인 목록 */}
-      <div className="flex-1 xl:flex-[1] bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col h-full">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-4">
+      <div className={`flex-1 lg:flex-[1] bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col ${
+        isMobile ? 'h-full' : 'h-full'
+      } ${
+        isMobile && showMobileDetail ? 'hidden' : ''
+      }`}>
+        <div className={`${isMobile ? 'p-2' : 'p-4'} border-b border-gray-200 dark:border-gray-700`}>
+          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
             <div className="flex items-center gap-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                 파싱된 타임라인 ({paginationInfo.totalItems}개)
@@ -1276,14 +2143,16 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                   <span className="text-sm text-blue-600 dark:text-blue-400">
                     {selectedTimelineIds.size}개 선택됨
                   </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-500">
-                    Shift+클릭으로 범위 선택, Ctrl+클릭으로 개별 선택
-                  </span>
+                  {!isMobile && (
+                    <span className="text-xs text-gray-500 dark:text-gray-500">
+                      Shift+클릭으로 범위 선택, Ctrl+클릭으로 개별 선택
+                    </span>
+                  )}
                 </div>
               )}
             </div>
             <div className="flex items-center gap-2">
-              {selectedTimelineIds.size > 0 && (
+              {selectedTimelineIds.size > 0 && !isMobile && (
                 <div className="flex items-center gap-1 mr-2">
                   <button
                     onClick={() => bulkUpdateRelevance(true)}
@@ -1352,7 +2221,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
           
           {/* 일괄 검색 진행 상황 */}
           {batchSearchProgress && (
-            <div className="px-4 py-3 bg-purple-50 dark:bg-purple-900/20 border-b border-gray-200 dark:border-gray-700">
+            <div className={`${isMobile ? 'px-2 py-2' : 'px-4 py-3'} bg-purple-50 dark:bg-purple-900/20 border-b border-gray-200 dark:border-gray-700`}>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-purple-700 dark:text-purple-300">
                   {batchSearchProgress.message}
@@ -1392,7 +2261,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
             paginationInfo.currentPageItems.map((timeline, pageIndex) => (
               <div
                 key={timeline.id}
-                className={`p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors select-none ${
+                className={`${isMobile ? 'p-2' : 'p-4'} border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors select-none ${
                   selectedTimelineIds.has(timeline.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                 } ${selectedTimeline?.id === timeline.id ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
                 onClick={(e) => handleTimelineSelection(timeline, pageIndex, e)}
@@ -1400,17 +2269,19 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 flex-1 min-w-0">
-                    <div className="flex-shrink-0 mt-1">
-                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                        selectedTimelineIds.has(timeline.id) 
-                          ? 'bg-blue-600 border-blue-600' 
-                          : 'border-gray-300 dark:border-gray-600'
-                      }`}>
-                        {selectedTimelineIds.has(timeline.id) && (
-                          <CheckIcon className="w-3 h-3 text-white" />
-                        )}
+                    {!isMobile && (
+                      <div className="flex-shrink-0 mt-1">
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                          selectedTimelineIds.has(timeline.id) 
+                            ? 'bg-blue-600 border-blue-600' 
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}>
+                          {selectedTimelineIds.has(timeline.id) && (
+                            <CheckIcon className="w-3 h-3 text-white" />
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
                         <h4 className="font-medium text-gray-900 dark:text-white text-sm">
@@ -1509,7 +2380,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         
         {/* 페이지네이션 컨트롤 */}
         {paginationInfo.totalPages > 1 && (
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <div className={`${isMobile ? 'p-2' : 'p-4'} border-t border-gray-200 dark:border-gray-700`}>
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 페이지 {currentPage} / {paginationInfo.totalPages} 
@@ -1576,8 +2447,10 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         )}
       </div>
 
-      {/* 상세 정보 */}
-      <div className="flex-1 xl:flex-[1] bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col h-full">
+      {/* 상세 정보 (데스크톱만) */}
+      <div className={`flex-1 lg:flex-[1] bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex-col h-full ${
+        isMobile ? 'hidden' : 'flex'
+      }`}>
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -1606,597 +2479,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-4">
-          {!selectedTimeline ? (
-            <div className="p-8 text-center">
-              <EyeIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 dark:text-gray-400">항목을 선택해주세요.</p>
-              {selectedTimelineIds.size > 1 && (
-                <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
-                  {selectedTimelineIds.size}개 항목이 선택되었습니다. 일괄 작업을 사용하세요.
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* 기본 정보 */}
-              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 dark:text-white mb-3">기본 정보</h4>
-                <div className="space-y-3">
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        아티스트
-                      </label>
-                      <input
-                        type="text"
-                        value={editingData?.artist || ''}
-                        onChange={handleArtistChange}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
-                                   bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        placeholder="아티스트 이름을 입력하세요"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={swapArtistAndTitle}
-                      className="px-2 py-2 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
-                                 text-blue-600 dark:text-blue-300 rounded transition-colors text-xs flex items-center gap-1"
-                      title="아티스트와 곡제목 교환"
-                      disabled={!editingData}
-                    >
-                      ⇄
-                    </button>
-                    <div className="flex-1">
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        곡명
-                      </label>
-                      <input
-                        type="text"
-                        value={editingData?.songTitle || ''}
-                        onChange={handleSongTitleChange}
-                        className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
-                                   bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                        placeholder="곡명을 입력하세요"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        시작 시간 (초)
-                      </label>
-                      <div className="space-y-2">
-                        <input
-                          type="number"
-                          min="0"
-                          value={editingData?.startTimeSeconds || 0}
-                          onChange={handleStartTimeChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
-                                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          placeholder="초 단위"
-                        />
-                        {youtubePlayer && showPlayer && (
-                          <button
-                            type="button"
-                            onClick={setCurrentTimeAsStart}
-                            className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
-                          >
-                            <ClockIcon className="w-3 h-3" />
-                            현재 시간으로 설정
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        종료 시간 (초)
-                      </label>
-                      <div className="space-y-2">
-                        <input
-                          type="number"
-                          min="0"
-                          value={editingData?.endTimeSeconds || ''}
-                          onChange={handleEndTimeChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
-                                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                          placeholder="선택사항 (초 단위)"
-                        />
-                        {youtubePlayer && showPlayer && (
-                          <button
-                            type="button"
-                            onClick={setCurrentTimeAsEnd}
-                            className="w-full px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
-                          >
-                            <ClockIcon className="w-3 h-3" />
-                            현재 시간으로 설정
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {(selectedTimeline.duration || (editingData?.endTimeSeconds && editingData?.startTimeSeconds)) && (
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        지속 시간
-                      </label>
-                      <p className="text-sm text-gray-900 dark:text-white">
-                        {editingPreview?.duration ? (
-                          <>
-                            {editingPreview.duration}초 ({formatDuration(editingPreview.duration)})
-                            <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">(미리보기)</span>
-                          </>
-                        ) : editingPreview && !editingPreview.isValidDuration ? (
-                          <span className="text-red-600 dark:text-red-400">종료 시간이 시작 시간보다 작습니다</span>
-                        ) : selectedTimeline.duration ? (
-                          `${selectedTimeline.duration}초 (${formatDuration(selectedTimeline.duration)})`
-                        ) : (
-                          '없음'
-                        )}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-
-              {/* 비디오 정보 */}
-              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 dark:text-white mb-3">비디오 정보</h4>
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">제목</label>
-                    <p className="text-sm text-gray-900 dark:text-white">{selectedTimeline.videoTitle}</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">업로드 날짜</label>
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      {new Date(selectedTimeline.uploadedDate).toLocaleDateString('ko-KR')}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">링크</label>
-                    <a 
-                      href={`${selectedTimeline.videoUrl}&t=${editingPreview && editingData ? editingData.startTimeSeconds : selectedTimeline.startTimeSeconds}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      YouTube에서 보기
-                      {editingPreview?.startTimeChanged && (
-                        <span className="text-xs text-blue-600 dark:text-blue-400 ml-2">(편집된 시간으로)</span>
-                      )}
-                    </a>
-                  </div>
-                </div>
-              </div>
-
-              {/* 매칭 정보 */}
-              {selectedTimeline.matchedSong && (
-                <div className="bg-green-50 dark:bg-green-900/30 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-green-800 dark:text-green-200 flex items-center gap-2">
-                      <CheckCircleIcon className="w-5 h-5" />
-                      매칭 완료
-                    </h4>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${
-                        selectedTimeline.matchedSong.confidence >= 0.95 
-                          ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
-                          : selectedTimeline.matchedSong.confidence >= 0.8
-                          ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200'  
-                          : 'bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200'
-                      }`}>
-                        {selectedTimeline.matchedSong.confidence >= 0.95 ? '정확한 매칭' :
-                         selectedTimeline.matchedSong.confidence >= 0.8 ? '높은 신뢰도' : '수동 매칭'}
-                      </span>
-                      <button
-                        onClick={() => handleDirectSongMatch(selectedTimeline, null, 0)}
-                        className="text-xs text-red-600 hover:text-red-700 transition-colors flex items-center gap-1"
-                      >
-                        <XMarkIcon className="w-3 h-3" />
-                        해제
-                      </button>
-                    </div>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-green-200 dark:border-green-700">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">아티스트</label>
-                        <p className="text-sm font-medium text-green-800 dark:text-green-200">{selectedTimeline.matchedSong.artist}</p>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-green-700 dark:text-green-300 mb-1">곡명</label>
-                        <p className="text-sm font-medium text-green-800 dark:text-green-200">{selectedTimeline.matchedSong.title}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-700">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-green-700 dark:text-green-300">매칭 신뢰도</span>
-                        <div className="flex items-center gap-2">
-                          <div className="w-20 bg-green-200 dark:bg-green-800 rounded-full h-2">
-                            <div 
-                              className="bg-green-600 dark:bg-green-400 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${selectedTimeline.matchedSong.confidence * 100}%` }}
-                            />
-                          </div>
-                          <span className="font-medium text-green-800 dark:text-green-200">
-                            {Math.round(selectedTimeline.matchedSong.confidence * 100)}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 일괄 검색 후보 목록 */}
-              {!selectedTimeline.matchedSong && batchSearchResults.has(selectedTimeline.id) && (
-                <div className="bg-purple-50 dark:bg-purple-900/30 rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-purple-800 dark:text-purple-200">검색 후보</h4>
-                    <span className="text-xs text-purple-600 dark:text-purple-400">
-                      {batchSearchResults.get(selectedTimeline.id)?.length || 0}개 후보
-                    </span>
-                  </div>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {batchSearchResults.get(selectedTimeline.id)?.map((candidate: any, index: number) => (
-                      <div 
-                        key={candidate.song._id}
-                        className="bg-white dark:bg-gray-800 rounded p-3 border border-purple-200 dark:border-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors cursor-pointer"
-                        onClick={() => handleDirectSongMatch(selectedTimeline, candidate.song._id, candidate.overallSimilarity)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              {candidate.song.artist} - {candidate.song.title}
-                            </p>
-                            {(candidate.song.artistAlias || candidate.song.titleAlias) && (
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                {candidate.song.artistAlias && `아티스트 별명: ${candidate.song.artistAlias}`}
-                                {candidate.song.artistAlias && candidate.song.titleAlias && ' | '}
-                                {candidate.song.titleAlias && `곡명 별명: ${candidate.song.titleAlias}`}
-                              </p>
-                            )}
-                            {candidate.song.searchTags && candidate.song.searchTags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mt-2">
-                                {candidate.song.searchTags.map((tag: string, tagIndex: number) => (
-                                  <span 
-                                    key={tagIndex}
-                                    className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded"
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <div className="ml-3 text-right">
-                            <div className="text-sm font-medium text-purple-700 dark:text-purple-300">
-                              {Math.round(candidate.overallSimilarity * 100)}%
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              A: {Math.round(candidate.artistSimilarity * 100)}% | 
-                              T: {Math.round(candidate.titleSimilarity * 100)}%
-                            </div>
-                            {candidate.isExactMatch && (
-                              <span className="inline-block mt-1 px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded">
-                                완전 일치
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )) || []}
-                  </div>
-                  <div className="mt-3 text-xs text-purple-600 dark:text-purple-400">
-                    💡 후보를 클릭하면 해당 곡으로 매칭됩니다.
-                  </div>
-                </div>
-              )}
-
-              {/* 상태 정보 */}
-              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 dark:text-white mb-3">상태</h4>
-                <div className="flex flex-wrap gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    selectedTimeline.isRelevant 
-                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200'
-                      : 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200'
-                  }`}>
-                    {selectedTimeline.isRelevant ? '관련성 있음' : '관련성 없음'}
-                  </span>
-                  {selectedTimeline.isExcluded && (
-                    <span className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-full text-xs font-medium">
-                      제외됨
-                    </span>
-                  )}
-                  {selectedTimeline.matchedSong && (
-                    <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-full text-xs font-medium">
-                      매칭 완료
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* 시간 검증 */}
-              <TimeVerificationSection 
-                timeline={selectedTimeline}
-                onVerificationUpdate={handleTimeVerificationUpdate}
-              />
-
-              {/* YouTube 재생 */}
-              <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
-                <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-3">YouTube 재생</h4>
-                <div className="space-y-3">
-                  {(() => {
-                    const videoId = extractVideoId(selectedTimeline.videoUrl);
-                    const startTime = editingData?.startTimeSeconds || selectedTimeline.startTimeSeconds;
-                    const endTime = editingData?.endTimeSeconds || selectedTimeline.endTimeSeconds;
-                    
-                    if (!videoId) {
-                      return (
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          올바르지 않은 YouTube URL입니다.
-                        </p>
-                      );
-                    }
-
-                    return (
-                      <>
-                        {showPlayer ? (
-                          /* YouTube 플레이어 */
-                          <div className="space-y-3">
-                            <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
-                              <YouTube
-                                videoId={videoId}
-                                className="absolute inset-0 w-full h-full"
-                                iframeClassName="w-full h-full rounded-lg"
-                                opts={{
-                                  width: '100%',
-                                  height: '100%',
-                                  playerVars: {
-                                    autoplay: 1,
-                                    start: startTime,
-                                    end: endTime,
-                                    modestbranding: 1,
-                                    rel: 0,
-                                  },
-                                }}
-                                onReady={onYouTubeReady}
-                                onStateChange={onYouTubeStateChange}
-                              />
-                            </div>
-                            
-                            {/* 플레이어 컨트롤 */}
-                            <div className="flex items-center justify-between">
-                              <div className="text-sm text-blue-700 dark:text-blue-300">
-                                <p>현재: {formatSeconds(currentTime)}</p>
-                                <p>시작: {formatSeconds(startTime)}</p>
-                                {endTime && <p>종료: {formatSeconds(endTime)}</p>}
-                                {endTime && startTime && (
-                                  <p>재생 시간: {formatDuration(endTime - startTime)}</p>
-                                )}
-                              </div>
-                              
-                              <div className="flex gap-2">
-                                <button
-                                  onClick={togglePlayback}
-                                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors flex items-center gap-2"
-                                >
-                                  {isPlaying ? (
-                                    <PauseIcon className="w-4 h-4" />
-                                  ) : (
-                                    <PlayIcon className="w-4 h-4" />
-                                  )}
-                                  {isPlaying ? '일시정지' : '재생'}
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setShowPlayer(false);
-                                    setIsPlaying(false);
-                                  }}
-                                  className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
-                                >
-                                  닫기
-                                </button>
-                              </div>
-                            </div>
-                            
-                            {/* 플레이어 시간 제어 */}
-                            {youtubePlayer && (
-                              <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-3 mt-3">
-                                <h5 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3 text-center">플레이어 제어</h5>
-                                <div className="grid grid-cols-3 gap-2">
-                                  {/* 뒤로 이동 */}
-                                  <div className="space-y-1">
-                                    <p className="text-xs text-center text-blue-600 dark:text-blue-400">뒤로</p>
-                                    <div className="flex flex-col gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={seekBackward1m}
-                                        className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
-                                                   text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                        title="1분 뒤로"
-                                      >
-                                        <ChevronDoubleLeftIcon className="w-3 h-3" />
-                                        1분
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={seekBackward10s}
-                                        className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
-                                                   text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                        title="10초 뒤로"
-                                      >
-                                        <ChevronLeftIcon className="w-3 h-3" />
-                                        10초
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={seekBackward1s}
-                                        className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
-                                                   text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                        title="1초 뒤로"
-                                      >
-                                        <BackwardIcon className="w-3 h-3" />
-                                        1초
-                                      </button>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* 특수 이동 */}
-                                  <div className="space-y-1">
-                                    <p className="text-xs text-center text-blue-600 dark:text-blue-400">특수</p>
-                                    <div className="flex flex-col gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          if (youtubePlayer && editingData?.startTimeSeconds !== undefined) {
-                                            youtubePlayer.seekTo(editingData.startTimeSeconds, true);
-                                          }
-                                        }}
-                                        className="px-2 py-1 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 
-                                                   text-green-700 dark:text-green-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                        title="시작시간으로 이동"
-                                      >
-                                        <PlayIcon className="w-3 h-3" />
-                                        시작
-                                      </button>
-                                      {editingData?.endTimeSeconds && (
-                                        <button
-                                          type="button"
-                                          onClick={seekToEndMinus3s}
-                                          className="px-2 py-1 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 
-                                                     text-purple-700 dark:text-purple-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                          title="종료시간 3초 전으로 이동"
-                                        >
-                                          <ClockIcon className="w-3 h-3" />
-                                          종료-3초
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
-                                  
-                                  {/* 앞으로 이동 */}
-                                  <div className="space-y-1">
-                                    <p className="text-xs text-center text-blue-600 dark:text-blue-400">앞으로</p>
-                                    <div className="flex flex-col gap-1">
-                                      <button
-                                        type="button"
-                                        onClick={seekForward1m}
-                                        className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
-                                                   text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                        title="1분 앞으로"
-                                      >
-                                        <ChevronDoubleRightIcon className="w-3 h-3" />
-                                        1분
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={seekForward10s}
-                                        className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
-                                                   text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                        title="10초 앞으로"
-                                      >
-                                        <ChevronRightIcon className="w-3 h-3" />
-                                        10초
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={seekForward1s}
-                                        className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
-                                                   text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                        title="1초 앞으로"
-                                      >
-                                        <ForwardIcon className="w-3 h-3" />
-                                        1초
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          /* 썸네일과 재생 버튼 */
-                          <>
-                            <div className="relative">
-                              <Image 
-                                src={`https://img.youtube.com/vi/${videoId}/mqdefault.jpg`}
-                                alt="YouTube 썸네일"
-                                width={320}
-                                height={180}
-                                className="w-full h-40 object-cover rounded-lg"
-                                unoptimized
-                              />
-                              <button
-                                onClick={() => playVideoAtTime(videoId, startTime, endTime)}
-                                className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors rounded-lg"
-                              >
-                                <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center hover:bg-red-700 transition-colors shadow-lg">
-                                  <PlayIcon className="w-6 h-6 text-white ml-1" />
-                                </div>
-                              </button>
-                            </div>
-                            
-                            {/* 재생 정보 */}
-                            <div className="text-sm text-blue-700 dark:text-blue-300">
-                              <p>시작: {formatSeconds(startTime)}</p>
-                              {endTime && <p>종료: {formatSeconds(endTime)}</p>}
-                              {endTime && startTime && (
-                                <p>재생 시간: {formatDuration(endTime - startTime)}</p>
-                              )}
-                            </div>
-
-                            {/* 재생 버튼들 */}
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => playVideoAtTime(videoId, startTime, endTime)}
-                                className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                              >
-                                <PlayIcon className="w-4 h-4" />
-                                구간 재생
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const url = `https://www.youtube.com/watch?v=${videoId}`;
-                                  window.open(url, '_blank');
-                                }}
-                                className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded text-sm font-medium transition-colors"
-                              >
-                                새 탭에서 열기
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* 원본 댓글 */}
-              <div className="bg-yellow-50 dark:bg-yellow-900/30 rounded-lg p-4">
-                <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-3">원본 댓글</h4>
-                {/* 댓글 작성자 정보 */}
-                {selectedTimeline.commentAuthor && (
-                  <div className="mb-3 text-xs text-yellow-600 dark:text-yellow-400">
-                    <span className="font-medium">작성자:</span> {selectedTimeline.commentAuthor}
-                    {selectedTimeline.commentPublishedAt && (
-                      <span className="ml-3">
-                        <span className="font-medium">작성일:</span> {new Date(selectedTimeline.commentPublishedAt).toLocaleDateString('ko-KR')}
-                      </span>
-                    )}
-                  </div>
-                )}
-                <div className="text-sm text-yellow-700 dark:text-yellow-300 bg-white dark:bg-gray-800 rounded p-3 border border-yellow-200 dark:border-yellow-800">
-                  <p className="whitespace-pre-wrap leading-relaxed">
-                    {stripHtmlTags(selectedTimeline.originalComment)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          {renderDetailContent()}
         </div>
       </div>
 

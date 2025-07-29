@@ -1,11 +1,6 @@
 import { redirect } from 'next/navigation';
-import TestDBClient from './TestDBClient';
 
 export default function TestDBPage() {
-  // 서버 사이드에서 프로덕션 환경 차단
-  if (process.env.NODE_ENV === 'production') {
-    redirect('/');
-  }
-
-  return <TestDBClient />;
+  // 기존 test-db 페이지는 관리자 페이지로 이전되었습니다
+  redirect('/admin');
 }

@@ -2099,9 +2099,34 @@ export default function TestDBClient() {
       </div>
 
       <div className="px-4 sm:px-6 lg:px-8 py-8 flex-1 min-h-0">
-        <div className="flex gap-8 h-full">
-          {/* Sidebar */}
-          <div className="w-64 flex-shrink-0">
+        <div className="flex flex-col lg:flex-row gap-8 h-full">
+          {/* Mobile Tab Navigation */}
+          <div className="lg:hidden">
+            <nav className="flex overflow-x-auto space-x-1 pb-2">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-lg transition-all duration-200 min-w-[80px] ${
+                      isActive
+                        ? 'bg-light-accent/10 dark:bg-dark-accent/10 border border-light-accent/20 dark:border-dark-accent/20 text-light-accent dark:text-dark-accent'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5 mb-1" />
+                    <div className="text-xs font-medium text-center">{tab.name}</div>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Desktop Sidebar */}
+          <div className="hidden lg:block w-64 flex-shrink-0">
             <nav className="space-y-2">
               {tabs.map((tab) => {
                 const Icon = tab.icon;

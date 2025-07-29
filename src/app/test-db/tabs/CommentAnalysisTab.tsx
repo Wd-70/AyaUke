@@ -64,8 +64,12 @@ interface PaginationData {
   limit: number;
 }
 
-export default function CommentAnalysisTab() {
-  const [viewMode, setViewMode] = useState<'comments' | 'timeline'>('comments');
+interface CommentAnalysisTabProps {
+  viewMode?: 'comments' | 'timeline';
+}
+
+export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAnalysisTabProps = {}) {
+  const [viewMode, setViewMode] = useState<'comments' | 'timeline'>(propViewMode || 'comments');
   const [loading, setLoading] = useState(false);
   
   // 다이얼로그 상태
@@ -105,6 +109,7 @@ export default function CommentAnalysisTab() {
     uniqueMatchedSongs: 0,
     verifiedItems: 0
   });
+  const [isMobile, setIsMobile] = useState(false);
   const [pagination, setPagination] = useState<PaginationData>({
     currentPage: 1,
     totalPages: 1,
@@ -349,21 +354,33 @@ export default function CommentAnalysisTab() {
     loadChannelData(newPage, searchQuery);
   };
 
+  // 모바일 감지
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    
+    return () => window.removeEventListener('resize', checkIsMobile);
+  }, []);
+
   useEffect(() => {
     loadChannelData();
   }, []);
 
   return (
-    <div className="h-full bg-gray-50 dark:bg-gray-900 p-6 overflow-hidden">
-      <div className="w-full h-full flex flex-col space-y-6">
+    <div className={`h-full bg-gray-50 dark:bg-gray-900 ${isMobile ? 'p-2 overflow-auto' : 'p-6 overflow-hidden'}`}>
+      <div className={`w-full h-full flex flex-col ${isMobile ? 'space-y-3' : 'space-y-6'}`}>
         {/* 헤더 */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-sm flex-shrink-0">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div className={`bg-white dark:bg-gray-800 rounded-lg ${isMobile ? 'p-3' : 'p-6'} border border-gray-200 dark:border-gray-700 shadow-sm flex-shrink-0`}>
+          <div className={`flex flex-col lg:flex-row lg:items-center justify-between ${isMobile ? 'gap-3' : 'gap-6'}`}>
             <div>
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-gray-900 dark:text-white ${isMobile ? 'mb-1' : 'mb-2'}`}>
                 {viewMode === 'comments' ? 'YouTube 댓글 분석' : '타임라인 파싱 관리'}
               </h2>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className={`text-gray-600 dark:text-gray-400 ${isMobile ? 'text-sm' : ''}`}>
                 {viewMode === 'comments' 
                   ? '아야 다시보기 채널의 댓글을 수집하고 타임라인 정보를 분석합니다.'
                   : '타임라인 댓글에서 곡 정보를 파싱하고 라이브 클립 데이터를 관리합니다.'
@@ -432,74 +449,76 @@ export default function CommentAnalysisTab() {
                 </div>
               )}
               
-              {/* 뷰 모드 토글 - 오른쪽 끝으로 이동 */}
-              <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('comments')}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    viewMode === 'comments'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <ChatBubbleBottomCenterTextIcon className="w-4 h-4 mr-2 inline" />
-                  댓글 분석
-                </button>
-                <button
-                  onClick={() => setViewMode('timeline')}
-                  className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    viewMode === 'timeline'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  <LinkIcon className="w-4 h-4 mr-2 inline" />
-                  타임라인 파싱
-                </button>
-              </div>
+              {/* 뷰 모드 토글 - 오른쪽 끝으로 이동 (propViewMode가 있으면 숨김) */}
+              {!propViewMode && (
+                <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+                  <button
+                    onClick={() => setViewMode('comments')}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      viewMode === 'comments'
+                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <ChatBubbleBottomCenterTextIcon className="w-4 h-4 mr-2 inline" />
+                    댓글 분석
+                  </button>
+                  <button
+                    onClick={() => setViewMode('timeline')}
+                    className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      viewMode === 'timeline'
+                        ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <LinkIcon className="w-4 h-4 mr-2 inline" />
+                    타임라인 파싱
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
           {/* 통계 - 모드에 따라 다르게 표시 */}
           {viewMode === 'comments' ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg">
-                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.totalVideos}</div>
-                <div className="text-sm text-blue-700 dark:text-blue-300">총 비디오</div>
+            <div className={`grid grid-cols-2 lg:grid-cols-4 ${isMobile ? 'gap-2 mt-3' : 'gap-4 mt-6'}`}>
+              <div className={`bg-blue-50 dark:bg-blue-900/20 ${isMobile ? 'p-3' : 'p-6'} rounded-lg`}>
+                <div className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-blue-600 dark:text-blue-400`}>{stats.totalVideos}</div>
+                <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-blue-700 dark:text-blue-300`}>총 비디오</div>
               </div>
-              <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-lg">
-                <div className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.totalComments}</div>
-                <div className="text-sm text-green-700 dark:text-green-300">총 댓글</div>
+              <div className={`bg-green-50 dark:bg-green-900/20 ${isMobile ? 'p-3' : 'p-6'} rounded-lg`}>
+                <div className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-green-600 dark:text-green-400`}>{stats.totalComments}</div>
+                <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-green-700 dark:text-green-300`}>총 댓글</div>
               </div>
-              <div className="bg-purple-50 dark:bg-purple-900/20 p-6 rounded-lg">
-                <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">{stats.timelineComments}</div>
-                <div className="text-sm text-purple-700 dark:text-purple-300">타임라인 댓글</div>
+              <div className={`bg-purple-50 dark:bg-purple-900/20 ${isMobile ? 'p-3' : 'p-6'} rounded-lg`}>
+                <div className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-purple-600 dark:text-purple-400`}>{stats.timelineComments}</div>
+                <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-purple-700 dark:text-purple-300`}>타임라인 댓글</div>
               </div>
-              <div className="bg-orange-50 dark:bg-orange-900/20 p-6 rounded-lg">
-                <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.processedComments}</div>
-                <div className="text-sm text-orange-700 dark:text-orange-300">처리 완료</div>
+              <div className={`bg-orange-50 dark:bg-orange-900/20 ${isMobile ? 'p-3' : 'p-6'} rounded-lg`}>
+                <div className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold text-orange-600 dark:text-orange-400`}>{stats.processedComments}</div>
+                <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-orange-700 dark:text-orange-300`}>처리 완료</div>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
-              <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{timelineStats.parsedItems}</div>
+            <div className={`grid grid-cols-2 lg:grid-cols-5 ${isMobile ? 'gap-2 mt-3' : 'gap-4 mt-6'}`}>
+              <div className={`bg-green-50 dark:bg-green-900/20 ${isMobile ? 'p-2' : 'p-4'} rounded-lg`}>
+                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-green-600 dark:text-green-400`}>{timelineStats.parsedItems}</div>
                 <div className="text-xs text-green-700 dark:text-green-300">파싱된 항목</div>
               </div>
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{timelineStats.relevantItems}</div>
+              <div className={`bg-yellow-50 dark:bg-yellow-900/20 ${isMobile ? 'p-2' : 'p-4'} rounded-lg`}>
+                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-yellow-600 dark:text-yellow-400`}>{timelineStats.relevantItems}</div>
                 <div className="text-xs text-yellow-700 dark:text-yellow-300">관련성 있음</div>
               </div>
-              <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{timelineStats.matchedSongs}</div>
+              <div className={`bg-indigo-50 dark:bg-indigo-900/20 ${isMobile ? 'p-2' : 'p-4'} rounded-lg`}>
+                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-indigo-600 dark:text-indigo-400`}>{timelineStats.matchedSongs}</div>
                 <div className="text-xs text-indigo-700 dark:text-indigo-300">매칭된 곡</div>
               </div>
-              <div className="bg-pink-50 dark:bg-pink-900/20 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">{timelineStats.uniqueMatchedSongs}</div>
+              <div className={`bg-pink-50 dark:bg-pink-900/20 ${isMobile ? 'p-2' : 'p-4'} rounded-lg`}>
+                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-pink-600 dark:text-pink-400`}>{timelineStats.uniqueMatchedSongs}</div>
                 <div className="text-xs text-pink-700 dark:text-pink-300">고유 곡</div>
               </div>
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{timelineStats.verifiedItems}</div>
+              <div className={`bg-blue-50 dark:bg-blue-900/20 ${isMobile ? 'p-2' : 'p-4'} rounded-lg`}>
+                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-blue-600 dark:text-blue-400`}>{timelineStats.verifiedItems}</div>
                 <div className="text-xs text-blue-700 dark:text-blue-300">검증완료</div>
               </div>
             </div>
