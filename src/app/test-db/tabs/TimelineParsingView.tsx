@@ -948,6 +948,9 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
           onReady: (event: any) => {
             console.log('✅ 새 플레이어 준비 완료!');
             console.log('로드된 비디오 ID:', videoId);
+            console.log('실제 DOM 컨테이너 확인:', document.getElementById('youtube-player'));
+            console.log('플레이어 객체:', event.target);
+            console.log('현재 비디오 데이터:', event.target.getVideoData());
             setYoutubePlayer(event.target);
             
             // iFrame 스타일링
@@ -1465,7 +1468,6 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
 
   // 자동 로딩을 제어하는 ref 추가
   const autoLoadingRef = useRef(false);
-  const lastLoadedRef = useRef<string>('');
 
   // 선택된 타임라인이 변경될 때 자동으로 플레이어 로드 (무한 루프 방지)
   useEffect(() => {
@@ -1475,23 +1477,17 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
       if (videoId) {
         const startTime = selectedTimeline.startTimeSeconds;
         const endTime = selectedTimeline.endTimeSeconds;
-        const loadKey = `${videoId}-${startTime}-${endTime}`;
-        
-        // 이전에 로드한 것과 같으면 스킵
-        if (lastLoadedRef.current === loadKey) {
-          return;
-        }
         
         console.log('🚀 자동 플레이어 로드:', { videoId, startTime, endTime });
         
         autoLoadingRef.current = true;
-        lastLoadedRef.current = loadKey;
         
         // DOM이 준비될 때까지 기다린 후 플레이어 로드
         const loadPlayerWhenReady = () => {
           const container = document.getElementById('youtube-player');
           if (container) {
             console.log('📦 컨테이너 발견, 기존 플레이어 완전 정리');
+            console.log('현재 플레이어 상태:', youtubePlayer ? '존재함' : '없음');
             
             // 기존 플레이어 완전 정리
             container.innerHTML = '';
@@ -1576,7 +1572,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         requestAnimationFrame(loadPlayerWhenReady);
       }
     }
-  }, [selectedTimeline?.id, selectedTimeline?.videoUrl, selectedTimeline?.startTimeSeconds, selectedTimeline?.endTimeSeconds, extractVideoId, initializePlayer]);
+  }, [selectedTimeline, extractVideoId, initializePlayer]);
 
   // 상세 화면 내용 렌더링 함수 (데스크톱과 모바일에서 공통 사용)
   const renderDetailContent = () => {
@@ -1893,6 +1889,29 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                               />
                               <span>타임라인 변경시 자동 재생</span>
                             </label>
+                          </div>
+                          
+                          {/* 수동 재로딩 버튼 */}
+                          <div className="mb-3 flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (selectedTimeline) {
+                                  const videoId = extractVideoId(selectedTimeline.videoUrl);
+                                  if (videoId) {
+                                    console.log('🔄 수동 플레이어 재로딩 요청');
+                                    playVideoAtTime(videoId, selectedTimeline.startTimeSeconds, selectedTimeline.endTimeSeconds);
+                                  }
+                                }
+                              }}
+                              className="px-3 py-1.5 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 
+                                         text-green-700 dark:text-green-300 rounded text-xs transition-colors flex items-center gap-1.5"
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              플레이어 재로딩
+                            </button>
                           </div>
                           
                           <h5 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3 text-center">플레이어 제어</h5>
