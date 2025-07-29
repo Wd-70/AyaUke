@@ -1,3 +1,5 @@
 {
+  "/api/timeline-parser/route": "app/api/timeline-parser/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/admin/page": "app/admin/page.js"
 }

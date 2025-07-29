@@ -1063,7 +1063,6 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
       // 현재 전역 스크롤 위치 최종 저장 (실시간 저장이 있지만 확실하게)
       const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
       setSavedScrollPosition(currentScroll);
-      console.log('📍 상세페이지 진입 시 전역 스크롤 위치 최종 저장:', currentScroll);
       
       loadTimelineDetails(timeline);
       setShowMobileDetail(true);
@@ -1448,10 +1447,6 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
     const checkIsMobile = () => {
       const mobile = window.innerWidth < 1024; // lg 브레이크포인트 미만을 모바일로 간주
       setIsMobile(mobile);
-      console.log('📱 모바일 감지:', { 
-        width: window.innerWidth, 
-        isMobile: mobile 
-      });
     };
 
     checkIsMobile();
@@ -1493,23 +1488,10 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   // 모바일 상세 페이지가 닫힐 때 전역 스크롤 위치 복원
   useEffect(() => {
     if (isMobile && !showMobileDetail && savedScrollPosition >= 0) {
-      console.log('🔄 상세페이지 닫힘, 전역 스크롤 복원 시도:', savedScrollPosition);
       
       const restoreScroll = () => {
-        console.log('📍 전역 스크롤 복원 실행:', savedScrollPosition);
         window.scrollTo({ top: savedScrollPosition, behavior: 'instant' });
         
-        // 복원 확인
-        requestAnimationFrame(() => {
-          const actualScroll = window.pageYOffset || document.documentElement.scrollTop;
-          console.log('✅ 복원 후 실제 위치:', actualScroll);
-          
-          // 복원이 제대로 안되었다면 한 번 더 시도
-          if (Math.abs(actualScroll - savedScrollPosition) > 10) {
-            console.log('🔄 재시도 필요, 다시 복원');
-            window.scrollTo({ top: savedScrollPosition, behavior: 'instant' });
-          }
-        });
       };
       
       // 여러 번 시도해서 확실하게 복원
@@ -1522,14 +1504,9 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
 
   // 모바일에서 전역 스크롤 위치 실시간 저장
   useEffect(() => {
-    console.log('🔧 전역 스크롤 이벤트 리스너 설정 시도:', {
-      isMobile,
-      showMobileDetail
-    });
 
     if (isMobile && !showMobileDetail) {
       const handleScroll = () => {
-        console.log('📜 전역 스크롤 이벤트 발생!');
         if (!showMobileDetail) {
           // 디바운스를 적용해서 성능 최적화
           if (scrollSaveTimeoutRef.current) {
@@ -1539,25 +1516,19 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
           scrollSaveTimeoutRef.current = setTimeout(() => {
             const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
             setSavedScrollPosition(currentScroll);
-            console.log('💾 실시간 전역 스크롤 저장:', currentScroll);
           }, 100);
         }
       };
 
-      console.log('✅ 전역 스크롤 이벤트 리스너 등록 완료');
       
       // 테스트용: 즉시 스크롤 테스트
       setTimeout(() => {
         const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
-        console.log('🧪 전역 스크롤 테스트 - 현재 scrollTop:', currentScroll);
-        console.log('🧪 전역 스크롤 테스트 - 페이지 높이:', document.documentElement.scrollHeight);
-        console.log('🧪 전역 스크롤 테스트 - 윈도우 높이:', window.innerHeight);
       }, 1000);
       
       window.addEventListener('scroll', handleScroll, { passive: true });
       
       return () => {
-        console.log('🧹 전역 스크롤 이벤트 리스너 정리');
         window.removeEventListener('scroll', handleScroll);
         if (scrollSaveTimeoutRef.current) {
           clearTimeout(scrollSaveTimeoutRef.current);
@@ -2263,14 +2234,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                 // 전역 스크롤 위치 복원
                 setTimeout(() => {
                   if (savedScrollPosition >= 0) {
-                    console.log('🔄 버튼 클릭 시 전역 스크롤 위치 복원:', savedScrollPosition);
                     window.scrollTo({ top: savedScrollPosition, behavior: 'instant' });
-                    const actualScroll = window.pageYOffset || document.documentElement.scrollTop;
-                    console.log('✅ 복원 후 실제 위치:', actualScroll);
-                  } else {
-                    console.log('⚠️ 전역 스크롤 복원 실패:', {
-                      savedPosition: savedScrollPosition
-                    });
                   }
                 }, 200);
               }}
@@ -2434,7 +2398,6 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         <div 
           ref={(el) => {
             timelineListRef.current = el;
-            console.log('🎯 timelineListRef 설정:', !!el);
           }}
           className={`flex-1 ${isMobile ? '' : 'overflow-y-auto'}`}
         >
