@@ -1,9 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/authOptions';
+import { isSuperAdmin, UserRole } from '@/lib/permissions';
 import dbConnect from '@/lib/mongodb';
 import SongDetail from '@/models/SongDetail';
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // 최고관리자만 데이터 수정 가능
+    const session = await getServerSession(authOptions);
+    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+      return NextResponse.json({
+        success: false,
+        error: '최고관리자 권한이 필요합니다. 이 API는 모든 곡 데이터를 수정합니다.'
+      }, { status: 403 });
+    }
+
     await dbConnect();
     
     // 모든 문서 가져오기

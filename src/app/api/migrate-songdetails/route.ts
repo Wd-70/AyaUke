@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
+import { isSuperAdmin, UserRole } from '@/lib/permissions'
 import dbConnect from '@/lib/mongodb'
 import mongoose from 'mongoose'
 
@@ -8,9 +9,9 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    // 관리자만 마이그레이션 실행 가능
-    if (!session?.user?.isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    // 최고관리자만 마이그레이션 실행 가능
+    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+      return NextResponse.json({ error: '최고관리자 권한이 필요합니다.' }, { status: 403 })
     }
 
     await dbConnect()
@@ -92,8 +93,8 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session?.user?.isAdmin) {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
+    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+      return NextResponse.json({ error: '최고관리자 권한이 필요합니다.' }, { status: 403 })
     }
 
     await dbConnect()

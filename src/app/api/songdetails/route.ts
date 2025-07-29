@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/authOptions';
+import { hasPermission, Permission, UserRole } from '@/lib/permissions';
 import SongDetailModel from '@/models/SongDetail';
 import connectDB from '@/lib/mongodb';
 import mongoose from 'mongoose';
 
 export async function GET(request: NextRequest) {
   try {
+    // 노래 조회 권한 체크
+    const session = await getServerSession(authOptions);
+    if (!session || !hasPermission(session.user.role as UserRole, Permission.SONGS_VIEW)) {
+      return NextResponse.json(
+        { success: false, error: '노래 조회 권한이 필요합니다.' },
+        { status: 403 }
+      );
+    }
+
     await connectDB();
 
     const searchParams = request.nextUrl.searchParams;
@@ -60,6 +72,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // 노래 생성 권한 체크
+    const session = await getServerSession(authOptions);
+    if (!session || !hasPermission(session.user.role as UserRole, Permission.SONGS_CREATE)) {
+      return NextResponse.json(
+        { success: false, error: '노래 생성 권한이 필요합니다.' },
+        { status: 403 }
+      );
+    }
+
     await connectDB();
     const data = await request.json();
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
+import { isSuperAdmin, UserRole } from '@/lib/permissions';
 import { connectToDatabase } from '@/lib/mongodb';
 import SongVideo from '@/models/SongVideo';
 import User from '@/models/User';
@@ -9,14 +10,14 @@ import User from '@/models/User';
  * POST: SongVideo 스키마 마이그레이션
  * addedBy 필드를 channelId에서 User ObjectId로 변경
  * 
- * 보안: 관리자만 접근 가능
+ * 보안: 최고관리자만 접근 가능
  */
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user?.isAdmin) {
+    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
       return NextResponse.json(
-        { error: '관리자 권한이 필요합니다.' },
+        { error: '최고관리자 권한이 필요합니다.' },
         { status: 403 }
       );
     }

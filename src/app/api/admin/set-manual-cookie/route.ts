@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/authOptions'
+import { isSuperAdmin, UserRole } from '@/lib/permissions'
 import { addManualChzzkCookie, createManualChzzkClient } from '@/lib/chzzkCookieManual'
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession()
+    const session = await getServerSession(authOptions)
     
-    if (!session || !session.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // 최고관리자만 수동 쿠키 설정 가능
+    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+      return NextResponse.json({ error: '최고관리자 권한이 필요합니다.' }, { status: 403 })
     }
 
     const { naverId, cookies } = await request.json()

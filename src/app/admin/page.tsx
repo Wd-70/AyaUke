@@ -1,3 +1,7 @@
+import { redirect } from 'next/navigation'
+import { getServerSession } from 'next-auth/next'
+import { authOptions } from '@/lib/authOptions'
+import { isSuperAdmin, UserRole } from '@/lib/permissions'
 import Navigation from '@/components/Navigation'
 import AdminClient from './AdminClient'
 
@@ -13,6 +17,17 @@ async function getInitialStats() {
 }
 
 export default async function AdminDashboard() {
+  // 서버사이드에서 권한 체크
+  const session = await getServerSession(authOptions)
+  
+  if (!session) {
+    redirect('/auth/signin')
+  }
+  
+  if (!isSuperAdmin(session.user.role as UserRole)) {
+    redirect('/')
+  }
+
   const initialStats = await getInitialStats()
 
   return (
