@@ -1269,10 +1269,15 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   };
 
 
-  // 초를 MM:SS 형식으로 변환
+  // 초를 HH:MM:SS 형식으로 변환
   const formatSeconds = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -1444,11 +1449,11 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
     onStatsUpdate?.(stats);
   }, [stats, onStatsUpdate]);
 
-  // YouTube 플레이어의 현재 시간 업데이트
+  // YouTube 플레이어의 현재 시간 업데이트 (재생 중이 아니어도 업데이트)
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
-    if (youtubePlayer && isPlaying) {
+    if (youtubePlayer) {
       interval = setInterval(() => {
         try {
           const time = youtubePlayer.getCurrentTime();
@@ -1456,7 +1461,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         } catch (error) {
           // 플레이어가 아직 준비되지 않은 경우 무시
         }
-      }, 1000);
+      }, 500); // 0.5초마다 업데이트로 더 부드럽게
     }
     
     return () => {
@@ -1464,7 +1469,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         clearInterval(interval);
       }
     };
-  }, [youtubePlayer, isPlaying]);
+  }, [youtubePlayer]); // isPlaying 의존성 제거하여 항상 업데이트
 
   // 자동 로딩을 제어하는 ref 추가
   const autoLoadingRef = useRef(false);
@@ -1875,46 +1880,104 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                       }}
                     />
                     
+                    {/* 플레이어 위쪽 옵션들 */}
+                    {youtubePlayer && (
+                      <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-3 mt-3 mb-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          {/* 자동 재생 옵션 */}
+                          <label className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={autoPlay}
+                              onChange={(e) => setAutoPlay(e.target.checked)}
+                              className="rounded border-blue-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
+                            />
+                            <span>타임라인 변경시 자동 재생</span>
+                          </label>
+                          
+                          {/* 수동 재로딩 버튼 */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (selectedTimeline) {
+                                const videoId = extractVideoId(selectedTimeline.videoUrl);
+                                if (videoId) {
+                                  console.log('🔄 수동 플레이어 재로딩 요청');
+                                  playVideoAtTime(videoId, selectedTimeline.startTimeSeconds, selectedTimeline.endTimeSeconds);
+                                }
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 
+                                       text-green-700 dark:text-green-300 rounded text-xs transition-colors flex items-center gap-1.5"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            플레이어 재로딩
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
                     {/* 플레이어 시간 제어 */}
                     {youtubePlayer && (
                         <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-3 mt-3">
-                          {/* 자동 재생 옵션 */}
-                          <div className="mb-3 flex items-center justify-center gap-2 pb-2 border-b border-blue-200 dark:border-blue-700">
-                            <label className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={autoPlay}
-                                onChange={(e) => setAutoPlay(e.target.checked)}
-                                className="rounded border-blue-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0"
-                              />
-                              <span>타임라인 변경시 자동 재생</span>
-                            </label>
+                          {/* 현재 시간 표시 */}
+                          <div className="text-center mb-3 pb-2 border-b border-blue-200 dark:border-blue-700">
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                              현재 시간: <span className="font-mono">{formatSeconds(Math.floor(currentTime))}</span>
+                            </p>
                           </div>
                           
-                          {/* 수동 재로딩 버튼 */}
-                          <div className="mb-3 flex justify-center">
+                          {/* 메인 제어 버튼들 */}
+                          <div className="grid grid-cols-3 gap-2 mb-3">
                             <button
                               type="button"
-                              onClick={() => {
-                                if (selectedTimeline) {
-                                  const videoId = extractVideoId(selectedTimeline.videoUrl);
-                                  if (videoId) {
-                                    console.log('🔄 수동 플레이어 재로딩 요청');
-                                    playVideoAtTime(videoId, selectedTimeline.startTimeSeconds, selectedTimeline.endTimeSeconds);
-                                  }
-                                }
-                              }}
-                              className="px-3 py-1.5 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 
-                                         text-green-700 dark:text-green-300 rounded text-xs transition-colors flex items-center gap-1.5"
+                              onClick={setCurrentTimeAsStart}
+                              className="px-2 py-2 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 
+                                         text-green-700 dark:text-green-300 rounded text-xs transition-colors flex flex-col items-center gap-1"
+                              title="현재 시간을 시작시간으로 설정"
                             >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                              플레이어 재로딩
+                              <ClockIcon className="w-4 h-4" />
+                              <span>시작시간 설정</span>
+                            </button>
+                            
+                            <button
+                              type="button"
+                              onClick={togglePlayback}
+                              className={`px-2 py-2 rounded text-xs transition-colors flex flex-col items-center gap-1 ${
+                                isPlaying 
+                                  ? 'bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300'
+                                  : 'bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                              }`}
+                              title={isPlaying ? '일시정지' : '재생'}
+                            >
+                              {isPlaying ? (
+                                <>
+                                  <PauseIcon className="w-4 h-4" />
+                                  <span>일시정지</span>
+                                </>
+                              ) : (
+                                <>
+                                  <PlayIcon className="w-4 h-4" />
+                                  <span>재생</span>
+                                </>
+                              )}
+                            </button>
+                            
+                            <button
+                              type="button"
+                              onClick={setCurrentTimeAsEnd}
+                              className="px-2 py-2 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 
+                                         text-purple-700 dark:text-purple-300 rounded text-xs transition-colors flex flex-col items-center gap-1"
+                              title="현재 시간을 종료시간으로 설정"
+                            >
+                              <ClockIcon className="w-4 h-4" />
+                              <span>종료시간 설정</span>
                             </button>
                           </div>
                           
-                          <h5 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3 text-center">플레이어 제어</h5>
+                          <h5 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3 text-center">세부 제어</h5>
                           <div className="grid grid-cols-3 gap-2">
                             {/* 뒤로 이동 */}
                             <div className="space-y-1">

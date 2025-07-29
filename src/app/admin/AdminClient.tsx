@@ -181,7 +181,7 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+              className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-6"
             >
               {quickStats.map((stat, index) => (
                 <motion.div
@@ -190,14 +190,14 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.4, delay: index * 0.1 }}
                   whileHover={{ scale: 1.02 }}
-                  className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 
+                  className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-4 xl:p-6 
                              border border-light-primary/20 dark:border-dark-primary/20 
                              hover:border-light-accent/40 dark:hover:border-dark-accent/40 
                              transition-all duration-300"
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <div className={`w-12 h-12 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}>
-                      <stat.icon className="w-6 h-6 text-white" />
+                    <div className={`w-10 xl:w-12 h-10 xl:h-12 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}>
+                      <stat.icon className="w-5 xl:w-6 h-5 xl:h-6 text-white" />
                     </div>
                     <div className={`px-2 py-1 rounded-full text-xs font-medium
                       ${stat.changeType === 'increase' 
@@ -207,10 +207,10 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
                       {stat.change}
                     </div>
                   </div>
-                  <div className="text-2xl font-bold text-light-text dark:text-dark-text mb-1">
+                  <div className="text-xl xl:text-2xl font-bold text-light-text dark:text-dark-text mb-1">
                     {stat.value}
                   </div>
-                  <div className="text-sm text-light-text/60 dark:text-dark-text/60">
+                  <div className="text-xs xl:text-sm text-light-text/60 dark:text-dark-text/60">
                     {stat.title}
                   </div>
                 </motion.div>
@@ -222,10 +222,10 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20"
+              className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-4 xl:p-6 border border-light-primary/20 dark:border-dark-primary/20"
             >
-              <h3 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4">시스템 상태</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <h3 className="text-base xl:text-lg font-semibold text-light-text dark:text-dark-text mb-4">시스템 상태</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs xl:text-sm">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                   <span className="text-light-text/70 dark:text-dark-text/70">시스템 정상</span>
@@ -260,16 +260,16 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
       
       case 'users':
         return (
-          <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-8 border border-light-primary/20 dark:border-dark-primary/20">
-            <h3 className="text-xl font-semibold text-light-text dark:text-dark-text mb-4">사용자 관리</h3>
+          <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-4 xl:p-8 border border-light-primary/20 dark:border-dark-primary/20">
+            <h3 className="text-lg xl:text-xl font-semibold text-light-text dark:text-dark-text mb-4">사용자 관리</h3>
             <p className="text-light-text/60 dark:text-dark-text/60">사용자 관리 기능이 곧 추가될 예정입니다.</p>
           </div>
         );
       
       case 'system':
         return (
-          <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-8 border border-light-primary/20 dark:border-dark-primary/20">
-            <h3 className="text-xl font-semibold text-light-text dark:text-dark-text mb-4">시스템 설정</h3>
+          <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-4 xl:p-8 border border-light-primary/20 dark:border-dark-primary/20">
+            <h3 className="text-lg xl:text-xl font-semibold text-light-text dark:text-dark-text mb-4">시스템 설정</h3>
             <p className="text-light-text/60 dark:text-dark-text/60">시스템 설정 기능이 곧 추가될 예정입니다.</p>
           </div>
         );
@@ -315,14 +315,14 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
           </div>
         </motion.div>
 
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col lg:flex-row gap-4 xl:gap-8">
           {/* Desktop Sidebar */}
-          <div className="hidden lg:block lg:w-80 flex-shrink-0">
+          <div className="hidden xl:block xl:w-80 flex-shrink-0">
             <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 overflow-hidden">
-              <div className="p-6 border-b border-light-primary/20 dark:border-dark-primary/20">
-                <h2 className="text-lg font-semibold text-light-text dark:text-dark-text">관리 메뉴</h2>
+              <div className="p-4 xl:p-6 border-b border-light-primary/20 dark:border-dark-primary/20">
+                <h2 className="text-base xl:text-lg font-semibold text-light-text dark:text-dark-text">관리 메뉴</h2>
               </div>
-              <nav className="p-4 space-y-2">
+              <nav className="p-3 xl:p-4 space-y-1 xl:space-y-2">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -330,19 +330,45 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 text-left ${
+                      className={`w-full flex items-center px-3 xl:px-4 py-2 xl:py-3 rounded-lg transition-all duration-200 text-left ${
                         isActive 
                           ? 'bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent border border-light-accent/20 dark:border-dark-accent/20 shadow-sm' 
                           : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text'
                       }`}
                     >
-                      <Icon className="w-5 h-5 mr-3 flex-shrink-0" />
-                      <div>
-                        <div className="font-medium">{tab.name}</div>
-                        <div className={`text-xs mt-0.5 ${isActive ? 'text-light-accent/70 dark:text-dark-accent/70' : 'text-light-text/50 dark:text-dark-text/50'}`}>
+                      <Icon className="w-4 xl:w-5 h-4 xl:h-5 mr-2 xl:mr-3 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="font-medium text-sm xl:text-base truncate">{tab.name}</div>
+                        <div className={`text-xs mt-0.5 line-clamp-1 ${isActive ? 'text-light-accent/70 dark:text-dark-accent/70' : 'text-light-text/50 dark:text-dark-text/50'}`}>
                           {tab.description}
                         </div>
                       </div>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </div>
+
+          {/* Medium Screen Sidebar - Icon Only */}
+          <div className="hidden lg:block xl:hidden lg:w-16 flex-shrink-0">
+            <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 overflow-hidden">
+              <nav className="p-2 space-y-1">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      title={tab.name}
+                      className={`w-full flex items-center justify-center p-3 rounded-lg transition-all duration-200 ${
+                        isActive 
+                          ? 'bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent border border-light-accent/20 dark:border-dark-accent/20 shadow-sm' 
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5 flex-shrink-0" />
                     </button>
                   );
                 })}
@@ -360,14 +386,14 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex-shrink-0 flex flex-col items-center px-3 py-2 rounded-lg transition-all duration-200 min-w-[80px] ${
+                    className={`flex-shrink-0 flex flex-col items-center px-2 sm:px-3 py-2 rounded-lg transition-all duration-200 min-w-[70px] sm:min-w-[80px] ${
                       isActive 
                         ? 'bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent border border-light-accent/20 dark:border-dark-accent/20' 
                         : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 text-light-text/70 dark:text-dark-text/70'
                     }`}
                   >
-                    <Icon className="w-5 h-5 mb-1" />
-                    <div className="text-xs font-medium text-center">{tab.name}</div>
+                    <Icon className="w-4 sm:w-5 h-4 sm:h-5 mb-1" />
+                    <div className="text-xs font-medium text-center leading-tight">{tab.name.replace(' ', '\n')}</div>
                   </button>
                 );
               })}
