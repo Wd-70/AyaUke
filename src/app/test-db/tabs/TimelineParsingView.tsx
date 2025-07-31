@@ -121,7 +121,7 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   const [selectedTimeline, setSelectedTimeline] = useState<ParsedTimelineItem | null>(null);
   const [selectedTimelineIds, setSelectedTimelineIds] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number>(-1);
-  const [filterType, setFilterType] = useState<'all' | 'relevant' | 'irrelevant' | 'excluded' | 'matched' | 'unmatched'>('relevant');
+  const [filterType, setFilterType] = useState<'all' | 'relevant' | 'irrelevant' | 'excluded' | 'matched' | 'unmatched' | 'relevantUnmatched' | 'relevantUnverified'>('relevant');
   const [autoPlay, setAutoPlay] = useState(true); // 자동 재생 옵션
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchingTimeline, setMatchingTimeline] = useState<ParsedTimelineItem | null>(null);
@@ -1120,6 +1120,8 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         case 'excluded': return timeline.isExcluded;
         case 'matched': return timeline.matchedSong;
         case 'unmatched': return !timeline.matchedSong;
+        case 'relevantUnmatched': return timeline.isRelevant && !timeline.isExcluded && !timeline.matchedSong;
+        case 'relevantUnverified': return timeline.isRelevant && !timeline.isExcluded && !timeline.isTimeVerified;
         default: return true;
       }
     });
@@ -1702,6 +1704,58 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                 />
               </div>
             </div>
+            
+            {/* 특수 태그 선택 */}
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                곡 상태 태그
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'unknown', label: '모르는 곡', color: 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300' },
+                  { id: 'no-song', label: '곡 없음', color: 'bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300' },
+                  { id: 'instrumental', label: '연주곡', color: 'bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300' },
+                  { id: 'talking', label: '대화/토크', color: 'bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:hover:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300' },
+                  { id: 'game-sound', label: '게임 효과음', color: 'bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 text-purple-700 dark:text-purple-300' }
+                ].map(tag => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    onClick={() => {
+                      if (editingData) {
+                        const currentTags = editingData.specialTags || [];
+                        const isSelected = currentTags.includes(tag.id);
+                        const newTags = isSelected 
+                          ? currentTags.filter(t => t !== tag.id)
+                          : [...currentTags, tag.id];
+                        setEditingData(prev => prev ? { ...prev, specialTags: newTags } : null);
+                      }
+                    }}
+                    className={`px-3 py-1.5 text-xs rounded-full transition-colors border ${
+                      editingData?.specialTags?.includes(tag.id)
+                        ? `${tag.color} border-current opacity-100`
+                        : `${tag.color} border-transparent opacity-60`
+                    }`}
+                  >
+                    {tag.label}
+                  </button>
+                ))}
+              </div>
+              {editingData?.specialTags && editingData.specialTags.length > 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  선택된 태그: {editingData.specialTags.map(tag => 
+                    ({ 
+                      'unknown': '모르는 곡', 
+                      'no-song': '곡 없음', 
+                      'instrumental': '연주곡', 
+                      'talking': '대화/토크', 
+                      'game-sound': '게임 효과음' 
+                    }[tag])
+                  ).join(', ')}
+                </p>
+              )}
+            </div>
+            
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -2298,18 +2352,6 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                   >
                     관련성 없음
                   </button>
-                  <button
-                    onClick={() => bulkUpdateExclusion(true)}
-                    className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs transition-colors"
-                  >
-                    제외
-                  </button>
-                  <button
-                    onClick={() => bulkUpdateExclusion(false)}
-                    className="px-2 py-1 bg-gray-600 hover:bg-gray-700 text-white rounded text-xs transition-colors"
-                  >
-                    제외 해제
-                  </button>
                 </div>
               )}
               <button
@@ -2347,6 +2389,8 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                 <option value="excluded">제외됨</option>
                 <option value="matched">매칭 완료</option>
                 <option value="unmatched">미매칭</option>
+                <option value="relevantUnmatched">관련성 있음 (매칭완료 제외)</option>
+                <option value="relevantUnverified">관련성 있음 (검증완료 제외)</option>
               </select>
             </div>
           </div>
@@ -2446,6 +2490,21 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                               검증완료
                             </span>
                           )}
+                          {timeline.specialTags && timeline.specialTags.map(tag => {
+                            const tagConfig = {
+                              'unknown': { label: '모르는 곡', color: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' },
+                              'no-song': { label: '곡 없음', color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' },
+                              'instrumental': { label: '연주곡', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' },
+                              'talking': { label: '대화/토크', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' },
+                              'game-sound': { label: '게임 효과음', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' }
+                            }[tag];
+                            
+                            return tagConfig ? (
+                              <span key={tag} className={`px-2 py-0.5 rounded text-xs ${tagConfig.color}`}>
+                                {tagConfig.label}
+                              </span>
+                            ) : null;
+                          })}
                         </div>
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-500">
@@ -2478,21 +2537,6 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                       title={timeline.isRelevant ? '관련성 없음으로 변경' : '관련성 있음으로 변경'}
                     >
                       <CheckCircleIcon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        toggleExcluded(timeline.id);
-                      }}
-                      className={`p-1 rounded transition-colors select-none ${
-                        timeline.isExcluded 
-                          ? 'text-red-600 hover:text-red-700' 
-                          : 'text-gray-400 hover:text-red-600'
-                      }`}
-                      title={timeline.isExcluded ? '제외 해제' : '제외'}
-                    >
-                      <XMarkIcon className="w-4 h-4" />
                     </button>
                     {timeline.isRelevant && (
                       <button
@@ -2614,6 +2658,50 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
               </div>
             )}
           </div>
+          {/* 선택된 타임라인의 태그들 표시 */}
+          {selectedTimeline && (
+            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+              <span className={`px-2 py-0.5 rounded text-xs flex items-center gap-1 ${
+                selectedTimeline.isRelevant 
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' 
+                  : 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300'
+              }`}>
+                <CheckCircleIcon className="w-3 h-3" />
+                {selectedTimeline.isRelevant ? '관련성 있음' : '관련성 없음'}
+              </span>
+              {selectedTimeline.isExcluded && (
+                <span className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded-full text-xs font-medium">
+                  제외됨
+                </span>
+              )}
+              {selectedTimeline.isTimeVerified && (
+                <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs flex items-center gap-1">
+                  <CheckCircleIcon className="w-3 h-3" />
+                  검증완료
+                </span>
+              )}
+              {selectedTimeline.matchedSong && (
+                <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs">
+                  매칭완료
+                </span>
+              )}
+              {selectedTimeline.specialTags && selectedTimeline.specialTags.map(tag => {
+                const tagConfig = {
+                  'unknown': { label: '모르는 곡', color: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300' },
+                  'no-song': { label: '곡 없음', color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' },
+                  'instrumental': { label: '연주곡', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' },
+                  'talking': { label: '대화/토크', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' },
+                  'game-sound': { label: '게임 효과음', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300' }
+                }[tag];
+                
+                return tagConfig ? (
+                  <span key={tag} className={`px-2 py-0.5 rounded text-xs font-medium ${tagConfig.color}`}>
+                    {tagConfig.label}
+                  </span>
+                ) : null;
+              })}
+            </div>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto p-4">
           {renderDetailContent()}
