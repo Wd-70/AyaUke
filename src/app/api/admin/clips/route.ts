@@ -5,6 +5,7 @@ import { isSuperAdmin, UserRole } from '@/lib/permissions'
 import dbConnect from '@/lib/mongodb'
 import SongVideo from '@/models/SongVideo'
 import SongDetail from '@/models/SongDetail'
+import { updateVideoData, validateYouTubeUrl } from '@/lib/youtube'
 
 export async function GET(request: Request) {
   try {
@@ -27,6 +28,9 @@ export async function GET(request: Request) {
 
     const skip = (page - 1) * limit
 
+    // 디버깅을 위한 로그
+    console.log('🔍 Clips API params:', { page, limit, sortBy, filterBy, search, addedBy, songId })
+
     // 필터 조건 구성
     let matchConditions: any = {}
     
@@ -37,21 +41,18 @@ export async function GET(request: Request) {
     }
 
     if (addedBy) {
-      matchConditions.addedByName = new RegExp(addedBy, 'i')
+      // 정확한 매칭을 위해 escape 처리
+      const escapedAddedBy = addedBy.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      matchConditions.addedByName = new RegExp(`^${escapedAddedBy}$`, 'i')
     }
 
     if (songId) {
       matchConditions.songId = songId
     }
 
-    if (search) {
-      matchConditions.$or = [
-        { title: new RegExp(search, 'i') },
-        { artist: new RegExp(search, 'i') },
-        { addedByName: new RegExp(search, 'i') },
-        { description: new RegExp(search, 'i') }
-      ]
-    }
+    console.log('🎯 Match conditions:', matchConditions)
+
+    // 검색의 경우 aggregation을 사용해야 하므로 별도 처리
 
     // 정렬 조건 구성
     let sortConditions: any = {}
@@ -75,18 +76,105 @@ export async function GET(request: Request) {
         sortConditions = { createdAt: -1 }
     }
 
-    // 클립 데이터 조회
-    const [clips, totalCount] = await Promise.all([
-      SongVideo.find(matchConditions)
-        .sort(sortConditions)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      SongVideo.countDocuments(matchConditions)
-    ])
+    // 클립 데이터 조회 (검색이 있는 경우 aggregation 사용)
+    let clips: any[]
+    let totalCount: number
 
-    // 각 클립의 곡 정보도 함께 조회
-    const clipsWithSongInfo = await Promise.all(
+    if (search) {
+      // 공백 제거 및 대소문자 무시 검색
+      const searchPattern = search.replace(/\s+/g, '').toLowerCase()
+      
+      const aggregationPipeline = [
+        {
+          $lookup: {
+            from: 'songdetails',
+            localField: 'songId',
+            foreignField: '_id',
+            as: 'songDetail'
+          }
+        },
+        {
+          $addFields: {
+            songDetail: { $arrayElemAt: ['$songDetail', 0] },
+            // 검색용 필드들 (공백 제거 및 소문자 변환)
+            searchableTitle: { $toLower: { $replaceAll: { input: '$title', find: ' ', replacement: '' } } },
+            searchableArtist: { $toLower: { $replaceAll: { input: '$artist', find: ' ', replacement: '' } } },
+            searchableAddedBy: { $toLower: { $replaceAll: { input: '$addedByName', find: ' ', replacement: '' } } },
+            searchableDescription: { $toLower: { $replaceAll: { input: { $ifNull: ['$description', ''] }, find: ' ', replacement: '' } } }
+          }
+        },
+        {
+          $addFields: {
+            // SongDetail의 alias와 searchTags도 검색 대상에 포함
+            searchableTitleAlias: { $toLower: { $replaceAll: { input: { $ifNull: ['$songDetail.titleAlias', ''] }, find: ' ', replacement: '' } } },
+            searchableArtistAlias: { $toLower: { $replaceAll: { input: { $ifNull: ['$songDetail.artistAlias', ''] }, find: ' ', replacement: '' } } },
+            searchableTags: {
+              $reduce: {
+                input: { $ifNull: ['$songDetail.searchTags', []] },
+                initialValue: '',
+                in: { $concat: ['$$value', { $toLower: { $replaceAll: { input: '$$this', find: ' ', replacement: '' } } }] }
+              }
+            }
+          }
+        },
+        {
+          $match: {
+            // 기본 필터 조건들
+            ...(filterBy === 'verified' && { isVerified: true }),
+            ...(filterBy === 'unverified' && { isVerified: false }),
+            ...(songId && { songId }),
+            ...(addedBy && { addedByName: { $regex: `^${addedBy.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }),
+            // 검색 조건
+            $or: [
+              { searchableTitle: { $regex: searchPattern, $options: 'i' } },
+              { searchableArtist: { $regex: searchPattern, $options: 'i' } },
+              { searchableAddedBy: { $regex: searchPattern, $options: 'i' } },
+              { searchableDescription: { $regex: searchPattern, $options: 'i' } },
+              { searchableTitleAlias: { $regex: searchPattern, $options: 'i' } },
+              { searchableArtistAlias: { $regex: searchPattern, $options: 'i' } },
+              { searchableTags: { $regex: searchPattern, $options: 'i' } }
+            ]
+          }
+        },
+        { $sort: sortConditions },
+        { $skip: skip },
+        { $limit: limit }
+      ]
+
+      clips = await SongVideo.aggregate(aggregationPipeline)
+      
+      // 검색 결과의 총 개수 계산
+      const countPipeline = aggregationPipeline.slice(0, -2) // skip과 limit 제외
+      countPipeline.push({ $count: 'total' })
+      const countResult = await SongVideo.aggregate(countPipeline)
+      totalCount = countResult.length > 0 ? countResult[0].total : 0
+    } else {
+      // 일반 조회
+      const [clipsResult, countResult] = await Promise.all([
+        SongVideo.find(matchConditions)
+          .sort(sortConditions)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        SongVideo.countDocuments(matchConditions)
+      ])
+      clips = clipsResult
+      totalCount = countResult
+    }
+
+    // 각 클립의 곡 정보도 함께 조회 (검색이 아닌 경우만)
+    const clipsWithSongInfo = search ? clips.map(clip => ({
+      ...clip,
+      songDetail: clip.songDetail ? {
+        _id: clip.songDetail._id,
+        title: clip.songDetail.title,
+        artist: clip.songDetail.artist,
+        titleAlias: clip.songDetail.titleAlias,
+        artistAlias: clip.songDetail.artistAlias,
+        language: clip.songDetail.language,
+        sungCount: clip.songDetail.sungCount
+      } : null
+    })) : await Promise.all(
       clips.map(async (clip) => {
         const songDetail = await SongDetail.findById(clip.songId).lean()
         return {
@@ -95,6 +183,8 @@ export async function GET(request: Request) {
             _id: songDetail._id,
             title: songDetail.title,
             artist: songDetail.artist,
+            titleAlias: songDetail.titleAlias,
+            artistAlias: songDetail.artistAlias,
             language: songDetail.language,
             sungCount: songDetail.sungCount
           } : null
@@ -112,7 +202,31 @@ export async function GET(request: Request) {
         { $limit: 10 }
       ]),
       SongVideo.aggregate([
-        { $group: { _id: { songId: '$songId', title: '$title', artist: '$artist' }, count: { $sum: 1 } } },
+        {
+          $lookup: {
+            from: 'songdetails',
+            localField: 'songId',
+            foreignField: '_id',
+            as: 'songDetail'
+          }
+        },
+        {
+          $addFields: {
+            songDetail: { $arrayElemAt: ['$songDetail', 0] }
+          }
+        },
+        { 
+          $group: { 
+            _id: { 
+              songId: '$songId', 
+              title: '$title', 
+              artist: '$artist',
+              titleAlias: '$songDetail.titleAlias',
+              artistAlias: '$songDetail.artistAlias'
+            }, 
+            count: { $sum: 1 } 
+          } 
+        },
         { $sort: { count: -1 } },
         { $limit: 10 }
       ])
@@ -140,6 +254,8 @@ export async function GET(request: Request) {
           songId: s._id.songId,
           title: s._id.title,
           artist: s._id.artist,
+          titleAlias: s._id.titleAlias,
+          artistAlias: s._id.artistAlias,
           count: s.count
         }))
       }
@@ -193,6 +309,49 @@ export async function PATCH(request: Request) {
         break
       case 'updateDescription':
         updateData.description = data.description
+        break
+      case 'updateUrl':
+        if (!data.videoUrl) {
+          return NextResponse.json({ error: 'videoUrl is required' }, { status: 400 })
+        }
+        
+        // 유튜브 URL 검증
+        if (!validateYouTubeUrl(data.videoUrl)) {
+          return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
+        }
+        
+        // videoUrl이 변경되면 videoId와 thumbnailUrl도 함께 업데이트
+        const videoData = updateVideoData(data.videoUrl)
+        if (videoData) {
+          updateData.videoUrl = data.videoUrl
+          updateData.videoId = videoData.videoId
+          updateData.thumbnailUrl = videoData.thumbnailUrl
+        } else {
+          return NextResponse.json({ error: 'Failed to extract video data' }, { status: 400 })
+        }
+        break
+      case 'updateClip':
+        // 전체 클립 정보 업데이트
+        if (data.videoUrl) {
+          // 유튜브 URL 검증
+          if (!validateYouTubeUrl(data.videoUrl)) {
+            return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
+          }
+          
+          // videoUrl이 변경되면 videoId와 thumbnailUrl도 함께 업데이트
+          const videoData = updateVideoData(data.videoUrl)
+          if (videoData) {
+            updateData.videoUrl = data.videoUrl
+            updateData.videoId = videoData.videoId
+            updateData.thumbnailUrl = videoData.thumbnailUrl
+          } else {
+            return NextResponse.json({ error: 'Failed to extract video data' }, { status: 400 })
+          }
+        }
+        
+        if (data.startTime !== undefined) updateData.startTime = data.startTime
+        if (data.endTime !== undefined) updateData.endTime = data.endTime
+        if (data.description !== undefined) updateData.description = data.description
         break
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

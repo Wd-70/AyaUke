@@ -5,6 +5,7 @@ import { connectToDatabase } from '@/lib/mongodb';
 import SongVideo from '@/models/SongVideo';
 import SongDetail from '@/models/SongDetail';
 import { SongVideo as SongVideoType } from '@/types';
+import { updateVideoData, validateYouTubeUrl } from '@/lib/youtube';
 
 // GET: 특정 곡의 영상 목록 조회
 export async function GET(
@@ -86,8 +87,16 @@ export async function POST(
     }
 
     // 유튜브 URL 검증
-    const youtubeRegex = /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
-    if (!youtubeRegex.test(videoUrl)) {
+    if (!validateYouTubeUrl(videoUrl)) {
+      return NextResponse.json(
+        { error: '올바른 유튜브 URL을 입력해주세요.' },
+        { status: 400 }
+      );
+    }
+
+    // 비디오 ID와 썸네일 URL 추출
+    const videoData = updateVideoData(videoUrl);
+    if (!videoData) {
       return NextResponse.json(
         { error: '올바른 유튜브 URL을 입력해주세요.' },
         { status: 400 }
@@ -103,28 +112,13 @@ export async function POST(
       );
     }
 
-    // 유튜브 비디오 ID 추출
-    const extractYouTubeVideoId = (url: string): string | null => {
-      const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/;
-      const match = url.match(regex);
-      return match ? match[1] : null;
-    };
-
-    const videoId = extractYouTubeVideoId(videoUrl);
-    if (!videoId) {
-      return NextResponse.json(
-        { error: '올바른 유튜브 URL을 입력해주세요.' },
-        { status: 400 }
-      );
-    }
-
     // 새 영상 생성
     const newVideo = new SongVideo({
       songId,
       title: song.title,
       artist: song.artist,
       videoUrl,
-      videoId, // 추출된 비디오 ID 포함
+      videoId: videoData.videoId,
       sungDate: new Date(sungDate),
       description,
       startTime: startTime || 0,
@@ -132,7 +126,7 @@ export async function POST(
       addedBy: session.user.userId,
       addedByName: session.user.displayName || session.user.name || session.user.channelName,
       isVerified: false,
-      thumbnailUrl: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`, // 썸네일 URL 생성
+      thumbnailUrl: videoData.thumbnailUrl,
     });
 
     await newVideo.save();

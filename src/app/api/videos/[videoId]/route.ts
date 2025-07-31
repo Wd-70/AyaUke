@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/authOptions';
 import { connectToDatabase } from '@/lib/mongodb';
 import SongVideo from '@/models/SongVideo';
 import { canManageSongs, UserRole } from '@/lib/permissions';
+import { updateVideoData, validateYouTubeUrl } from '@/lib/youtube';
 
 // GET: 특정 영상 정보 조회
 export async function GET(
@@ -67,7 +68,10 @@ export async function PUT(
     }
 
     // 권한 확인: 영상을 추가한 사용자 또는 관리자만 수정 가능
-    const isOwner = video.addedBy === session.user.channelId;
+    // 마이그레이션 전후를 모두 지원 (ObjectId 또는 channelId)
+    const isOwnerByUserId = video.addedBy.toString() === session.user.userId;
+    const isOwnerByChannelId = video.addedBy.toString() === session.user.channelId;
+    const isOwner = isOwnerByUserId || isOwnerByChannelId;
     const isAdmin = canManageSongs(session.user.role as UserRole);
     
     if (!isOwner && !isAdmin) {
@@ -84,14 +88,25 @@ export async function PUT(
     
     if (videoUrl !== undefined) {
       // 유튜브 URL 검증
-      const youtubeRegex = /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
-      if (!youtubeRegex.test(videoUrl)) {
+      if (!validateYouTubeUrl(videoUrl)) {
         return NextResponse.json(
           { error: '올바른 유튜브 URL을 입력해주세요.' },
           { status: 400 }
         );
       }
-      updateData.videoUrl = videoUrl;
+      
+      // videoUrl이 변경되면 videoId와 thumbnailUrl도 함께 업데이트
+      const videoData = updateVideoData(videoUrl);
+      if (videoData) {
+        updateData.videoUrl = videoUrl;
+        updateData.videoId = videoData.videoId;
+        updateData.thumbnailUrl = videoData.thumbnailUrl;
+      } else {
+        return NextResponse.json(
+          { error: '올바른 유튜브 URL을 입력해주세요.' },
+          { status: 400 }
+        );
+      }
     }
     
     if (sungDate !== undefined) {
@@ -159,7 +174,10 @@ export async function DELETE(
     }
 
     // 권한 확인: 영상을 추가한 사용자 또는 관리자만 삭제 가능
-    const isOwner = video.addedBy === session.user.channelId;
+    // 마이그레이션 전후를 모두 지원 (ObjectId 또는 channelId)
+    const isOwnerByUserId = video.addedBy.toString() === session.user.userId;
+    const isOwnerByChannelId = video.addedBy.toString() === session.user.channelId;
+    const isOwner = isOwnerByUserId || isOwnerByChannelId;
     const isAdmin = canManageSongs(session.user.role as UserRole);
     
     if (!isOwner && !isAdmin) {

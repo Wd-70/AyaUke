@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { updateVideoData } from '@/lib/youtube';
 
 export interface ISongVideo extends Document {
   songId: string; // SongDetail의 _id와 연결
@@ -122,22 +123,14 @@ SongVideoSchema.index({ title: 1, artist: 1 }); // 곡 정보로 검색
 // 유튜브 비디오 ID 추출 미들웨어
 SongVideoSchema.pre('save', function(next) {
   if (this.isModified('videoUrl')) {
-    const videoId = extractYouTubeVideoId(this.videoUrl);
-    if (videoId) {
-      this.videoId = videoId;
-      // 썸네일 URL 자동 생성
-      this.thumbnailUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+    const videoData = updateVideoData(this.videoUrl);
+    if (videoData) {
+      this.videoId = videoData.videoId;
+      this.thumbnailUrl = videoData.thumbnailUrl;
     }
   }
   next();
 });
-
-// 유튜브 비디오 ID 추출 함수
-function extractYouTubeVideoId(url: string): string | null {
-  const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/;
-  const match = url.match(regex);
-  return match ? match[1] : null;
-}
 
 // 모델 생성
 const SongVideo = mongoose.models.SongVideo || mongoose.model<ISongVideo>('SongVideo', SongVideoSchema);

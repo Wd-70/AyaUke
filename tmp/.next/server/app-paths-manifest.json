@@ -1,6 +1,5 @@
 {
-  "/api/timeline-parser/route": "app/api/timeline-parser/route.js",
-  "/api/youtube-comments/route": "app/api/youtube-comments/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/admin/clips/route": "app/api/admin/clips/route.js",
   "/admin/page": "app/admin/page.js"
 }
