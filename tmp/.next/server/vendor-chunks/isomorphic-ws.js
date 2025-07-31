@@ -17,7 +17,7 @@ exports.modules = {
   \********************************************/
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
-eval("\n\nmodule.exports = __webpack_require__(/*! ws */ \"(rsc)/./node_modules/ws/index.js\");//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9ub2RlX21vZHVsZXMvaXNvbW9ycGhpYy13cy9ub2RlLmpzIiwibWFwcGluZ3MiOiJBQUFhOztBQUViLGtGQUE4QiIsInNvdXJjZXMiOlsiL21udC9mL2RhdGEvZ2l0L2NsYXVkZS1jb2RlL2F5YXVrZS1wYWdlL2F5YXVrZS1wYWdlL25vZGVfbW9kdWxlcy9pc29tb3JwaGljLXdzL25vZGUuanMiXSwic291cmNlc0NvbnRlbnQiOlsiXCJ1c2Ugc3RyaWN0XCI7XG5cbm1vZHVsZS5leHBvcnRzID0gcmVxdWlyZSgnd3MnKTsiXSwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbMF0sInNvdXJjZVJvb3QiOiIifQ==\n//# sourceURL=webpack-internal:///(rsc)/./node_modules/isomorphic-ws/node.js\n");
+eval("\n\nmodule.exports = __webpack_require__(/*! ws */ \"(rsc)/./node_modules/ws/index.js\");//# sourceURL=[module]\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiKHJzYykvLi9ub2RlX21vZHVsZXMvaXNvbW9ycGhpYy13cy9ub2RlLmpzIiwibWFwcGluZ3MiOiJBQUFhOztBQUViLGtGQUE4QiIsInNvdXJjZXMiOlsiL21udC9mL0RhdGEvR2l0L2NsYXVkZS1jb2RlL2F5YXVrZS1wYWdlL2F5YXVrZS1wYWdlL25vZGVfbW9kdWxlcy9pc29tb3JwaGljLXdzL25vZGUuanMiXSwic291cmNlc0NvbnRlbnQiOlsiXCJ1c2Ugc3RyaWN0XCI7XG5cbm1vZHVsZS5leHBvcnRzID0gcmVxdWlyZSgnd3MnKTsiXSwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbMF0sInNvdXJjZVJvb3QiOiIifQ==\n//# sourceURL=webpack-internal:///(rsc)/./node_modules/isomorphic-ws/node.js\n");
 
 /***/ })
 

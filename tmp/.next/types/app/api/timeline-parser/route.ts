@@ -1,4 +1,4 @@
-// File: /mnt/f/data/git/claude-code/ayauke-page/ayauke-page/src/app/api/timeline-parser/route.ts
+// File: /mnt/f/Data/Git/claude-code/ayauke-page/ayauke-page/src/app/api/timeline-parser/route.ts
 import * as entry from '../../../../../../src/app/api/timeline-parser/route.js'
 import type { NextRequest } from 'next/server.js'
 

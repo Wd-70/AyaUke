@@ -21,6 +21,7 @@ import YouTube from 'react-youtube';
 import LiveClipManager from './LiveClipManager';
 import SongEditForm from './SongEditForm';
 import { useSession } from 'next-auth/react';
+import { useCallback } from 'react';
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -49,6 +50,11 @@ export default function SongCardModal({
   const [isPlaying, setIsPlaying] = useState(false);
   const [youtubePlayer, setYoutubePlayer] = useState<YouTubePlayer | null>(null);
 
+  // 라이브 클립 데이터 상태 (LiveClipManager와 공유)
+  const [songVideos, setSongVideos] = useState<any[]>([]);
+  const [videosLoading, setVideosLoading] = useState(false);
+  const [videosLoaded, setVideosLoaded] = useState(false);
+
   // 관리자 권한 체크
   const isAdmin = session?.user?.isAdmin || false;
 
@@ -60,6 +66,34 @@ export default function SongCardModal({
   const youtubeMR = song.mrLinks && song.mrLinks.length > 0 
     ? song.mrLinks[song.selectedMRIndex || 0]?.url 
     : null;
+
+  // 라이브 클립 데이터 로드
+  const loadSongVideos = useCallback(async () => {
+    setVideosLoading(true);
+    try {
+      const response = await fetch(`/api/songs/${song.id}/videos`);
+      if (response.ok) {
+        const data = await response.json();
+        setSongVideos(data.videos || []);
+        setVideosLoaded(true);
+      } else {
+        console.error('라이브 클립 로딩 실패');
+        setVideosLoaded(true);
+      }
+    } catch (error) {
+      console.error('라이브 클립 로딩 에러:', error);
+      setVideosLoaded(true);
+    } finally {
+      setVideosLoading(false);
+    }
+  }, [song.id]);
+
+  // 라이브 클립 데이터 로드 (videos 탭을 처음 열 때만)
+  useEffect(() => {
+    if (isExpanded && currentTab === 'videos' && !videosLoaded && !videosLoading) {
+      loadSongVideos();
+    }
+  }, [isExpanded, currentTab, videosLoaded, videosLoading, loadSongVideos]);
 
   // XL 화면에서는 MR 탭을 기본으로 설정
   useEffect(() => {
@@ -98,6 +132,7 @@ export default function SongCardModal({
 
   // 탭 전환 핸들러
   const switchTab = (tab: 'lyrics' | 'mr' | 'videos') => {
+    console.log(`🔄 Tab switch: ${currentTab} → ${tab}`);
     setCurrentTab(tab);
   };
 
@@ -364,38 +399,16 @@ export default function SongCardModal({
                       songId={song.id}
                       songTitle={displayTitle}
                       isVisible={currentTab === 'videos'}
+                      songVideos={songVideos}
+                      setSongVideos={setSongVideos}
+                      videosLoading={videosLoading}
+                      loadSongVideos={loadSongVideos}
                     />
                   </div>
                 </motion.div>
               )}
             </div>
 
-            {/* LiveClipManager - 독립적으로 렌더링, 탭 콘텐츠 영역에만 표시 */}
-            {/* 모바일 화면 */}
-            <div className="xl:hidden" style={{ 
-              position: 'absolute', 
-              top: 0, 
-              left: 0, 
-              width: '100%', 
-              height: '100%', 
-              pointerEvents: 'none',
-              zIndex: 1
-            }}>
-              <div style={{ 
-                position: 'absolute',
-                bottom: currentTab === 'videos' ? '5rem' : '-100vh', // Action buttons 위에 위치
-                left: 0,
-                right: 0,
-                top: '7.5rem', // 탭 메뉴와 충분한 여백 확보
-                pointerEvents: currentTab === 'videos' ? 'auto' : 'none'
-              }}>
-                <LiveClipManager 
-                  songId={song.id}
-                  songTitle={displayTitle}
-                  isVisible={currentTab === 'videos'}
-                />
-              </div>
-            </div>
 
             {/* 작은 화면에서의 탭 섹션 */}
             <motion.div
@@ -442,7 +455,7 @@ export default function SongCardModal({
               </div>
 
               {/* 탭 콘텐츠 */}
-              <div className={`flex-1 min-h-0 ${currentTab === 'videos' ? '' : 'p-4 sm:p-6'}`}>
+              <div className="flex-1 min-h-0 p-4 sm:p-6">
                 {/* MR 영상/편집 영역 */}
                 <div className={`${currentTab === 'mr' ? 'flex' : 'hidden'} flex-col h-full min-h-0`}>
                   {/* 기존 YouTube 플레이어 */}
@@ -487,7 +500,15 @@ export default function SongCardModal({
 
                 {/* 유튜브 영상 섹션 */}
                 <div className={`${currentTab === 'videos' ? 'flex' : 'hidden'} flex-col h-full min-h-0`}>
-                  {/* 빈 공간 - LiveClipManager는 독립적으로 렌더링됨 */}
+                  <LiveClipManager 
+                    songId={song.id}
+                    songTitle={displayTitle}
+                    isVisible={currentTab === 'videos'}
+                    songVideos={songVideos}
+                    setSongVideos={setSongVideos}
+                    videosLoading={videosLoading}
+                    loadSongVideos={loadSongVideos}
+                  />
                 </div>
               </div>
             </motion.div>

@@ -1,0 +1,13 @@
+[automount]
+enabled = true
+root = /mnt/
+options = "metadata,umask=022,fmask=011"
+mountFsTab = false
+
+[interop]  
+enabled = true
+appendWindowsPath = true
+
+[wsl2]
+memory=8GB
+swap=2GB

@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { isSuperAdmin, UserRole } from "@/lib/permissions";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import {
   ChartBarIcon,
   UsersIcon,
   Cog6ToothIcon,
@@ -22,67 +22,79 @@ import {
   DocumentDuplicateIcon,
   MagnifyingGlassIcon,
   AdjustmentsHorizontalIcon,
-  ChatBubbleBottomCenterTextIcon
-} from '@heroicons/react/24/outline';
+  ChatBubbleBottomCenterTextIcon,
+  Bars3Icon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from "@heroicons/react/24/outline";
 
 // Import tabs from test-db
-import TimestampParserTab from '../test-db/tabs/TimestampParserTab';
-import TimelineAdjusterTab from '../test-db/tabs/TimelineAdjusterTab';
-import CommentAnalysisTab from '../test-db/tabs/CommentAnalysisTab';
-import SongManagementTab from './tabs/SongManagementTab';
-import BackupManagementTab from './tabs/BackupManagementTab';
+import TimestampParserTab from "../test-db/tabs/TimestampParserTab";
+import TimelineAdjusterTab from "../test-db/tabs/TimelineAdjusterTab";
+import CommentAnalysisTab from "../test-db/tabs/CommentAnalysisTab";
+import SongManagementTab from "./tabs/SongManagementTab";
+import BackupManagementTab from "./tabs/BackupManagementTab";
+import UserManagementTab from "./tabs/UserManagementTab";
 
-type TabType = 'dashboard' | 'songs' | 'backup' | 'timestamp' | 'timeline' | 'comments' | 'users' | 'system';
+type TabType =
+  | "dashboard"
+  | "songs"
+  | "backup"
+  | "timestamp"
+  | "timeline"
+  | "comments"
+  | "users"
+  | "system";
 
 const tabs = [
   {
-    id: 'dashboard' as const,
-    name: '대시보드',
+    id: "dashboard" as const,
+    name: "대시보드",
     icon: ChartBarIcon,
-    description: '시스템 개요 및 통계'
+    description: "시스템 개요 및 통계",
   },
   {
-    id: 'songs' as const,
-    name: '노래 관리',
+    id: "songs" as const,
+    name: "노래 관리",
     icon: MusicalNoteIcon,
-    description: '노래 데이터 조회, 편집, 삭제'
+    description: "노래 데이터 조회, 편집, 삭제",
   },
   {
-    id: 'backup' as const,
-    name: '백업 관리',
+    id: "backup" as const,
+    name: "백업 관리",
     icon: DocumentDuplicateIcon,
-    description: 'DB 백업, 복원, 통계'
+    description: "DB 백업, 복원, 통계",
   },
   {
-    id: 'timestamp' as const,
-    name: '타임스탬프 파서',
+    id: "timestamp" as const,
+    name: "타임스탬프 파서",
     icon: ClockIcon,
-    description: '댓글 타임스탬프로 라이브 클립 일괄 등록'
+    description: "댓글 타임스탬프로 라이브 클립 일괄 등록",
   },
   {
-    id: 'timeline' as const,
-    name: '타임라인 파싱',
+    id: "timeline" as const,
+    name: "타임라인 파싱",
     icon: AdjustmentsHorizontalIcon,
-    description: 'YouTube 댓글 수집 및 타임라인 분석'
+    description: "YouTube 댓글 수집 및 타임라인 분석",
   },
   {
-    id: 'comments' as const,
-    name: '댓글 분석',
+    id: "comments" as const,
+    name: "댓글 분석",
     icon: ChatBubbleBottomCenterTextIcon,
-    description: '댓글 분석 도구 (미사용)'
+    description: "댓글 분석 도구",
   },
   {
-    id: 'users' as const,
-    name: '사용자 관리',
+    id: "users" as const,
+    name: "사용자 관리",
     icon: UsersIcon,
-    description: '사용자 권한 및 활동 관리'
+    description: "사용자 권한 및 활동 관리",
   },
   {
-    id: 'system' as const,
-    name: '시스템 설정',
+    id: "system" as const,
+    name: "시스템 설정",
     icon: ServerIcon,
-    description: '시스템 설정 및 모니터링'
-  }
+    description: "시스템 설정 및 모니터링",
+  },
 ];
 
 interface AdminClientProps {
@@ -97,34 +109,35 @@ interface AdminClientProps {
 export default function AdminClient({ initialStats }: AdminClientProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const [stats, setStats] = useState(initialStats);
   const [isMobile, setIsMobile] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     const checkIsMobile = () => {
       setIsMobile(window.innerWidth < 1024);
     };
     checkIsMobile();
-    window.addEventListener('resize', checkIsMobile);
-    return () => window.removeEventListener('resize', checkIsMobile);
+    window.addEventListener("resize", checkIsMobile);
+    return () => window.removeEventListener("resize", checkIsMobile);
   }, []);
 
   useEffect(() => {
-    if (status === 'loading') return;
+    if (status === "loading") return;
 
     if (!session) {
-      router.push('/auth/signin');
+      router.push("/auth/signin");
       return;
     }
 
     if (!isSuperAdmin(session.user.role as UserRole)) {
-      router.push('/');
+      router.push("/");
       return;
     }
   }, [session, status, router]);
 
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
       <div className="min-h-screen bg-light-background dark:bg-dark-background flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-light-accent/30 dark:border-dark-accent/30 border-t-light-accent dark:border-t-dark-accent rounded-full animate-spin" />
@@ -143,7 +156,8 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
       icon: MusicalNoteIcon,
       change: "+12",
       changeType: "increase" as const,
-      color: "from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple"
+      color:
+        "from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple",
     },
     {
       title: "등록 사용자",
@@ -151,7 +165,8 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
       icon: UsersIcon,
       change: "+5",
       changeType: "increase" as const,
-      color: "from-light-secondary to-light-accent dark:from-dark-secondary dark:to-dark-accent"
+      color:
+        "from-light-secondary to-light-accent dark:from-dark-secondary dark:to-dark-accent",
     },
     {
       title: "플레이리스트",
@@ -159,7 +174,8 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
       icon: ListBulletIcon,
       change: "+8",
       changeType: "increase" as const,
-      color: "from-light-purple to-light-secondary dark:from-dark-purple dark:to-dark-secondary"
+      color:
+        "from-light-purple to-light-secondary dark:from-dark-purple dark:to-dark-secondary",
     },
     {
       title: "오늘 활동",
@@ -167,13 +183,14 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
       icon: ArrowTrendingUpIcon,
       change: "+3",
       changeType: "increase" as const,
-      color: "from-emerald-400 to-teal-500 dark:from-emerald-500 dark:to-teal-600"
-    }
+      color:
+        "from-emerald-400 to-teal-500 dark:from-emerald-500 dark:to-teal-600",
+    },
   ];
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'dashboard':
+      case "dashboard":
         return (
           <div className="space-y-8">
             {/* Quick Stats */}
@@ -196,14 +213,19 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
                              transition-all duration-300"
                 >
                   <div className="flex items-center justify-between mb-4">
-                    <div className={`w-10 xl:w-12 h-10 xl:h-12 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}>
+                    <div
+                      className={`w-10 xl:w-12 h-10 xl:h-12 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}
+                    >
                       <stat.icon className="w-5 xl:w-6 h-5 xl:h-6 text-white" />
                     </div>
-                    <div className={`px-2 py-1 rounded-full text-xs font-medium
-                      ${stat.changeType === 'increase' 
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' 
-                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      }`}>
+                    <div
+                      className={`px-2 py-1 rounded-full text-xs font-medium
+                      ${
+                        stat.changeType === "increase"
+                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      }`}
+                    >
                       {stat.change}
                     </div>
                   </div>
@@ -224,56 +246,63 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-4 xl:p-6 border border-light-primary/20 dark:border-dark-primary/20"
             >
-              <h3 className="text-base xl:text-lg font-semibold text-light-text dark:text-dark-text mb-4">시스템 상태</h3>
+              <h3 className="text-base xl:text-lg font-semibold text-light-text dark:text-dark-text mb-4">
+                시스템 상태
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs xl:text-sm">
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-light-text/70 dark:text-dark-text/70">시스템 정상</span>
+                  <span className="text-light-text/70 dark:text-dark-text/70">
+                    시스템 정상
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <ClockIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60" />
-                  <span className="text-light-text/70 dark:text-dark-text/70">마지막 동기화: 5분 전</span>
+                  <span className="text-light-text/70 dark:text-dark-text/70">
+                    마지막 동기화: 5분 전
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <EyeIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60" />
-                  <span className="text-light-text/70 dark:text-dark-text/70">권한: 최고 관리자</span>
+                  <span className="text-light-text/70 dark:text-dark-text/70">
+                    권한: 최고 관리자
+                  </span>
                 </div>
               </div>
             </motion.div>
           </div>
         );
 
-      case 'songs':
+      case "songs":
         return <SongManagementTab />;
-      
-      case 'backup':
+
+      case "backup":
         return <BackupManagementTab />;
-      
-      case 'timestamp':
+
+      case "timestamp":
         return <TimestampParserTab />;
-      
-      case 'timeline':
+
+      case "timeline":
         return <CommentAnalysisTab viewMode="timeline" />;
-      
-      case 'comments':
+
+      case "comments":
         return <CommentAnalysisTab viewMode="comments" />;
-      
-      case 'users':
+
+      case "users":
+        return <UserManagementTab />;
+
+      case "system":
         return (
           <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-4 xl:p-8 border border-light-primary/20 dark:border-dark-primary/20">
-            <h3 className="text-lg xl:text-xl font-semibold text-light-text dark:text-dark-text mb-4">사용자 관리</h3>
-            <p className="text-light-text/60 dark:text-dark-text/60">사용자 관리 기능이 곧 추가될 예정입니다.</p>
+            <h3 className="text-lg xl:text-xl font-semibold text-light-text dark:text-dark-text mb-4">
+              시스템 설정
+            </h3>
+            <p className="text-light-text/60 dark:text-dark-text/60">
+              시스템 설정 기능이 곧 추가될 예정입니다.
+            </p>
           </div>
         );
-      
-      case 'system':
-        return (
-          <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-4 xl:p-8 border border-light-primary/20 dark:border-dark-primary/20">
-            <h3 className="text-lg xl:text-xl font-semibold text-light-text dark:text-dark-text mb-4">시스템 설정</h3>
-            <p className="text-light-text/60 dark:text-dark-text/60">시스템 설정 기능이 곧 추가될 예정입니다.</p>
-          </div>
-        );
-      
+
       default:
         return null;
     }
@@ -283,12 +312,18 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
     <div className="min-h-screen bg-light-background dark:bg-dark-background">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-20 w-96 h-96 bg-light-accent/5 dark:bg-dark-accent/5 
-                        rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
-        <div className="absolute top-40 right-20 w-96 h-96 bg-light-secondary/5 dark:bg-dark-secondary/5 
-                        rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
-        <div className="absolute -bottom-8 left-1/2 w-96 h-96 bg-light-purple/5 dark:bg-dark-purple/5 
-                        rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
+        <div
+          className="absolute top-20 left-20 w-96 h-96 bg-light-accent/5 dark:bg-dark-accent/5 
+                        rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"
+        ></div>
+        <div
+          className="absolute top-40 right-20 w-96 h-96 bg-light-secondary/5 dark:bg-dark-secondary/5 
+                        rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"
+        ></div>
+        <div
+          className="absolute -bottom-8 left-1/2 w-96 h-96 bg-light-purple/5 dark:bg-dark-purple/5 
+                        rounded-full mix-blend-multiply filter blur-3xl animate-blob"
+        ></div>
       </div>
 
       <div className="relative z-10 pt-24 pb-12 px-2 sm:px-4 lg:px-8 max-w-[98%] sm:max-w-[95%] 2xl:max-w-[90%] mx-auto">
@@ -300,8 +335,10 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
           className="mb-8"
         >
           <div className="flex items-center gap-4 mb-6">
-            <div className="w-16 h-16 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple 
-                            rounded-2xl flex items-center justify-center shadow-lg">
+            <div
+              className="w-16 h-16 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple 
+                            rounded-2xl flex items-center justify-center shadow-lg"
+            >
               <ShieldCheckIcon className="w-8 h-8 text-white" />
             </div>
             <div>
@@ -317,10 +354,29 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
 
         <div className="flex flex-col lg:flex-row gap-4 xl:gap-8">
           {/* Desktop Sidebar */}
-          <div className="hidden xl:block xl:w-80 flex-shrink-0">
+          <div
+            className={`hidden xl:block flex-shrink-0 transition-all duration-300 ${
+              sidebarCollapsed ? "xl:w-16" : "xl:w-80"
+            }`}
+          >
             <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 overflow-hidden">
-              <div className="p-4 xl:p-6 border-b border-light-primary/20 dark:border-dark-primary/20">
-                <h2 className="text-base xl:text-lg font-semibold text-light-text dark:text-dark-text">관리 메뉴</h2>
+              <div className="p-4 xl:p-6 border-b border-light-primary/20 dark:border-dark-primary/20 flex items-center justify-between">
+                {!sidebarCollapsed && (
+                  <h2 className="text-base xl:text-lg font-semibold text-light-text dark:text-dark-text">
+                    관리 메뉴
+                  </h2>
+                )}
+                <button
+                  onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800/50 text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text transition-colors duration-200"
+                  title={sidebarCollapsed ? "사이드바 확장" : "사이드바 축소"}
+                >
+                  {sidebarCollapsed ? (
+                    <ChevronRightIcon className="w-5 h-5" />
+                  ) : (
+                    <ChevronLeftIcon className="w-5 h-5" />
+                  )}
+                </button>
               </div>
               <nav className="p-3 xl:p-4 space-y-1 xl:space-y-2">
                 {tabs.map((tab) => {
@@ -330,19 +386,34 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
+                      title={sidebarCollapsed ? tab.name : undefined}
                       className={`w-full flex items-center px-3 xl:px-4 py-2 xl:py-3 rounded-lg transition-all duration-200 text-left ${
-                        isActive 
-                          ? 'bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent border border-light-accent/20 dark:border-dark-accent/20 shadow-sm' 
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text'
-                      }`}
+                        isActive
+                          ? "bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent border border-light-accent/20 dark:border-dark-accent/20 shadow-sm"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-800/50 text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text"
+                      } ${sidebarCollapsed ? "justify-center" : ""}`}
                     >
-                      <Icon className="w-4 xl:w-5 h-4 xl:h-5 mr-2 xl:mr-3 flex-shrink-0" />
-                      <div className="min-w-0">
-                        <div className="font-medium text-sm xl:text-base truncate">{tab.name}</div>
-                        <div className={`text-xs mt-0.5 line-clamp-1 ${isActive ? 'text-light-accent/70 dark:text-dark-accent/70' : 'text-light-text/50 dark:text-dark-text/50'}`}>
-                          {tab.description}
+                      <Icon
+                        className={`w-4 xl:w-5 h-4 xl:h-5 flex-shrink-0 ${
+                          sidebarCollapsed ? "" : "mr-2 xl:mr-3"
+                        }`}
+                      />
+                      {!sidebarCollapsed && (
+                        <div className="min-w-0 overflow-hidden">
+                          <div className="font-medium text-sm xl:text-base truncate">
+                            {tab.name}
+                          </div>
+                          <div
+                            className={`text-xs mt-0.5 line-clamp-1 ${
+                              isActive
+                                ? "text-light-accent/70 dark:text-dark-accent/70"
+                                : "text-light-text/50 dark:text-dark-text/50"
+                            }`}
+                          >
+                            {tab.description}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </button>
                   );
                 })}
@@ -363,9 +434,9 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
                       onClick={() => setActiveTab(tab.id)}
                       title={tab.name}
                       className={`w-full flex items-center justify-center p-3 rounded-lg transition-all duration-200 ${
-                        isActive 
-                          ? 'bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent border border-light-accent/20 dark:border-dark-accent/20 shadow-sm' 
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text'
+                        isActive
+                          ? "bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent border border-light-accent/20 dark:border-dark-accent/20 shadow-sm"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-800/50 text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text"
                       }`}
                     >
                       <Icon className="w-5 h-5 flex-shrink-0" />
@@ -387,13 +458,15 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`flex-shrink-0 flex flex-col items-center px-2 sm:px-3 py-2 rounded-lg transition-all duration-200 min-w-[70px] sm:min-w-[80px] ${
-                      isActive 
-                        ? 'bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent border border-light-accent/20 dark:border-dark-accent/20' 
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 text-light-text/70 dark:text-dark-text/70'
+                      isActive
+                        ? "bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent border border-light-accent/20 dark:border-dark-accent/20"
+                        : "hover:bg-gray-100 dark:hover:bg-gray-800/50 text-light-text/70 dark:text-dark-text/70"
                     }`}
                   >
                     <Icon className="w-4 sm:w-5 h-4 sm:h-5 mb-1" />
-                    <div className="text-xs font-medium text-center leading-tight">{tab.name.replace(' ', '\n')}</div>
+                    <div className="text-xs font-medium text-center leading-tight">
+                      {tab.name.replace(" ", "\n")}
+                    </div>
                   </button>
                 );
               })}

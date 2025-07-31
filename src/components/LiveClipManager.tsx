@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { SongVideo } from '@/types';
 import { PlayIcon, PlusIcon, XMarkIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
@@ -429,24 +429,16 @@ export default function LiveClipManager({
     return roleToIsAdmin(session.user.role as UserRole);
   };
 
-  // 권한 확인 함수
-  const canEditVideo = (video: SongVideo): boolean => {
+  // 권한 확인 함수 (메모이제이션으로 무한 리렌더링 방지)
+  const canEditVideo = useCallback((video: SongVideo): boolean => {
     if (!session || !session.user) return false;
     
     const isOwner = video.addedBy === session.user.userId;
     const isAdminUser = isAdmin();
     
-    // 디버깅 로그 (개발 중에만)
-    console.log(`🔐 권한 확인 - 클립 ID: ${video._id}`);
-    console.log(`   클립 업로더: ${video.addedBy}`);
-    console.log(`   현재 사용자 ID: ${session.user.userId}`);
-    console.log(`   소유자 여부: ${isOwner}`);
-    console.log(`   관리자 여부: ${isAdminUser}`);
-    console.log(`   편집 가능: ${isOwner || isAdminUser}`);
-    
     // 자신이 추가한 클립이거나 관리자인 경우
     return isOwner || isAdminUser;
-  };
+  }, [session, isAdmin]);
 
   // 편집 모드 시작
   const startEditVideo = (video: SongVideo) => {

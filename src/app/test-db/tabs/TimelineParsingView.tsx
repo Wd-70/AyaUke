@@ -1717,16 +1717,6 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                                bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="초 단위"
                   />
-                  {youtubePlayer && (
-                    <button
-                      type="button"
-                      onClick={setCurrentTimeAsStart}
-                      className="w-full px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
-                    >
-                      <ClockIcon className="w-3 h-3" />
-                      현재 시간으로 설정
-                    </button>
-                  )}
                 </div>
               </div>
               <div>
@@ -1743,16 +1733,6 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
                                bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     placeholder="선택사항 (초 단위)"
                   />
-                  {youtubePlayer && (
-                    <button
-                      type="button"
-                      onClick={setCurrentTimeAsEnd}
-                      className="w-full px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors flex items-center justify-center gap-1"
-                    >
-                      <ClockIcon className="w-3 h-3" />
-                      현재 시간으로 설정
-                    </button>
-                  )}
                 </div>
               </div>
             </div>

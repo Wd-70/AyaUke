@@ -599,15 +599,26 @@ export default function SongCard({ song, showNumber = false, number, onDialogSta
     // 플레이어가 준비되면 자동 재생 방지
     try {
       if (event.target && typeof event.target.pauseVideo === 'function') {
-        // 약간의 지연 후 일시정지 (플레이어 초기화 완료 대기)
+        // 더 긴 지연으로 플레이어 완전 초기화 대기
         setTimeout(() => {
           try {
-            event.target.pauseVideo();
-            setIsPlaying(false);
+            // 플레이어 상태를 확인한 후 일시정지 시도
+            if (typeof event.target.getPlayerState === 'function') {
+              const playerState = event.target.getPlayerState();
+              if (playerState !== undefined && playerState !== -1) {
+                event.target.pauseVideo();
+                setIsPlaying(false);
+              }
+            } else {
+              // getPlayerState가 없으면 그냥 일시정지 시도
+              event.target.pauseVideo();
+              setIsPlaying(false);
+            }
           } catch (err) {
-            console.warn('Failed to pause video on ready:', err);
+            // 에러가 발생해도 조용히 처리 (플레이어가 아직 완전히 로드되지 않은 경우)
+            console.log('Failed to pause video on ready (normal during initialization)');
           }
-        }, 100);
+        }, 500); // 지연 시간을 늘림
       }
     } catch (error) {
       console.warn('YouTube player ready error:', error);
