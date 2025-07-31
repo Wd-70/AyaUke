@@ -35,9 +35,12 @@ import CommentAnalysisTab from "../test-db/tabs/CommentAnalysisTab";
 import SongManagementTab from "./tabs/SongManagementTab";
 import BackupManagementTab from "./tabs/BackupManagementTab";
 import UserManagementTab from "./tabs/UserManagementTab";
+import DashboardTab from "./tabs/DashboardTab";
+import LiveClipManagementTab from "./tabs/LiveClipManagementTab";
 
 type TabType =
   | "dashboard"
+  | "clips"
   | "songs"
   | "backup"
   | "timestamp"
@@ -52,6 +55,12 @@ const tabs = [
     name: "대시보드",
     icon: ChartBarIcon,
     description: "시스템 개요 및 통계",
+  },
+  {
+    id: "clips" as const,
+    name: "라이브 클립",
+    icon: PlayIcon,
+    description: "라이브 클립 조회, 재생, 관리",
   },
   {
     id: "songs" as const,
@@ -97,20 +106,10 @@ const tabs = [
   },
 ];
 
-interface AdminClientProps {
-  initialStats: {
-    totalSongs: number;
-    totalUsers: number;
-    totalPlaylists: number;
-    recentActivity: number;
-  };
-}
-
-export default function AdminClient({ initialStats }: AdminClientProps) {
+export default function AdminClient() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
-  const [stats, setStats] = useState(initialStats);
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -149,129 +148,13 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
     return null;
   }
 
-  const quickStats = [
-    {
-      title: "총 노래 수",
-      value: stats.totalSongs.toLocaleString(),
-      icon: MusicalNoteIcon,
-      change: "+12",
-      changeType: "increase" as const,
-      color:
-        "from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple",
-    },
-    {
-      title: "등록 사용자",
-      value: stats.totalUsers.toLocaleString(),
-      icon: UsersIcon,
-      change: "+5",
-      changeType: "increase" as const,
-      color:
-        "from-light-secondary to-light-accent dark:from-dark-secondary dark:to-dark-accent",
-    },
-    {
-      title: "플레이리스트",
-      value: stats.totalPlaylists.toLocaleString(),
-      icon: ListBulletIcon,
-      change: "+8",
-      changeType: "increase" as const,
-      color:
-        "from-light-purple to-light-secondary dark:from-dark-purple dark:to-dark-secondary",
-    },
-    {
-      title: "오늘 활동",
-      value: stats.recentActivity.toLocaleString(),
-      icon: ArrowTrendingUpIcon,
-      change: "+3",
-      changeType: "increase" as const,
-      color:
-        "from-emerald-400 to-teal-500 dark:from-emerald-500 dark:to-teal-600",
-    },
-  ];
-
   const renderTabContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return (
-          <div className="space-y-8">
-            {/* Quick Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-6"
-            >
-              {quickStats.map((stat, index) => (
-                <motion.div
-                  key={stat.title}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.4, delay: index * 0.1 }}
-                  whileHover={{ scale: 1.02 }}
-                  className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-4 xl:p-6 
-                             border border-light-primary/20 dark:border-dark-primary/20 
-                             hover:border-light-accent/40 dark:hover:border-dark-accent/40 
-                             transition-all duration-300"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div
-                      className={`w-10 xl:w-12 h-10 xl:h-12 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}
-                    >
-                      <stat.icon className="w-5 xl:w-6 h-5 xl:h-6 text-white" />
-                    </div>
-                    <div
-                      className={`px-2 py-1 rounded-full text-xs font-medium
-                      ${
-                        stat.changeType === "increase"
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                      }`}
-                    >
-                      {stat.change}
-                    </div>
-                  </div>
-                  <div className="text-xl xl:text-2xl font-bold text-light-text dark:text-dark-text mb-1">
-                    {stat.value}
-                  </div>
-                  <div className="text-xs xl:text-sm text-light-text/60 dark:text-dark-text/60">
-                    {stat.title}
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
+        return <DashboardTab />;
 
-            {/* System Status */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-4 xl:p-6 border border-light-primary/20 dark:border-dark-primary/20"
-            >
-              <h3 className="text-base xl:text-lg font-semibold text-light-text dark:text-dark-text mb-4">
-                시스템 상태
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs xl:text-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-light-text/70 dark:text-dark-text/70">
-                    시스템 정상
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <ClockIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60" />
-                  <span className="text-light-text/70 dark:text-dark-text/70">
-                    마지막 동기화: 5분 전
-                  </span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <EyeIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60" />
-                  <span className="text-light-text/70 dark:text-dark-text/70">
-                    권한: 최고 관리자
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        );
+      case "clips":
+        return <LiveClipManagementTab />;
 
       case "songs":
         return <SongManagementTab />;
@@ -346,7 +229,7 @@ export default function AdminClient({ initialStats }: AdminClientProps) {
                 관리자 패널
               </h1>
               <p className="text-light-text/70 dark:text-dark-text/70 text-lg mt-2">
-                안녕하세요, {session.user.channelName || session.user.name}님!
+                안녕하세요, {session.user.displayName || session.user.name}님!
               </p>
             </div>
           </div>
