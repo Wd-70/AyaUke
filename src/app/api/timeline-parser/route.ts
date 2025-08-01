@@ -37,6 +37,7 @@ const ParsedTimelineSchema = new mongoose.Schema({
   verifiedBy: { type: String }, // 검증한 사용자 ID/이름
   verifiedAt: { type: Date }, // 검증 완료 시간
   verificationNotes: { type: String }, // 검증 관련 메모
+  specialTags: [{ type: String }], // 특별 태그 (모르는 곡, 곡 없음 등)
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 }, {

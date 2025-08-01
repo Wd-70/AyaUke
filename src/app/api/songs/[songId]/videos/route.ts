@@ -103,14 +103,7 @@ export async function POST(
       );
     }
 
-    // 중복 영상 확인
-    const existingVideo = await SongVideo.findOne({ songId, videoUrl });
-    if (existingVideo) {
-      return NextResponse.json(
-        { error: '이미 등록된 영상입니다.' },
-        { status: 409 }
-      );
-    }
+    // 중복 검사 제거 - 모든 클립 등록 허용, 클라이언트에서 시각적 표시만
 
     // 새 영상 생성
     const newVideo = new SongVideo({

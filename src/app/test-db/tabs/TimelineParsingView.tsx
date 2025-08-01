@@ -2562,68 +2562,99 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
         {/* 페이지네이션 컨트롤 */}
         {paginationInfo.totalPages > 1 && (
           <div className={`${isMobile ? 'p-2' : 'p-4'} border-t border-gray-200 dark:border-gray-700`}>
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                페이지 {currentPage} / {paginationInfo.totalPages} 
-                ({paginationInfo.startIndex + 1}-{paginationInfo.endIndex} / {paginationInfo.totalItems}개)
+            {isMobile ? (
+              /* 모바일용 간단한 페이지네이션 */
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {currentPage}/{paginationInfo.totalPages}
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={!paginationInfo.hasPrevPage}
+                    className="p-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
+                               rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeftIcon className="w-4 h-4" />
+                  </button>
+                  <span className="px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded">
+                    {currentPage}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={!paginationInfo.hasNextPage}
+                    className="p-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
+                               rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRightIcon className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
-                             rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  처음
-                </button>
-                <button
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={!paginationInfo.hasPrevPage}
-                  className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
-                             rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  이전
-                </button>
-                
-                {/* 페이지 번호들 */}
-                {Array.from({ length: Math.min(5, paginationInfo.totalPages) }, (_, i) => {
-                  const startPage = Math.max(1, currentPage - 2);
-                  const pageNum = startPage + i;
-                  if (pageNum > paginationInfo.totalPages) return null;
+            ) : (
+              /* 데스크톱용 전체 페이지네이션 */
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  페이지 {currentPage} / {paginationInfo.totalPages} 
+                  ({paginationInfo.startIndex + 1}-{paginationInfo.endIndex} / {paginationInfo.totalItems}개)
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
+                               rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    처음
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={!paginationInfo.hasPrevPage}
+                    className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
+                               rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    이전
+                  </button>
                   
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1 rounded text-sm ${
-                        pageNum === currentPage
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-                
-                <button
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={!paginationInfo.hasNextPage}
-                  className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
-                             rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  다음
-                </button>
-                <button
-                  onClick={() => setCurrentPage(paginationInfo.totalPages)}
-                  disabled={currentPage === paginationInfo.totalPages}
-                  className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
-                             rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  마지막
-                </button>
+                  {/* 페이지 번호들 */}
+                  {Array.from({ length: Math.min(5, paginationInfo.totalPages) }, (_, i) => {
+                    const startPage = Math.max(1, currentPage - 2);
+                    const pageNum = startPage + i;
+                    if (pageNum > paginationInfo.totalPages) return null;
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1 rounded text-sm ${
+                          pageNum === currentPage
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  
+                  <button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={!paginationInfo.hasNextPage}
+                    className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
+                               rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    다음
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(paginationInfo.totalPages)}
+                    disabled={currentPage === paginationInfo.totalPages}
+                    className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 
+                               rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    마지막
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

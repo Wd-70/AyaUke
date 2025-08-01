@@ -7,6 +7,7 @@ import { PlayIcon, PlusIcon, XMarkIcon, PencilIcon, TrashIcon } from '@heroicons
 import YouTube from 'react-youtube';
 import { useSession } from 'next-auth/react';
 import { UserRole, roleToIsAdmin } from '@/lib/permissions';
+import { updateVideoData } from '@/lib/youtube';
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -71,9 +72,43 @@ export default function LiveClipManager({
   });
   const [isEditingVideo, setIsEditingVideo] = useState(false);
   const [isDeletingVideo, setIsDeletingVideo] = useState<string | null>(null);
+  const [expandedOverlapInfo, setExpandedOverlapInfo] = useState<string | null>(null);
 
   // 선택된 영상 정보
   const selectedVideo = songVideos[selectedVideoIndex];
+
+  // 시간 중복 검사 함수
+  const checkTimeOverlap = (video1: SongVideo, video2: SongVideo): boolean => {
+    // 같은 영상이 아니면 중복 아님
+    if (video1.videoId !== video2.videoId) return false;
+    
+    // 같은 클립이면 중복 아님
+    if (video1._id === video2._id) return false;
+    
+    const start1 = video1.startTime || 0;
+    const end1 = video1.endTime || Number.MAX_SAFE_INTEGER; // 종료시간이 없으면 무한대로 처리
+    const start2 = video2.startTime || 0;
+    const end2 = video2.endTime || Number.MAX_SAFE_INTEGER;
+    
+    // 시작시간과 종료시간이 정확히 연결되는 경우는 정상 (중복 아님)
+    if (end1 === start2 || end2 === start1) return false;
+    
+    // 중복 구간이 있는지 확인
+    return Math.max(start1, start2) < Math.min(end1, end2);
+  };
+
+  // 각 영상의 중복 상태를 계산
+  const getVideoOverlapInfo = (video: SongVideo) => {
+    const overlappingVideos = songVideos.filter(otherVideo => 
+      checkTimeOverlap(video, otherVideo)
+    );
+    
+    return {
+      hasOverlap: overlappingVideos.length > 0,
+      overlappingVideos,
+      overlappingCount: overlappingVideos.length
+    };
+  };
 
 
   // YouTube URL에서 시간 파라미터 추출
@@ -143,25 +178,15 @@ export default function LiveClipManager({
     try {
       const parsedStartTime = extractTimeFromUrl(videoUrl);
       
-      console.log('🔍 메타데이터 요청:', videoUrl);
-      
       // API로 메타데이터 가져오기
       const response = await fetch(`/api/youtube/metadata?url=${encodeURIComponent(videoUrl)}`);
       
-      console.log('📡 API 응답 상태:', response.status);
-      
       if (response.ok) {
         const data = await response.json();
-        console.log('📄 API 응답 데이터:', data);
         
         if (data.success && data.metadata) {
           const metadata = data.metadata;
           
-          console.log('✅ 메타데이터 처리:', {
-            title: metadata.title,
-            extractedDate: metadata.extractedDate,
-            parsedStartTime
-          });
           
           setVideoMetadata(prev => ({
             ...prev,
@@ -172,14 +197,12 @@ export default function LiveClipManager({
           
           // 자동 감지된 날짜가 있으면 설정
           if (metadata.extractedDate) {
-            console.log('📅 날짜 자동 설정:', metadata.extractedDate);
             setAddVideoData(prev => ({
               ...prev,
               sungDate: metadata.extractedDate,
               startTime: parsedStartTime
             }));
           } else {
-            console.log('⚠️ 날짜 추출 실패');
             setAddVideoData(prev => ({
               ...prev,
               startTime: parsedStartTime
@@ -190,7 +213,6 @@ export default function LiveClipManager({
         }
       }
       
-      console.log('❌ API 실패, 기본 파싱만 수행');
       
       // API 실패 시 기본 파싱만 수행
       setVideoMetadata(prev => ({
@@ -466,24 +488,57 @@ export default function LiveClipManager({
 
   // 현재 재생 시간을 시작 시간으로 설정
   const setCurrentTimeAsStart = () => {
-    if (videoPlayer) {
-      const currentTime = Math.floor(videoPlayer.getCurrentTime());
-      setEditingVideoData(prev => ({
-        ...prev,
-        startTime: currentTime
-      }));
+    if (videoPlayer && typeof videoPlayer.getCurrentTime === 'function') {
+      try {
+        const currentTime = Math.floor(videoPlayer.getCurrentTime());
+        setEditingVideoData(prev => ({
+          ...prev,
+          startTime: currentTime
+        }));
+      } catch (e) {
+        console.error('시작 시간 설정 실패:', e);
+      }
     }
   };
 
   // 현재 재생 시간을 종료 시간으로 설정
   const setCurrentTimeAsEnd = () => {
-    if (videoPlayer) {
-      const currentTime = Math.floor(videoPlayer.getCurrentTime());
-      setEditingVideoData(prev => ({
-        ...prev,
-        endTime: currentTime
-      }));
+    if (videoPlayer && typeof videoPlayer.getCurrentTime === 'function') {
+      try {
+        const currentTime = Math.floor(videoPlayer.getCurrentTime());
+        setEditingVideoData(prev => ({
+          ...prev,
+          endTime: currentTime
+        }));
+      } catch (e) {
+        console.error('종료 시간 설정 실패:', e);
+      }
     }
+  };
+
+  // 편집 중인 영상의 시간 중복 검사
+  const getEditingVideoOverlapInfo = () => {
+    if (!editingVideoId) return { hasOverlap: false, overlappingVideos: [], overlappingCount: 0 };
+    
+    const editingVideo = songVideos.find(v => v._id === editingVideoId);
+    if (!editingVideo) return { hasOverlap: false, overlappingVideos: [], overlappingCount: 0 };
+    
+    // 편집 중인 데이터로 임시 비디오 객체 생성
+    const tempVideo = {
+      ...editingVideo,
+      startTime: editingVideoData.startTime,
+      endTime: editingVideoData.endTime
+    };
+    
+    const overlappingVideos = songVideos.filter(otherVideo => 
+      checkTimeOverlap(tempVideo, otherVideo)
+    );
+    
+    return {
+      hasOverlap: overlappingVideos.length > 0,
+      overlappingVideos,
+      overlappingCount: overlappingVideos.length
+    };
   };
 
   // 시간을 hh:mm:ss 형식으로 변환
@@ -575,6 +630,30 @@ export default function LiveClipManager({
     } finally {
       setIsDeletingVideo(null);
     }
+  };
+
+  // 새로 추가할 영상의 시간 중복 검사
+  const getAddVideoOverlapInfo = () => {
+    const videoData = updateVideoData(addVideoData.videoUrl);
+    if (!videoData) return { hasOverlap: false, overlappingVideos: [], overlappingCount: 0 };
+    
+    // 추가할 영상 데이터로 임시 비디오 객체 생성
+    const tempVideo = {
+      _id: 'temp-add',
+      videoId: videoData.videoId,
+      startTime: addVideoData.startTime,
+      endTime: addVideoData.endTime
+    } as SongVideo;
+    
+    const overlappingVideos = songVideos.filter(otherVideo => 
+      checkTimeOverlap(tempVideo, otherVideo)
+    );
+    
+    return {
+      hasOverlap: overlappingVideos.length > 0,
+      overlappingVideos,
+      overlappingCount: overlappingVideos.length
+    };
   };
 
   // 라이브 클립 추가 핸들러
@@ -693,13 +772,20 @@ export default function LiveClipManager({
                       },
                     }}
                     onReady={(event) => {
-                      setVideoPlayer(event.target);
-                      // 자동 재생이 필요한 경우 재생 시작
-                      if (shouldAutoPlay) {
-                        setTimeout(() => {
-                          event.target.playVideo();
-                          setShouldAutoPlay(false);
-                        }, 500); // 짧은 딩레이로 안정성 향상
+                      if (event.target && typeof event.target.playVideo === 'function') {
+                        setVideoPlayer(event.target);
+                        // 자동 재생이 필요한 경우 재생 시작
+                        if (shouldAutoPlay) {
+                          setTimeout(() => {
+                            try {
+                              event.target.playVideo();
+                              setShouldAutoPlay(false);
+                            } catch (e) {
+                              console.error('자동 재생 실패:', e);
+                              setShouldAutoPlay(false);
+                            }
+                          }, 500); // 짧은 딩레이로 안정성 향상
+                        }
                       }
                     }}
                     onStateChange={(event) => {
@@ -779,8 +865,10 @@ export default function LiveClipManager({
               
               {/* 영상 목록 */}
               <div className="space-y-2">
-                {songVideos.map((video, index) => (
-                  editingVideoId === video._id ? (
+                {songVideos.map((video, index) => {
+                  const overlapInfo = getVideoOverlapInfo(video);
+                  
+                  return editingVideoId === video._id ? (
                     // 편집 모드
                     <div key={video._id} className="p-4 rounded-lg border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20">
                       <form onSubmit={handleEditVideo} className="space-y-3">
@@ -940,6 +1028,25 @@ export default function LiveClipManager({
                           </div>
                         </div>
                         
+                        {/* 시간 중복 경고 */}
+                        {(() => {
+                          const editOverlapInfo = getEditingVideoOverlapInfo();
+                          return editOverlapInfo.hasOverlap ? (
+                            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                              <div className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-2">
+                                ⚠️ 시간 중복 경고 ({editOverlapInfo.overlappingCount}개 클립과 중복)
+                              </div>
+                              <div className="space-y-1">
+                                {editOverlapInfo.overlappingVideos.map((overlappingVideo) => (
+                                  <div key={overlappingVideo._id} className="text-xs text-amber-700 dark:text-amber-300">
+                                    • {new Date(overlappingVideo.sungDate).toLocaleDateString('ko-KR')} ({overlappingVideo.addedByName}) - {formatTime(overlappingVideo.startTime || 0)} ~ {overlappingVideo.endTime ? formatTime(overlappingVideo.endTime) : '∞'}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null;
+                        })()}
+
                         {/* 일반 사용자를 위한 안내 메시지 */}
                         {!isAdmin() && (
                           <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
@@ -973,9 +1080,13 @@ export default function LiveClipManager({
                       key={video._id}
                       onClick={() => setSelectedVideoIndex(index)}
                       className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 relative group ${
-                        selectedVideoIndex === index
-                          ? 'border-light-accent/50 dark:border-dark-accent/50 bg-light-accent/10 dark:bg-dark-accent/10'
-                          : 'border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent/30 dark:hover:border-dark-accent/30 hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                        overlapInfo.hasOverlap
+                          ? selectedVideoIndex === index
+                            ? 'border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-900/20 shadow-amber-100 dark:shadow-amber-900/20 shadow-md'
+                            : 'border-amber-300 dark:border-amber-600 bg-amber-50/70 dark:bg-amber-900/10 hover:border-amber-400 dark:hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                          : selectedVideoIndex === index
+                            ? 'border-light-accent/50 dark:border-dark-accent/50 bg-light-accent/10 dark:bg-dark-accent/10'
+                            : 'border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent/30 dark:hover:border-dark-accent/30 hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -998,6 +1109,20 @@ export default function LiveClipManager({
                             {video.addedByName}
                             {video.isVerified && (
                               <span className="ml-2 text-green-600 dark:text-green-400">✓ 검증됨</span>
+                            )}
+                            {overlapInfo.hasOverlap && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedOverlapInfo(
+                                    expandedOverlapInfo === video._id ? null : video._id
+                                  );
+                                }}
+                                className="ml-2 text-amber-600 dark:text-amber-400 font-medium hover:text-amber-700 dark:hover:text-amber-300 underline decoration-dotted"
+                                title="중복 상세 정보 보기"
+                              >
+                                ⚠️ 시간 중복 ({overlapInfo.overlappingCount}개)
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1039,9 +1164,46 @@ export default function LiveClipManager({
                           )}
                         </div>
                       </div>
+                      
+                      {/* 중복 상세 정보 확장 영역 */}
+                      {expandedOverlapInfo === video._id && overlapInfo.hasOverlap && (
+                        <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800 bg-amber-25 dark:bg-amber-950/30 -mx-3 px-3 pb-3 rounded-b-lg">
+                          <div className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-2">
+                            🔍 시간 중복 상세 정보:
+                          </div>
+                          <div className="space-y-2">
+                            {overlapInfo.overlappingVideos.map((overlappingVideo) => {
+                              const video1Start = video.startTime || 0;
+                              const video1End = video.endTime || '∞';
+                              const video2Start = overlappingVideo.startTime || 0;
+                              const video2End = overlappingVideo.endTime || '∞';
+                              
+                              return (
+                                <div key={overlappingVideo._id} className="text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 p-2 rounded border border-amber-200 dark:border-amber-800">
+                                  <div className="font-medium mb-1">
+                                    📅 {new Date(overlappingVideo.sungDate).toLocaleDateString('ko-KR')} ({overlappingVideo.addedByName})
+                                  </div>
+                                  <div className="space-y-1 text-amber-600 dark:text-amber-400">
+                                    <div>현재 클립: {formatTime(video1Start)} ~ {typeof video1End === 'number' ? formatTime(video1End) : video1End}</div>
+                                    <div>중복 클립: {formatTime(video2Start)} ~ {typeof video2End === 'number' ? formatTime(video2End) : video2End}</div>
+                                  </div>
+                                  {overlappingVideo.description && (
+                                    <div className="text-amber-600 dark:text-amber-400 mt-1 italic">
+                                      "{overlappingVideo.description}"
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 italic">
+                            💡 관리자에게 문의하여 중복된 클립을 정리하세요.
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -1288,6 +1450,36 @@ export default function LiveClipManager({
                 />
               </div>
             </div>
+
+            {/* 시간 중복 경고 (클립 추가 시) */}
+            {addVideoData.videoUrl && (() => {
+              const addOverlapInfo = getAddVideoOverlapInfo();
+              return addOverlapInfo.hasOverlap ? (
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                  <div className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
+                    ⚠️ 시간 중복 경고 ({addOverlapInfo.overlappingCount}개 클립과 중복)
+                  </div>
+                  <div className="space-y-2">
+                    {addOverlapInfo.overlappingVideos.map((overlappingVideo) => (
+                      <div key={overlappingVideo._id} className="text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 p-2 rounded border border-amber-200 dark:border-amber-800">
+                        <div className="font-medium">
+                          📅 {new Date(overlappingVideo.sungDate).toLocaleDateString('ko-KR')} ({overlappingVideo.addedByName})
+                        </div>
+                        <div className="text-amber-600 dark:text-amber-400">
+                          기존 클립: {formatTime(overlappingVideo.startTime || 0)} ~ {overlappingVideo.endTime ? formatTime(overlappingVideo.endTime) : '∞'}
+                        </div>
+                        {overlappingVideo.description && (
+                          <div className="italic">"{overlappingVideo.description}"</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                    💡 그래도 등록하시겠습니까? 관리자가 나중에 중복을 정리할 수 있습니다.
+                  </div>
+                </div>
+              ) : null;
+            })()}
 
             {/* 설명 입력 */}
             <div>

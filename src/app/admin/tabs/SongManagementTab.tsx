@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   MagnifyingGlassIcon, 
   PlusIcon, 
@@ -231,31 +231,41 @@ export default function SongManagementTab() {
 
     try {
       const updatePromises = Array.from(selectedSongs).map(async (songId) => {
-        // 기본 업데이트
-        if (Object.keys(updateData).length > 0) {
+        // 기존 곡 정보 가져오기 (태그 추가가 있는 경우)
+        let existingTags: string[] = [];
+        if (Object.keys(addTagsData).length > 0) {
+          const songResponse = await fetch(`/api/songdetails/${songId}`);
+          
+          if (songResponse.ok) {
+            const responseData = await songResponse.json();
+            // API 응답 구조가 {success: true, song: {...}} 형태
+            const songData = responseData.song || responseData;
+            existingTags = songData.searchTags || [];
+          }
+        }
+
+        // 최종 업데이트 데이터 준비 (태그는 별도 처리하므로 제외)
+        const finalUpdateData = { ...updateData };
+        delete finalUpdateData.searchTags; // 태그는 별도로 처리
+
+        // 태그 처리
+        if (Object.keys(addTagsData).length > 0) {
+          // 태그 추가 모드: 기존 태그 + 새 태그
+          const newTags = addTagsData.addTags as string[];
+          const mergedTags = [...new Set([...existingTags, ...newTags])]; // 기존 태그 + 새 태그, 중복 제거
+          finalUpdateData.searchTags = mergedTags;
+        } else if (updateData.searchTags) {
+          // 태그 교체 모드: 기존 태그를 새 태그로 완전 교체
+          finalUpdateData.searchTags = updateData.searchTags;
+        }
+
+        // 하나의 요청으로 모든 업데이트 수행
+        if (Object.keys(finalUpdateData).length > 0) {
           await fetch(`/api/songdetails/${songId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updateData)
+            body: JSON.stringify(finalUpdateData)
           });
-        }
-
-        // 태그 추가 (기존 태그 유지)
-        if (Object.keys(addTagsData).length > 0) {
-          // 기존 곡 정보 가져오기
-          const songResponse = await fetch(`/api/songdetails/${songId}`);
-          if (songResponse.ok) {
-            const songData = await songResponse.json();
-            const existingTags = songData.searchTags || [];
-            const newTags = addTagsData.addTags as string[];
-            const mergedTags = [...new Set([...existingTags, ...newTags])]; // 중복 제거
-
-            await fetch(`/api/songdetails/${songId}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ searchTags: mergedTags })
-            });
-          }
         }
       });
       
@@ -273,6 +283,8 @@ export default function SongManagementTab() {
 
   // YouTube에서 MR 링크 검색
   const searchMRFromYouTube = async (title: string, artist: string) => {
+    console.log('searchMRFromYouTube 호출:', { title, artist });
+    
     try {
       const response = await fetch('/api/youtube-search', {
         method: 'POST',
@@ -280,8 +292,13 @@ export default function SongManagementTab() {
         body: JSON.stringify({ title, artist })
       });
 
+      console.log('API 응답 상태:', response.status);
+      
       const result = await response.json();
+      console.log('API 응답 데이터:', result);
+      
       if (result.success) {
+        console.log('검색 성공, 결과 반환:', result.selectedResult);
         return result.selectedResult;
       } else {
         console.error('YouTube 검색 실패:', result.error);
@@ -911,45 +928,89 @@ export default function SongManagementTab() {
 
   // 곡 상세 모달 컴포넌트
   function SongDetailModal() {
-    const [formData, setFormData] = useState(() => {
-      if (modalMode === 'create') {
-        return {
-          title: '',
-          artist: '',
-          titleAlias: '',
-          artistAlias: '',
-          language: '',
-          lyrics: '',
-          searchTags: [],
-          sungCount: 0,
-          lastSungDate: '',
-          keyAdjustment: null as number | null,
-          mrLinks: [] as Array<{url: string; skipSeconds: number; label: string; duration: string}>,
-          selectedMRIndex: 0,
-          personalNotes: '',
-          imageUrl: ''
-        };
-      }
-      return {
-        title: selectedSong?.title || '',
-        artist: selectedSong?.artist || '',
-        titleAlias: selectedSong?.titleAlias || '',
-        artistAlias: selectedSong?.artistAlias || '',
-        language: selectedSong?.language || '',
-        lyrics: selectedSong?.lyrics || '',
-        searchTags: selectedSong?.searchTags || [],
-        sungCount: selectedSong?.sungCount || 0,
-        lastSungDate: selectedSong?.lastSungDate || '',
-        keyAdjustment: selectedSong?.keyAdjustment ?? null,
-        mrLinks: selectedSong?.mrLinks || [],
-        selectedMRIndex: selectedSong?.selectedMRIndex || 0,
-        personalNotes: selectedSong?.personalNotes || '',
-        imageUrl: selectedSong?.imageUrl || ''
-      };
+    const [formData, setFormData] = useState({
+      title: '',
+      artist: '',
+      titleAlias: '',
+      artistAlias: '',
+      language: '',
+      lyrics: '',
+      searchTags: [] as string[],
+      sungCount: 0,
+      lastSungDate: '',
+      keyAdjustment: null as number | null,
+      mrLinks: [] as Array<{url: string; skipSeconds: number; label: string; duration: string}>,
+      selectedMRIndex: 0,
+      personalNotes: '',
+      imageUrl: ''
     });
+
+    // 모달이 처음 열릴 때만 초기화
+    const hasInitializedRef = useRef(false);
+    const modalKeyRef = useRef('');
+    
+    useEffect(() => {
+      const currentModalKey = `${isModalOpen}-${modalMode}-${selectedSong?._id || 'new'}`;
+      
+      if (isModalOpen && currentModalKey !== modalKeyRef.current) {
+        console.log('모달 새로 열림 - 데이터 설정');
+        modalKeyRef.current = currentModalKey;
+        hasInitializedRef.current = true;
+        
+        if (modalMode === 'create') {
+          console.log('생성 모드로 설정');
+          setFormData({
+            title: '',
+            artist: '',
+            titleAlias: '',
+            artistAlias: '',
+            language: '',
+            lyrics: '',
+            searchTags: [],
+            sungCount: 0,
+            lastSungDate: '',
+            keyAdjustment: null,
+            mrLinks: [],
+            selectedMRIndex: 0,
+            personalNotes: '',
+            imageUrl: ''
+          });
+        } else if (selectedSong) {
+          console.log('수정 모드로 설정, 기존 MR 링크:', selectedSong.mrLinks);
+          setFormData({
+            title: selectedSong.title || '',
+            artist: selectedSong.artist || '',
+            titleAlias: selectedSong.titleAlias || '',
+            artistAlias: selectedSong.artistAlias || '',
+            language: selectedSong.language || '',
+            lyrics: selectedSong.lyrics || '',
+            searchTags: selectedSong.searchTags || [],
+            sungCount: selectedSong.sungCount || 0,
+            lastSungDate: selectedSong.lastSungDate || '',
+            keyAdjustment: selectedSong.keyAdjustment ?? null,
+            mrLinks: selectedSong.mrLinks || [],
+            selectedMRIndex: selectedSong.selectedMRIndex || 0,
+            personalNotes: selectedSong.personalNotes || '',
+            imageUrl: selectedSong.imageUrl || ''
+          });
+        }
+      } else if (!isModalOpen) {
+        console.log('모달 닫힘 - 키 리셋');
+        modalKeyRef.current = '';
+        hasInitializedRef.current = false;
+        setTagInput('');
+      } else if (isModalOpen && hasInitializedRef.current) {
+        console.log('모달 이미 초기화됨 - 스킵');
+      }
+    }, [isModalOpen, modalMode, selectedSong]);
 
     const [saving, setSaving] = useState(false);
     const [tagInput, setTagInput] = useState('');
+
+    // MR 링크 변경 감지를 위한 디버깅
+    useEffect(() => {
+      console.log('formData.mrLinks 변경됨:', formData.mrLinks);
+    }, [formData.mrLinks]);
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -1027,19 +1088,63 @@ export default function SongManagementTab() {
     };
 
     const removeMRLink = (index: number) => {
-      setFormData(prev => ({
-        ...prev,
-        mrLinks: prev.mrLinks.filter((_, i) => i !== index),
-        selectedMRIndex: prev.selectedMRIndex >= prev.mrLinks.length - 1 ? 0 : prev.selectedMRIndex
-      }));
+      setFormData(prev => {
+        const newMRLinks = prev.mrLinks.filter((_, i) => i !== index);
+        let newSelectedIndex = prev.selectedMRIndex;
+        
+        // 선택된 항목이 삭제되는 경우
+        if (prev.selectedMRIndex === index) {
+          newSelectedIndex = 0; // 첫 번째 항목으로 이동
+        }
+        // 선택된 항목보다 앞의 항목이 삭제되는 경우
+        else if (prev.selectedMRIndex > index) {
+          newSelectedIndex = prev.selectedMRIndex - 1; // 인덱스 조정
+        }
+        
+        // MR 링크가 모두 삭제되는 경우
+        if (newMRLinks.length === 0) {
+          newSelectedIndex = 0;
+        }
+        // 선택된 인덱스가 범위를 벗어나는 경우
+        else if (newSelectedIndex >= newMRLinks.length) {
+          newSelectedIndex = newMRLinks.length - 1;
+        }
+        
+        return {
+          ...prev,
+          mrLinks: newMRLinks,
+          selectedMRIndex: newSelectedIndex
+        };
+      });
     };
 
     return (
       <div 
         className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-        onClick={(e) => {
+        onMouseDown={(e) => {
           if (e.target === e.currentTarget) {
-            setIsModalOpen(false);
+            const startTime = Date.now();
+            const startX = e.clientX;
+            const startY = e.clientY;
+            
+            const handleMouseUp = (upEvent: MouseEvent) => {
+              const endTime = Date.now();
+              const endX = upEvent.clientX;
+              const endY = upEvent.clientY;
+              
+              // 드래그 감지 (거리 또는 시간으로 판단)
+              const distance = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+              const duration = endTime - startTime;
+              
+              // 클릭으로 간주하는 조건: 이동거리 5px 이하, 시간 300ms 이하
+              if (distance <= 5 && duration <= 300) {
+                setIsModalOpen(false);
+              }
+              
+              document.removeEventListener('mouseup', handleMouseUp);
+            };
+            
+            document.addEventListener('mouseup', handleMouseUp);
           }
         }}
       >
@@ -1290,9 +1395,16 @@ export default function SongManagementTab() {
             {/* MR 링크 관리 */}
             <div>
               <div className="flex justify-between items-center mb-3">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  MR 링크
-                </label>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    MR 링크
+                  </label>
+                  {formData.mrLinks.length > 1 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      여러 MR 중 하나를 선택하세요. 선택된 MR이 기본값으로 사용됩니다.
+                    </p>
+                  )}
+                </div>
                 {(
                   <div className="flex gap-2">
                     <button
@@ -1303,22 +1415,60 @@ export default function SongManagementTab() {
                           return;
                         }
                         
-                        const mrResult = await searchMRFromYouTube(formData.title, formData.artist);
-                        if (mrResult && mrResult !== 'QUOTA_EXCEEDED') {
-                          setFormData(prev => ({
-                            ...prev,
-                            mrLinks: [...prev.mrLinks, {
+                        console.log('MR 검색 시작:', { title: formData.title, artist: formData.artist });
+                        
+                        try {
+                          // 버튼을 비활성화하여 중복 클릭 방지
+                          const button = document.activeElement as HTMLButtonElement;
+                          if (button) button.disabled = true;
+                          
+                          const mrResult = await searchMRFromYouTube(formData.title, formData.artist);
+                          console.log('MR 검색 결과:', mrResult);
+                          
+                          if (mrResult && mrResult !== 'QUOTA_EXCEEDED') {
+                            console.log('MR 링크 추가 전 상태:', formData.mrLinks);
+                            
+                            const newMRLink = {
                               url: mrResult.url,
                               skipSeconds: 0,
                               label: `Auto-found: ${mrResult.title.substring(0, 30)}...`,
                               duration: ''
-                            }]
-                          }));
-                          showToast(`MR 링크를 찾았습니다! 제목: ${mrResult.title}`, 'success');
-                        } else if (mrResult === 'QUOTA_EXCEEDED') {
-                          showToast('YouTube API 할당량이 초과되었습니다.', 'error');
-                        } else {
-                          showToast('MR 링크를 찾을 수 없습니다.', 'error');
+                            };
+                            
+                            console.log('MR 링크 추가 시도 - 현재 상태:', formData.mrLinks);
+                            console.log('추가할 MR 링크:', newMRLink);
+                            
+                            // 상태 업데이트 함수를 사용하여 현재 상태를 기반으로 업데이트
+                            setFormData(prevFormData => {
+                              console.log('setFormData 콜백 진입 성공!');
+                              console.log('이전 MR 링크 배열:', prevFormData.mrLinks);
+                              
+                              const newMRLinks = [...prevFormData.mrLinks, newMRLink];
+                              console.log('새로운 MR 링크 배열:', newMRLinks);
+                              
+                              return {
+                                ...prevFormData,
+                                mrLinks: newMRLinks
+                              };
+                            });
+                            
+                            console.log('setFormData 호출 완료');
+                            
+                            showToast(`MR 링크를 찾았습니다! 제목: ${mrResult.title}`, 'success');
+                          } else if (mrResult === 'QUOTA_EXCEEDED') {
+                            console.log('YouTube API 할당량 초과');
+                            showToast('YouTube API 할당량이 초과되었습니다. 나중에 다시 시도해주세요.', 'error');
+                          } else {
+                            console.log('MR 링크를 찾을 수 없음');
+                            showToast('해당 곡의 MR 링크를 찾을 수 없습니다. 수동으로 추가해주세요.', 'error');
+                          }
+                        } catch (error) {
+                          console.error('MR 검색 오류:', error);
+                          showToast('MR 검색 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.', 'error');
+                        } finally {
+                          // 버튼 재활성화
+                          const button = document.activeElement as HTMLButtonElement;
+                          if (button) button.disabled = false;
                         }
                       }}
                       className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-md"
@@ -1338,8 +1488,31 @@ export default function SongManagementTab() {
               
               <div className="space-y-3 max-w-full overflow-hidden">
                 {formData.mrLinks.map((link, index) => (
-                  <div key={index} className="p-3 border border-gray-300 dark:border-gray-600 rounded-md">
+                  <div key={index} className={`p-3 border rounded-md transition-colors ${
+                    formData.selectedMRIndex === index 
+                      ? 'border-blue-500 dark:border-blue-400 bg-blue-50/50 dark:bg-blue-900/20' 
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}>
                     <div className="space-y-3">
+                      {/* 선택 라디오 버튼과 헤더 */}
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="radio"
+                          name="selectedMR"
+                          checked={formData.selectedMRIndex === index}
+                          onChange={() => setFormData(prev => ({ ...prev, selectedMRIndex: index }))}
+                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                        />
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          MR #{index + 1} {formData.selectedMRIndex === index && '(선택됨)'}
+                        </label>
+                        {link.label && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            - {link.label}
+                          </span>
+                        )}
+                      </div>
+
                       {/* URL - 전체 폭 사용 */}
                       <div>
                         <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">URL</label>
