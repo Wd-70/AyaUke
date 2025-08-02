@@ -109,6 +109,13 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
     uniqueMatchedSongs: 0,
     verifiedItems: 0
   });
+
+  // 라이브 클립 업로드 트리거 함수
+  const triggerUpload = () => {
+    if ((window as any).triggerTimelineUpload) {
+      (window as any).triggerTimelineUpload();
+    }
+  };
   const [isMobile, setIsMobile] = useState(false);
   const [pagination, setPagination] = useState<PaginationData>({
     currentPage: 1,
@@ -439,6 +446,15 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                   </button>
                   
                   <button
+                    onClick={triggerUpload}
+                    disabled={timelineStats.matchedSongs === 0 && timelineStats.verifiedItems === 0}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <ArrowPathIcon className="w-4 h-4" />
+                    라이브 클립 업로드
+                  </button>
+                  
+                  <button
                     onClick={reprocessAllTimelines}
                     disabled={timelineParsing}
                     className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white rounded-lg flex items-center gap-2 transition-colors"
@@ -527,7 +543,7 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
 
         {/* 콘텐츠 영역 - 조건부 렌더링 */}
         {viewMode === 'timeline' ? (
-          <TimelineParsingView onStatsUpdate={setTimelineStats} />
+          <TimelineParsingView onStatsUpdate={setTimelineStats} onUploadRequest={triggerUpload} />
         ) : (
           <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0">
             {/* 비디오 목록 */}

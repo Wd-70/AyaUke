@@ -62,6 +62,7 @@ interface ParsedTimelineItem {
   verifiedBy?: string;
   verifiedAt?: string;
   verificationNotes?: string;
+  customDescription?: string; // 커스텀 설명 (라이브 클립 업로드용)
   createdAt: string;
   updatedAt: string;
 }
@@ -76,6 +77,7 @@ interface TimelineStats {
 
 interface TimelineParsingViewProps {
   onStatsUpdate?: (stats: TimelineStats) => void;
+  onUploadRequest?: () => void;
 }
 
 // YouTube 플레이어 타입 정의
@@ -107,7 +109,7 @@ declare global {
   }
 }
 
-export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingViewProps) {
+export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: TimelineParsingViewProps) {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [parsedTimelines, setParsedTimelines] = useState<ParsedTimelineItem[]>([]);
@@ -150,6 +152,46 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   
   // 일괄 검색 결과 저장 (메모리)
   const [batchSearchResults, setBatchSearchResults] = useState<Map<string, any[]>>(new Map());
+  
+  // 라이브 클립 업로드 관련 상태
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number;
+    total: number;
+    message: string;
+  } | null>(null);
+  const [uploadSelection, setUploadSelection] = useState<{
+    matched: boolean;
+    verified: boolean;
+  }>({ matched: false, verified: false });
+
+  // 외부에서 업로드 요청이 들어왔을 때 처리
+  useEffect(() => {
+    if (onUploadRequest) {
+      // 외부에서 업로드를 요청할 때 호출할 함수를 등록
+      (window as any).triggerTimelineUpload = () => {
+        // 직접 상태를 확인하여 업로드 가능한지 체크
+        const hasMatchedTimelines = parsedTimelines.some(timeline => 
+          timeline.matchedSong && 
+          !timeline.isExcluded && 
+          timeline.isRelevant &&
+          !timeline.isTimeVerified // 매칭완료이지만 검증은 안됨
+        );
+        
+        const hasVerifiedTimelines = parsedTimelines.some(timeline => 
+          timeline.matchedSong && 
+          !timeline.isExcluded && 
+          timeline.isRelevant &&
+          timeline.isTimeVerified // 검증완료
+        );
+        
+        if (hasMatchedTimelines || hasVerifiedTimelines) {
+          setShowUploadDialog(true);
+        }
+      };
+    }
+  }, [onUploadRequest, parsedTimelines]);
   
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState(1);
@@ -1037,6 +1079,110 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
   const seekForward10s = useCallback(() => seekToTime(10), [seekToTime]);
   const seekBackward10s = useCallback(() => seekToTime(-10), [seekToTime]);
   const seekForward1m = useCallback(() => seekToTime(60), [seekToTime]);
+
+  // 라이브 클립 업로드 관련 함수들
+  const getUploadableTimelines = useCallback(() => {
+    return parsedTimelines.filter(timeline => 
+      timeline.matchedSong && 
+      !timeline.isExcluded && 
+      timeline.isRelevant &&
+      (timeline.isTimeVerified || false) // 매칭완료 또는 검증완료
+    );
+  }, [parsedTimelines]);
+
+  const getMatchedTimelines = useCallback(() => {
+    return parsedTimelines.filter(timeline => 
+      timeline.matchedSong && 
+      !timeline.isExcluded && 
+      timeline.isRelevant &&
+      !timeline.isTimeVerified // 매칭완료 (검증되지 않음)
+    );
+  }, [parsedTimelines]);
+
+  const getVerifiedTimelines = useCallback(() => {
+    return parsedTimelines.filter(timeline => 
+      timeline.matchedSong && 
+      !timeline.isExcluded && 
+      timeline.isRelevant &&
+      timeline.isTimeVerified // 검증완료
+    );
+  }, [parsedTimelines]);
+
+  // 라이브 클립 업로드 함수
+  const uploadToLiveClips = async (timelines: ParsedTimelineItem[]) => {
+    try {
+      setUploadLoading(true);
+      setUploadProgress({ current: 0, total: timelines.length, message: '업로드 준비 중...' });
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (let i = 0; i < timelines.length; i++) {
+        const timeline = timelines[i];
+        
+        setUploadProgress({ 
+          current: i + 1, 
+          total: timelines.length, 
+          message: `${timeline.matchedSong?.title || timeline.songTitle} 업로드 중...` 
+        });
+
+        try {
+          // 기본 설명 생성
+          const defaultDescription = timeline.customDescription || 
+            `${timeline.commentAuthor}님의 댓글로부터 생성되었습니다`;
+
+          // 라이브 클립 데이터 준비
+          const clipData = {
+            videoUrl: timeline.videoUrl,
+            sungDate: timeline.originalDateString || timeline.uploadedDate,
+            description: defaultDescription,
+            startTime: timeline.startTimeSeconds,
+            endTime: timeline.endTimeSeconds
+          };
+
+          // 라이브 클립 생성 API 호출
+          const response = await fetch(`/api/songs/${timeline.matchedSong!.songId}/videos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(clipData)
+          });
+
+          if (response.ok) {
+            successCount++;
+          } else {
+            const error = await response.json();
+            console.error(`타임라인 ${timeline.id} 업로드 실패:`, error);
+            failCount++;
+          }
+        } catch (error) {
+          console.error(`타임라인 ${timeline.id} 업로드 오료:`, error);
+          failCount++;
+        }
+
+        // 잠시 대기 (서버 부하 방지)
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      setUploadProgress(null);
+      
+      // 결과 알림
+      if (successCount > 0 && failCount === 0) {
+        alert(`✅ 모든 클립이 성공적으로 업로드되었습니다! (${successCount}개)`);
+      } else if (successCount > 0 && failCount > 0) {
+        alert(`⚠️ 일부 클립이 업로드되었습니다.\n성공: ${successCount}개\n실패: ${failCount}개`);
+      } else {
+        alert(`❌ 클립 업로드에 실패했습니다. (실패: ${failCount}개)`);
+      }
+
+      setShowUploadDialog(false);
+    } catch (error) {
+      console.error('라이브 클립 업로드 오류:', error);
+      alert('업로드 중 오류가 발생했습니다.');
+      setUploadProgress(null);
+    } finally {
+      setUploadLoading(false);
+    }
+  };
   const seekBackward1m = useCallback(() => seekToTime(-60), [seekToTime]);
 
   // 종료시간 3초 전으로 이동
@@ -2418,6 +2564,30 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
               )}
             </div>
           )}
+          
+          {/* 업로드 진행 상황 */}
+          {uploadProgress && (
+            <div className={`${isMobile ? 'px-2 py-2' : 'px-4 py-3'} bg-blue-50 dark:bg-blue-900/20 border-b border-gray-200 dark:border-gray-700`}>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-blue-700 dark:text-blue-300">
+                  {uploadProgress.message}
+                </span>
+                <span className="text-blue-600 dark:text-blue-400">
+                  {uploadProgress.current} / {uploadProgress.total}
+                </span>
+              </div>
+              {uploadProgress.total > 0 && (
+                <div className="mt-2 w-full bg-blue-200 dark:bg-blue-800 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
+                    style={{ 
+                      width: `${(uploadProgress.current / uploadProgress.total) * 100}%` 
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div 
           ref={(el) => {
@@ -2756,6 +2926,118 @@ export default function TimelineParsingView({ onStatsUpdate }: TimelineParsingVi
           }}
           onMatch={handleSongMatch}
         />
+      )}
+      
+      {/* 라이브 클립 업로드 다이얼로그 */}
+      {showUploadDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  라이브 클립 업로드
+                </h3>
+                <button
+                  onClick={() => setShowUploadDialog(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  disabled={uploadLoading}
+                >
+                  <XMarkIcon className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  업로드할 타임라인 항목을 선택하세요:
+                </div>
+                
+                {/* 매칭완료 옵션 */}
+                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={uploadSelection.matched}
+                        onChange={(e) => setUploadSelection(prev => ({ ...prev, matched: e.target.checked }))}
+                        disabled={uploadLoading}
+                        className="rounded"
+                      />
+                      <span className="font-medium text-gray-900 dark:text-white">매칭완료</span>
+                    </label>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {getMatchedTimelines().length}개
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-500">
+                    매칭은 완료했지만 아직 시간 검증이 되지 않은 항목들
+                  </div>
+                </div>
+                
+                {/* 검증완료 옵션 */}
+                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={uploadSelection.verified}
+                        onChange={(e) => setUploadSelection(prev => ({ ...prev, verified: e.target.checked }))}
+                        disabled={uploadLoading}
+                        className="rounded"
+                      />
+                      <span className="font-medium text-gray-900 dark:text-white">검증완료</span>
+                    </label>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {getVerifiedTimelines().length}개
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-500">
+                    매칭과 시간 검증이 모두 완료된 항목들
+                  </div>
+                </div>
+                
+                {/* 업로드 버튼들 */}
+                <div className="flex gap-2 pt-4">
+                  <button
+                    onClick={() => setShowUploadDialog(false)}
+                    disabled={uploadLoading}
+                    className="flex-1 px-4 py-2 bg-gray-300 hover:bg-gray-400 disabled:bg-gray-200 text-gray-700 rounded transition-colors"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const timelinesToUpload = [];
+                      if (uploadSelection.matched) {
+                        timelinesToUpload.push(...getMatchedTimelines());
+                      }
+                      if (uploadSelection.verified) {
+                        timelinesToUpload.push(...getVerifiedTimelines());
+                      }
+                      
+                      if (timelinesToUpload.length > 0) {
+                        await uploadToLiveClips(timelinesToUpload);
+                      }
+                    }}
+                    disabled={uploadLoading || (!uploadSelection.matched && !uploadSelection.verified)}
+                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded transition-colors flex items-center justify-center gap-2"
+                  >
+                    {uploadLoading ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        업로드 중...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowPathIcon className="w-4 h-4" />
+                        업로드 시작
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

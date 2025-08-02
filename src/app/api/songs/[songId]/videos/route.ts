@@ -86,6 +86,65 @@ export async function POST(
       );
     }
 
+    // 날짜 형식 검증 및 변환
+    let validSungDate: Date;
+    try {
+      let dateString = sungDate.toString().trim();
+      
+      // 다양한 날짜 형식 지원
+      if (dateString.includes('T') || dateString.includes('Z')) {
+        // ISO 8601 형식
+        validSungDate = new Date(dateString);
+      } else if (dateString.includes('.')) {
+        // YY.MM.DD 또는 YYYY.MM.DD 형식 처리
+        const parts = dateString.split('.');
+        if (parts.length === 3) {
+          let year = parseInt(parts[0]);
+          const month = parseInt(parts[1]) - 1; // 월은 0부터 시작
+          const day = parseInt(parts[2]);
+          
+          // 2자리 연도를 4자리로 변환 (25 → 2025, 99 → 1999)
+          if (year < 100) {
+            if (year <= 30) {
+              year += 2000; // 00-30은 2000-2030
+            } else {
+              year += 1900; // 31-99는 1931-1999
+            }
+          }
+          
+          validSungDate = new Date(year, month, day);
+        } else {
+          throw new Error('Invalid dot format');
+        }
+      } else if (dateString.includes('-')) {
+        // YYYY-MM-DD 형식
+        validSungDate = new Date(dateString + 'T00:00:00');
+      } else if (dateString.includes('/')) {
+        // MM/DD/YYYY 또는 DD/MM/YYYY 형식
+        validSungDate = new Date(dateString);
+      } else {
+        // 기타 형식 시도
+        validSungDate = new Date(dateString);
+      }
+      
+      // 유효한 날짜인지 확인
+      if (isNaN(validSungDate.getTime())) {
+        throw new Error('Invalid date format');
+      }
+      
+      // 미래 날짜는 오늘로 제한
+      const today = new Date();
+      if (validSungDate > today) {
+        validSungDate = today;
+      }
+    } catch (dateError) {
+      console.error('날짜 변환 오류:', dateError, 'Original sungDate:', sungDate);
+      return NextResponse.json(
+        { error: `올바른 날짜 형식을 입력해주세요. 받은 값: ${sungDate}` },
+        { status: 400 }
+      );
+    }
+
     // 유튜브 URL 검증
     if (!validateYouTubeUrl(videoUrl)) {
       return NextResponse.json(
@@ -112,7 +171,7 @@ export async function POST(
       artist: song.artist,
       videoUrl,
       videoId: videoData.videoId,
-      sungDate: new Date(sungDate),
+      sungDate: validSungDate, // 검증된 날짜 사용
       description,
       startTime: startTime || 0,
       endTime,
@@ -123,6 +182,28 @@ export async function POST(
     });
 
     await newVideo.save();
+
+    // 곡 통계 업데이트 (부른 회수 증가, 마지막 부른 날짜 업데이트)
+    try {
+      const sungDateString = validSungDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+      
+      // 현재 곡 정보를 가져와서 기존 마지막 부른 날짜와 비교
+      const currentSong = await SongDetail.findById(songId);
+      
+      const updateData: any = {
+        $inc: { sungCount: 1 } // 부른 회수는 항상 1 증가
+      };
+      
+      // 마지막 부른 날짜는 더 최근 날짜로만 업데이트
+      if (!currentSong?.lastSungDate || sungDateString > currentSong.lastSungDate) {
+        updateData.$set = { lastSungDate: sungDateString };
+      }
+      
+      await SongDetail.findByIdAndUpdate(songId, updateData);
+    } catch (statsError) {
+      console.error('곡 통계 업데이트 오류:', statsError);
+      // 통계 업데이트 실패해도 라이브 클립 생성은 성공으로 처리
+    }
 
     return NextResponse.json({
       success: true,

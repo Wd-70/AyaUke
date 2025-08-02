@@ -65,6 +65,7 @@ export default function DashboardTab() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [recalculatingStats, setRecalculatingStats] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -84,6 +85,35 @@ export default function DashboardTab() {
 
     fetchStats();
   }, []);
+
+  // 곡 통계 재계산 함수
+  const recalculateSongStats = async () => {
+    if (recalculatingStats) return;
+    
+    try {
+      setRecalculatingStats(true);
+      
+      const response = await fetch('/api/admin/recalculate-song-stats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`✅ 곡 통계 재계산 완료!\n처리된 곡: ${result.processedCount}개\n오류: ${result.errorCount}개`);
+        // 통계 새로고침
+        window.location.reload();
+      } else {
+        alert('❌ 통계 재계산 실패: ' + (result.error || '알 수 없는 오류'));
+      }
+    } catch (error) {
+      console.error('통계 재계산 오류:', error);
+      alert('❌ 통계 재계산 중 오류가 발생했습니다.');
+    } finally {
+      setRecalculatingStats(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -144,6 +174,41 @@ export default function DashboardTab() {
 
   return (
     <div className="space-y-8">
+      {/* Admin Tools */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20"
+      >
+        <h3 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4 flex items-center gap-2">
+          <ChartBarIcon className="w-5 h-5" />
+          관리 도구
+        </h3>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={recalculateSongStats}
+            disabled={recalculatingStats}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 transition-colors"
+          >
+            {recalculatingStats ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                처리 중...
+              </>
+            ) : (
+              <>
+                <ArrowTrendingUpIcon className="w-4 h-4" />
+                곡 통계 재계산
+              </>
+            )}
+          </button>
+        </div>
+        <p className="text-sm text-light-text/60 dark:text-dark-text/60 mt-2">
+          기존 라이브 클립 데이터를 기반으로 곡별 부른 회수와 마지막 부른 날짜를 다시 계산합니다.
+        </p>
+      </motion.div>
+
       {/* Quick Stats */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
