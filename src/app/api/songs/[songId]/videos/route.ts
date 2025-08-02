@@ -162,7 +162,28 @@ export async function POST(
       );
     }
 
-    // 중복 검사 제거 - 모든 클립 등록 허용, 클라이언트에서 시각적 표시만
+    // 중복 검사 (동일한 영상+시작시간±10초 중복 방지)
+    const currentStartTime = startTime || 0;
+    const existingVideo = await SongVideo.findOne({
+      songId,
+      videoId: videoData.videoId,
+      startTime: {
+        $gte: currentStartTime - 10,
+        $lte: currentStartTime + 10
+      }
+    });
+
+    if (existingVideo) {
+      return NextResponse.json({
+        success: false,
+        error: '동일한 영상의 같은 시간대 클립이 이미 존재합니다.',
+        existingVideo: {
+          _id: existingVideo._id.toString(),
+          description: existingVideo.description,
+          sungDate: existingVideo.sungDate
+        }
+      }, { status: 409 }); // Conflict
+    }
 
     // 새 영상 생성
     const newVideo = new SongVideo({
@@ -183,23 +204,42 @@ export async function POST(
 
     await newVideo.save();
 
-    // 곡 통계 업데이트 (부른 회수 증가, 마지막 부른 날짜 업데이트)
+    // 곡 통계 업데이트 (효율적인 하이브리드 방식)
     try {
       const sungDateString = validSungDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
       
-      // 현재 곡 정보를 가져와서 기존 마지막 부른 날짜와 비교
-      const currentSong = await SongDetail.findById(songId);
+      // 요청 헤더에서 배치 업로드 여부 확인
+      const isBatchUpload = request.headers.get('x-batch-upload') === 'true';
       
-      const updateData: any = {
-        $inc: { sungCount: 1 } // 부른 회수는 항상 1 증가
-      };
-      
-      // 마지막 부른 날짜는 더 최근 날짜로만 업데이트
-      if (!currentSong?.lastSungDate || sungDateString > currentSong.lastSungDate) {
-        updateData.$set = { lastSungDate: sungDateString };
+      if (isBatchUpload) {
+        // 배치 업로드 시: 증가만 하고 정확한 계산은 배치 완료 후 수행
+        const currentSong = await SongDetail.findById(songId);
+        const updateData: any = { $inc: { sungCount: 1 } };
+        
+        // 마지막 부른 날짜는 더 최근 날짜로만 업데이트
+        if (!currentSong?.lastSungDate || sungDateString > currentSong.lastSungDate) {
+          updateData.$set = { lastSungDate: sungDateString };
+        }
+        
+        await SongDetail.findByIdAndUpdate(songId, updateData);
+      } else {
+        // 일반 업로드 시: 정확한 개수로 계산 (단일 업로드는 성능 영향 미미)
+        const actualClipCount = await SongVideo.countDocuments({ songId });
+        
+        // 현재 곡 정보를 가져와서 기존 마지막 부른 날짜와 비교
+        const currentSong = await SongDetail.findById(songId);
+        
+        const updateData: any = {
+          $set: { sungCount: actualClipCount }
+        };
+        
+        // 마지막 부른 날짜는 더 최근 날짜로만 업데이트
+        if (!currentSong?.lastSungDate || sungDateString > currentSong.lastSungDate) {
+          updateData.$set.lastSungDate = sungDateString;
+        }
+        
+        await SongDetail.findByIdAndUpdate(songId, updateData);
       }
-      
-      await SongDetail.findByIdAndUpdate(songId, updateData);
     } catch (statsError) {
       console.error('곡 통계 업데이트 오류:', statsError);
       // 통계 업데이트 실패해도 라이브 클립 생성은 성공으로 처리

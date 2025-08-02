@@ -736,6 +736,10 @@ video {
   margin-left: -1rem;
   margin-right: -1rem;
 }
+.mx-2{
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+}
 .mx-4{
   margin-left: 1rem;
   margin-right: 1rem;
@@ -3907,6 +3911,10 @@ body {
   opacity: 0.75;
 }
 
+.hover\:opacity-80:hover{
+  opacity: 0.8;
+}
+
 .hover\:opacity-90:hover{
   opacity: 0.9;
 }
@@ -5386,6 +5394,11 @@ body {
 
 .dark\:hover\:bg-orange-900\/50:hover:is(.dark *){
   background-color: rgb(124 45 18 / 0.5);
+}
+
+.dark\:hover\:bg-purple-800:hover:is(.dark *){
+  --tw-bg-opacity: 1;
+  background-color: rgb(107 33 168 / var(--tw-bg-opacity, 1));
 }
 
 .dark\:hover\:bg-purple-900\/20:hover:is(.dark *){

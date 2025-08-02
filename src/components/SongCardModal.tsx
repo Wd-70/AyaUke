@@ -54,6 +54,7 @@ export default function SongCardModal({
   const [songVideos, setSongVideos] = useState<any[]>([]);
   const [videosLoading, setVideosLoading] = useState(false);
   const [videosLoaded, setVideosLoaded] = useState(false);
+  const [isEditingClip, setIsEditingClip] = useState(false);
 
   // 관리자 권한 체크
   const isAdmin = session?.user?.isAdmin || false;
@@ -156,6 +157,17 @@ export default function SongCardModal({
     window.open(youtubeSearchUrl, '_blank');
   };
 
+  // 모달 닫기 핸들러 (편집 중일 때 확인)
+  const handleClose = () => {
+    if (isEditingClip) {
+      if (confirm('클립을 편집하는 중입니다. 정말로 닫으시겠습니까? 편집 중인 내용은 저장되지 않습니다.')) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
   // 스크롤 핸들러
   const handleDialogScroll = (e: React.WheelEvent) => {
     e.stopPropagation();
@@ -189,7 +201,7 @@ export default function SongCardModal({
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
         className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
-        onClick={onClose}
+        onClick={handleClose}
       />
       
       {/* 확장된 모달 */}
@@ -260,7 +272,7 @@ export default function SongCardModal({
                   <PencilIcon className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={onClose}
+                  onClick={handleClose}
                   className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
                            transition-colors duration-200"
                   title="닫기"
@@ -403,6 +415,7 @@ export default function SongCardModal({
                       setSongVideos={setSongVideos}
                       videosLoading={videosLoading}
                       loadSongVideos={loadSongVideos}
+                      onEditingStateChange={setIsEditingClip}
                     />
                   </div>
                 </motion.div>
@@ -508,6 +521,7 @@ export default function SongCardModal({
                     setSongVideos={setSongVideos}
                     videosLoading={videosLoading}
                     loadSongVideos={loadSongVideos}
+                    onEditingStateChange={setIsEditingClip}
                   />
                 </div>
               </div>

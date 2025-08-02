@@ -17,9 +17,14 @@ export async function POST(request: NextRequest) {
     }
 
     await connectToDatabase();
+    
+    const body = await request.json().catch(() => ({}));
+    const { songId } = body;
 
-    // 모든 곡의 통계를 다시 계산
-    const songs = await SongDetail.find({ status: { $ne: 'deleted' } });
+    // 특정 곡만 재계산 또는 모든 곡 재계산
+    const songs = songId 
+      ? await SongDetail.find({ _id: songId, status: { $ne: 'deleted' } })
+      : await SongDetail.find({ status: { $ne: 'deleted' } });
     let processedCount = 0;
     let errorCount = 0;
 

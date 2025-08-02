@@ -103,10 +103,18 @@ export async function GET() {
         { $match: { status: 'active' } },
         { $group: { _id: '$language', count: { $sum: 1 } } }
       ]),
-      SongDetail.find({ status: 'active' })
-        .sort({ sungCount: -1 })
+      SongDetail.find({ 
+        $or: [
+          { status: 'active' },
+          { status: { $exists: false } }, // status 필드가 없는 경우
+          { status: null }, // status가 null인 경우
+          { status: undefined } // status가 undefined인 경우
+        ]
+      })
+        .sort({ sungCount: -1, _id: 1 })
         .limit(10)
-        .select('title artist sungCount'),
+        .select('title artist sungCount')
+        .lean(),
       SongDetail.countDocuments({ 
         status: 'active',
         mrLinks: { $exists: true, $ne: [] }
@@ -168,6 +176,14 @@ export async function GET() {
         { $sort: { '_id.year': 1, '_id.month': 1 } }
       ])
     ])
+
+    // 디버그: topSungSongs 데이터 확인 (status 수정 후)
+    console.log('=== TOP SUNG SONGS DEBUG (status 수정 후) ===');
+    console.log('Top 10 songs from sungCount query:');
+    topSungSongs.forEach((song, index) => {
+      console.log(`${index + 1}. ${song.title} - ${song.artist}: sungCount=${song.sungCount || 'null'}`);
+    });
+    console.log('=== END DEBUG ===\n');
 
     // 데이터 정리 및 반환
     const stats = {
@@ -232,7 +248,7 @@ export async function GET() {
         topSung: topSungSongs.map(s => ({
           title: s.title,
           artist: s.artist,
-          sungCount: s.sungCount
+          sungCount: s.sungCount || 0
         })),
         withMR: songsWithMR,
         byStatus: songsByStatus.reduce((acc, s) => {

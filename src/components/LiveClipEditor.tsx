@@ -1,6 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+
+// YouTube API 타입 정의
+declare global {
+  interface Window {
+    YT: any;
+    onYouTubeIframeAPIReady: () => void;
+  }
+}
 import { motion, AnimatePresence } from 'framer-motion';
 import { SongVideo } from '@/types';
 import { 
@@ -12,7 +20,12 @@ import {
   ClockIcon,
   CalendarIcon,
   PlayIcon,
-  ExclamationTriangleIcon
+  PauseIcon,
+  ForwardIcon,
+  BackwardIcon,
+  ExclamationTriangleIcon,
+  ArrowRightIcon,
+  ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { useSession } from 'next-auth/react';
 import { UserRole, roleToIsAdmin } from '@/lib/permissions';
@@ -58,6 +71,17 @@ export default function LiveClipEditor({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // YouTube 플레이어 관련 상태
+  const youtubePlayerRef = useRef<any>(null);
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+
+  // 재생시간 입력으로 종료시간 설정하기 위한 상태
+  const [durationInput, setDurationInput] = useState('');
+
   // 권한 확인
   const isAdmin = session?.user?.isAdmin && roleToIsAdmin(session.user.role as UserRole);
   const canEditAllClips = isAdmin;
@@ -97,6 +121,162 @@ export default function LiveClipEditor({
       return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
   };
+
+  // YouTube 플레이어 제어 함수들
+  const seekToTime = useCallback((seconds: number) => {
+    if (youtubePlayerRef.current && isPlayerReady) {
+      const newTime = Math.max(0, Math.min(duration, seconds));
+      youtubePlayerRef.current.seekTo(newTime, true);
+    }
+  }, [isPlayerReady, duration]);
+
+  const togglePlayPause = useCallback(() => {
+    if (!youtubePlayerRef.current || !isPlayerReady) return;
+    
+    if (isPlaying) {
+      youtubePlayerRef.current.pauseVideo();
+    } else {
+      youtubePlayerRef.current.playVideo();
+    }
+  }, [isPlaying, isPlayerReady]);
+
+  const seekRelative = useCallback((seconds: number) => {
+    seekToTime(currentTime + seconds);
+  }, [currentTime, seekToTime]);
+
+  // 시작시간으로 이동
+  const seekToStart = useCallback(() => {
+    seekToTime(formData.startTime || 0);
+  }, [formData.startTime, seekToTime]);
+
+  // 종료시간 3초 전으로 이동
+  const seekToEndMinus3 = useCallback(() => {
+    if (formData.endTime) {
+      seekToTime(Math.max(0, formData.endTime - 3));
+    }
+  }, [formData.endTime, seekToTime]);
+
+  // 현재 시간을 시작/종료시간으로 설정
+  const setCurrentAsStart = useCallback(() => {
+    setFormData(prev => ({ ...prev, startTime: Math.floor(currentTime) }));
+  }, [currentTime]);
+
+  const setCurrentAsEnd = useCallback(() => {
+    setFormData(prev => ({ ...prev, endTime: Math.floor(currentTime) }));
+  }, [currentTime]);
+
+  // 재생시간을 입력받아 종료시간 설정
+  const handleDurationInputChange = useCallback((value: string) => {
+    setDurationInput(value);
+    const durationSeconds = parseInt(value) || 0;
+    if (durationSeconds > 0) {
+      setFormData(prev => ({ 
+        ...prev, 
+        endTime: (prev.startTime || 0) + durationSeconds 
+      }));
+    }
+  }, []);
+
+  // YouTube 플레이어 이벤트 핸들러
+  const onPlayerReady = useCallback((event: any) => {
+    youtubePlayerRef.current = event.target;
+    setIsPlayerReady(true);
+    setDuration(event.target.getDuration() || 0);
+  }, []);
+
+  const onPlayerStateChange = useCallback((event: any) => {
+    const playerState = event.data;
+    setIsPlaying(playerState === 1); // 1 = playing
+    
+    if (playerState === 1) {
+      // 재생 시작 시 현재 시간 업데이트 시작
+      const updateTime = () => {
+        if (youtubePlayerRef.current && isPlayerReady) {
+          const currentTime = youtubePlayerRef.current.getCurrentTime();
+          setCurrentTime(currentTime);
+        }
+      };
+      updateTime();
+    }
+  }, [isPlayerReady]);
+
+  // 현재 시간 실시간 업데이트
+  useEffect(() => {
+    if (!isPlaying || !isPlayerReady) return;
+
+    const interval = setInterval(() => {
+      if (youtubePlayerRef.current) {
+        const time = youtubePlayerRef.current.getCurrentTime();
+        setCurrentTime(time);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, isPlayerReady]);
+
+  // YouTube API 로드 및 플레이어 초기화
+  useEffect(() => {
+    if (!formData.videoUrl || !extractVideoId(formData.videoUrl)) return;
+
+    // YouTube API 스크립트 로드
+    const loadYouTubeAPI = () => {
+      if (window.YT && window.YT.Player) {
+        initializePlayer();
+        return;
+      }
+
+      if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+        const script = document.createElement('script');
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.async = true;
+        document.head.appendChild(script);
+      }
+
+      window.onYouTubeIframeAPIReady = initializePlayer;
+    };
+
+    const initializePlayer = () => {
+      const videoId = extractVideoId(formData.videoUrl);
+      if (!videoId) return;
+
+      const playerId = `youtube-player-${songId}`;
+      const playerElement = document.getElementById(playerId);
+      
+      if (!playerElement) return;
+
+      // 기존 플레이어 정리
+      if (youtubePlayerRef.current && youtubePlayerRef.current.destroy) {
+        youtubePlayerRef.current.destroy();
+      }
+
+      // 새 플레이어 생성
+      youtubePlayerRef.current = new window.YT.Player(playerId, {
+        videoId: videoId,
+        height: '256',
+        width: '100%',
+        playerVars: {
+          autoplay: 0,
+          controls: 1,
+          modestbranding: 1,
+          rel: 0,
+          showinfo: 0,
+        },
+        events: {
+          onReady: onPlayerReady,
+          onStateChange: onPlayerStateChange,
+        },
+      });
+    };
+
+    loadYouTubeAPI();
+
+    // 컴포넌트 언마운트 시 플레이어 정리
+    return () => {
+      if (youtubePlayerRef.current && youtubePlayerRef.current.destroy) {
+        youtubePlayerRef.current.destroy();
+      }
+    };
+  }, [formData.videoUrl, songId, onPlayerReady, onPlayerStateChange]);
 
   // URL 변경 시 메타데이터 추출
   const handleUrlChange = (url: string) => {
@@ -153,6 +333,19 @@ export default function LiveClipEditor({
       extractedDate: ''
     });
     setError('');
+    setDurationInput('');
+    
+    // 플레이어 상태 초기화
+    setIsPlayerReady(false);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    
+    // 플레이어 인스턴스 정리
+    if (youtubePlayerRef.current && youtubePlayerRef.current.destroy) {
+      youtubePlayerRef.current.destroy();
+      youtubePlayerRef.current = null;
+    }
   };
 
   // 편집 시작
@@ -314,6 +507,132 @@ export default function LiveClipEditor({
               />
             </div>
 
+            {/* YouTube 플레이어 (편집 모드에서만 표시) */}
+            {formData.videoUrl && extractVideoId(formData.videoUrl) && (
+              <div className="space-y-4">
+                <div className="bg-black rounded-lg overflow-hidden">
+                  <div 
+                    id={`youtube-player-${songId}`}
+                    className="w-full h-64"
+                  ></div>
+                </div>
+
+                {/* 고급 플레이어 제어 패널 */}
+                <div className="bg-white dark:bg-gray-700 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                  <div className="space-y-4">
+                    {/* 현재 시간 표시 */}
+                    <div className="text-center">
+                      <div className="text-lg font-mono font-bold text-gray-900 dark:text-white">
+                        현재: {formatTime(currentTime)}
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        시작: {formatTime(formData.startTime)} {formData.endTime && `/ 종료: ${formatTime(formData.endTime)}`}
+                      </div>
+                    </div>
+
+                    {/* 재생 컨트롤 */}
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => seekRelative(-60)}
+                        className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+                        title="1분 뒤로"
+                      >
+                        <BackwardIcon className="w-5 h-5" />
+                        <span className="text-xs">1m</span>
+                      </button>
+                      <button
+                        onClick={() => seekRelative(-10)}
+                        className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+                        title="10초 뒤로"
+                      >
+                        <ArrowLeftIcon className="w-5 h-5" />
+                        <span className="text-xs">10s</span>
+                      </button>
+                      <button
+                        onClick={() => seekRelative(-1)}
+                        className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+                        title="1초 뒤로"
+                      >
+                        <ArrowLeftIcon className="w-4 h-4" />
+                        <span className="text-xs">1s</span>
+                      </button>
+
+                      <button
+                        onClick={togglePlayPause}
+                        className="p-3 bg-light-accent dark:bg-dark-accent text-white rounded-full hover:opacity-80 transition-opacity"
+                        title={isPlaying ? "일시정지" : "재생"}
+                      >
+                        {isPlaying ? (
+                          <PauseIcon className="w-6 h-6" />
+                        ) : (
+                          <PlayIcon className="w-6 h-6" />
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => seekRelative(1)}
+                        className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+                        title="1초 앞으로"
+                      >
+                        <ArrowRightIcon className="w-4 h-4" />
+                        <span className="text-xs">1s</span>
+                      </button>
+                      <button
+                        onClick={() => seekRelative(10)}
+                        className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+                        title="10초 앞으로"
+                      >
+                        <ArrowRightIcon className="w-5 h-5" />
+                        <span className="text-xs">10s</span>
+                      </button>
+                      <button
+                        onClick={() => seekRelative(60)}
+                        className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+                        title="1분 앞으로"
+                      >
+                        <ForwardIcon className="w-5 h-5" />
+                        <span className="text-xs">1m</span>
+                      </button>
+                    </div>
+
+                    {/* 시간 설정 버튼 */}
+                    <div className="flex items-center justify-center gap-4">
+                      <button
+                        onClick={seekToStart}
+                        className="px-3 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-sm"
+                        title="시작시간으로 이동"
+                      >
+                        시작점
+                      </button>
+                      <button
+                        onClick={setCurrentAsStart}
+                        className="px-3 py-2 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 transition-colors text-sm"
+                        title="현재 시간을 시작시간으로 설정"
+                      >
+                        IN
+                      </button>
+                      <button
+                        onClick={setCurrentAsEnd}
+                        className="px-3 py-2 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-800 transition-colors text-sm"
+                        title="현재 시간을 종료시간으로 설정"
+                      >
+                        OUT
+                      </button>
+                      {formData.endTime && (
+                        <button
+                          onClick={seekToEndMinus3}
+                          className="px-3 py-2 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors text-sm"
+                          title="종료시간 3초 전으로 이동"
+                        >
+                          끝-3초
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 시간 설정 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* 시작 시간 */}
@@ -351,6 +670,42 @@ export default function LiveClipEditor({
                   </p>
                 )}
               </div>
+            </div>
+
+            {/* 재생시간으로 종료시간 설정 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                재생시간 입력 (선택사항)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={durationInput}
+                  onChange={(e) => handleDurationInputChange(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="재생시간 (초)"
+                  min="1"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const duration = parseInt(durationInput) || 0;
+                    if (duration > 0) {
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        endTime: (prev.startTime || 0) + duration 
+                      }));
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  적용
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                시작시간 + 재생시간 = 종료시간
+                {durationInput && ` (${formatTime((formData.startTime || 0) + (parseInt(durationInput) || 0))})`}
+              </p>
             </div>
 
             {/* 부른 날짜 */}

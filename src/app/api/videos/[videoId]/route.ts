@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import { connectToDatabase } from '@/lib/mongodb';
 import SongVideo from '@/models/SongVideo';
+import SongDetail from '@/models/SongDetail';
 import { canManageSongs, UserRole } from '@/lib/permissions';
 import { updateVideoData, validateYouTubeUrl } from '@/lib/youtube';
 
@@ -187,7 +188,36 @@ export async function DELETE(
       );
     }
 
+    const songId = video.songId;
     await SongVideo.findByIdAndDelete(videoId);
+
+    // 곡 통계 업데이트 (삭제 후 실제 클립 개수 재계산)
+    try {
+      const actualClipCount = await SongVideo.countDocuments({ songId });
+      
+      if (actualClipCount > 0) {
+        // 남은 클립이 있으면 가장 최근 날짜 찾기
+        const latestVideo = await SongVideo.findOne({ songId }).sort({ sungDate: -1 });
+        const latestSungDate = latestVideo?.sungDate.toISOString().split('T')[0];
+        
+        await SongDetail.findByIdAndUpdate(songId, {
+          $set: {
+            sungCount: actualClipCount,
+            lastSungDate: latestSungDate
+          }
+        });
+      } else {
+        // 클립이 모두 삭제되면 0으로 설정
+        await SongDetail.findByIdAndUpdate(songId, {
+          $set: {
+            sungCount: 0,
+            lastSungDate: null
+          }
+        });
+      }
+    } catch (statsError) {
+      console.error('삭제 후 곡 통계 업데이트 오류:', statsError);
+    }
 
     return NextResponse.json({
       success: true,
