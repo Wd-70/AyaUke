@@ -74,17 +74,18 @@ export default function LiveClipManager({
     return 0;
   };
 
-  // 시간을 hh:mm:ss 형식으로 변환
+  // 시간을 hh:mm:ss 형식으로 변환 (소수점 아래 1자리)
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
+    const decimal = Math.floor((seconds % 1) * 10);
     
-    if (hours > 0) {
-      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    } else {
-      return `${mins}:${secs.toString().padStart(2, '0')}`;
-    }
+    const timeStr = hours > 0 
+      ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}` 
+      : `${mins}:${secs.toString().padStart(2, '0')}`;
+    
+    return `${timeStr}.${decimal}`;
   };
   
   // 라이브 클립 관련 상태 (videos 탭의 상태만 유지)
@@ -521,16 +522,52 @@ export default function LiveClipManager({
   };
 
 
-  // 재생시간을 입력받아 종료시간 설정
+  // 시간 형식을 초로 변환 (mm:ss.d 또는 h:mm:ss.d 형식 지원)
+  const parseTimeToSeconds = (timeStr: string): number => {
+    if (!timeStr) return 0;
+    
+    // 숫자만 있으면 초 단위로 처리
+    if (/^\d+$/.test(timeStr)) {
+      return parseInt(timeStr) || 0;
+    }
+    
+    // mm:ss.d 또는 h:mm:ss.d 형식 처리
+    const timePattern = /^(?:(\d+):)?(\d+):(\d+)(?:\.(\d))?$/;
+    const match = timeStr.match(timePattern);
+    
+    if (match) {
+      const hours = parseInt(match[1] || '0') || 0;
+      const minutes = parseInt(match[2] || '0') || 0;
+      const seconds = parseInt(match[3] || '0') || 0;
+      const decimal = parseInt(match[4] || '0') || 0;
+      
+      return hours * 3600 + minutes * 60 + seconds + decimal / 10;
+    }
+    
+    return 0;
+  };
+
+  // 재생시간을 입력받아 종료시간 설정 (시간 형식 지원)
   const handleDurationInputChange = (value: string) => {
     setDurationInput(value);
-    const durationSeconds = parseInt(value) || 0;
+    const durationSeconds = parseTimeToSeconds(value);
     if (durationSeconds > 0) {
       setEditingVideoData(prev => ({ 
         ...prev, 
         endTime: (prev.startTime || 0) + durationSeconds 
       }));
     }
+  };
+
+  // 클립 선택 핸들러 (수정 중일 때 확인)
+  const handleVideoSelect = (index: number) => {
+    // 편집 중일 때는 아예 이동을 차단
+    if (editingVideoId) {
+      return; // 아무것도 하지 않음
+    }
+    
+    // 편집 중이 아니면 바로 이동
+    setSelectedVideoIndex(index);
   };
 
   // 편집 중인 영상의 시간 중복 검사
@@ -926,8 +963,8 @@ export default function LiveClipManager({
                     onPause={() => setIsVideoPlaying(false)}
                     onEnd={() => {
                       setIsVideoPlaying(false);
-                      // 보이는 상태일 때만 다음 영상 전환
-                      if (isVisible && selectedVideoIndex < songVideos.length - 1) {
+                      // 보이는 상태일 때만 다음 영상 전환 (수정 중이 아닐 때만)
+                      if (isVisible && selectedVideoIndex < songVideos.length - 1 && !editingVideoId) {
                         setShouldAutoPlay(true);
                         setSelectedVideoIndex(selectedVideoIndex + 1);
                       }
@@ -967,14 +1004,30 @@ export default function LiveClipManager({
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     시작: {formatTime(editingVideoData.startTime)} {editingVideoData.endTime && `/ 종료: ${formatTime(editingVideoData.endTime)}`}
                   </div>
+                  {editingVideoData.endTime && editingVideoData.endTime > editingVideoData.startTime && (
+                    <div 
+                      className="text-xs text-blue-600 dark:text-blue-400 mt-1 cursor-pointer hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
+                      onClick={() => {
+                        const clipDuration = formatTime(editingVideoData.endTime - editingVideoData.startTime);
+                        navigator.clipboard.writeText(clipDuration).then(() => {
+                          console.log('클립 길이 복사됨:', clipDuration);
+                        }).catch(() => {
+                          console.log('복사 실패');
+                        });
+                      }}
+                      title="클립 길이를 복사하려면 클릭하세요 (재생시간 입력에 붙여넣기 가능)"
+                    >
+                      클립 길이: {formatTime(editingVideoData.endTime - editingVideoData.startTime)} 📋
+                    </div>
+                  )}
                 </div>
 
                 {/* 재생 컨트롤 */}
-                <div className="flex items-center justify-center gap-1">
+                <div className="flex items-center justify-center gap-4">
                   <button
                     type="button"
                     onClick={() => seekRelative(-60)}
-                    className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs"
+                    className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg min-w-[2.5rem] min-h-[2.5rem] flex flex-col items-center justify-center"
                     title="1분 뒤로"
                   >
                     <BackwardIcon className="w-4 h-4" />
@@ -983,7 +1036,7 @@ export default function LiveClipManager({
                   <button
                     type="button"
                     onClick={() => seekRelative(-10)}
-                    className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs"
+                    className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg min-w-[2.5rem] min-h-[2.5rem] flex flex-col items-center justify-center"
                     title="10초 뒤로"
                   >
                     <ArrowLeftIcon className="w-4 h-4" />
@@ -992,7 +1045,7 @@ export default function LiveClipManager({
                   <button
                     type="button"
                     onClick={() => seekRelative(-1)}
-                    className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs"
+                    className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg min-w-[2.5rem] min-h-[2.5rem] flex flex-col items-center justify-center"
                     title="1초 뒤로"
                   >
                     <ArrowLeftIcon className="w-3 h-3" />
@@ -1002,7 +1055,7 @@ export default function LiveClipManager({
                   <button
                     type="button"
                     onClick={togglePlayPause}
-                    className="p-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors mx-2"
+                    className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors min-w-[3rem] min-h-[3rem] flex items-center justify-center"
                     title={isVideoPlaying ? "일시정지" : "재생"}
                   >
                     {isVideoPlaying ? (
@@ -1015,7 +1068,7 @@ export default function LiveClipManager({
                   <button
                     type="button"
                     onClick={() => seekRelative(1)}
-                    className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs"
+                    className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg min-w-[2.5rem] min-h-[2.5rem] flex flex-col items-center justify-center"
                     title="1초 앞으로"
                   >
                     <ArrowRightIcon className="w-3 h-3" />
@@ -1024,7 +1077,7 @@ export default function LiveClipManager({
                   <button
                     type="button"
                     onClick={() => seekRelative(10)}
-                    className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs"
+                    className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg min-w-[2.5rem] min-h-[2.5rem] flex flex-col items-center justify-center"
                     title="10초 앞으로"
                   >
                     <ArrowRightIcon className="w-4 h-4" />
@@ -1033,7 +1086,7 @@ export default function LiveClipManager({
                   <button
                     type="button"
                     onClick={() => seekRelative(60)}
-                    className="p-1 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs"
+                    className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg min-w-[2.5rem] min-h-[2.5rem] flex flex-col items-center justify-center"
                     title="1분 앞으로"
                   >
                     <ForwardIcon className="w-4 h-4" />
@@ -1042,11 +1095,11 @@ export default function LiveClipManager({
                 </div>
 
                 {/* 시간 설정 버튼 */}
-                <div className="flex items-center justify-center gap-2">
+                <div className="flex items-center justify-center gap-3">
                   <button
                     type="button"
                     onClick={() => seekToTime(editingVideoData.startTime)}
-                    className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-xs"
+                    className="px-3 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors text-sm font-medium min-w-[4rem] min-h-[2.5rem] flex items-center justify-center"
                     title="시작시간으로 이동"
                   >
                     시작점
@@ -1054,7 +1107,7 @@ export default function LiveClipManager({
                   <button
                     type="button"
                     onClick={setCurrentTimeAsStart}
-                    className="px-2 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
+                    className="px-3 py-2 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded-lg hover:bg-green-200 dark:hover:bg-green-800 transition-colors text-sm font-medium min-w-[4rem] min-h-[2.5rem] flex items-center justify-center"
                     title="현재 시간을 시작시간으로 설정"
                   >
                     IN
@@ -1062,7 +1115,7 @@ export default function LiveClipManager({
                   <button
                     type="button"
                     onClick={setCurrentTimeAsEnd}
-                    className="px-2 py-1 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800 transition-colors"
+                    className="px-3 py-2 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg hover:bg-red-200 dark:hover:bg-red-800 transition-colors text-sm font-medium min-w-[4rem] min-h-[2.5rem] flex items-center justify-center"
                     title="현재 시간을 종료시간으로 설정"
                   >
                     OUT
@@ -1071,7 +1124,7 @@ export default function LiveClipManager({
                     <button
                       type="button"
                       onClick={() => seekToTime(Math.max(0, editingVideoData.endTime - 3))}
-                      className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors"
+                      className="px-3 py-2 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors text-sm font-medium min-w-[4rem] min-h-[2.5rem] flex items-center justify-center"
                       title="종료시간 3초 전으로 이동"
                     >
                       끝-3초
@@ -1258,17 +1311,16 @@ export default function LiveClipManager({
                           </label>
                           <div className="flex gap-2">
                             <input
-                              type="number"
+                              type="text"
                               value={durationInput}
                               onChange={(e) => handleDurationInputChange(e.target.value)}
                               className="flex-1 px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
-                              placeholder="재생시간 (초)"
-                              min="1"
+                              placeholder="예: 180 또는 3:05.0"
                             />
                             <button
                               type="button"
                               onClick={() => {
-                                const duration = parseInt(durationInput) || 0;
+                                const duration = parseTimeToSeconds(durationInput);
                                 if (duration > 0) {
                                   setEditingVideoData(prev => ({ 
                                     ...prev, 
@@ -1282,8 +1334,8 @@ export default function LiveClipManager({
                             </button>
                           </div>
                           <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                            시작시간 + 재생시간 = 종료시간
-                            {durationInput && ` (${formatTime((editingVideoData.startTime || 0) + (parseInt(durationInput) || 0))})`}
+                            시간 형식: 180(초) 또는 3:05.0(mm:ss.d)
+                            {durationInput && ` → 종료: ${formatTime((editingVideoData.startTime || 0) + parseTimeToSeconds(durationInput))}`}
                           </p>
                         </div>
                         
@@ -1352,15 +1404,23 @@ export default function LiveClipManager({
                     // 일반 모드
                     <div
                       key={video._id}
-                      onClick={() => setSelectedVideoIndex(index)}
-                      className={`p-3 rounded-lg border cursor-pointer transition-all duration-200 relative group ${
+                      onClick={() => handleVideoSelect(index)}
+                      className={`p-3 rounded-lg border transition-all duration-200 relative group ${
+                        editingVideoId && selectedVideoIndex !== index
+                          ? 'cursor-not-allowed opacity-60'
+                          : 'cursor-pointer'
+                      } ${
                         overlapInfo.hasOverlap
                           ? selectedVideoIndex === index
                             ? 'border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-900/20 shadow-amber-100 dark:shadow-amber-900/20 shadow-md'
-                            : 'border-amber-300 dark:border-amber-600 bg-amber-50/70 dark:bg-amber-900/10 hover:border-amber-400 dark:hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            : editingVideoId && selectedVideoIndex !== index
+                              ? 'border-amber-300 dark:border-amber-600 bg-amber-50/70 dark:bg-amber-900/10'
+                              : 'border-amber-300 dark:border-amber-600 bg-amber-50/70 dark:bg-amber-900/10 hover:border-amber-400 dark:hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
                           : selectedVideoIndex === index
                             ? 'border-light-accent/50 dark:border-dark-accent/50 bg-light-accent/10 dark:bg-dark-accent/10'
-                            : 'border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent/30 dark:hover:border-dark-accent/30 hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
+                            : editingVideoId && selectedVideoIndex !== index
+                              ? 'border-light-primary/20 dark:border-dark-primary/20'
+                              : 'border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent/30 dark:hover:border-dark-accent/30 hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -1402,8 +1462,8 @@ export default function LiveClipManager({
                         </div>
                         
                         <div className="flex items-center gap-2">
-                          {/* 편집/삭제 버튼 (권한 있는 사용자만) */}
-                          {canEditVideo(video) && (
+                          {/* 편집/삭제 버튼 (권한 있는 사용자만, 편집 중이 아닐 때만, 선택된 클립만) */}
+                          {canEditVideo(video) && !editingVideoId && selectedVideoIndex === index && (
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1">
                               <button
                                 onClick={(e) => {
