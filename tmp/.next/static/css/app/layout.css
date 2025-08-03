@@ -836,6 +836,12 @@ video {
 .mt-auto{
   margin-top: auto;
 }
+.mr-16{
+  margin-right: 4rem;
+}
+.mr-20{
+  margin-right: 5rem;
+}
 .line-clamp-1{
   overflow: hidden;
   display: -webkit-box;
@@ -1164,6 +1170,9 @@ video {
   flex: 1 1 0%;
 }
 .flex-shrink-0{
+  flex-shrink: 0;
+}
+.shrink-0{
   flex-shrink: 0;
 }
 .-translate-x-1\/2{
@@ -2657,6 +2666,12 @@ video {
 }
 .pr-20{
   padding-right: 5rem;
+}
+.pr-16{
+  padding-right: 4rem;
+}
+.pr-12{
+  padding-right: 3rem;
 }
 .text-left{
   text-align: left;
@@ -5647,6 +5662,10 @@ body {
     margin-top: 1rem;
   }
 
+  .sm\:mr-20{
+    margin-right: 5rem;
+  }
+
   .sm\:inline{
     display: inline;
   }
@@ -5836,6 +5855,14 @@ body {
 
   .sm\:pt-24{
     padding-top: 6rem;
+  }
+
+  .sm\:pr-20{
+    padding-right: 5rem;
+  }
+
+  .sm\:pr-16{
+    padding-right: 4rem;
   }
 
   .sm\:text-2xl{
@@ -6048,6 +6075,14 @@ body {
 
   .xl\:mb-6{
     margin-bottom: 1.5rem;
+  }
+
+  .xl\:mr-12{
+    margin-right: 3rem;
+  }
+
+  .xl\:mr-10{
+    margin-right: 2.5rem;
   }
 
   .xl\:block{

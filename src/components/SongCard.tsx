@@ -1169,15 +1169,15 @@ export default function SongCard({ song, showNumber = false, number, onDialogSta
     <div className="relative">
       {/* 콘텐츠 영역: 제목, 아티스트, 태그들 */}
       <div className="min-w-0 pr-16 sm:pr-20">
-        <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+        <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2 mr-20 sm:mr-20 xl:mr-10">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold text-light-text dark:text-dark-text 
-                         text-light-accent dark:text-dark-accent">
+                         text-light-accent dark:text-dark-accent flex-1 min-w-0">
             {displayTitle}
           </h3>
           {formatKeyAdjustment(song.keyAdjustment) && (
             <span className="px-2 py-1 text-sm font-medium rounded-md 
                            bg-yellow-100 dark:bg-yellow-900 
-                           text-yellow-800 dark:text-yellow-200">
+                           text-yellow-800 dark:text-yellow-200 shrink-0">
               {formatKeyAdjustment(song.keyAdjustment)}
             </span>
           )}

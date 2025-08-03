@@ -1,9 +1,9 @@
 {
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/likes-bulk/route": "app/api/likes-bulk/route.js",
-  "/api/user/playlists/route": "app/api/user/playlists/route.js",
-  "/songbook/page": "app/songbook/page.js",
-  "/admin/songs/page": "app/admin/songs/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/user/[userId]/route": "app/api/user/[userId]/route.js",
+  "/api/songs/[songId]/videos/route": "app/api/songs/[songId]/videos/route.js",
   "/page": "app/page.js",
-  "/admin/page": "app/admin/page.js"
+  "/admin/page": "app/admin/page.js",
+  "/songbook/page": "app/songbook/page.js",
+  "/admin/songs/page": "app/admin/songs/page.js"
 }
