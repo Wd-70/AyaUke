@@ -257,45 +257,23 @@ export default function SongCardModal({
 
           {/* 오른쪽: 모든 다른 요소들 */}
           <div className="flex-1 xl:w-1/2 flex flex-col min-h-0 relative">
-            {/* 편집 액션 버튼들 - 맨 위에 배치 */}
-            {isAdmin && (
-              <div className="flex justify-end gap-2 mb-4">
-                <button
-                  onClick={toggleEditMode}
-                  className={`p-2 rounded-full transition-colors duration-200 ${
-                    isEditMode 
-                      ? 'bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent' 
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
-                  title={isEditMode ? "편집 중" : "편집"}
-                >
-                  <PencilIcon className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={handleClose}
-                  className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
-                           transition-colors duration-200"
-                  title="닫기"
-                >
-                  <XMarkIcon className="w-5 h-5 text-red-500" />
-                </button>
-              </div>
-            )}
-
-            {/* 메타데이터 섹션 */}
-            <div className="mb-4 sm:mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
-                {/* 제목과 아티스트 */}
-                <div className="flex-1">
-                  <h3 className="text-xl sm:text-2xl xl:text-3xl font-bold text-light-text dark:text-dark-text mb-2">
-                    {displayTitle}
-                  </h3>
-                  <p className="text-base sm:text-lg xl:text-xl text-light-text/70 dark:text-dark-text/70 mb-3">
-                    {displayArtist}
-                  </p>
+            {/* 메타데이터 섹션 - Grid 레이아웃으로 공간 활용 최적화 */}
+            <div className="mb-3 sm:mb-4 xl:mb-6 relative">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 md:gap-4">
+                {/* 왼쪽 영역: 제목, 아티스트, 태그들 */}
+                <div className="min-w-0">
+                  {/* 제목과 아티스트 */}
+                  <div className="mb-2">
+                    <h3 className="text-lg sm:text-xl xl:text-2xl font-bold text-light-text dark:text-dark-text mb-1 leading-tight">
+                      {displayTitle}
+                    </h3>
+                    <p className="text-base sm:text-lg xl:text-xl text-light-text/70 dark:text-dark-text/70">
+                      {displayArtist}
+                    </p>
+                  </div>
                   
-                  {/* 메타데이터 섹션 - 키 조절, 언어, 기타 정보 */}
-                  <div className="flex flex-wrap gap-2 mb-3">
+                  {/* 메타데이터와 태그들 */}
+                  <div className="flex flex-wrap gap-2">
                     {/* 키 조절 표시 */}
                     {song.keyAdjustment !== null && song.keyAdjustment !== undefined && (
                       <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full">
@@ -318,24 +296,79 @@ export default function SongCardModal({
                         ★ 즐겨찾기
                       </span>
                     )}
+                    
+                    {/* 검색 태그들 */}
+                    {song.searchTags && song.searchTags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 text-xs bg-light-secondary/20 dark:bg-dark-secondary/20 
+                                 text-light-text/70 dark:text-dark-text/70 rounded-full"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
                   </div>
+                </div>
+                
+                {/* 오른쪽 영역: 버튼들 - 데스크톱에서만 별도 영역 */}
+                <div className="hidden md:flex flex-col gap-2 items-end justify-start">
+                  <div className="flex gap-2">
+                    {/* 관리자 전용 편집 버튼 */}
+                    {isAdmin && (
+                      <button
+                        onClick={toggleEditMode}
+                        className={`p-2 rounded-full transition-colors duration-200 ${
+                          isEditMode 
+                            ? 'bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent' 
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                        title={isEditMode ? "편집 중" : "편집"}
+                      >
+                        <PencilIcon className="w-5 h-5" />
+                      </button>
+                    )}
+                    
+                    {/* 닫기 버튼 - 모든 사용자 */}
+                    <button
+                      onClick={handleClose}
+                      className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
+                               transition-colors duration-200"
+                      title="닫기"
+                    >
+                      <XMarkIcon className="w-5 h-5 text-red-500" />
+                    </button>
+                  </div>
+                </div>
+                
+                {/* 모바일에서 버튼들 - 제목 오른쪽에 배치 */}
+                <div className="md:hidden absolute top-0 right-0 flex gap-2">
+                  {/* 관리자 전용 편집 버튼 */}
+                  {isAdmin && (
+                    <button
+                      onClick={toggleEditMode}
+                      className={`p-2 rounded-full transition-colors duration-200 ${
+                        isEditMode 
+                          ? 'bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent' 
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                      title={isEditMode ? "편집 중" : "편집"}
+                    >
+                      <PencilIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                  
+                  {/* 닫기 버튼 - 모든 사용자 */}
+                  <button
+                    onClick={handleClose}
+                    className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
+                             transition-colors duration-200"
+                    title="닫기"
+                  >
+                    <XMarkIcon className="w-4 h-4 text-red-500" />
+                  </button>
                 </div>
               </div>
 
-              {/* 태그들 */}
-              {song.searchTags && song.searchTags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {song.searchTags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 text-xs bg-light-secondary/20 dark:bg-dark-secondary/20 
-                               text-light-text/70 dark:text-dark-text/70 rounded-full"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* 큰 화면에서의 영상 섹션 - 플레이어 대상 영역 */}

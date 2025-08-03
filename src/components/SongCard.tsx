@@ -1166,8 +1166,9 @@ export default function SongCard({ song, showNumber = false, number, onDialogSta
 
   // 일반 모드 헤더 렌더링
   const renderNormalModeHeader = () => (
-    <div className="flex items-start justify-between">
-      <div className="flex-1 min-w-0">
+    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 md:gap-4 relative">
+      {/* 왼쪽 영역: 제목, 아티스트, 태그들 */}
+      <div className="min-w-0">
         <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
           <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold text-light-text dark:text-dark-text 
                          text-light-accent dark:text-dark-accent">
@@ -1198,45 +1199,47 @@ export default function SongCard({ song, showNumber = false, number, onDialogSta
           />
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      
+      {/* 오른쪽 영역: 버튼들 - 데스크톱에서만 별도 영역 */}
+      <div className="hidden md:flex items-center gap-2 justify-end">
         {/* OBS 토글 버튼 - XL 화면에서는 숨김 */}
-          <>
-            {obsActive && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.2 }}
-                onClick={copyOBSLink}
-                className="xl:hidden w-10 h-10 flex items-center justify-center rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                           transition-colors duration-200 text-blue-600 dark:text-blue-400"
-                title="OBS 링크 복사"
-              >
-                <DocumentDuplicateIcon className="w-5 h-5" />
-              </motion.button>
-            )}
-            <button
-              onClick={toggleOBS}
-              disabled={obsLoading}
-              className={`xl:hidden w-10 h-10 flex items-center justify-center rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                         transition-all duration-200 disabled:opacity-50 ${
-                           obsActive 
-                             ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
-                             : 'text-light-accent dark:text-dark-accent'
-                         }`}
-              title={obsActive ? 'OBS 표시 끄기' : 'OBS 표시 켜기'}
+        <>
+          {obsActive && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+              onClick={copyOBSLink}
+              className="xl:hidden w-10 h-10 flex items-center justify-center rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                         transition-colors duration-200 text-blue-600 dark:text-blue-400"
+              title="OBS 링크 복사"
             >
-              {obsLoading ? (
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-5 h-5 border-2 border-light-accent/30 border-t-light-accent rounded-full dark:border-dark-accent/30 dark:border-t-dark-accent"
-                />
-              ) : (
-                <ComputerDesktopIcon className="w-5 h-5" />
-              )}
-            </button>
-          </>
+              <DocumentDuplicateIcon className="w-5 h-5" />
+            </motion.button>
+          )}
+          <button
+            onClick={toggleOBS}
+            disabled={obsLoading}
+            className={`xl:hidden w-10 h-10 flex items-center justify-center rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                       transition-all duration-200 disabled:opacity-50 ${
+                         obsActive 
+                           ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
+                           : 'text-light-accent dark:text-dark-accent'
+                       }`}
+            title={obsActive ? 'OBS 표시 끄기' : 'OBS 표시 켜기'}
+          >
+            {obsLoading ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-5 h-5 border-2 border-light-accent/30 border-t-light-accent rounded-full dark:border-dark-accent/30 dark:border-t-dark-accent"
+              />
+            ) : (
+              <ComputerDesktopIcon className="w-5 h-5" />
+            )}
+          </button>
+        </>
         {isAdmin && (
           <button
             onClick={toggleEditMode}
@@ -1270,6 +1273,82 @@ export default function SongCard({ song, showNumber = false, number, onDialogSta
           title="닫기"
         >
           <XMarkIcon className="w-5 h-5 text-red-500" />
+        </button>
+      </div>
+      
+      {/* 모바일에서 버튼들 - 절대 위치로 제목 오른쪽에 배치 */}
+      <div className="md:hidden absolute top-0 right-0 flex gap-2 z-10">
+        {/* OBS 토글 버튼 - XL 화면에서는 숨김 */}
+        <>
+          {obsActive && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.2 }}
+              onClick={copyOBSLink}
+              className="xl:hidden w-8 h-8 flex items-center justify-center rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                         transition-colors duration-200 text-blue-600 dark:text-blue-400"
+              title="OBS 링크 복사"
+            >
+              <DocumentDuplicateIcon className="w-4 h-4" />
+            </motion.button>
+          )}
+          <button
+            onClick={toggleOBS}
+            disabled={obsLoading}
+            className={`xl:hidden w-8 h-8 flex items-center justify-center rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                       transition-all duration-200 disabled:opacity-50 ${
+                         obsActive 
+                           ? 'bg-green-500/20 text-green-600 dark:text-green-400' 
+                           : 'text-light-accent dark:text-dark-accent'
+                       }`}
+            title={obsActive ? 'OBS 표시 끄기' : 'OBS 표시 켜기'}
+          >
+            {obsLoading ? (
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-4 h-4 border-2 border-light-accent/30 border-t-light-accent rounded-full dark:border-dark-accent/30 dark:border-t-dark-accent"
+              />
+            ) : (
+              <ComputerDesktopIcon className="w-4 h-4" />
+            )}
+          </button>
+        </>
+        {isAdmin && (
+          <button
+            onClick={toggleEditMode}
+            className="p-1.5 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                       transition-colors duration-200"
+            title="편집"
+          >
+            <PencilIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+          </button>
+        )}
+        <button
+          onClick={handleLike}
+          disabled={likeLoading}
+          className="p-1.5 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                     transition-colors duration-200 disabled:opacity-50"
+          title={liked ? '좋아요 취소' : '좋아요'}
+        >
+          <HeartIcon 
+            className={`w-4 h-4 transition-all duration-200 
+                       ${likeLoading 
+                         ? 'text-red-400 fill-current opacity-60 animate-pulse scale-110' 
+                         : liked 
+                           ? 'text-red-500 fill-current' 
+                           : 'text-light-text/40 dark:text-dark-text/40 hover:text-red-400'}`}
+          />
+        </button>
+        <button
+          onClick={handleCardClick}
+          className="p-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 
+                     transition-colors duration-200"
+          title="닫기"
+        >
+          <XMarkIcon className="w-4 h-4 text-red-500" />
         </button>
       </div>
     </div>
