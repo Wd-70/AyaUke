@@ -980,13 +980,13 @@ export default function SongCard({ song, showNumber = false, number, onDialogSta
           </div>
         </div>
       
-      <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
+      <div className="flex-1 p-3 sm:p-4 lg:p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
         {isEditMode ? (
           <textarea
             value={lyricsText}
             onChange={(e) => handleLyricsChange(e.target.value)}
             className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg 
-                       bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
+                       bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-3 sm:p-4 
                        outline-none resize-none flex-1 min-h-0"
             placeholder="가사를 입력하세요..."
             style={{

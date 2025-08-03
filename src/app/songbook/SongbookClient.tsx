@@ -173,7 +173,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
                         rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
       </div>
 
-      <main className="relative z-10 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <main className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 px-3 sm:px-4 lg:px-6 xl:px-8 max-w-7xl mx-auto">
         <SongbookHeader 
           totalSongs={initialSongs?.length || 0}
           filteredSongs={filteredSongs.length || 0}
@@ -211,7 +211,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
           </motion.div>
         ) : songs && songs.length > 0 ? (
           filteredSongs.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             {visibleSongs.map((song, index) => (
               <motion.div
                 key={song.id}

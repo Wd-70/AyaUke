@@ -226,14 +226,14 @@ export default function SongCardModal({
         <div className="absolute inset-0 bg-gradient-to-br from-light-accent/5 to-light-purple/5 
                         dark:from-dark-accent/5 dark:to-dark-purple/5 rounded-xl"></div>
 
-        <div className="relative p-4 sm:p-6 xl:p-8 flex flex-col xl:flex-row h-full gap-4 sm:gap-6 xl:gap-8">
+        <div className="relative p-3 sm:p-4 xl:p-8 flex flex-col xl:flex-row h-full gap-3 sm:gap-4 xl:gap-8">
           {/* 왼쪽: 가사 전용 영역 (XL 이상에서만) */}
           <div className="hidden xl:flex xl:w-1/2 flex-col min-h-0">
-            <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
               <MusicalNoteIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
               <h4 className="text-xl font-semibold text-light-text dark:text-dark-text">가사</h4>
             </div>
-            <div className="flex-1 p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
+            <div className="flex-1 p-3 sm:p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col min-h-0">
               {song.lyrics ? (
                 <div 
                   className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
@@ -284,7 +284,7 @@ export default function SongCardModal({
 
             {/* 메타데이터 섹션 */}
             <div className="mb-4 sm:mb-6">
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                 {/* 제목과 아티스트 */}
                 <div className="flex-1">
                   <h3 className="text-xl sm:text-2xl xl:text-3xl font-bold text-light-text dark:text-dark-text mb-2">
@@ -339,7 +339,7 @@ export default function SongCardModal({
             </div>
 
             {/* 큰 화면에서의 영상 섹션 - 플레이어 대상 영역 */}
-            <div className="hidden xl:flex flex-col flex-1 gap-6 min-h-0">
+            <div className="hidden xl:flex flex-col flex-1 gap-4 xl:gap-6 min-h-0">
               {isEditMode ? (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -359,13 +359,13 @@ export default function SongCardModal({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   transition={{ duration: 0.3, delay: 0.1 }}
-                  className="p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
+                  className="p-3 sm:p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
                 >
                   {/* XL 화면 탭 네비게이션 */}
                   <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20 mb-4">
                     <button
                       onClick={() => switchTab('mr')}
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 text-sm font-medium transition-colors duration-200 ${
                         currentTab === 'mr'
                           ? 'text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10'
                           : 'text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
@@ -376,7 +376,7 @@ export default function SongCardModal({
                     </button>
                     <button
                       onClick={() => switchTab('videos')}
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 text-sm font-medium transition-colors duration-200 ${
                         currentTab === 'videos'
                           ? 'text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10'
                           : 'text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
@@ -468,7 +468,7 @@ export default function SongCardModal({
               </div>
 
               {/* 탭 콘텐츠 */}
-              <div className="flex-1 min-h-0 p-4 sm:p-6">
+              <div className="flex-1 min-h-0 p-3 sm:p-4 xl:p-6">
                 {/* MR 영상/편집 영역 */}
                 <div className={`${currentTab === 'mr' ? 'flex' : 'hidden'} flex-col h-full min-h-0`}>
                   {/* 기존 YouTube 플레이어 */}
@@ -529,7 +529,7 @@ export default function SongCardModal({
 
             {/* Action buttons - 편집 모드가 아닐 때만 표시 */}
             {!isEditMode && (
-              <div className="flex items-center gap-2 sm:gap-3 flex-wrap mt-3 sm:mt-4">
+              <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-3 flex-wrap mt-2 sm:mt-3">
                 {youtubeMR ? (
                   // MR 링크가 있을 때 - 3개 버튼으로 분리
                   <>
