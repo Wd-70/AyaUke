@@ -26,12 +26,12 @@ interface YouTubePlayer {
   pauseVideo(): void;
   getCurrentTime(): number;
   seekTo(seconds: number): void;
+  getPlayerState(): number;
 }
 
 interface LiveClipManagerProps {
   songId: string;
   songTitle: string;
-  isVisible: boolean;
   songVideos: SongVideo[];
   setSongVideos: (videos: SongVideo[]) => void;
   videosLoading: boolean;
@@ -42,7 +42,6 @@ interface LiveClipManagerProps {
 export default function LiveClipManager({ 
   songId, 
   songTitle, 
-  isVisible, 
   songVideos, 
   setSongVideos, 
   videosLoading, 
@@ -340,7 +339,7 @@ export default function LiveClipManager({
 
   // 닉네임 동기화는 props로 받은 데이터에 대해서만 수행
   useEffect(() => {
-    if (!isVisible || songVideos.length === 0) return;
+    if (songVideos.length === 0) return;
     
     // 백그라운드에서 닉네임 동기화 처리
     setTimeout(async () => {
@@ -477,7 +476,7 @@ export default function LiveClipManager({
       await Promise.all(updatePromises);
       console.log('🎯 모든 업로더 동기화 완료');
     }, 0); // 다음 이벤트 루프에서 실행
-  }, [isVisible, songVideos]); // songVideos가 변경될 때만 동기화 수행
+  }, [songVideos]); // songVideos가 변경될 때만 동기화 수행
 
   // 관리자 여부 확인
   const isAdmin = (): boolean => {
@@ -621,20 +620,27 @@ export default function LiveClipManager({
   }, [videoPlayer]);
 
   const seekRelative = useCallback((seconds: number) => {
-    if (videoPlayer && typeof videoPlayer.getCurrentTime === 'function') {
-      try {
-        const currentTime = videoPlayer.getCurrentTime();
-        seekToTime(currentTime + seconds);
-      } catch (e) {
-        console.error('상대 시간 이동 실패:', e);
+    try {
+      if (!videoPlayer || typeof videoPlayer.getCurrentTime !== 'function') {
+        console.warn('YouTube 플레이어가 준비되지 않았거나 getCurrentTime 메서드가 없습니다.');
+        return;
       }
+      
+      const currentTime = videoPlayer.getCurrentTime();
+      seekToTime(currentTime + seconds);
+    } catch (e) {
+      console.error('상대 시간 이동 실패:', e);
+      setVideoPlayer(null); // 오류 시 플레이어 참조 초기화
     }
   }, [videoPlayer, seekToTime]);
 
   const togglePlayPause = useCallback(() => {
-    if (!videoPlayer) return;
-    
     try {
+      if (!videoPlayer || !videoPlayer.playVideo || !videoPlayer.pauseVideo) {
+        console.warn('YouTube 플레이어가 준비되지 않았거나 메서드가 없습니다.');
+        return;
+      }
+      
       if (isVideoPlaying) {
         if (typeof videoPlayer.pauseVideo === 'function') {
           videoPlayer.pauseVideo();
@@ -645,37 +651,48 @@ export default function LiveClipManager({
         }
       }
     } catch (e) {
-      console.error('재생/일시정지 실패:', e);
+      console.warn('⚠️ 재생/일시정지 실패 (영상에 문제가 있을 수 있음):', e.message);
+      // 오류 발생 시 플레이어 참조 초기화
+      setVideoPlayer(null);
+      setIsVideoPlaying(false);
     }
   }, [videoPlayer, isVideoPlaying]);
 
   // 현재 재생 시간을 시작 시간으로 설정
   const setCurrentTimeAsStart = useCallback(() => {
-    if (videoPlayer && typeof videoPlayer.getCurrentTime === 'function') {
-      try {
-        const currentTime = Math.floor(videoPlayer.getCurrentTime());
-        setEditingVideoData(prev => ({
-          ...prev,
-          startTime: currentTime
-        }));
-      } catch (e) {
-        console.error('시작 시간 설정 실패:', e);
+    try {
+      if (!videoPlayer || typeof videoPlayer.getCurrentTime !== 'function') {
+        console.warn('YouTube 플레이어가 준비되지 않았거나 getCurrentTime 메서드가 없습니다.');
+        return;
       }
+      
+      const currentTime = Math.floor(videoPlayer.getCurrentTime());
+      setEditingVideoData(prev => ({
+        ...prev,
+        startTime: currentTime
+      }));
+    } catch (e) {
+      console.error('시작 시간 설정 실패:', e);
+      setVideoPlayer(null); // 오류 시 플레이어 참조 초기화
     }
   }, [videoPlayer]);
 
   // 현재 재생 시간을 종료 시간으로 설정
   const setCurrentTimeAsEnd = useCallback(() => {
-    if (videoPlayer && typeof videoPlayer.getCurrentTime === 'function') {
-      try {
-        const currentTime = Math.floor(videoPlayer.getCurrentTime());
-        setEditingVideoData(prev => ({
-          ...prev,
-          endTime: currentTime
-        }));
-      } catch (e) {
-        console.error('종료 시간 설정 실패:', e);
+    try {
+      if (!videoPlayer || typeof videoPlayer.getCurrentTime !== 'function') {
+        console.warn('YouTube 플레이어가 준비되지 않았거나 getCurrentTime 메서드가 없습니다.');
+        return;
       }
+      
+      const currentTime = Math.floor(videoPlayer.getCurrentTime());
+      setEditingVideoData(prev => ({
+        ...prev,
+        endTime: currentTime
+      }));
+    } catch (e) {
+      console.error('종료 시간 설정 실패:', e);
+      setVideoPlayer(null); // 오류 시 플레이어 참조 초기화
     }
   }, [videoPlayer]);
 
@@ -684,13 +701,14 @@ export default function LiveClipManager({
     if (!editingVideoId || !isVideoPlaying || !videoPlayer) return;
 
     const interval = setInterval(() => {
-      if (videoPlayer && typeof videoPlayer.getCurrentTime === 'function') {
-        try {
+      try {
+        if (videoPlayer && typeof videoPlayer.getCurrentTime === 'function') {
           const time = videoPlayer.getCurrentTime();
           setCurrentTime(time);
-        } catch (e) {
-          console.error('현재 시간 업데이트 실패:', e);
         }
+      } catch (e) {
+        console.error('현재 시간 업데이트 실패:', e);
+        setVideoPlayer(null); // 오류 시 플레이어 참조 초기화
       }
     }, 100);
 
@@ -703,6 +721,19 @@ export default function LiveClipManager({
       onEditingStateChange(!!editingVideoId);
     }
   }, [editingVideoId, onEditingStateChange]);
+
+  // 컴포넌트 언마운트 시 videoPlayer 정리
+  useEffect(() => {
+    return () => {
+      setVideoPlayer(null);
+    };
+  }, []);
+
+  // 선택된 영상이 변경될 때 기존 플레이어 참조 정리
+  useEffect(() => {
+    setVideoPlayer(null);
+    setIsVideoPlaying(false);
+  }, [selectedVideoIndex]);
 
   // 영상 수정 핸들러
   const handleEditVideo = async (e: React.FormEvent) => {
@@ -865,8 +896,7 @@ export default function LiveClipManager({
 
   return (
     <>
-      {/* UI는 isVisible일 때만 표시 */}
-      <div className="flex flex-col h-full min-h-0 p-2 pb-4 sm:p-4 sm:pb-6 xl:p-0 xl:pb-1" style={{ display: isVisible ? 'flex' : 'none' }}>
+      <div className="flex flex-col h-full min-h-0 p-0 pb-1">
         {!showAddVideoForm ? (
           videosLoading ? (
             <div className="flex-1 flex items-center justify-center">
@@ -878,28 +908,14 @@ export default function LiveClipManager({
                  scrollbarWidth: 'thin',
                  scrollbarColor: 'rgba(156, 163, 175, 0.5) transparent'
                }}>
-            <div className="space-y-2 sm:space-y-4 pb-4 sm:pb-6">
+            <div className="space-y-2 p-2 pb-4">
               {/* 유튜브 플레이어 */}
               <div className="relative">
               <div className={`w-full bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden transition-all duration-300 ${
                 isPlayerMinimized 
                   ? 'aspect-video max-h-[20vh] min-h-[120px]' 
                   : 'aspect-video max-h-[40vh] sm:max-h-[45vh] min-h-[200px] sm:min-h-[250px]'
-              }`} style={{ 
-                ...(isVisible 
-                  ? { visibility: 'visible', position: 'static', left: 'auto', top: 'auto' }
-                  : { 
-                      position: 'fixed', 
-                      left: '-320px', 
-                      top: '-240px', 
-                      width: '320px', 
-                      height: '240px', 
-                      opacity: 0,
-                      pointerEvents: 'none',
-                      zIndex: -1
-                    }
-                )
-              }}>
+              }`}>
                 {selectedVideo && (
                   <YouTube
                     key={`liveclip-player-${selectedVideo._id}`}
@@ -923,18 +939,43 @@ export default function LiveClipManager({
                     }}
                     onReady={(event) => {
                       if (event.target && typeof event.target.playVideo === 'function') {
+                        console.log('🎵 LiveClip 플레이어 준비 완료');
                         setVideoPlayer(event.target);
-                        // 자동 재생이 필요한 경우 재생 시작
+                        // 자동 재생은 onStateChange에서 처리하지만, 백업으로 여기서도 시도
                         if (shouldAutoPlay) {
+                          console.log('🔄 자동 재생 대기 중 - onStateChange에서 처리될 예정');
+                          
+                          // 백업 자동 재생 로직 (2초 후 시도)
                           setTimeout(() => {
-                            try {
-                              event.target.playVideo();
-                              setShouldAutoPlay(false);
-                            } catch (e) {
-                              console.error('자동 재생 실패:', e);
-                              setShouldAutoPlay(false);
+                            if (shouldAutoPlay) {
+                              console.log('⏰ 백업 자동 재생 시도');
+                              try {
+                                const player = event.target;
+                                if (player && 
+                                    typeof player.playVideo === 'function' &&
+                                    typeof player.getPlayerState === 'function') {
+                                  
+                                  const state = player.getPlayerState();
+                                  console.log('⏰ 백업 재생 시 플레이어 상태:', state);
+                                  
+                                  // 재생 중이 아닌 경우에만 재생 시도
+                                  if (state !== 1) {
+                                    player.playVideo();
+                                    setShouldAutoPlay(false);
+                                    console.log('✅ 백업 자동 재생 성공');
+                                  } else {
+                                    console.log('ℹ️ 이미 재생 중이므로 백업 재생 건너뜀');
+                                    setShouldAutoPlay(false);
+                                  }
+                                }
+                              } catch (e) {
+                                console.warn('⚠️ 백업 자동 재생 실패 (영상에 문제가 있을 수 있음):', e.message);
+                                setShouldAutoPlay(false);
+                                // 플레이어 참조 초기화
+                                setVideoPlayer(null);
+                              }
                             }
-                          }, 500); // 짧은 딩레이로 안정성 향상
+                          }, 2000);
                         }
                       }
                     }}
@@ -943,16 +984,51 @@ export default function LiveClipManager({
                       const playerState = event.data;
                       const isCurrentlyPlaying = playerState === 1; // 재생 중
                       const isPaused = playerState === 2; // 일시정지
+                      const isReady = playerState === 5; // 준비완료
+                      
+                      console.log('🎵 플레이어 상태 변경:', {
+                        state: playerState,
+                        shouldAutoPlay,
+                        stateNames: {
+                          [-1]: '시작되지 않음',
+                          0: '종료됨',
+                          1: '재생 중',
+                          2: '일시정지됨',
+                          3: '버퍼링 중',
+                          5: '준비완료'
+                        }[playerState] || '알 수 없음'
+                      });
                       
                       setIsVideoPlaying(isCurrentlyPlaying);
                       
+                      // 자동 재생이 필요한 경우 여러 상태에서 시도
+                      if (shouldAutoPlay && (isReady || playerState === -1 || playerState === 2)) {
+                        console.log('🎵 자동 재생 조건 충족 - 재생 시도');
+                        setTimeout(() => {
+                          try {
+                            if (event.target && typeof event.target.playVideo === 'function') {
+                              event.target.playVideo();
+                              setShouldAutoPlay(false);
+                              console.log('✅ 자동 재생 성공');
+                            }
+                          } catch (e) {
+                            console.warn('⚠️ 상태 변경 시 자동 재생 실패 (영상에 문제가 있을 수 있음):', e.message);
+                            setShouldAutoPlay(false);
+                            // 플레이어 참조 초기화
+                            setVideoPlayer(null);
+                          }
+                        }, 200);
+                      }
+                      
                       // 탭이 숨겨진 상태에서 재생이 중단된 경우 복원 시도
-                      if (document.hidden && isPaused && !isVisible) {
+                      if (document.hidden && isPaused) {
                         console.log('🔄 백그라운드에서 재생 중단 감지 - 복원 시도');
                         setTimeout(() => {
                           try {
-                            event.target.playVideo();
-                            console.log('🎵 백그라운드 재생 복원');
+                            if (event.target && typeof event.target.playVideo === 'function') {
+                              event.target.playVideo();
+                              console.log('🎵 백그라운드 재생 복원');
+                            }
                           } catch (e) {
                             console.log('⚠️ 백그라운드 재생 복원 실패:', e);
                           }
@@ -961,12 +1037,40 @@ export default function LiveClipManager({
                     }}
                     onPlay={() => setIsVideoPlaying(true)}
                     onPause={() => setIsVideoPlaying(false)}
+                    onError={(event) => {
+                      console.warn('⚠️ YouTube 영상 재생 오류:', {
+                        errorCode: event.data,
+                        videoId: selectedVideo.videoId,
+                        errorMessages: {
+                          2: '잘못된 매개변수 - 영상 ID가 올바르지 않음',
+                          5: '플레이어 HTML5 오류',
+                          100: '영상을 찾을 수 없음 - 삭제되었거나 비공개',
+                          101: '영상 소유자가 임베드를 허용하지 않음',
+                          150: '영상 소유자가 임베드를 허용하지 않음'
+                        }[event.data] || '알 수 없는 오류'
+                      });
+                      
+                      // 재생 상태 초기화
+                      setIsVideoPlaying(false);
+                      setVideoPlayer(null);
+                      setShouldAutoPlay(false);
+                    }}
                     onEnd={() => {
                       setIsVideoPlaying(false);
-                      // 보이는 상태일 때만 다음 영상 전환 (수정 중이 아닐 때만)
-                      if (isVisible && selectedVideoIndex < songVideos.length - 1 && !editingVideoId) {
-                        setShouldAutoPlay(true);
-                        setSelectedVideoIndex(selectedVideoIndex + 1);
+                      
+                      // 다음 영상 전환 (수정 중이 아닐 때만)
+                      if (selectedVideoIndex < songVideos.length - 1 && !editingVideoId) {
+                        console.log('🔄 다음 영상으로 전환 시작');
+                        setVideoPlayer(null); // 다음 영상으로 넘어갈 때만 플레이어 참조 제거
+                        // 약간의 딜레이를 두고 자동재생 플래그 설정
+                        setTimeout(() => {
+                          setShouldAutoPlay(true);
+                          setSelectedVideoIndex(selectedVideoIndex + 1);
+                          console.log('✅ 다음 영상 설정 완료 - shouldAutoPlay: true');
+                        }, 100);
+                      } else {
+                        console.log('🔄 영상 종료 - 수정 중이므로 플레이어 참조 유지');
+                        // 수정 중이거나 마지막 영상인 경우 플레이어 참조 유지 (제어 패널 계속 사용 가능)
                       }
                     }}
                     className="w-full h-full"
@@ -1570,7 +1674,7 @@ export default function LiveClipManager({
           transition={{ duration: 0.3 }}
           className="flex flex-col flex-1 min-h-0 h-full"
         >
-          <div className="flex-1 min-h-0 overflow-y-auto p-3 pb-6 sm:p-6 sm:pb-8 bg-gradient-to-br from-light-primary/10 to-light-accent/5 
+          <div className="flex-1 min-h-0 overflow-y-auto p-2 pb-4 bg-gradient-to-br from-light-primary/10 to-light-accent/5 
                         dark:from-dark-primary/10 dark:to-dark-accent/5 
                         border border-light-accent/20 dark:border-dark-accent/20 
                         rounded-2xl backdrop-blur-sm"
@@ -1895,69 +1999,6 @@ export default function LiveClipManager({
         </motion.div>
       )}
     </div>
-    
-    {/* 백그라운드 플레이어 - 항상 렌더링, isVisible이 false일 때는 숨김 */}
-    {selectedVideo && (
-      <div style={{ 
-        ...(isVisible 
-          ? { display: 'none' } // 보이는 상태에서는 숨김 (위의 UI에 표시되므로)
-          : { 
-              position: 'fixed', 
-              left: '-320px', 
-              top: '-240px', 
-              width: '320px', 
-              height: '240px', 
-              opacity: 0,
-              pointerEvents: 'none',
-              zIndex: -1
-            }
-        )
-      }}>
-        <YouTube
-          key={`liveclip-player-${selectedVideo._id}`}
-          videoId={selectedVideo.videoId}
-          opts={{
-            width: '100%',
-            height: '100%',
-            playerVars: {
-              autoplay: 0,
-              controls: 1,
-              rel: 0,
-              modestbranding: 1,
-              start: selectedVideo.startTime || 0,
-              end: selectedVideo.endTime || undefined,
-              iv_load_policy: 3,
-              cc_load_policy: 0,
-              playsinline: 1,
-              enablejsapi: 1
-            },
-          }}
-          onReady={(event) => {
-            if (!isVisible) {
-              setVideoPlayer(event.target);
-              if (shouldAutoPlay) {
-                setTimeout(() => {
-                  event.target.playVideo();
-                  setShouldAutoPlay(false);
-                }, 500);
-              }
-            }
-          }}
-          onStateChange={(event) => {
-            const playerState = event.data;
-            const isCurrentlyPlaying = playerState === 1;
-            setIsVideoPlaying(isCurrentlyPlaying);
-          }}
-          onPlay={() => setIsVideoPlaying(true)}
-          onPause={() => setIsVideoPlaying(false)}
-          onEnd={() => {
-            setIsVideoPlaying(false);
-            // 백그라운드에서는 다음 영상 전환 안 함 (예측 가능한 동작)
-          }}
-          className="w-full h-full"
-        />
-      </div>
-    )}
     </>
   );
 }

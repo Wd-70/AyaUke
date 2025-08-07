@@ -11,6 +11,10 @@ class LikesStore {
   setLike(songId: string, liked: boolean) {
     this.likes.set(songId, liked)
     this.notifySubscribers(songId)
+    // 전역 이벤트 발생
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('likesUpdated'))
+    }
   }
 
   getLike(songId: string): boolean | undefined {
@@ -60,6 +64,10 @@ class LikesStore {
       this.likes.set(songId, liked)
       this.notifySubscribers(songId)
     })
+    // 전역 이벤트 발생
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('likesUpdated'))
+    }
   }
 
   // 좋아요한 곡 ID들 반환
@@ -121,6 +129,11 @@ class LikesStore {
           this.likes.set(songId, liked as boolean)
           this.notifySubscribers(songId)
         })
+
+        // 전역 이벤트 발생
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('likesUpdated'))
+        }
 
         console.log(`✅ 대량 좋아요 로딩 완료: ${Object.keys(data.likes).length}곡`)
       } else {

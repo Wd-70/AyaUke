@@ -553,9 +553,6 @@ video {
 .invisible{
   visibility: hidden;
 }
-.static{
-  position: static;
-}
 .fixed{
   position: fixed;
 }
@@ -803,6 +800,9 @@ video {
 .mr-2{
   margin-right: 0.5rem;
 }
+.mr-20{
+  margin-right: 5rem;
+}
 .mr-3{
   margin-right: 0.75rem;
 }
@@ -835,12 +835,6 @@ video {
 }
 .mt-auto{
   margin-top: auto;
-}
-.mr-16{
-  margin-right: 4rem;
-}
-.mr-20{
-  margin-right: 5rem;
 }
 .line-clamp-1{
   overflow: hidden;
@@ -2482,6 +2476,9 @@ video {
   -o-object-fit: cover;
      object-fit: cover;
 }
+.p-0{
+  padding: 0px;
+}
 .p-0\.5{
   padding: 0.125rem;
 }
@@ -2610,9 +2607,6 @@ video {
 .pb-4{
   padding-bottom: 1rem;
 }
-.pb-6{
-  padding-bottom: 1.5rem;
-}
 .pb-8{
   padding-bottom: 2rem;
 }
@@ -2624,6 +2618,9 @@ video {
 }
 .pl-3{
   padding-left: 0.75rem;
+}
+.pr-16{
+  padding-right: 4rem;
 }
 .pr-2{
   padding-right: 0.5rem;
@@ -2663,15 +2660,6 @@ video {
 }
 .pt-8{
   padding-top: 2rem;
-}
-.pr-20{
-  padding-right: 5rem;
-}
-.pr-16{
-  padding-right: 4rem;
-}
-.pr-12{
-  padding-right: 3rem;
 }
 .text-left{
   text-align: left;
@@ -5650,8 +5638,8 @@ body {
     margin-bottom: 1rem;
   }
 
-  .sm\:mb-6{
-    margin-bottom: 1.5rem;
+  .sm\:mr-20{
+    margin-right: 5rem;
   }
 
   .sm\:mt-3{
@@ -5660,10 +5648,6 @@ body {
 
   .sm\:mt-4{
     margin-top: 1rem;
-  }
-
-  .sm\:mr-20{
-    margin-right: 5rem;
   }
 
   .sm\:inline{
@@ -5754,10 +5738,6 @@ body {
     flex-direction: row;
   }
 
-  .sm\:items-start{
-    align-items: flex-start;
-  }
-
   .sm\:items-center{
     align-items: center;
   }
@@ -5786,12 +5766,6 @@ body {
     --tw-space-y-reverse: 0;
     margin-top: calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));
     margin-bottom: calc(0.75rem * var(--tw-space-y-reverse));
-  }
-
-  .sm\:space-y-4 > :not([hidden]) ~ :not([hidden]){
-    --tw-space-y-reverse: 0;
-    margin-top: calc(1rem * calc(1 - var(--tw-space-y-reverse)));
-    margin-bottom: calc(1rem * var(--tw-space-y-reverse));
   }
 
   .sm\:space-y-6 > :not([hidden]) ~ :not([hidden]){
@@ -5845,24 +5819,12 @@ body {
     padding-bottom: 3rem;
   }
 
-  .sm\:pb-6{
-    padding-bottom: 1.5rem;
-  }
-
-  .sm\:pb-8{
-    padding-bottom: 2rem;
-  }
-
-  .sm\:pt-24{
-    padding-top: 6rem;
-  }
-
   .sm\:pr-20{
     padding-right: 5rem;
   }
 
-  .sm\:pr-16{
-    padding-right: 4rem;
+  .sm\:pt-24{
+    padding-top: 6rem;
   }
 
   .sm\:text-2xl{
@@ -5905,14 +5867,14 @@ body {
     line-height: 1.25rem;
   }
 
-  .sm\:text-xs{
-    font-size: 0.75rem;
-    line-height: 1rem;
-  }
-
   .sm\:text-xl{
     font-size: 1.25rem;
     line-height: 1.75rem;
+  }
+
+  .sm\:text-xs{
+    font-size: 0.75rem;
+    line-height: 1rem;
   }
 }
 
@@ -6069,20 +6031,16 @@ body {
 
 @media (min-width: 1280px){
 
-  .xl\:mr-3{
-    margin-right: 0.75rem;
-  }
-
   .xl\:mb-6{
     margin-bottom: 1.5rem;
   }
 
-  .xl\:mr-12{
-    margin-right: 3rem;
-  }
-
   .xl\:mr-10{
     margin-right: 2.5rem;
+  }
+
+  .xl\:mr-3{
+    margin-right: 0.75rem;
   }
 
   .xl\:block{
@@ -6167,10 +6125,6 @@ body {
     margin-bottom: calc(0.5rem * var(--tw-space-y-reverse));
   }
 
-  .xl\:p-0{
-    padding: 0px;
-  }
-
   .xl\:p-4{
     padding: 1rem;
   }
@@ -6198,18 +6152,9 @@ body {
     padding-bottom: 0.75rem;
   }
 
-  .xl\:pb-1{
-    padding-bottom: 0.25rem;
-  }
-
   .xl\:text-2xl{
     font-size: 1.5rem;
     line-height: 2rem;
-  }
-
-  .xl\:text-3xl{
-    font-size: 1.875rem;
-    line-height: 2.25rem;
   }
 
   .xl\:text-base{

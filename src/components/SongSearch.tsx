@@ -98,18 +98,21 @@ export default function SongSearch({
 
   // 좋아요 데이터 실시간 업데이트
   useEffect(() => {
-    const updateLikedSongs = () => {
+    // 초기 로드
+    setLikedSongIds(getLikedSongIds());
+
+    // 좋아요 상태 변경 이벤트 리스너
+    const handleLikesChange = () => {
       setLikedSongIds(getLikedSongIds());
     };
 
-    // 초기 로드
-    updateLikedSongs();
+    // 이벤트 리스너 등록 (likesStore에서 발생시키는 커스텀 이벤트)
+    window.addEventListener('likesUpdated', handleLikesChange);
 
-    // 주기적 업데이트 (1초마다)
-    const interval = setInterval(updateLikedSongs, 1000);
-
-    return () => clearInterval(interval);
-  }, [getLikedSongIds]);
+    return () => {
+      window.removeEventListener('likesUpdated', handleLikesChange);
+    };
+  }, []);
 
   // 플레이리스트별 곡 ID 매핑
   const playlistSongIds = useMemo(() => {
