@@ -301,7 +301,7 @@ export default function SongCard({
     if (currentArtistAlias !== originalArtistAlias) return true;
 
     // 키 조정 변경 확인
-    if (editData.keyAdjustment !== song.keyAdjustment) return true;
+    if (editData.keyAdjustment !== (song.keyAdjustment ?? null)) return true;
 
     // 언어 변경 확인
     if (editData.language !== song.language) return true;
@@ -326,7 +326,7 @@ export default function SongCard({
       titleAlias: song.titleAlias || song.title,
       artistAlias: song.artistAlias || song.artist,
       mrLinks: song.mrLinks || [],
-      keyAdjustment: song.keyAdjustment,
+      keyAdjustment: song.keyAdjustment ?? null,
       language: song.language,
       searchTags: song.searchTags || [],
       selectedMRIndex: song.selectedMRIndex || 0,
@@ -404,9 +404,7 @@ export default function SongCard({
         mrLinks: editData.mrLinks.filter((link: any) => link.url.trim() !== ""),
       };
 
-      // 기본값은 제거 (수정 불가능)
-      delete saveData.title;
-      delete saveData.artist;
+      // 기본값은 제거 (수정 불가능) - title과 artist는 이미 saveData에 포함되지 않음
 
       console.log("🚀 저장할 데이터:", JSON.stringify(saveData, null, 2));
 
@@ -752,7 +750,7 @@ export default function SongCard({
   const handlePlaylistClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     // 로그인하지 않은 경우 플레이리스트 메뉴 표시하지 않음
-    if (!songPlaylists && songPlaylists.length === 0) {
+    if (!songPlaylists || songPlaylists.length === 0) {
       console.log("🔒 로그인이 필요한 기능입니다");
       return;
     }
@@ -1023,14 +1021,12 @@ export default function SongCard({
 
     if (
       song.sungCount !== undefined ||
-      song.lastSungDate ||
-      song.isFavorite !== undefined
+      song.lastSungDate
     ) {
       console.log("📊 활동 정보:", {
         sungCount: song.sungCount,
         lastSungDate: song.lastSungDate,
-        isFavorite: song.isFavorite,
-        keyAdjustment: song.keyAdjustment,
+        keyAdjustment: song.keyAdjustment ?? null,
       });
     }
 
@@ -1041,11 +1037,11 @@ export default function SongCard({
       });
     }
 
-    if (song.playlists?.length || song.searchTags?.length) {
+    if (songPlaylists?.length || song.searchTags?.length) {
       console.log("🏷️ 태그/플레이리스트:", {
         tags: song.tags,
         searchTags: song.searchTags,
-        playlists: song.playlists,
+        playlists: songPlaylists,
       });
     }
 
@@ -1470,8 +1466,10 @@ export default function SongCard({
         <button
           onClick={handleLike}
           disabled={likeLoading}
-          className="p-1.5 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                     transition-colors duration-200 disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 dark:bg-gray-800/50
+                     hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 
+                     transition-all duration-200 disabled:opacity-50 backdrop-blur-sm
+                     border border-white/10 dark:border-gray-700/50"
           title={liked ? "좋아요 취소" : "좋아요"}
         >
           <HeartIcon
@@ -1481,10 +1479,33 @@ export default function SongCard({
                            ? "text-red-400 fill-current opacity-60 animate-pulse scale-110"
                            : liked
                            ? "text-red-500 fill-current"
-                           : "text-light-text/40 dark:text-dark-text/40 hover:text-red-400"
+                           : "text-light-text/60 dark:text-dark-text/60 hover:text-red-400"
                        }`}
           />
+          {song.likeCount !== undefined && (
+            <span
+              className={`text-xs font-medium transition-all duration-200 min-w-[1rem] text-center ${
+                liked 
+                  ? "text-red-500" 
+                  : "text-light-text/70 dark:text-dark-text/70"
+              }`}
+            >
+              {song.likeCount}
+            </span>
+          )}
         </button>
+        
+        {/* 부른 횟수 표시 */}
+        {song.sungCount !== undefined && song.sungCount > 0 && (
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full
+                         bg-green-500/10 dark:bg-green-500/20 
+                         border border-green-500/20 dark:border-green-500/30">
+            <span className="text-xs font-medium text-green-600 dark:text-green-400">
+              🎤 {song.sungCount}
+            </span>
+          </div>
+        )}
+        
         <button
           onClick={handleCardClick}
           className="p-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 
@@ -1497,6 +1518,7 @@ export default function SongCard({
     </div>
   );
 
+  // SongCard 컴포넌트 메인 렌더링
   return (
     <>
       {/* 확장 시 배경 오버레이 */}
@@ -1902,10 +1924,15 @@ export default function SongCard({
                 </div>
               )}
 
-              {/* Date added - 편집 모드가 아닐 때만 표시 */}
-              {!isEditMode && song.dateAdded && (
-                <div className="mt-3 sm:mt-4 text-sm text-light-text/50 dark:text-dark-text/50">
-                  추가일: {new Date(song.dateAdded).toLocaleDateString("ko-KR")}
+              {/* Date info - 편집 모드가 아닐 때만 표시 */}
+              {!isEditMode && (song.dateAdded || song.lastSungDate) && (
+                <div className="mt-3 sm:mt-4 text-sm text-light-text/50 dark:text-dark-text/50 flex justify-between items-center">
+                  {song.dateAdded && (
+                    <div>추가일: {new Date(song.dateAdded).toLocaleDateString("ko-KR")}</div>
+                  )}
+                  {song.lastSungDate && (
+                    <div>마지막 부른 날: {new Date(song.lastSungDate).toLocaleDateString("ko-KR")}</div>
+                  )}
                 </div>
               )}
             </div>
@@ -1979,33 +2006,50 @@ export default function SongCard({
                       {displayArtist}
                     </p>
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <button
                       onClick={handleLike}
                       disabled={likeLoading}
-                      className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                                 transition-colors duration-200 disabled:opacity-50"
+                      className="flex items-center justify-center gap-1 px-2 py-1 rounded-full
+                                 bg-white/10 dark:bg-gray-800/50 backdrop-blur-sm
+                                 hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                 transition-all duration-200 disabled:opacity-50
+                                 border border-white/20 dark:border-gray-700/50"
                       title={liked ? "좋아요 취소" : "좋아요"}
                     >
                       <HeartIcon
-                        className={`w-5 h-5 transition-all duration-200 
+                        className={`w-4 h-4 transition-all duration-200 
                                    ${
                                      likeLoading
                                        ? "text-red-400 fill-current opacity-60 animate-pulse scale-110"
                                        : liked
                                        ? "text-red-500 fill-current"
-                                       : "text-light-text/40 dark:text-dark-text/40 hover:text-red-400"
+                                       : "text-light-text/60 dark:text-dark-text/60 hover:text-red-400"
                                    }`}
                       />
+                      {song.likeCount !== undefined && (
+                        <span
+                          className={`text-xs font-medium transition-all duration-200 min-w-[1rem] text-center ${
+                            liked 
+                              ? "text-red-500" 
+                              : "text-light-text/70 dark:text-dark-text/70"
+                          }`}
+                        >
+                          {song.likeCount}
+                        </span>
+                      )}
                     </button>
-                    <button
-                      onClick={handlePlaylistClick}
-                      className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                                 transition-colors duration-200"
-                      title="플레이리스트 관리"
-                    >
-                      <ListBulletIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-                    </button>
+                    
+                    {/* 부른 횟수 표시 */}
+                    {song.sungCount !== undefined && song.sungCount > 0 && (
+                      <div className="flex items-center justify-center gap-1 px-2 py-1 rounded-full
+                                    bg-green-100/80 dark:bg-green-900/50 
+                                    border border-green-200/50 dark:border-green-700/50">
+                        <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                          🎤 {song.sungCount}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2117,33 +2161,50 @@ export default function SongCard({
                       {displayArtist}
                     </p>
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex flex-col gap-2">
                     <button
                       onClick={handleLike}
                       disabled={likeLoading}
-                      className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                                 transition-colors duration-200 disabled:opacity-50"
+                      className="flex items-center justify-center gap-1 px-2 py-1 rounded-full
+                                 bg-white/10 dark:bg-gray-800/50 backdrop-blur-sm
+                                 hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                                 transition-all duration-200 disabled:opacity-50
+                                 border border-white/20 dark:border-gray-700/50"
                       title={liked ? "좋아요 취소" : "좋아요"}
                     >
                       <HeartIcon
-                        className={`w-5 h-5 transition-all duration-200 
+                        className={`w-4 h-4 transition-all duration-200 
                                    ${
                                      likeLoading
                                        ? "text-red-400 fill-current opacity-60 animate-pulse scale-110"
                                        : liked
                                        ? "text-red-500 fill-current"
-                                       : "text-light-text/40 dark:text-dark-text/40 hover:text-red-400"
+                                       : "text-light-text/60 dark:text-dark-text/60 hover:text-red-400"
                                    }`}
                       />
+                      {song.likeCount !== undefined && (
+                        <span
+                          className={`text-xs font-medium transition-all duration-200 min-w-[1rem] text-center ${
+                            liked 
+                              ? "text-red-500" 
+                              : "text-light-text/70 dark:text-dark-text/70"
+                          }`}
+                        >
+                          {song.likeCount}
+                        </span>
+                      )}
                     </button>
-                    <button
-                      onClick={handlePlaylistClick}
-                      className="p-2 rounded-full hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                                 transition-colors duration-200"
-                      title="플레이리스트 관리"
-                    >
-                      <ListBulletIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-                    </button>
+                    
+                    {/* 부른 횟수 표시 */}
+                    {song.sungCount !== undefined && song.sungCount > 0 && (
+                      <div className="flex items-center justify-center gap-1 px-2 py-1 rounded-full
+                                    bg-green-100/80 dark:bg-green-900/50 
+                                    border border-green-200/50 dark:border-green-700/50">
+                        <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                          🎤 {song.sungCount}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

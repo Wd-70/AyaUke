@@ -72,6 +72,10 @@ export default function SongSearch({
     string | null
   >(null); // 개별 모드용
 
+  // 정렬 옵션
+  const [sortBy, setSortBy] = useState<"default" | "likes" | "title" | "sungCount">("default");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
   // 훅 사용
   const { playlists } = useGlobalPlaylists();
   const { getLikedSongIds } = useLikes();
@@ -221,10 +225,37 @@ export default function SongSearch({
     playlistSongIds,
   ]);
 
-  // Update filtered songs when filteredSongs changes
+  // 정렬된 곡들
+  const sortedSongs = useMemo(() => {
+    if (sortBy === "default") {
+      return filteredSongs;
+    }
+
+    const sorted = [...filteredSongs].sort((a, b) => {
+      if (sortBy === "likes") {
+        const aLikes = a.likeCount || 0;
+        const bLikes = b.likeCount || 0;
+        return sortOrder === "desc" ? bLikes - aLikes : aLikes - bLikes;
+      } else if (sortBy === "sungCount") {
+        const aSungCount = a.sungCount || 0;
+        const bSungCount = b.sungCount || 0;
+        return sortOrder === "desc" ? bSungCount - aSungCount : aSungCount - bSungCount;
+      } else if (sortBy === "title") {
+        const aTitle = a.titleAlias || a.title;
+        const bTitle = b.titleAlias || b.title;
+        const result = aTitle.localeCompare(bTitle, 'ko', { numeric: true });
+        return sortOrder === "desc" ? -result : result;
+      }
+      return 0;
+    });
+
+    return sorted;
+  }, [filteredSongs, sortBy, sortOrder]);
+
+  // Update filtered songs when sortedSongs changes
   React.useEffect(() => {
-    onFilteredSongs(filteredSongs);
-  }, [filteredSongs, onFilteredSongs]);
+    onFilteredSongs(sortedSongs);
+  }, [sortedSongs, onFilteredSongs]);
 
   // Helper 함수들
   const toggleLanguage = useCallback((language: string) => {
@@ -316,6 +347,8 @@ export default function SongSearch({
     setShowLikedOnly(false);
     setActivePlaylists(new Set());
     setSelectedSingleFilter(null);
+    setSortBy("default");
+    setSortOrder("desc");
   }, []);
 
   const hasActiveFilters =
@@ -439,6 +472,32 @@ export default function SongSearch({
               <HashtagIcon className="h-5 w-5" />
             </button>
           )}
+
+          {/* 정렬 버튼 */}
+          <div className="flex items-center">
+            <select
+              value={`${sortBy}-${sortOrder}`}
+              onChange={(e) => {
+                const [newSortBy, newSortOrder] = e.target.value.split('-') as [typeof sortBy, typeof sortOrder];
+                setSortBy(newSortBy);
+                setSortOrder(newSortOrder);
+              }}
+              className="text-xs px-2 py-1 rounded-md bg-white dark:bg-gray-900 
+                       border border-light-primary/20 dark:border-dark-primary/20
+                       text-gray-900 dark:text-white
+                       focus:outline-none focus:ring-1 focus:ring-light-accent dark:focus:ring-dark-accent
+                       hover:bg-light-primary/10 dark:hover:bg-gray-800
+                       transition-colors duration-200"
+            >
+              <option value="default-desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">기본순</option>
+              <option value="likes-desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">좋아요 많은순</option>
+              <option value="likes-asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">좋아요 적은순</option>
+              <option value="sungCount-desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">부른 많은순</option>
+              <option value="sungCount-asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">부른 적은순</option>
+              <option value="title-asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">제목 ㄱㄴㄷ순</option>
+              <option value="title-desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">제목 ㄷㄴㄱ순</option>
+            </select>
+          </div>
 
           {/* 필터 토글 버튼 */}
           <button

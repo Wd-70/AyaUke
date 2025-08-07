@@ -66,6 +66,7 @@ export default function DashboardTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [recalculatingStats, setRecalculatingStats] = useState(false);
+  const [recalculatingLikes, setRecalculatingLikes] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -112,6 +113,35 @@ export default function DashboardTab() {
       alert('❌ 통계 재계산 중 오류가 발생했습니다.');
     } finally {
       setRecalculatingStats(false);
+    }
+  };
+
+  // 좋아요 카운트 재계산 함수
+  const recalculateLikeCounts = async () => {
+    if (recalculatingLikes) return;
+    
+    try {
+      setRecalculatingLikes(true);
+      
+      const response = await fetch('/api/admin/recalculate-like-counts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(`✅ 좋아요 카운트 재계산 완료!\n처리된 곡: ${result.processedCount}개\n업데이트된 곡: ${result.updatedCount}개\n변경없음: ${result.unchangedCount}개\n오류: ${result.errorCount}개`);
+        // 통계 새로고침
+        window.location.reload();
+      } else {
+        alert('❌ 좋아요 카운트 재계산 실패: ' + (result.error || '알 수 없는 오류'));
+      }
+    } catch (error) {
+      console.error('좋아요 카운트 재계산 오류:', error);
+      alert('❌ 좋아요 카운트 재계산 중 오류가 발생했습니다.');
+    } finally {
+      setRecalculatingLikes(false);
     }
   };
 
@@ -203,10 +233,33 @@ export default function DashboardTab() {
               </>
             )}
           </button>
+          
+          <button
+            onClick={recalculateLikeCounts}
+            disabled={recalculatingLikes}
+            className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:bg-red-400 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 transition-colors"
+          >
+            {recalculatingLikes ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                처리 중...
+              </>
+            ) : (
+              <>
+                <HeartIcon className="w-4 h-4" />
+                좋아요 카운트 재계산
+              </>
+            )}
+          </button>
         </div>
-        <p className="text-sm text-light-text/60 dark:text-dark-text/60 mt-2">
-          기존 라이브 클립 데이터를 기반으로 곡별 부른 회수와 마지막 부른 날짜를 다시 계산합니다.
-        </p>
+        <div className="space-y-1 mt-2">
+          <p className="text-sm text-light-text/60 dark:text-dark-text/60">
+            • 곡 통계: 기존 라이브 클립 데이터를 기반으로 곡별 부른 회수와 마지막 부른 날짜를 다시 계산합니다.
+          </p>
+          <p className="text-sm text-light-text/60 dark:text-dark-text/60">
+            • 좋아요 카운트: 실제 좋아요 데이터를 집계하여 곡별 좋아요 수를 정확하게 업데이트합니다.
+          </p>
+        </div>
       </motion.div>
 
       {/* Quick Stats */}

@@ -1,5 +1,6 @@
 {
-  "/api/user/[userId]/route": "app/api/user/[userId]/route.js",
+  "/api/videos/[videoId]/route": "app/api/videos/[videoId]/route.js",
+  "/api/songs/[songId]/videos/route": "app/api/songs/[songId]/videos/route.js",
   "/songbook/page": "app/songbook/page.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js"
+  "/api/user/[userId]/route": "app/api/user/[userId]/route.js"
 }

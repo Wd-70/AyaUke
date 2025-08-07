@@ -61,6 +61,11 @@ const SongDetailSchema: Schema = new Schema({
     default: 0,
     min: 0,
   },
+  likeCount: {
+    type: Number,
+    default: 0,
+    min: 0,
+  },
   lastSungDate: {
     type: String,
     trim: true,

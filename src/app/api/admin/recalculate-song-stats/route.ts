@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/authOptions';
 import { connectToDatabase } from '@/lib/mongodb';
 import SongVideo from '@/models/SongVideo';
 import SongDetail from '@/models/SongDetail';
+import { isSuperAdmin, UserRole } from '@/lib/permissions';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +14,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: '로그인이 필요합니다.' },
         { status: 401 }
+      );
+    }
+
+    // 슈퍼 관리자 권한 확인
+    if (!isSuperAdmin(session.user.role as UserRole)) {
+      return NextResponse.json(
+        { error: '슈퍼 관리자 권한이 필요합니다.' },
+        { status: 403 }
       );
     }
 

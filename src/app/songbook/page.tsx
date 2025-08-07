@@ -32,11 +32,11 @@ async function getSongs(): Promise<{ songs: Song[]; error: string | null }> {
     const sheetSongs = await getCachedSheetSongs();
     
     // 2. MongoDB (실시간 조회)
-    const mongoDetails = await fetchSongDetailsFromMongo();
+    const { songDetails: mongoDetails, deletedSongKeys } = await fetchSongDetailsFromMongo();
     console.log(`🗄️ MongoDB 조회: ${mongoDetails.length}곡`);
     
     // 3. 데이터 병합
-    const mergedSongs = mergeSongsData(sheetSongs, mongoDetails);
+    const mergedSongs = mergeSongsData(sheetSongs, mongoDetails, deletedSongKeys);
     console.log(`✅ 병합 완료: ${mergedSongs.length}곡`);
     
     return { songs: mergedSongs, error: null };

@@ -86,6 +86,13 @@ export async function POST(request: NextRequest) {
 
     await like.save()
 
+    // SongDetail의 likeCount 증가
+    await SongDetail.findByIdAndUpdate(
+      songId,
+      { $inc: { likeCount: 1 } },
+      { new: true }
+    )
+
     return NextResponse.json({ success: true, like }, { status: 201 })
   } catch (error) {
     console.error('좋아요 추가 오류:', error)
@@ -124,6 +131,13 @@ export async function DELETE(request: NextRequest) {
     if (!result) {
       return NextResponse.json({ error: 'Like not found' }, { status: 404 })
     }
+
+    // SongDetail의 likeCount 감소
+    await SongDetail.findByIdAndUpdate(
+      songId,
+      { $inc: { likeCount: -1 } },
+      { new: true }
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -17,10 +17,10 @@ export async function fetchSongsFromSheet(): Promise<Song[]> {
     const sheetSongs = await fetchRawSongsFromSheet();
     
     // 2. MongoDB에서 상세 데이터 가져오기
-    const songDetails = await fetchSongDetailsFromMongo();
+    const { songDetails, deletedSongKeys } = await fetchSongDetailsFromMongo();
     
     // 3. 두 데이터를 병합
-    const mergedSongs = mergeSongsData(sheetSongs, songDetails);
+    const mergedSongs = mergeSongsData(sheetSongs, songDetails, deletedSongKeys);
     
     console.log(`✅ 노래 데이터 병합: ${mergedSongs.length}곡`);
     return mergedSongs;
@@ -68,7 +68,7 @@ export async function fetchRawSongsFromSheet(): Promise<Song[]> {
   throw new Error('NO_DATA_FOUND');
 }
 
-export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
+export async function fetchSongDetailsFromMongo(): Promise<{ songDetails: SongDetail[], deletedSongKeys: Set<string> }> {
   try {
     
     // 서버사이드에서는 직접 MongoDB 모델 사용
@@ -78,6 +78,7 @@ export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
     
     await dbConnect();
     
+    // 활성화된 곡들 조회
     const songDetails = await SongDetail.find({ 
       $and: [
         // 삭제된 곡 제외 (기존 데이터는 status 필드가 없으므로 null도 허용)
@@ -86,9 +87,46 @@ export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
         { $or: [{ sourceType: { $in: ['sheet', 'admin'] } }, { sourceType: { $exists: false } }] }
       ]
     }).sort({ updatedAt: -1 }).lean();
+
+    // 삭제된 곡들의 키를 별도로 조회
+    const deletedSongs = await SongDetail.find({ 
+      status: 'deleted'
+    }, { title: 1, artist: 1, titleAlias: 1, artistAlias: 1 }).lean();
+
+    const deletedSongKeys = new Set<string>();
+    deletedSongs.forEach(song => {
+      // 원본 제목+아티스트 키
+      const originalKey = createSongKey(song.title, song.artist);
+      deletedSongKeys.add(originalKey);
+      
+      // 별칭이 있는 경우 별칭 키도 추가
+      if (song.titleAlias || song.artistAlias) {
+        const aliasKey = createSongKey(
+          song.titleAlias || song.title,
+          song.artistAlias || song.artist
+        );
+        deletedSongKeys.add(aliasKey);
+        console.log(`🗑️ 삭제된 곡 별칭 키 추가: "${song.titleAlias || song.title}" - "${song.artistAlias || song.artist}" => "${aliasKey}"`);
+      }
+      
+      // 구글시트 파싱 오류로 인한 추가 키 패턴들
+      // "Unknown Title" - "제목" 패턴 (제목과 아티스트가 바뀐 경우)
+      const swappedKey1 = createSongKey("Unknown Title", song.title);
+      deletedSongKeys.add(swappedKey1);
+      console.log(`🗑️ 삭제된 곡 스왑 키1 추가: "Unknown Title" - "${song.title}" => "${swappedKey1}"`);
+      
+      // "제목" - "Unknown Artist" 패턴
+      const swappedKey2 = createSongKey(song.title, "Unknown Artist");
+      deletedSongKeys.add(swappedKey2);
+      console.log(`🗑️ 삭제된 곡 스왑 키2 추가: "${song.title}" - "Unknown Artist" => "${swappedKey2}"`);
+      
+      console.log(`🗑️ 삭제된 곡 키 추가: "${song.title}" - "${song.artist}" => "${originalKey}"`);
+    });
+    
+    console.log(`🗑️ 총 삭제된 곡 키: ${deletedSongKeys.size}개`);
     
     // Mongoose 문서를 일반 객체로 변환 (MongoDB _id 포함)
-    return songDetails.map(doc => ({
+    const processedSongDetails = songDetails.map(doc => ({
       _id: doc._id.toString(), // MongoDB ObjectId를 문자열로 변환
       title: doc.title,
       artist: doc.artist,
@@ -98,6 +136,7 @@ export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
       lyrics: doc.lyrics,
       searchTags: doc.searchTags,
       sungCount: doc.sungCount,
+      likeCount: doc.likeCount,
       lastSungDate: doc.lastSungDate,
       keyAdjustment: doc.keyAdjustment,
       mrLinks: doc.mrLinks,
@@ -116,6 +155,8 @@ export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
       approvedAt: doc.approvedAt,
       approvedBy: doc.approvedBy,
     }));
+
+    return { songDetails: processedSongDetails, deletedSongKeys };
   } catch (error) {
     console.error('❌ MongoDB 오류 발생:', error);
     console.error('스택 트레이스:', error instanceof Error ? error.stack : 'Unknown error');
@@ -131,7 +172,7 @@ export async function fetchSongDetailsFromMongo(): Promise<SongDetail[]> {
       }
     }
     
-    return []; // MongoDB 오류 시 빈 배열 반환
+    return { songDetails: [], deletedSongKeys: new Set() }; // MongoDB 오류 시 빈 객체 반환
   }
 }
 
@@ -148,7 +189,7 @@ function createSongKey(title: string, artist: string): string {
   return `${normalizeTitle(title)}|||${normalizeTitle(artist)}`;
 }
 
-export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[]): Song[] {
+export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[], deletedSongKeys: Set<string>): Song[] {
   // MongoDB 데이터를 정규화된 title+artist 복합키로 맵 생성
   const detailsMap = new Map<string, SongDetail>();
   const normalizedToOriginalMap = new Map<string, string>(); // 디버깅용
@@ -161,45 +202,56 @@ export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[]): S
   });
 
 
-  // 1. 구글시트 데이터에 MongoDB 데이터 병합
-  const mergedSheetSongs = sheetSongs.map(song => {
-    const sheetSongKey = createSongKey(song.title, song.artist);
-    const detail = detailsMap.get(sheetSongKey);
-    
-    
-    if (!detail) {
-      // MongoDB에 데이터가 없는 경우 구글시트 기본 데이터만 반환
-      return { ...song, source: 'sheet' as const };
-    }
-
-    // 매칭된 MongoDB 곡 표시
-    usedMongoSongs.add(sheetSongKey);
-
-    // MongoDB 데이터를 우선하되, title/artist만 구글시트 값 사용
-    return {
-      // MongoDB _id를 메인 ID로 사용
-      id: detail._id,              // MongoDB ObjectId를 메인 ID로 사용
-      sheetId: song.id,           // 구글시트 원본 ID는 별도 보관
-      title: song.title,           // 구글시트 우선
-      artist: song.artist,         // 구글시트 우선
-      source: 'merged' as const,   // 병합된 데이터
+  // 1. 구글시트 데이터에 MongoDB 데이터 병합 (단, 삭제된 곡은 제외)
+  const mergedSheetSongs = sheetSongs
+    .filter(song => {
+      const sheetSongKey = createSongKey(song.title, song.artist);
+      // 삭제된 곡이면 제외
+      if (deletedSongKeys.has(sheetSongKey)) {
+        console.log(`🗑️ 삭제된 곡 제외: ${song.title} - ${song.artist}`);
+        return false;
+      }
+      return true;
+    })
+    .map(song => {
+      const sheetSongKey = createSongKey(song.title, song.artist);
+      const detail = detailsMap.get(sheetSongKey);
       
-      // MongoDB 데이터 우선 사용
-      language: detail.language || song.language,
-      lyrics: detail.lyrics || '',
-      titleAlias: detail.titleAlias,
-      artistAlias: detail.artistAlias,
-      searchTags: detail.searchTags,
-      sungCount: detail.sungCount,
-      lastSungDate: detail.lastSungDate,
-      keyAdjustment: detail.keyAdjustment,
-      mrLinks: detail.mrLinks,
-      selectedMRIndex: detail.selectedMRIndex,
-      personalNotes: detail.personalNotes,
-      imageUrl: detail.imageUrl,
-      dateAdded: detail.createdAt ? detail.createdAt.toISOString().split('T')[0] : song.dateAdded,
-    };
-  });
+      
+      if (!detail) {
+        // MongoDB에 데이터가 없는 경우 구글시트 기본 데이터만 반환
+        return { ...song, source: 'sheet' as const };
+      }
+
+      // 매칭된 MongoDB 곡 표시
+      usedMongoSongs.add(sheetSongKey);
+
+      // MongoDB 데이터를 우선하되, title/artist만 구글시트 값 사용
+      return {
+        // MongoDB _id를 메인 ID로 사용
+        id: detail._id,              // MongoDB ObjectId를 메인 ID로 사용
+        sheetId: song.id,           // 구글시트 원본 ID는 별도 보관
+        title: song.title,           // 구글시트 우선
+        artist: song.artist,         // 구글시트 우선
+        source: 'merged' as const,   // 병합된 데이터
+        
+        // MongoDB 데이터 우선 사용
+        language: detail.language || song.language,
+        lyrics: detail.lyrics || '',
+        titleAlias: detail.titleAlias,
+        artistAlias: detail.artistAlias,
+        searchTags: detail.searchTags,
+        sungCount: detail.sungCount,
+        likeCount: detail.likeCount,
+        lastSungDate: detail.lastSungDate,
+        keyAdjustment: detail.keyAdjustment,
+        mrLinks: detail.mrLinks,
+        selectedMRIndex: detail.selectedMRIndex,
+        personalNotes: detail.personalNotes,
+        imageUrl: detail.imageUrl,
+        dateAdded: detail.createdAt ? detail.createdAt.toISOString().split('T')[0] : song.dateAdded,
+      };
+    });
 
   // 2. MongoDB 전용 곡들 추가 (구글시트에 없는 곡들)
   const mongoOnlySongs: Song[] = [];
@@ -223,6 +275,7 @@ export function mergeSongsData(sheetSongs: Song[], songDetails: SongDetail[]): S
         artistAlias: detail.artistAlias,
         searchTags: detail.searchTags,
         sungCount: detail.sungCount,
+        likeCount: detail.likeCount,
         lastSungDate: detail.lastSungDate,
         keyAdjustment: detail.keyAdjustment,
         mrLinks: detail.mrLinks,

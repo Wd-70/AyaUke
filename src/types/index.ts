@@ -17,6 +17,7 @@ export interface Song {
   artistAlias?: string;
   searchTags?: string[];
   sungCount?: number;
+  likeCount?: number;
   lastSungDate?: string;
   keyAdjustment?: number | null;
   selectedMRIndex?: number;
@@ -27,7 +28,6 @@ export interface Song {
 // SongCard에서 사용하는 확장된 Song 타입
 export interface SongData extends Song {
   mrLinks?: MRLink[];  // string[] 대신 MRLink[] 사용
-  isFavorite?: boolean;
 }
 
 export interface MRLink {
@@ -47,6 +47,7 @@ export interface SongDetail {
   lyrics?: string;
   searchTags?: string[];
   sungCount?: number;
+  likeCount?: number;
   lastSungDate?: string;
   keyAdjustment?: number | null;
   mrLinks?: MRLink[];
