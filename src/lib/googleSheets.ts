@@ -95,32 +95,9 @@ export async function fetchSongDetailsFromMongo(): Promise<{ songDetails: SongDe
 
     const deletedSongKeys = new Set<string>();
     deletedSongs.forEach(song => {
-      // 원본 제목+아티스트 키
-      const originalKey = createSongKey(song.title, song.artist);
-      deletedSongKeys.add(originalKey);
-      
-      // 별칭이 있는 경우 별칭 키도 추가
-      if (song.titleAlias || song.artistAlias) {
-        const aliasKey = createSongKey(
-          song.titleAlias || song.title,
-          song.artistAlias || song.artist
-        );
-        deletedSongKeys.add(aliasKey);
-        console.log(`🗑️ 삭제된 곡 별칭 키 추가: "${song.titleAlias || song.title}" - "${song.artistAlias || song.artist}" => "${aliasKey}"`);
-      }
-      
-      // 구글시트 파싱 오류로 인한 추가 키 패턴들
-      // "Unknown Title" - "제목" 패턴 (제목과 아티스트가 바뀐 경우)
-      const swappedKey1 = createSongKey("Unknown Title", song.title);
-      deletedSongKeys.add(swappedKey1);
-      console.log(`🗑️ 삭제된 곡 스왑 키1 추가: "Unknown Title" - "${song.title}" => "${swappedKey1}"`);
-      
-      // "제목" - "Unknown Artist" 패턴
-      const swappedKey2 = createSongKey(song.title, "Unknown Artist");
-      deletedSongKeys.add(swappedKey2);
-      console.log(`🗑️ 삭제된 곡 스왑 키2 추가: "${song.title}" - "Unknown Artist" => "${swappedKey2}"`);
-      
-      console.log(`🗑️ 삭제된 곡 키 추가: "${song.title}" - "${song.artist}" => "${originalKey}"`);
+      const songKey = createSongKey(song.title, song.artist);
+      deletedSongKeys.add(songKey);
+      console.log(`🗑️ 삭제된 곡 키 추가: "${song.title}" - "${song.artist}" => "${songKey}"`);
     });
     
     console.log(`🗑️ 총 삭제된 곡 키: ${deletedSongKeys.size}개`);
@@ -349,25 +326,30 @@ function parseSheetData(values: string[][]): Song[] {
       
       if (hasRealHeader && titleIndex !== -1 && artistIndex !== -1) {
         // 헤더가 있고 컬럼이 제대로 감지된 경우
-        title = row[titleIndex] || 'Unknown Title';
-        artist = row[artistIndex] || 'Unknown Artist';
+        title = row[titleIndex]?.trim() || '';
+        artist = row[artistIndex]?.trim() || '';
       } else {
         // 헤더가 없거나 컬럼 감지 실패 시 실제 구글시트 구조: 첫 번째 컬럼=아티스트, 두 번째 컬럼=제목
-        artist = row[0] || 'Unknown Artist';  // 첫 번째 컬럼 = 아티스트  
-        title = row[1] || 'Unknown Title';    // 두 번째 컬럼 = 제목
+        artist = row[0]?.trim() || '';  // 첫 번째 컬럼 = 아티스트  
+        title = row[1]?.trim() || '';   // 두 번째 컬럼 = 제목
       }
 
+      // 제목이나 아티스트 중 하나라도 비어있으면 null 반환 (나중에 필터링됨)
+      if (!title || !artist) {
+        return null;
+      }
 
       const song: Song = {
         id: `song-${index + 1}`,
-        title: title.trim(),
-        artist: artist.trim(),
+        title: title,
+        artist: artist,
         language: 'Korean', // 기본값, MongoDB에서 덮어씀
         dateAdded: new Date().toISOString().split('T')[0], // 기본값
         source: 'sheet' as const, // 구글시트 데이터 표시
       };
       return song;
     })
+    .filter((song): song is Song => song !== null) // null인 항목들 제거 및 타입 가드
     .filter(song => {
       // 중복으로 인한 문제가 되는 곡들을 하드코딩으로 제외
       const problematicSongs = [
