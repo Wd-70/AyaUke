@@ -17,17 +17,8 @@ import {
   ChevronRightIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
-import YouTube from "react-youtube";
-import LiveClipManager from "./LiveClipManager";
 import SongEditForm from "./SongEditForm";
 import { useSession } from "next-auth/react";
-import { useCallback } from "react";
-
-// YouTube 플레이어 타입 정의
-interface YouTubePlayer {
-  playVideo(): void;
-  pauseVideo(): void;
-}
 
 interface SongCardModalProps {
   song: SongData;
@@ -45,20 +36,8 @@ export default function SongCardModal({
   isMobileScreen,
 }: SongCardModalProps) {
   const { data: session } = useSession();
-  const [currentTab, setCurrentTab] = useState<"lyrics" | "mr" | "videos">(
-    "lyrics"
-  );
   const [isEditMode, setIsEditMode] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [youtubePlayer, setYoutubePlayer] = useState<YouTubePlayer | null>(
-    null
-  );
 
-  // 라이브 클립 데이터 상태 (LiveClipManager와 공유)
-  const [songVideos, setSongVideos] = useState<any[]>([]);
-  const [videosLoading, setVideosLoading] = useState(false);
-  const [videosLoaded, setVideosLoaded] = useState(false);
-  const [isEditingClip, setIsEditingClip] = useState(false);
 
   // 관리자 권한 체크
   const isAdmin = session?.user?.isAdmin || false;
@@ -67,63 +46,8 @@ export default function SongCardModal({
   const displayTitle = song.titleAlias || song.title;
   const displayArtist = song.artistAlias || song.artist;
 
-  // 유튜브 MR 링크 처리
-  const youtubeMR =
-    song.mrLinks && song.mrLinks.length > 0
-      ? song.mrLinks[song.selectedMRIndex || 0]?.url
-      : null;
 
-  // 라이브 클립 데이터 로드
-  const loadSongVideos = useCallback(async () => {
-    setVideosLoading(true);
-    try {
-      const response = await fetch(`/api/songs/${song.id}/videos`);
-      if (response.ok) {
-        const data = await response.json();
-        setSongVideos(data.videos || []);
-        setVideosLoaded(true);
-      } else {
-        console.error("라이브 클립 로딩 실패");
-        setVideosLoaded(true);
-      }
-    } catch (error) {
-      console.error("라이브 클립 로딩 에러:", error);
-      setVideosLoaded(true);
-    } finally {
-      setVideosLoading(false);
-    }
-  }, [song.id]);
 
-  // 라이브 클립 데이터 로드 (videos 탭을 처음 열 때만)
-  useEffect(() => {
-    if (
-      isExpanded &&
-      currentTab === "videos" &&
-      !videosLoaded &&
-      !videosLoading
-    ) {
-      loadSongVideos();
-    }
-  }, [isExpanded, currentTab, videosLoaded, videosLoading, loadSongVideos]);
-
-  // XL 화면에서는 MR 탭을 기본으로 설정
-  useEffect(() => {
-    const updateDefaultTab = () => {
-      const isXL = window.innerWidth >= 1280;
-      if (isExpanded && isXL && currentTab === "lyrics") {
-        setCurrentTab("mr");
-      }
-    };
-
-    if (isExpanded) {
-      updateDefaultTab();
-      window.addEventListener("resize", updateDefaultTab);
-    }
-
-    return () => {
-      window.removeEventListener("resize", updateDefaultTab);
-    };
-  }, [isExpanded, currentTab]);
 
   // 편집 모드 토글
   const toggleEditMode = () => {
@@ -141,47 +65,11 @@ export default function SongCardModal({
     setIsEditMode(false);
   };
 
-  // 탭 전환 핸들러
-  const switchTab = (tab: "lyrics" | "mr" | "videos") => {
-    console.log(`🔄 Tab switch: ${currentTab} → ${tab}`);
-    setCurrentTab(tab);
-  };
 
-  // 모달 재생 버튼 핸들러
-  const handleModalPlay = () => {
-    if (youtubePlayer) {
-      if (isPlaying) {
-        youtubePlayer.pauseVideo();
-      } else {
-        youtubePlayer.playVideo();
-      }
-    } else if (onPlay) {
-      onPlay(song);
-    }
-  };
 
-  // MR 검색 핸들러
-  const handleMRSearch = () => {
-    const searchQuery = `${song.title} ${song.artist} MR 반주`;
-    const youtubeSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
-      searchQuery
-    )}`;
-    window.open(youtubeSearchUrl, "_blank");
-  };
-
-  // 모달 닫기 핸들러 (편집 중일 때 확인)
+  // 모달 닫기 핸들러
   const handleClose = () => {
-    if (isEditingClip) {
-      if (
-        confirm(
-          "클립을 편집하는 중입니다. 정말로 닫으시겠습니까? 편집 중인 내용은 저장되지 않습니다."
-        )
-      ) {
-        onClose();
-      }
-    } else {
-      onClose();
-    }
+    onClose();
   };
 
   // 스크롤 핸들러
@@ -401,7 +289,7 @@ export default function SongCardModal({
             </div>
 
             {/* 큰 화면에서의 영상 섹션 - 플레이어 대상 영역 */}
-            <div className="hidden xl:flex flex-col flex-1 gap-4 xl:gap-6 min-h-0">
+            <div className="hidden xl:flex flex-col flex-1 gap-4 xl:gap-0 min-h-0">
               {isEditMode ? (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -421,70 +309,19 @@ export default function SongCardModal({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   transition={{ duration: 0.3, delay: 0.1 }}
-                  className="p-3 sm:p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
+                  className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
                 >
-                  {/* XL 화면 탭 네비게이션 */}
-                  <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20 mb-4">
-                    <button
-                      onClick={() => switchTab("mr")}
-                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 text-sm font-medium transition-colors duration-200 ${
-                        currentTab === "mr"
-                          ? "text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10"
-                          : "text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"
-                      }`}
-                    >
-                      <VideoCameraIcon className="w-5 h-5" />
-                      <span>MR 영상</span>
-                    </button>
-                    <button
-                      onClick={() => switchTab("videos")}
-                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 sm:px-4 sm:py-3 text-sm font-medium transition-colors duration-200 ${
-                        currentTab === "videos"
-                          ? "text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10"
-                          : "text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"
-                      }`}
-                    >
-                      <PlayIcon className="w-5 h-5" />
-                      <span>라이브 클립</span>
-                    </button>
-                  </div>
+                  {/* 
+                    📝 주의: MR 영상과 라이브 클립 화면은 SongCard.tsx에서 제어됩니다.
+                    이 모달은 가사 표시 전용으로 사용되며, 실제 영상 재생은 
+                    SongCard.tsx의 통합 플레이어 시스템을 통해 처리됩니다.
+                  */}
 
-                  {/* XL 화면 MR 섹션 */}
-                  <div
-                    className={`${
-                      currentTab === "mr" ? "flex" : "hidden"
-                    } flex-col flex-1 min-h-0`}
-                  >
-                    {/* 기존 YouTube 플레이어 */}
-                    {youtubeMR && (
-                      <div
-                        id="xl-player-target"
-                        className="w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                        style={{
-                          height: "100%",
-                          maxHeight: "100%",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {/* 통합 플레이어가 여기에 위치함 */}
-                      </div>
-                    )}
-                  </div>
+                  {/* 
+                    🎵 XL 화면 MR/라이브클립 영역
+                    실제 영상 재생은 SongCard.tsx의 통합 플레이어가 이 영역에 오버레이됩니다.
+                  */}
 
-                  {/* XL 화면 유튜브 영상 섹션 */}
-                  {/* {currentTab === "videos" && (
-                    <div className="flex flex-col h-full min-h-0 relative">
-                      <LiveClipManager
-                        songId={song.id}
-                        songTitle={displayTitle}
-                        songVideos={songVideos}
-                        setSongVideos={setSongVideos}
-                        videosLoading={videosLoading}
-                        loadSongVideos={loadSongVideos}
-                        onEditingStateChange={setIsEditingClip}
-                      />
-                    </div>
-                  )} */}
                 </motion.div>
               )}
             </div>
@@ -512,166 +349,49 @@ export default function SongCardModal({
                   transition={{ duration: 0.3, delay: 0.1 }}
                   className="flex flex-col flex-1 min-h-0"
                 >
-                  {/* 탭 네비게이션 */}
-                  <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20">
-                    <button
-                      onClick={() => switchTab("lyrics")}
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
-                        currentTab === "lyrics"
-                          ? "text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10"
-                          : "text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"
-                      }`}
-                    >
-                      <MusicalNoteIcon className="w-4 h-4" />
-                      <span>가사</span>
-                    </button>
-                    <button
-                      onClick={() => switchTab("mr")}
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
-                        currentTab === "mr"
-                          ? "text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10"
-                          : "text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"
-                      }`}
-                    >
-                      <VideoCameraIcon className="w-4 h-4" />
-                      <span>MR</span>
-                    </button>
-                    <button
-                      onClick={() => switchTab("videos")}
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors duration-200 ${
-                        currentTab === "videos"
-                          ? "text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent bg-light-primary/10 dark:bg-dark-primary/10"
-                          : "text-gray-600 dark:text-gray-400 hover:text-light-accent dark:hover:text-dark-accent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"
-                      }`}
-                    >
-                      <PlayIcon className="w-4 h-4" />
-                      <span>라이브 클립</span>
-                    </button>
+                  {/* 
+                    📱 모바일 화면 - 가사 표시 전용
+                    MR과 라이브클립은 SongCard.tsx에서 별도 처리됩니다.
+                  */}
+                  <div className="flex items-center gap-2 mb-4 px-4 py-2">
+                    <MusicalNoteIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
+                    <h3 className="text-lg font-semibold text-light-text dark:text-dark-text">가사</h3>
                   </div>
 
-                  {/* MR 섹션 */}
-                  {currentTab === "mr" && (
-                    <div className="flex flex-col flex-1 min-h-0 p-3 sm:p-6">
-                      {/* 기존 YouTube 플레이어 */}
-                      {youtubeMR && (
-                        <div className="flex-1 flex flex-col min-h-0">
-                          <div
-                            id="mobile-player-target"
-                            className="w-full bg-gray-50 dark:bg-gray-800 rounded-lg flex-1"
-                            style={{
-                              minHeight: "240px",
-                              overflow: "hidden",
-                            }}
-                          >
-                            {/* 통합 플레이어가 여기에 위치함 */}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* 가사 섹션 */}
-                  {currentTab === "lyrics" && (
-                    <div className="flex flex-col flex-1 min-h-0 p-3 sm:p-6">
-                      {song.lyrics ? (
-                        <div
-                          className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
-                          style={{
-                            overscrollBehavior: "contain",
-                            willChange: "scroll-position",
-                            transform: "translateZ(0)",
-                          }}
-                          onWheel={handleScrollableAreaScroll}
-                        >
-                          {song.lyrics}
-                        </div>
-                      ) : (
-                        <div className="text-center h-full flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50">
-                          <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
-                          <p className="text-lg mb-2">
-                            아직 가사가 등록되지 않았습니다
-                          </p>
-                          <p className="text-base">곧 업데이트될 예정입니다</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex flex-col flex-1 min-h-0 p-3 sm:p-6">
+                    {song.lyrics ? (
+                      <div
+                        className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg overflow-y-auto flex-1 min-h-0"
+                        style={{
+                          overscrollBehavior: "contain",
+                          willChange: "scroll-position",
+                          transform: "translateZ(0)",
+                        }}
+                        onWheel={handleScrollableAreaScroll}
+                      >
+                        {song.lyrics}
+                      </div>
+                    ) : (
+                      <div className="text-center h-full flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50">
+                        <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
+                        <p className="text-lg mb-2">
+                          아직 가사가 등록되지 않았습니다
+                        </p>
+                        <p className="text-base">곧 업데이트될 예정입니다</p>
+                      </div>
+                    )}
+                  </div>
 
-                  {/* 유튜브 영상 섹션 - XL과 동일한 구조 */}
-                  {/* {currentTab === "videos" && (
-                    <div className="flex flex-col h-full min-h-0 relative">
-                      <LiveClipManager
-                        songId={song.id}
-                        songTitle={displayTitle}
-                        songVideos={songVideos}
-                        setSongVideos={setSongVideos}
-                        videosLoading={videosLoading}
-                        loadSongVideos={loadSongVideos}
-                        onEditingStateChange={setIsEditingClip}
-                      />
-                    </div>
-                  )} */}
                 </motion.div>
               )}
             </div>
 
-            {/* Action buttons - 편집 모드가 아닐 때만 표시 */}
-            {!isEditMode && (
-              <div className="flex items-center gap-1.5 sm:gap-2 xl:gap-3 flex-wrap mt-2 sm:mt-3">
-                {youtubeMR ? (
-                  // MR 링크가 있을 때 - 3개 버튼으로 분리
-                  <>
-                    {/* 재생/일시정지 버튼 */}
-                    <button
-                      onClick={handleModalPlay}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base
-                               bg-gradient-to-r from-light-accent to-light-purple 
-                               dark:from-dark-accent dark:to-dark-purple text-white 
-                               rounded-lg hover:shadow-lg transform hover:scale-105 
-                               transition-all duration-200 font-medium"
-                    >
-                      {isPlaying ? (
-                        <>
-                          <PauseIcon className="w-5 h-5" />
-                          <span>일시정지</span>
-                        </>
-                      ) : (
-                        <>
-                          <PlayIcon className="w-5 h-5" />
-                          <span>재생</span>
-                        </>
-                      )}
-                    </button>
-
-                    {/* MR 검색 버튼 */}
-                    <button
-                      onClick={handleMRSearch}
-                      className="px-3 sm:px-4 py-2 sm:py-3 bg-light-secondary/20 dark:bg-dark-secondary/20 
-                               hover:bg-light-secondary/30 dark:hover:bg-dark-secondary/30
-                               text-light-text dark:text-dark-text rounded-lg
-                               transition-colors duration-200 flex items-center gap-2"
-                      title="YouTube에서 MR 검색"
-                    >
-                      <MagnifyingGlassIcon className="w-4 h-4 sm:w-5 sm:h-5" />
-                      <span className="hidden sm:inline">MR 검색</span>
-                    </button>
-                  </>
-                ) : (
-                  // MR 링크가 없을 때 - 단일 버튼
-                  <button
-                    onClick={handleMRSearch}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base
-                             bg-gradient-to-r from-light-accent to-light-purple 
-                             dark:from-dark-accent dark:to-dark-purple text-white 
-                             rounded-lg hover:shadow-lg transform hover:scale-105 
-                             transition-all duration-200 font-medium"
-                  >
-                    <MagnifyingGlassIcon className="w-5 h-5" />
-                    <span>MR 검색</span>
-                  </button>
-                )}
-              </div>
-            )}
+            {/* 
+              📝 Action buttons 영역
+              MR 재생/검색 버튼들은 SongCard.tsx에서 처리됩니다.
+              이 모달은 가사 표시 전용입니다.
+            */}
           </div>
         </div>
       </motion.div>

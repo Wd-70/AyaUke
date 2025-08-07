@@ -1571,7 +1571,7 @@ export default function SongCard({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   transition={{ duration: 0.3, delay: 0.1 }}
-                  className="p-6 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
+                  className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
                 >
                   {/* XL 화면 탭 네비게이션 */}
                   <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20 mb-4">
