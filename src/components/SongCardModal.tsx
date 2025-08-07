@@ -115,7 +115,7 @@ export default function SongCardModal({
         exit={{ opacity: 0, scale: 0.9, x: "-50%", y: "-10%" }}
         transition={{ duration: 0.3 }}
         className="fixed top-20 sm:top-20 left-1/2 z-40 
-                   w-[90vw] max-w-7xl overflow-hidden
+                   w-[95vw] max-w-[1600px] overflow-hidden
                    bg-white dark:bg-gray-900 backdrop-blur-sm 
                    rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
                    shadow-2xl transform -translate-x-1/2 youtube-dialog-container"

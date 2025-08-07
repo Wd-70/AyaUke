@@ -16,7 +16,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
   const { data: session, status, update } = useSession(); // 한 번만 호출
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-light-primary/20 dark:border-dark-primary/20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center h-16">
           {/* Left side - Logo */}
           <div className="flex-1">

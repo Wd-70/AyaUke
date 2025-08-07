@@ -173,7 +173,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
                         rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
       </div>
 
-      <main className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 px-3 sm:px-4 lg:px-6 xl:px-8 max-w-7xl mx-auto">
+      <main className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 px-3 sm:px-4 lg:px-6 xl:px-8 max-w-[1400px] mx-auto">
         <SongbookHeader 
           totalSongs={initialSongs?.length || 0}
           filteredSongs={filteredSongs.length || 0}

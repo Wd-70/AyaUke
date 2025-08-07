@@ -21,35 +21,25 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/[...nextauth]/route.js"
     ],
-    "/api/songs/[songId]/videos/route": [
+    "/api/likes-bulk/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/songs/[songId]/videos/route.js"
+      "static/chunks/app/api/likes-bulk/route.js"
     ],
     "/api/user/playlists/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/user/playlists/route.js"
     ],
-    "/api/likes-bulk/route": [
+    "/api/songs/[songId]/videos/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/likes-bulk/route.js"
+      "static/chunks/app/api/songs/[songId]/videos/route.js"
     ],
     "/api/user/[userId]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/user/[userId]/route.js"
-    ],
-    "/api/user/activity/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/user/activity/route.js"
-    ],
-    "/api/videos/[videoId]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/videos/[videoId]/route.js"
     ]
   }
 }
