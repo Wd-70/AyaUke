@@ -113,16 +113,6 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
     });
   };
 
-  // 랜덤 섞기 함수
-  const handleShuffleSongs = () => {
-    const shuffled = [...songs].sort(() => Math.random() - 0.5);
-    setSongs(shuffled);
-    // 필터된 곡들도 업데이트 (현재 필터 조건 유지하면서)
-    setFilteredSongs(prev => {
-      const filteredIds = new Set(prev.map(song => song.id));
-      return shuffled.filter(song => filteredIds.has(song.id));
-    });
-  };
 
   // 번호 표시 토글 함수
   const handleToggleNumbers = (show: boolean) => {
@@ -184,7 +174,6 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
         <SongSearch 
           songs={songs || []} 
           onFilteredSongs={setFilteredSongs}
-          onShuffleSongs={handleShuffleSongs}
           showNumbers={showNumbers}
           onToggleNumbers={handleToggleNumbers}
         />

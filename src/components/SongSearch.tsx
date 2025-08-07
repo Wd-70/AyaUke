@@ -25,7 +25,6 @@ import { useLikes } from "@/hooks/useLikes";
 interface SongSearchProps {
   songs: Song[];
   onFilteredSongs: (songs: Song[]) => void;
-  onShuffleSongs?: () => void;
   showNumbers?: boolean;
   onToggleNumbers?: (show: boolean) => void;
 }
@@ -52,7 +51,6 @@ type FilterMode = "individual" | "intersection" | "union";
 export default function SongSearch({
   songs,
   onFilteredSongs,
-  onShuffleSongs,
   showNumbers = false,
   onToggleNumbers,
 }: SongSearchProps) {
@@ -73,7 +71,7 @@ export default function SongSearch({
   >(null); // 개별 모드용
 
   // 정렬 옵션
-  const [sortBy, setSortBy] = useState<"default" | "likes" | "title" | "sungCount">("default");
+  const [sortBy, setSortBy] = useState<"default" | "random" | "likes" | "sungCount" | "title">("default");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // 훅 사용
@@ -225,10 +223,24 @@ export default function SongSearch({
     playlistSongIds,
   ]);
 
+  // 랜덤 시드를 위한 상태 (재섞기 트리거)
+  const [randomSeed, setRandomSeed] = useState(0);
+
   // 정렬된 곡들
   const sortedSongs = useMemo(() => {
     if (sortBy === "default") {
       return filteredSongs;
+    }
+
+    if (sortBy === "random") {
+      // 랜덤 정렬을 위해 Fisher-Yates 셔플 알고리즘 사용
+      // randomSeed가 변경될 때마다 재실행됨
+      const shuffled = [...filteredSongs];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
     }
 
     const sorted = [...filteredSongs].sort((a, b) => {
@@ -250,7 +262,7 @@ export default function SongSearch({
     });
 
     return sorted;
-  }, [filteredSongs, sortBy, sortOrder]);
+  }, [filteredSongs, sortBy, sortOrder, randomSeed]);
 
   // Update filtered songs when sortedSongs changes
   React.useEffect(() => {
@@ -351,6 +363,11 @@ export default function SongSearch({
     setSortOrder("desc");
   }, []);
 
+  // 랜덤 정렬 함수
+  const handleRandomSort = useCallback(() => {
+    setSortBy("random");
+  }, []);
+
   const hasActiveFilters =
     searchTerm ||
     activeLanguages.size > 0 ||
@@ -445,19 +462,6 @@ export default function SongSearch({
                      focus:border-transparent transition-all duration-200"
         />
         <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-1">
-          {/* 랜덤 섞기 버튼 */}
-          {onShuffleSongs && (
-            <button
-              onClick={onShuffleSongs}
-              className="p-1.5 rounded-lg hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 
-                       text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent 
-                       transition-all duration-200 hover:scale-110"
-              title="곡 순서 랜덤 섞기"
-            >
-              <ArrowsUpDownIcon className="h-5 w-5" />
-            </button>
-          )}
-
           {/* 번호 표시 토글 버튼 */}
           {onToggleNumbers && (
             <button
@@ -472,32 +476,6 @@ export default function SongSearch({
               <HashtagIcon className="h-5 w-5" />
             </button>
           )}
-
-          {/* 정렬 버튼 */}
-          <div className="flex items-center">
-            <select
-              value={`${sortBy}-${sortOrder}`}
-              onChange={(e) => {
-                const [newSortBy, newSortOrder] = e.target.value.split('-') as [typeof sortBy, typeof sortOrder];
-                setSortBy(newSortBy);
-                setSortOrder(newSortOrder);
-              }}
-              className="text-xs px-2 py-1 rounded-md bg-white dark:bg-gray-900 
-                       border border-light-primary/20 dark:border-dark-primary/20
-                       text-gray-900 dark:text-white
-                       focus:outline-none focus:ring-1 focus:ring-light-accent dark:focus:ring-dark-accent
-                       hover:bg-light-primary/10 dark:hover:bg-gray-800
-                       transition-colors duration-200"
-            >
-              <option value="default-desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">기본순</option>
-              <option value="likes-desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">좋아요 많은순</option>
-              <option value="likes-asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">좋아요 적은순</option>
-              <option value="sungCount-desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">부른 많은순</option>
-              <option value="sungCount-asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">부른 적은순</option>
-              <option value="title-asc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">제목 ㄱㄴㄷ순</option>
-              <option value="title-desc" className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">제목 ㄷㄴㄱ순</option>
-            </select>
-          </div>
 
           {/* 필터 토글 버튼 */}
           <button
@@ -527,29 +505,126 @@ export default function SongSearch({
         className="overflow-hidden"
       >
         <div className="space-y-3">
-          {/* 첫 번째 줄: 언어 필터들 */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* <span className="text-sm font-medium text-light-text/60 dark:text-dark-text/60 mr-2">언어:</span> */}
-            {languages.map((language) => (
+          {/* 첫 번째 줄: 언어 필터들 + 정렬 탭 */}
+          <div className="flex items-center justify-between gap-4">
+            {/* 왼쪽: 언어 필터들 */}
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              {languages.map((language) => (
+                <button
+                  key={language}
+                  onClick={() => toggleLanguage(language)}
+                  className={`
+                    flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium
+                    transition-all duration-200 hover:scale-105 border-2
+                    ${
+                      activeLanguages.has(language)
+                        ? "bg-blue-500 text-white border-blue-500 shadow-lg"
+                        : "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                    }
+                  `}
+                >
+                  <span>{language}</span>
+                  <span className="text-xs opacity-75">
+                    ({songs.filter((song) => song.language === language).length})
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* 오른쪽: 정렬 탭 (큰 화면에서만 표시) */}
+            <div className="hidden lg:flex items-center gap-1 bg-white/50 dark:bg-gray-800/50 rounded-lg p-1 border border-light-primary/20 dark:border-dark-primary/20 flex-shrink-0">
               <button
-                key={language}
-                onClick={() => toggleLanguage(language)}
-                className={`
-                  flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium
-                  transition-all duration-200 hover:scale-105 border-2
-                  ${
-                    activeLanguages.has(language)
-                      ? "bg-blue-500 text-white border-blue-500 shadow-lg"
-                      : "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                  }
-                `}
+                onClick={() => setSortBy("default")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                  sortBy === "default"
+                    ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
+                    : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
+                }`}
               >
-                <span>{language}</span>
-                <span className="text-xs opacity-75">
-                  ({songs.filter((song) => song.language === language).length})
-                </span>
+                기본
               </button>
-            ))}
+              <button
+                onClick={() => {
+                  setSortBy("random");
+                  setRandomSeed(prev => prev + 1);
+                }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                  sortBy === "random"
+                    ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
+                    : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
+                }`}
+              >
+                <ArrowsUpDownIcon className="w-3 h-3" />
+                랜덤
+              </button>
+              <button
+                onClick={() => {
+                  if (sortBy === "likes") {
+                    setSortOrder(sortOrder === "desc" ? "asc" : "desc");
+                  } else {
+                    setSortBy("likes");
+                    setSortOrder("desc");
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                  sortBy === "likes"
+                    ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
+                    : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
+                }`}
+              >
+                <HeartIcon className="w-3 h-3" />
+                좋아요
+                {sortBy === "likes" && (
+                  <span className="text-xs opacity-75">
+                    {sortOrder === "desc" ? "↓" : "↑"}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  if (sortBy === "sungCount") {
+                    setSortOrder(sortOrder === "desc" ? "asc" : "desc");
+                  } else {
+                    setSortBy("sungCount");
+                    setSortOrder("desc");
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                  sortBy === "sungCount"
+                    ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
+                    : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
+                }`}
+              >
+                🎤 부른횟수
+                {sortBy === "sungCount" && (
+                  <span className="text-xs opacity-75">
+                    {sortOrder === "desc" ? "↓" : "↑"}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  if (sortBy === "title") {
+                    setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                  } else {
+                    setSortBy("title");
+                    setSortOrder("asc");
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                  sortBy === "title"
+                    ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
+                    : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
+                }`}
+              >
+                가나다
+                {sortBy === "title" && (
+                  <span className="text-xs opacity-75">
+                    {sortOrder === "asc" ? "↑" : "↓"}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* 두 번째 줄: 모드 선택 + 기타 필터들 */}
@@ -630,6 +705,105 @@ export default function SongSearch({
                 </motion.div>
               </>
             )}
+          </div>
+
+          {/* 세 번째 줄: 정렬 탭 (작은 화면에서만 표시) */}
+          <div className="lg:hidden">
+            <div className="flex items-center justify-center">
+              <div className="flex items-center gap-1 bg-white/50 dark:bg-gray-800/50 rounded-lg p-1 border border-light-primary/20 dark:border-dark-primary/20">
+                <button
+                  onClick={() => setSortBy("default")}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                    sortBy === "default"
+                      ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
+                      : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
+                  }`}
+                >
+                  기본
+                </button>
+                <button
+                  onClick={() => {
+                    setSortBy("random");
+                    setRandomSeed(prev => prev + 1);
+                  }}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                    sortBy === "random"
+                      ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
+                      : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
+                  }`}
+                >
+                  <ArrowsUpDownIcon className="w-3 h-3" />
+                  랜덤
+                </button>
+                <button
+                  onClick={() => {
+                    if (sortBy === "likes") {
+                      setSortOrder(sortOrder === "desc" ? "asc" : "desc");
+                    } else {
+                      setSortBy("likes");
+                      setSortOrder("desc");
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                    sortBy === "likes"
+                      ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
+                      : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
+                  }`}
+                >
+                  <HeartIcon className="w-3 h-3" />
+                  좋아요
+                  {sortBy === "likes" && (
+                    <span className="text-xs opacity-75">
+                      {sortOrder === "desc" ? "↓" : "↑"}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    if (sortBy === "sungCount") {
+                      setSortOrder(sortOrder === "desc" ? "asc" : "desc");
+                    } else {
+                      setSortBy("sungCount");
+                      setSortOrder("desc");
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                    sortBy === "sungCount"
+                      ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
+                      : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
+                  }`}
+                >
+                  🎤 부른횟수
+                  {sortBy === "sungCount" && (
+                    <span className="text-xs opacity-75">
+                      {sortOrder === "desc" ? "↓" : "↑"}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    if (sortBy === "title") {
+                      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+                    } else {
+                      setSortBy("title");
+                      setSortOrder("asc");
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                    sortBy === "title"
+                      ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
+                      : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
+                  }`}
+                >
+                  가나다
+                  {sortBy === "title" && (
+                    <span className="text-xs opacity-75">
+                      {sortOrder === "asc" ? "↑" : "↓"}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </motion.div>

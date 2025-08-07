@@ -1,6 +1,9 @@
 {
-  "/api/user/playlists/route": "app/api/user/playlists/route.js",
+  "/api/user/activity/route": "app/api/user/activity/route.js",
+  "/api/chzzk-videos/route": "app/api/chzzk-videos/route.js",
   "/api/likes-bulk/route": "app/api/likes-bulk/route.js",
+  "/api/user/playlists/route": "app/api/user/playlists/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/page": "app/page.js",
   "/songbook/page": "app/songbook/page.js"
 }
