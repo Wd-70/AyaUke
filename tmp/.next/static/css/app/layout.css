@@ -2707,6 +2707,9 @@ video {
 .pt-8{
   padding-top: 2rem;
 }
+.pb-6{
+  padding-bottom: 1.5rem;
+}
 .text-left{
   text-align: left;
 }
@@ -6256,6 +6259,14 @@ body {
   .xl\:py-3{
     padding-top: 0.75rem;
     padding-bottom: 0.75rem;
+  }
+
+  .xl\:pr-6{
+    padding-right: 1.5rem;
+  }
+
+  .xl\:pb-0{
+    padding-bottom: 0px;
   }
 
   .xl\:text-2xl{

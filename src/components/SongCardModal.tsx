@@ -92,6 +92,7 @@ export default function SongCardModal({
     Korean: "bg-blue-500",
     English: "bg-purple-500",
     Japanese: "bg-pink-500",
+    Chinese: "bg-red-500",
   };
 
   if (!isExpanded) return null;

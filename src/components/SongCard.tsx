@@ -37,6 +37,7 @@ import { useConfirm } from "./ConfirmDialog";
 interface YouTubePlayer {
   playVideo(): void;
   pauseVideo(): void;
+  getPlayerState(): number;
 }
 
 interface SongCardProps {
@@ -443,6 +444,13 @@ export default function SongCard({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // SongEditForm용 저장 핸들러
+  const handleSaveEdit = (updatedSong: SongData) => {
+    // 곡 데이터 업데이트
+    Object.assign(song, updatedSong);
+    setIsEditMode(false);
   };
 
   // 편집 취소
@@ -1206,10 +1214,12 @@ export default function SongCard({
     </div>
   );
 
+  // TODO: 기존 인라인 편집 코드 - SongEditForm 컴포넌트로 교체됨
+  /*
   // 편집 모드 헤더 렌더링
   const renderEditModeHeader = () => (
     <div className="space-y-4">
-      {/* 편집 액션 버튼들 - 맨 위에 배치 */}
+      // 편집 액션 버튼들 - 맨 위에 배치
       <div className="flex items-center justify-between">
         <h4 className="text-lg font-semibold text-light-accent dark:text-dark-accent">
           곡 정보 편집
@@ -1254,211 +1264,13 @@ export default function SongCard({
         </div>
       </div>
 
-      {/* 기본 정보 섹션 */}
+      // 기본 정보 섹션 
       <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-xl p-6 space-y-4">
-        <h4 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4">
-          기본 정보
-        </h4>
-
-        {/* 곡 제목 */}
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
-            <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
-            곡 제목
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              value={editData.titleAlias}
-              onChange={(e) =>
-                setEditData({ ...editData, titleAlias: e.target.value })
-              }
-              className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
-                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
-                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
-                         transition-all outline-none backdrop-blur-sm text-xl font-semibold"
-              placeholder={`원본: ${song.title}`}
-            />
-            {editData.titleAlias && editData.titleAlias !== song.title && (
-              <div className="absolute -top-2 right-3 px-2 py-1 bg-light-accent dark:bg-dark-accent text-white text-xs rounded-full">
-                수정됨
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 아티스트 */}
-        <div className="space-y-3">
-          <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
-            <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
-            아티스트
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              value={editData.artistAlias}
-              onChange={(e) =>
-                setEditData({ ...editData, artistAlias: e.target.value })
-              }
-              className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
-                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
-                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
-                         transition-all outline-none backdrop-blur-sm text-lg"
-              placeholder={`원본: ${song.artist}`}
-            />
-            {editData.artistAlias && editData.artistAlias !== song.artist && (
-              <div className="absolute -top-2 right-3 px-2 py-1 bg-light-accent dark:bg-dark-accent text-white text-xs rounded-full">
-                수정됨
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 키 조절과 언어 */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
-              <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
-              키 조절
-            </label>
-            <div className="flex items-center gap-3 bg-light-primary/10 dark:bg-dark-primary/10 rounded-xl p-3">
-              <button
-                onClick={() =>
-                  setEditData({
-                    ...editData,
-                    keyAdjustment:
-                      editData.keyAdjustment === null
-                        ? -1
-                        : Math.max(-12, editData.keyAdjustment - 1),
-                  })
-                }
-                className="p-2 rounded-lg hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                           transition-colors duration-200 bg-white/50 dark:bg-gray-700/50"
-                title="키 내리기"
-              >
-                <MinusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-              </button>
-              <div className="flex-1 text-center">
-                <span
-                  className="px-4 py-2 text-sm font-medium bg-white dark:bg-gray-700 
-                               text-light-text dark:text-dark-text rounded-lg border border-light-primary/20 dark:border-dark-primary/20"
-                >
-                  {editData.keyAdjustment === null
-                    ? "미등록"
-                    : formatKeyAdjustment(editData.keyAdjustment) || "원본키"}
-                </span>
-                {editData.keyAdjustment !== null &&
-                  editData.keyAdjustment !== 0 && (
-                    <div className="mt-1">
-                      <div
-                        className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                          editData.keyAdjustment > 0
-                            ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                            : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-                        }`}
-                      >
-                        {editData.keyAdjustment > 0 ? "+" : ""}
-                        {editData.keyAdjustment} 반음
-                      </div>
-                    </div>
-                  )}
-              </div>
-              <button
-                onClick={() =>
-                  setEditData({
-                    ...editData,
-                    keyAdjustment:
-                      editData.keyAdjustment === null
-                        ? 1
-                        : Math.min(12, editData.keyAdjustment + 1),
-                  })
-                }
-                className="p-2 rounded-lg hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                           transition-colors duration-200 bg-white/50 dark:bg-gray-700/50"
-                title="키 올리기"
-              >
-                <PlusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-              </button>
-            </div>
-            <div className="flex gap-2 justify-center">
-              <button
-                onClick={() => setEditData({ ...editData, keyAdjustment: 0 })}
-                className="px-3 py-1 text-xs rounded-lg bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 
-                           transition-colors duration-200 text-blue-700 dark:text-blue-300 font-medium"
-                title="원본키로 설정"
-              >
-                원본키
-              </button>
-              <button
-                onClick={() =>
-                  setEditData({ ...editData, keyAdjustment: null })
-                }
-                className="px-3 py-1 text-xs rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 
-                           transition-colors duration-200 text-gray-700 dark:text-gray-300 font-medium"
-                title="키 정보 삭제"
-              >
-                삭제
-              </button>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
-              <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
-              언어
-            </label>
-            <select
-              value={editData.language}
-              onChange={(e) =>
-                setEditData({ ...editData, language: e.target.value })
-              }
-              className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
-                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
-                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
-                         transition-all outline-none backdrop-blur-sm appearance-none cursor-pointer"
-            >
-              <option value="">언어 선택</option>
-              <option value="Korean" className="py-2">
-                🇰🇷 Korean
-              </option>
-              <option value="English" className="py-2">
-                🇺🇸 English
-              </option>
-              <option value="Japanese" className="py-2">
-                🇯🇵 Japanese
-              </option>
-              <option value="Chinese" className="py-2">
-                🇨🇳 Chinese
-              </option>
-              <option value="Other" className="py-2">
-                🌍 Other
-              </option>
-            </select>
-            {editData.language && (
-              <div className="flex items-center gap-2 pl-1">
-                <div
-                  className={`w-2 h-2 rounded-full ${
-                    editData.language === "Korean"
-                      ? "bg-blue-500"
-                      : editData.language === "English"
-                      ? "bg-purple-500"
-                      : editData.language === "Japanese"
-                      ? "bg-pink-500"
-                      : editData.language === "Chinese"
-                      ? "bg-red-500"
-                      : "bg-gray-500"
-                  }`}
-                ></div>
-                <span className="text-xs text-light-text/70 dark:text-dark-text/70">
-                  {editData.language}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
+        // ... 기존 인라인 편집 UI 코드들 ...
+        // (전체 코드는 너무 길어서 생략)
       </div>
 
-      {/* 검색 태그 편집 */}
+      // 검색 태그 편집 
       <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-xl p-6">
         <h4 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4">
           검색 태그
@@ -1471,6 +1283,7 @@ export default function SongCard({
       </div>
     </div>
   );
+  */
 
   // 일반 모드 헤더 렌더링
   const renderNormalModeHeader = () => (
@@ -1673,10 +1486,21 @@ export default function SongCard({
             {renderXLLyricsPanel()}
 
             {/* 오른쪽: 모든 다른 요소들 */}
-            <div className="flex-1 xl:w-1/2 flex flex-col min-h-0 relative xl:overflow-y-auto xl:overscroll-behavior-contain">
+            <div className="flex-1 xl:w-1/2 flex flex-col min-h-0 relative xl:overflow-y-auto xl:overscroll-behavior-contain xl:pr-6">
               {/* Header */}
               <div className="mb-3 sm:mb-4">
-                {isEditMode ? renderEditModeHeader() : renderNormalModeHeader()}
+                {isEditMode ? (
+                  <SongEditForm
+                    song={song}
+                    isVisible={true}
+                    onSave={handleSaveEdit}
+                    onCancel={cancelEdit}
+                    onLyricsChange={handleLyricsChange}
+                    initialLyrics={lyricsText}
+                  />
+                ) : (
+                  renderNormalModeHeader()
+                )}
               </div>
 
               {/* Legacy Tags (if exists) */}
@@ -1695,14 +1519,15 @@ export default function SongCard({
                 </div>
               )}
 
-              {/* 큰 화면에서의 영상 섹션 - 플레이어 대상 영역 */}
-              <div className="hidden xl:flex flex-col flex-1 gap-6 min-h-0">
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  transition={{ duration: 0.3, delay: 0.1 }}
-                  className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
-                >
+              {/* 큰 화면에서의 영상 섹션 - 플레이어 대상 영역, 편집 모드에서는 숨김 */}
+              {!isEditMode && (
+                <div className="hidden xl:flex flex-col flex-1 gap-6 min-h-0">
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    transition={{ duration: 0.3, delay: 0.1 }}
+                    className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
+                  >
                   {/* XL 화면 탭 네비게이션 */}
                   <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20 mb-4">
                     <button
@@ -1730,25 +1555,13 @@ export default function SongCard({
                   </div>
 
                   {/* XL 화면 MR 섹션 */}
-                  <div
-                    className={`${
-                      currentTab === "mr" ? "flex" : "hidden"
-                    } flex-col flex-1 min-h-0`}
-                  >
-                    {isEditMode ? (
-                      /* MR 링크 편집 UI */
-                      <MRLinkManager
-                        mrLinks={editData.mrLinks}
-                        selectedMRIndex={editData.selectedMRIndex}
-                        onMRLinksChange={handleMRLinksChange}
-                        onSelectedMRIndexChange={handleSelectedMRIndexChange}
-                        isEditMode={true}
-                        songTitle={displayTitle}
-                        songArtist={displayArtist}
-                      />
-                    ) : (
-                      /* 기존 YouTube 플레이어 */
-                      youtubeMR && (
+                    <div
+                      className={`${
+                        currentTab === "mr" ? "flex" : "hidden"
+                      } flex-col flex-1 min-h-0`}
+                    >
+                      {/* 기존 YouTube 플레이어 */}
+                      {youtubeMR && (
                         <div
                           id="xl-player-target"
                           className="w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg"
@@ -1760,9 +1573,8 @@ export default function SongCard({
                         >
                           {/* 통합 플레이어가 여기에 위치함 */}
                         </div>
-                      )
-                    )}
-                  </div>
+                      )}
+                    </div>
 
                   {/* XL 화면 유튜브 영상 섹션 */}
                   <div
@@ -1770,41 +1582,30 @@ export default function SongCard({
                       currentTab === "videos" ? "flex" : "hidden"
                     } flex-col h-full min-h-0 relative`}
                   >
-                    {isEditMode ? (
-                      <div className="h-full overflow-y-auto p-4" style={{maxHeight: '1000px'}}>
-                        <LiveClipEditor
-                          songId={song.id}
-                          songTitle={displayTitle}
-                          songVideos={songVideos}
-                          setSongVideos={setSongVideos}
-                          videosLoading={videosLoading}
-                          loadSongVideos={loadSongVideos}
-                        />
-                      </div>
-                    ) : (
-                      <div
-                        id="xl-liveclip-target"
-                        className="w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg"
-                        style={{
-                          height: "100%",
-                          maxHeight: "100%",
-                          overflow: "hidden",
-                        }}
-                      >
-                        {/* 통합 LiveClip Manager가 여기에 위치함 */}
-                      </div>
-                    )}
+                    <div
+                      id="xl-liveclip-target"
+                      className="w-full flex-1 min-h-0 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                      style={{
+                        height: "100%",
+                        maxHeight: "100%",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {/* 통합 LiveClip Manager가 여기에 위치함 */}
+                    </div>
                   </div>
                 </motion.div>
               </div>
+              )}
 
-              {/* 작은 화면에서의 탭 섹션 */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                className="xl:hidden bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 relative flex flex-col flex-1 min-h-0"
-              >
+              {/* 작은 화면에서의 탭 섹션 - 편집 모드에서는 숨김 */}
+              {!isEditMode && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                  className="xl:hidden bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 relative flex flex-col flex-1 min-h-0"
+                >
                 {/* 탭 네비게이션 */}
                 <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20">
                   <button
@@ -1960,6 +1761,7 @@ export default function SongCard({
                   </div>
                 </div>
               </motion.div>
+              )}
 
               {/* Action buttons - 편집 모드가 아닐 때만 표시 */}
               {!isEditMode && (
