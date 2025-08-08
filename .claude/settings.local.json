@@ -28,7 +28,8 @@
       "mcp__playwright__playwright_fill",
       "mcp__playwright__playwright_console_logs",
       "Bash(npm install:*)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }

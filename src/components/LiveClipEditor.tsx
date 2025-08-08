@@ -28,6 +28,7 @@ import {
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import { useSession } from 'next-auth/react';
+import { useConfirm } from './ConfirmDialog';
 import { UserRole, roleToIsAdmin } from '@/lib/permissions';
 
 interface LiveClipEditorProps {
@@ -48,6 +49,7 @@ export default function LiveClipEditor({
   loadSongVideos 
 }: LiveClipEditorProps) {
   const { data: session } = useSession();
+  const confirm = useConfirm();
   
   // 편집 UI 상태
   const [showAddVideoForm, setShowAddVideoForm] = useState(false);
@@ -419,7 +421,15 @@ export default function LiveClipEditor({
 
   // 클립 삭제
   const handleDelete = async (videoId: string) => {
-    if (!confirm('정말로 이 라이브 클립을 삭제하시겠습니까?')) return;
+    const confirmed = await confirm.confirm({
+      title: '라이브 클립 삭제',
+      message: '정말로 이 라이브 클립을 삭제하시겠습니까?',
+      confirmText: '삭제',
+      cancelText: '취소',
+      type: 'danger'
+    });
+    
+    if (!confirmed) return;
     
     setIsDeletingVideo(videoId);
     

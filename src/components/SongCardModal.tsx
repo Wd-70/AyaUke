@@ -118,7 +118,8 @@ export default function SongCardModal({
                    w-[95vw] max-w-[1600px] overflow-hidden
                    bg-white dark:bg-gray-900 backdrop-blur-sm 
                    rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
-                   shadow-2xl transform -translate-x-1/2 youtube-dialog-container"
+                   shadow-2xl transform -translate-x-1/2 youtube-dialog-container
+                   xl:overflow-y-auto xl:overscroll-behavior-contain"
         style={{
           top: isMobileScreen ? "4.5rem" : "5rem",
           height: isMobileScreen
@@ -295,7 +296,7 @@ export default function SongCardModal({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.3 }}
-                  className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
+                  className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col xl:flex-1 xl:min-h-0 xl:h-auto flex-1 min-h-0"
                 >
                   <SongEditForm
                     song={song}
@@ -333,7 +334,7 @@ export default function SongCardModal({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.3 }}
-                  className="flex flex-col flex-1 min-h-0"
+                  className="flex flex-col xl:flex-1 xl:min-h-0 xl:h-auto flex-1 min-h-0"
                 >
                   <SongEditForm
                     song={song}

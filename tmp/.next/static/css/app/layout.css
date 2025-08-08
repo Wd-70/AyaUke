@@ -593,6 +593,9 @@ video {
 .-top-1{
   top: -0.25rem;
 }
+.-top-2{
+  top: -0.5rem;
+}
 .-top-4{
   top: -1rem;
 }
@@ -881,6 +884,9 @@ video {
 .h-0\.5{
   height: 0.125rem;
 }
+.h-1{
+  height: 0.25rem;
+}
 .h-1\.5{
   height: 0.375rem;
 }
@@ -1015,6 +1021,9 @@ video {
 }
 .min-h-screen{
   min-height: 100vh;
+}
+.min-h-\[400px\]{
+  min-height: 400px;
 }
 .w-0\.5{
   width: 0.125rem;
@@ -1570,6 +1579,9 @@ video {
   border-bottom-right-radius: 0.5rem;
   border-bottom-left-radius: 0.5rem;
 }
+.rounded-bl-lg{
+  border-bottom-left-radius: 0.5rem;
+}
 .border{
   border-width: 1px;
 }
@@ -1849,6 +1861,9 @@ video {
 .bg-blue-600{
   --tw-bg-opacity: 1;
   background-color: rgb(37 99 235 / var(--tw-bg-opacity, 1));
+}
+.bg-current{
+  background-color: currentColor;
 }
 .bg-dark-accent\/20{
   background-color: rgb(227 139 255 / 0.2);
@@ -2586,6 +2601,10 @@ video {
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
 }
+.py-2\.5{
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
 .py-20{
   padding-top: 5rem;
   padding-bottom: 5rem;
@@ -2631,6 +2650,9 @@ video {
 .pb-8{
   padding-bottom: 2rem;
 }
+.pl-1{
+  padding-left: 0.25rem;
+}
 .pl-10{
   padding-left: 2.5rem;
 }
@@ -2654,6 +2676,9 @@ video {
 }
 .pr-4{
   padding-right: 1rem;
+}
+.pt-0{
+  padding-top: 0px;
 }
 .pt-1{
   padding-top: 0.25rem;
@@ -3200,6 +3225,11 @@ video {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }
+.transition-shadow{
+  transition-property: box-shadow;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
 .transition-transform{
   transition-property: transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -3735,6 +3765,11 @@ body {
 .hover\:bg-yellow-200:hover{
   --tw-bg-opacity: 1;
   background-color: rgb(254 240 138 / var(--tw-bg-opacity, 1));
+}
+
+.hover\:bg-yellow-600:hover{
+  --tw-bg-opacity: 1;
+  background-color: rgb(202 138 4 / var(--tw-bg-opacity, 1));
 }
 
 .hover\:bg-yellow-700:hover{
@@ -5087,6 +5122,11 @@ body {
   color: rgb(249 250 251 / 0.8);
 }
 
+.dark\:text-gray-100:is(.dark *){
+  --tw-text-opacity: 1;
+  color: rgb(243 244 246 / var(--tw-text-opacity, 1));
+}
+
 .dark\:text-gray-200:is(.dark *){
   --tw-text-opacity: 1;
   color: rgb(229 231 235 / var(--tw-text-opacity, 1));
@@ -6109,6 +6149,14 @@ body {
     height: 1.5rem;
   }
 
+  .xl\:h-auto{
+    height: auto;
+  }
+
+  .xl\:min-h-0{
+    min-height: 0px;
+  }
+
   .xl\:w-1\/2{
     width: 50%;
   }
@@ -6131,6 +6179,10 @@ body {
 
   .xl\:w-80{
     width: 20rem;
+  }
+
+  .xl\:flex-1{
+    flex: 1 1 0%;
   }
 
   .xl\:flex-\[1\]{
@@ -6165,6 +6217,18 @@ body {
     --tw-space-y-reverse: 0;
     margin-top: calc(0.5rem * calc(1 - var(--tw-space-y-reverse)));
     margin-bottom: calc(0.5rem * var(--tw-space-y-reverse));
+  }
+
+  .xl\:overflow-hidden{
+    overflow: hidden;
+  }
+
+  .xl\:overflow-visible{
+    overflow: visible;
+  }
+
+  .xl\:overflow-y-auto{
+    overflow-y: auto;
   }
 
   .xl\:p-4{

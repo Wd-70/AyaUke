@@ -24,6 +24,7 @@ import { CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/soli
 import SongCard from './SongCard'
 import ShareManagement from './ShareManagement'
 import { Song } from '@/types'
+import { useToast } from './Toast'
 
 interface PlaylistData {
   playlist: {
@@ -71,6 +72,7 @@ interface PlaylistDetailViewProps {
 
 export default function PlaylistDetailView({ data, shareId }: PlaylistDetailViewProps) {
   const { playlist, isOwner, permissions } = data
+  const { showSuccess, showError } = useToast()
   const [showShareManagement, setShowShareManagement] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -180,12 +182,12 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
         window.location.reload()
       } else {
         const result = await response.json()
-        alert(result.error || '플레이리스트 이름 변경에 실패했습니다')
+        showError('변경 실패', result.error || '플레이리스트 이름 변경에 실패했습니다')
         setEditedName(playlist.name)
       }
     } catch (error) {
       console.error('플레이리스트 이름 변경 오류:', error)
-      alert('네트워크 오류가 발생했습니다')
+      showError('네트워크 오류', '네트워크 오류가 발생했습니다')
       setEditedName(playlist.name)
     } finally {
       setIsLoading(false)
@@ -207,15 +209,18 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
 
       if (response.ok) {
         // 성공 시 메인 페이지로 이동
-        alert('플레이리스트가 삭제되었습니다')
-        window.location.href = '/songbook'
+        showSuccess('삭제 완료', '플레이리스트가 삭제되었습니다')
+        // 약간의 지연 후 페이지 이동
+        setTimeout(() => {
+          window.location.href = '/songbook'
+        }, 1500)
       } else {
         const result = await response.json()
-        alert(result.error || '플레이리스트 삭제에 실패했습니다')
+        showError('삭제 실패', result.error || '플레이리스트 삭제에 실패했습니다')
       }
     } catch (error) {
       console.error('플레이리스트 삭제 오류:', error)
-      alert('네트워크 오류가 발생했습니다')
+      showError('네트워크 오류', '네트워크 오류가 발생했습니다')
     } finally {
       setIsLoading(false)
       setShowDeleteConfirm(false)

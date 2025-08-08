@@ -19,6 +19,8 @@ import YouTube from 'react-youtube';
 import { useSession } from 'next-auth/react';
 import { UserRole, roleToIsAdmin } from '@/lib/permissions';
 import { updateVideoData } from '@/lib/youtube';
+import { useToast } from './Toast';
+import { useConfirm } from './ConfirmDialog';
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -49,6 +51,8 @@ export default function LiveClipManager({
   onEditingStateChange
 }: LiveClipManagerProps) {
   const { data: session } = useSession();
+  const { showSuccess, showError } = useToast();
+  const confirm = useConfirm();
   
   // YouTube URL에서 비디오 ID 추출
   const extractVideoId = (url: string): string => {
@@ -772,11 +776,11 @@ export default function LiveClipManager({
       } else {
         const error = await response.json();
         console.error('라이브 클립 수정 실패:', error.error);
-        alert(error.error || '라이브 클립 수정에 실패했습니다.');
+        showError('수정 실패', error.error || '라이브 클립 수정에 실패했습니다.');
       }
     } catch (error) {
       console.error('라이브 클립 수정 오류:', error);
-      alert('라이브 클립 수정 중 오류가 발생했습니다.');
+      showError('오류 발생', '라이브 클립 수정 중 오류가 발생했습니다.');
     } finally {
       setIsEditingVideo(false);
     }
@@ -784,7 +788,15 @@ export default function LiveClipManager({
 
   // 영상 삭제 핸들러
   const handleDeleteVideo = async (videoId: string) => {
-    if (!confirm('정말로 이 라이브 클립을 삭제하시겠습니까?')) return;
+    const confirmed = await confirm.confirm({
+      title: '라이브 클립 삭제',
+      message: '정말로 이 라이브 클립을 삭제하시겠습니까?',
+      confirmText: '삭제',
+      cancelText: '취소',
+      type: 'danger'
+    });
+    
+    if (!confirmed) return;
 
     setIsDeletingVideo(videoId);
     try {
@@ -803,11 +815,11 @@ export default function LiveClipManager({
       } else {
         const error = await response.json();
         console.error('라이브 클립 삭제 실패:', error.error);
-        alert(error.error || '라이브 클립 삭제에 실패했습니다.');
+        showError('삭제 실패', error.error || '라이브 클립 삭제에 실패했습니다.');
       }
     } catch (error) {
       console.error('라이브 클립 삭제 오류:', error);
-      alert('라이브 클립 삭제 중 오류가 발생했습니다.');
+      showError('오류 발생', '라이브 클립 삭제 중 오류가 발생했습니다.');
     } finally {
       setIsDeletingVideo(null);
     }
@@ -883,11 +895,11 @@ export default function LiveClipManager({
       } else {
         const error = await response.json();
         console.error('라이브 클립 추가 실패:', error.error);
-        alert(error.error || '라이브 클립 추가에 실패했습니다.');
+        showError('추가 실패', error.error || '라이브 클립 추가에 실패했습니다.');
       }
     } catch (error) {
       console.error('라이브 클립 추가 오류:', error);
-      alert('라이브 클립 추가 중 오류가 발생했습니다.');
+      showError('오류 발생', '라이브 클립 추가 중 오류가 발생했습니다.');
     } finally {
       setIsAddingVideo(false);
     }

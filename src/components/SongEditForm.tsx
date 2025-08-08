@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { SongData } from '@/types';
 import { StarIcon, TrashIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { useToast } from './Toast';
 
 interface SongEditFormProps {
   song: SongData;
@@ -31,6 +32,7 @@ interface EditData {
 }
 
 export default function SongEditForm({ song, isVisible, onSave, onCancel }: SongEditFormProps) {
+  const { showSuccess, showError } = useToast();
   const [editData, setEditData] = useState<EditData>({
     title: '',
     artist: '',
@@ -175,13 +177,13 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel }: Song
       if (result.success) {
         console.log('✅ 저장 성공, 반환된 데이터:', result.song);
         onSave(result.song);
-        alert('곡 정보가 성공적으로 수정되었습니다.');
+        showSuccess('수정 완료', '곡 정보가 성공적으로 수정되었습니다.');
       } else {
-        alert(result.error || '저장에 실패했습니다.');
+        showError('저장 실패', result.error || '저장에 실패했습니다.');
       }
     } catch (error) {
       console.error('저장 오류:', error);
-      alert('저장 중 오류가 발생했습니다.');
+      showError('저장 오류', '저장 중 오류가 발생했습니다.');
     } finally {
       setIsSaving(false);
     }
@@ -226,79 +228,138 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel }: Song
       </div>
 
       {/* 편집 폼 */}
-      <div className="flex-1 overflow-y-auto space-y-6">
-        {/* 제목과 아티스트 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-              제목 별칭
-            </label>
-            <input
-              type="text"
-              value={editData.titleAlias}
-              onChange={(e) => setEditData({...editData, titleAlias: e.target.value})}
-              className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                       bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
-                       focus:border-light-accent dark:focus:border-dark-accent outline-none"
-              placeholder={song.title}
-            />
-            <p className="text-xs text-light-text/50 dark:text-dark-text/50 mt-1">
-              원본: {song.title}
-            </p>
+      <div className="flex-1 xl:overflow-visible xl:h-auto overflow-y-auto space-y-6">
+        {/* 기본 정보 */}
+        <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-xl p-6 space-y-4">
+          <h4 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4">
+            기본 정보
+          </h4>
+          
+          {/* 제목과 아티스트 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
+                <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
+                제목 별칭
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={editData.titleAlias}
+                  onChange={(e) => setEditData({...editData, titleAlias: e.target.value})}
+                  className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
+                           bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
+                           focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
+                           transition-all outline-none backdrop-blur-sm"
+                  placeholder={`원본: ${song.title}`}
+                />
+                {editData.titleAlias && editData.titleAlias !== song.title && (
+                  <div className="absolute -top-2 right-3 px-2 py-1 bg-light-accent dark:bg-dark-accent text-white text-xs rounded-full">
+                    수정됨
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-light-text/50 dark:text-dark-text/50 pl-1">
+                원본: {song.title}
+              </p>
+            </div>
+            
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
+                <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
+                아티스트 별칭
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={editData.artistAlias}
+                  onChange={(e) => setEditData({...editData, artistAlias: e.target.value})}
+                  className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
+                           bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
+                           focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
+                           transition-all outline-none backdrop-blur-sm"
+                  placeholder={`원본: ${song.artist}`}
+                />
+                {editData.artistAlias && editData.artistAlias !== song.artist && (
+                  <div className="absolute -top-2 right-3 px-2 py-1 bg-light-accent dark:bg-dark-accent text-white text-xs rounded-full">
+                    수정됨
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-light-text/50 dark:text-dark-text/50 pl-1">
+                원본: {song.artist}
+              </p>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-              아티스트 별칭
-            </label>
-            <input
-              type="text"
-              value={editData.artistAlias}
-              onChange={(e) => setEditData({...editData, artistAlias: e.target.value})}
-              className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                       bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
-                       focus:border-light-accent dark:focus:border-dark-accent outline-none"
-              placeholder={song.artist}
-            />
-            <p className="text-xs text-light-text/50 dark:text-dark-text/50 mt-1">
-              원본: {song.artist}
-            </p>
-          </div>
-        </div>
 
-        {/* 언어와 키 조절 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-              언어
-            </label>
-            <select
-              value={editData.language}
-              onChange={(e) => setEditData({...editData, language: e.target.value})}
-              className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                       bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
-                       focus:border-light-accent dark:focus:border-dark-accent outline-none"
-            >
-              <option value="">언어 선택</option>
-              <option value="Korean">Korean</option>
-              <option value="English">English</option>
-              <option value="Japanese">Japanese</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-              키 조절
-            </label>
-            <input
-              type="number"
-              value={editData.keyAdjustment ?? ''}
-              onChange={(e) => setEditData({...editData, keyAdjustment: e.target.value ? parseInt(e.target.value) : null})}
-              className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                       bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
-                       focus:border-light-accent dark:focus:border-dark-accent outline-none"
-              placeholder="키 조절 값"
-              min="-12"
-              max="12"
-            />
+          {/* 언어와 키 조절 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
+                <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
+                언어
+              </label>
+              <select
+                value={editData.language}
+                onChange={(e) => setEditData({...editData, language: e.target.value})}
+                className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
+                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
+                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
+                         transition-all outline-none backdrop-blur-sm appearance-none cursor-pointer"
+              >
+                <option value="">언어 선택</option>
+                <option value="Korean" className="py-2">🇰🇷 Korean</option>
+                <option value="English" className="py-2">🇺🇸 English</option>
+                <option value="Japanese" className="py-2">🇯🇵 Japanese</option>
+              </select>
+              {editData.language && (
+                <div className="flex items-center gap-2 pl-1">
+                  <div className={`w-2 h-2 rounded-full ${
+                    editData.language === 'Korean' ? 'bg-blue-500' :
+                    editData.language === 'English' ? 'bg-purple-500' :
+                    'bg-pink-500'
+                  }`}></div>
+                  <span className="text-xs text-light-text/70 dark:text-dark-text/70">
+                    {editData.language}
+                  </span>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
+                <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
+                키 조절
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  value={editData.keyAdjustment ?? ''}
+                  onChange={(e) => setEditData({...editData, keyAdjustment: e.target.value ? parseInt(e.target.value) : null})}
+                  className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
+                           bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
+                           focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
+                           transition-all outline-none backdrop-blur-sm text-center font-mono"
+                  placeholder="0"
+                  min="-12"
+                  max="12"
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-light-text/40 dark:text-dark-text/40 pointer-events-none">
+                  반음
+                </div>
+              </div>
+              {editData.keyAdjustment && (
+                <div className="flex items-center justify-center gap-2">
+                  <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    editData.keyAdjustment > 0 
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                  }`}>
+                    {editData.keyAdjustment > 0 ? '+' : ''}{editData.keyAdjustment} 반음
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

@@ -30,6 +30,8 @@ import SongEditForm from "./SongEditForm";
 import TagManager from "./TagManager";
 import MRLinkManager from "./MRLinkManager";
 import { useSession } from "next-auth/react";
+import { useToast } from "./Toast";
+import { useConfirm } from "./ConfirmDialog";
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -86,6 +88,10 @@ export default function SongCard({
   // 라이브 클립 데이터 상태 (LiveClipManager와 LiveClipEditor 공유)
   const [songVideos, setSongVideos] = useState<any[]>([]);
   const [videosLoading, setVideosLoading] = useState(false);
+
+  // 토스트 훅
+  const { showSuccess, showError, showInfo } = useToast();
+  const confirm = useConfirm();
   const [videosLoaded, setVideosLoaded] = useState(false); // 한 번이라도 로드 시도했는지 추적
 
   // 가사 전용 상태 (성능 최적화를 위해 분리)
@@ -335,13 +341,17 @@ export default function SongCard({
   };
 
   // ESC 키 핸들러
-  const handleEscapeKey = useCallback(() => {
+  const handleEscapeKey = useCallback(async () => {
     if (isEditMode) {
       // 수정 모드에서 ESC: 변경사항 확인 후 일반 모드로
       if (hasUnsavedChanges()) {
-        const confirmed = window.confirm(
-          "수정 중인 내용이 있습니다. 정말 취소하시겠습니까?"
-        );
+        const confirmed = await confirm.confirm({
+          title: "편집 취소",
+          message: "수정 중인 내용이 있습니다. 정말 취소하시겠습니까?",
+          confirmText: "취소하기",
+          cancelText: "계속 편집",
+          type: "warning",
+        });
         if (confirmed) {
           setIsEditMode(false);
           resetEditData(); // 모든 편집 데이터 초기화
@@ -353,7 +363,7 @@ export default function SongCard({
       // 일반 모드에서 ESC: 다이얼로그 닫기
       setIsExpanded(false);
     }
-  }, [isEditMode, hasUnsavedChanges]);
+  }, [isEditMode, hasUnsavedChanges, confirm]);
 
   // ESC 키 이벤트 리스너 등록
   useEffect(() => {
@@ -423,13 +433,13 @@ export default function SongCard({
         // 곡 데이터 업데이트
         Object.assign(song, result.song);
         setIsEditMode(false);
-        alert("곡 정보가 성공적으로 수정되었습니다.");
+        showSuccess("수정 완료", "곡 정보가 성공적으로 수정되었습니다.");
       } else {
-        alert(result.error || "저장에 실패했습니다.");
+        showError("저장 실패", result.error || "저장에 실패했습니다.");
       }
     } catch (error) {
       console.error("저장 오류:", error);
-      alert("저장 중 오류가 발생했습니다.");
+      showError("오류 발생", "저장 중 오류가 발생했습니다.");
     } finally {
       setIsSaving(false);
     }
@@ -456,7 +466,7 @@ export default function SongCard({
   // OBS 토글 함수
   const toggleOBS = async () => {
     if (!session?.user?.userId) {
-      alert("로그인이 필요합니다.");
+      showError("로그인 필요", "OBS 기능을 사용하려면 로그인이 필요합니다.");
       return;
     }
 
@@ -502,12 +512,12 @@ export default function SongCard({
           setObsActive(true);
           console.log(`OBS 상태 ON: ${result.obsUrl}`);
         } else {
-          alert("OBS 켜기에 실패했습니다.");
+          showError("OBS 오류", "OBS 켜기에 실패했습니다.");
         }
       }
     } catch (error) {
       console.error("OBS 토글 오류:", error);
-      alert("OBS 설정 중 오류가 발생했습니다.");
+      showError("OBS 오류", "OBS 설정 중 오류가 발생했습니다.");
     } finally {
       setObsLoading(false);
     }
@@ -516,7 +526,10 @@ export default function SongCard({
   // OBS 링크 복사 함수
   const copyOBSLink = async () => {
     if (!session?.user?.userId) {
-      alert("로그인이 필요합니다.");
+      showError(
+        "로그인 필요",
+        "OBS 링크 복사 기능을 사용하려면 로그인이 필요합니다."
+      );
       return;
     }
 
@@ -524,7 +537,7 @@ export default function SongCard({
 
     try {
       await navigator.clipboard.writeText(obsUrl);
-      alert("OBS 링크가 클립보드에 복사되었습니다!");
+      showSuccess("복사 완료", "OBS 링크가 클립보드에 복사되었습니다!");
     } catch (error) {
       console.error("클립보드 복사 오류:", error);
       // 대체 방법으로 텍스트 선택
@@ -534,7 +547,7 @@ export default function SongCard({
       textArea.select();
       document.execCommand("copy");
       document.body.removeChild(textArea);
-      alert("OBS 링크가 클립보드에 복사되었습니다!");
+      showSuccess("복사 완료", "OBS 링크가 클립보드에 복사되었습니다!");
     }
   };
 
@@ -859,7 +872,7 @@ export default function SongCard({
 
     const updatePositions = () => {
       const xlScreen = window.innerWidth >= 1280;
-      setIsXLScreen(prev => prev !== xlScreen ? xlScreen : prev);
+      setIsXLScreen((prev) => (prev !== xlScreen ? xlScreen : prev));
 
       // MR 플레이어 위치 계산
       if (youtubeMR) {
@@ -911,10 +924,14 @@ export default function SongCard({
             width: actualWidth,
             height: actualHeight,
           };
-          
-          setPlayerPosition(prev => {
-            if (prev.top !== newPosition.top || prev.left !== newPosition.left || 
-                prev.width !== newPosition.width || prev.height !== newPosition.height) {
+
+          setPlayerPosition((prev) => {
+            if (
+              prev.top !== newPosition.top ||
+              prev.left !== newPosition.left ||
+              prev.width !== newPosition.width ||
+              prev.height !== newPosition.height
+            ) {
               return newPosition;
             }
             return prev;
@@ -925,11 +942,14 @@ export default function SongCard({
       // LiveClip 위치 계산
       if (currentTab === "videos") {
         let liveClipTargetContainer = null;
-        
+
         if (xlScreen) {
-          liveClipTargetContainer = document.getElementById("xl-liveclip-target");
+          liveClipTargetContainer =
+            document.getElementById("xl-liveclip-target");
         } else {
-          liveClipTargetContainer = document.getElementById("mobile-liveclip-target");
+          liveClipTargetContainer = document.getElementById(
+            "mobile-liveclip-target"
+          );
         }
 
         if (liveClipTargetContainer) {
@@ -972,10 +992,14 @@ export default function SongCard({
             width: actualWidth,
             height: actualHeight,
           };
-          
-          setLiveClipPosition(prev => {
-            if (prev.top !== newLiveClipPosition.top || prev.left !== newLiveClipPosition.left || 
-                prev.width !== newLiveClipPosition.width || prev.height !== newLiveClipPosition.height) {
+
+          setLiveClipPosition((prev) => {
+            if (
+              prev.top !== newLiveClipPosition.top ||
+              prev.left !== newLiveClipPosition.left ||
+              prev.width !== newLiveClipPosition.width ||
+              prev.height !== newLiveClipPosition.height
+            ) {
               return newLiveClipPosition;
             }
             return prev;
@@ -1019,10 +1043,7 @@ export default function SongCard({
       });
     }
 
-    if (
-      song.sungCount !== undefined ||
-      song.lastSungDate
-    ) {
+    if (song.sungCount !== undefined || song.lastSungDate) {
       console.log("📊 활동 정보:", {
         sungCount: song.sungCount,
         lastSungDate: song.lastSungDate,
@@ -1233,137 +1254,221 @@ export default function SongCard({
         </div>
       </div>
 
-      {/* 곡 제목 */}
-      <div>
-        <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-          곡 제목
-        </label>
-        <input
-          type="text"
-          value={editData.titleAlias}
-          onChange={(e) =>
-            setEditData({ ...editData, titleAlias: e.target.value })
-          }
-          className="w-full text-xl sm:text-2xl font-semibold text-light-accent dark:text-dark-accent 
-                     bg-transparent border-b-2 border-light-accent dark:border-dark-accent 
-                     outline-none pb-1"
-          placeholder="곡 제목"
-        />
-      </div>
+      {/* 기본 정보 섹션 */}
+      <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-xl p-6 space-y-4">
+        <h4 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4">
+          기본 정보
+        </h4>
 
-      {/* 아티스트 */}
-      <div>
-        <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-          아티스트
-        </label>
-        <input
-          type="text"
-          value={editData.artistAlias}
-          onChange={(e) =>
-            setEditData({ ...editData, artistAlias: e.target.value })
-          }
-          className="w-full text-lg text-light-text/70 dark:text-dark-text/70 
-                     bg-transparent border-b border-light-accent/50 dark:border-dark-accent/50 
-                     outline-none pb-1"
-          placeholder="아티스트"
-        />
-      </div>
-
-      {/* 키 조절과 언어 - 나란히 배치 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-            키 조절
+        {/* 곡 제목 */}
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
+            <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
+            곡 제목
           </label>
-          <div className="flex items-center gap-2 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg p-2">
-            <button
-              onClick={() =>
-                setEditData({
-                  ...editData,
-                  keyAdjustment:
-                    editData.keyAdjustment === null
-                      ? -1
-                      : Math.max(-12, editData.keyAdjustment - 1),
-                })
+          <div className="relative">
+            <input
+              type="text"
+              value={editData.titleAlias}
+              onChange={(e) =>
+                setEditData({ ...editData, titleAlias: e.target.value })
               }
-              className="p-1 rounded-md hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                         transition-colors duration-200"
-              title="키 내리기"
-            >
-              <MinusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-            </button>
-            <span
-              className="px-3 py-1 text-sm font-medium min-w-[4rem] text-center
-                           bg-yellow-100 dark:bg-yellow-900 
-                           text-yellow-800 dark:text-yellow-200 rounded-md"
-            >
-              {editData.keyAdjustment === null
-                ? "미등록"
-                : formatKeyAdjustment(editData.keyAdjustment) || "원본키"}
-            </span>
-            <button
-              onClick={() =>
-                setEditData({
-                  ...editData,
-                  keyAdjustment:
-                    editData.keyAdjustment === null
-                      ? 1
-                      : Math.min(12, editData.keyAdjustment + 1),
-                })
-              }
-              className="p-1 rounded-md hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
-                         transition-colors duration-200"
-              title="키 올리기"
-            >
-              <PlusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-            </button>
-            <button
-              onClick={() => setEditData({ ...editData, keyAdjustment: 0 })}
-              className="ml-2 px-2 py-1 text-xs rounded-md bg-blue-500/20 hover:bg-blue-500/30 
-                         transition-colors duration-200 text-blue-600 dark:text-blue-400"
-              title="원본키로 설정"
-            >
-              원본키
-            </button>
-            <button
-              onClick={() => setEditData({ ...editData, keyAdjustment: null })}
-              className="px-2 py-1 text-xs rounded-md bg-gray-500/20 hover:bg-gray-500/30 
-                         transition-colors duration-200 text-gray-600 dark:text-gray-400"
-              title="키 정보 삭제"
-            >
-              삭제
-            </button>
+              className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
+                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
+                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
+                         transition-all outline-none backdrop-blur-sm text-xl font-semibold"
+              placeholder={`원본: ${song.title}`}
+            />
+            {editData.titleAlias && editData.titleAlias !== song.title && (
+              <div className="absolute -top-2 right-3 px-2 py-1 bg-light-accent dark:bg-dark-accent text-white text-xs rounded-full">
+                수정됨
+              </div>
+            )}
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-            언어
+        {/* 아티스트 */}
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
+            <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
+            아티스트
           </label>
-          <select
-            value={editData.language}
-            onChange={(e) =>
-              setEditData({ ...editData, language: e.target.value })
-            }
-            className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
-                       rounded-lg outline-none text-light-text dark:text-dark-text"
-          >
-            <option value="">선택안함</option>
-            <option value="Korean">한국어</option>
-            <option value="English">영어</option>
-            <option value="Japanese">일본어</option>
-            <option value="Chinese">중국어</option>
-            <option value="Other">기타</option>
-          </select>
+          <div className="relative">
+            <input
+              type="text"
+              value={editData.artistAlias}
+              onChange={(e) =>
+                setEditData({ ...editData, artistAlias: e.target.value })
+              }
+              className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
+                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
+                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
+                         transition-all outline-none backdrop-blur-sm text-lg"
+              placeholder={`원본: ${song.artist}`}
+            />
+            {editData.artistAlias && editData.artistAlias !== song.artist && (
+              <div className="absolute -top-2 right-3 px-2 py-1 bg-light-accent dark:bg-dark-accent text-white text-xs rounded-full">
+                수정됨
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 키 조절과 언어 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
+              <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
+              키 조절
+            </label>
+            <div className="flex items-center gap-3 bg-light-primary/10 dark:bg-dark-primary/10 rounded-xl p-3">
+              <button
+                onClick={() =>
+                  setEditData({
+                    ...editData,
+                    keyAdjustment:
+                      editData.keyAdjustment === null
+                        ? -1
+                        : Math.max(-12, editData.keyAdjustment - 1),
+                  })
+                }
+                className="p-2 rounded-lg hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                           transition-colors duration-200 bg-white/50 dark:bg-gray-700/50"
+                title="키 내리기"
+              >
+                <MinusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+              </button>
+              <div className="flex-1 text-center">
+                <span
+                  className="px-4 py-2 text-sm font-medium bg-white dark:bg-gray-700 
+                               text-light-text dark:text-dark-text rounded-lg border border-light-primary/20 dark:border-dark-primary/20"
+                >
+                  {editData.keyAdjustment === null
+                    ? "미등록"
+                    : formatKeyAdjustment(editData.keyAdjustment) || "원본키"}
+                </span>
+                {editData.keyAdjustment !== null &&
+                  editData.keyAdjustment !== 0 && (
+                    <div className="mt-1">
+                      <div
+                        className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                          editData.keyAdjustment > 0
+                            ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                            : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                        }`}
+                      >
+                        {editData.keyAdjustment > 0 ? "+" : ""}
+                        {editData.keyAdjustment} 반음
+                      </div>
+                    </div>
+                  )}
+              </div>
+              <button
+                onClick={() =>
+                  setEditData({
+                    ...editData,
+                    keyAdjustment:
+                      editData.keyAdjustment === null
+                        ? 1
+                        : Math.min(12, editData.keyAdjustment + 1),
+                  })
+                }
+                className="p-2 rounded-lg hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 
+                           transition-colors duration-200 bg-white/50 dark:bg-gray-700/50"
+                title="키 올리기"
+              >
+                <PlusIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
+              </button>
+            </div>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => setEditData({ ...editData, keyAdjustment: 0 })}
+                className="px-3 py-1 text-xs rounded-lg bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 
+                           transition-colors duration-200 text-blue-700 dark:text-blue-300 font-medium"
+                title="원본키로 설정"
+              >
+                원본키
+              </button>
+              <button
+                onClick={() =>
+                  setEditData({ ...editData, keyAdjustment: null })
+                }
+                className="px-3 py-1 text-xs rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 
+                           transition-colors duration-200 text-gray-700 dark:text-gray-300 font-medium"
+                title="키 정보 삭제"
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
+              <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
+              언어
+            </label>
+            <select
+              value={editData.language}
+              onChange={(e) =>
+                setEditData({ ...editData, language: e.target.value })
+              }
+              className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
+                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
+                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
+                         transition-all outline-none backdrop-blur-sm appearance-none cursor-pointer"
+            >
+              <option value="">언어 선택</option>
+              <option value="Korean" className="py-2">
+                🇰🇷 Korean
+              </option>
+              <option value="English" className="py-2">
+                🇺🇸 English
+              </option>
+              <option value="Japanese" className="py-2">
+                🇯🇵 Japanese
+              </option>
+              <option value="Chinese" className="py-2">
+                🇨🇳 Chinese
+              </option>
+              <option value="Other" className="py-2">
+                🌍 Other
+              </option>
+            </select>
+            {editData.language && (
+              <div className="flex items-center gap-2 pl-1">
+                <div
+                  className={`w-2 h-2 rounded-full ${
+                    editData.language === "Korean"
+                      ? "bg-blue-500"
+                      : editData.language === "English"
+                      ? "bg-purple-500"
+                      : editData.language === "Japanese"
+                      ? "bg-pink-500"
+                      : editData.language === "Chinese"
+                      ? "bg-red-500"
+                      : "bg-gray-500"
+                  }`}
+                ></div>
+                <span className="text-xs text-light-text/70 dark:text-dark-text/70">
+                  {editData.language}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* 검색 태그 편집 */}
-      <TagManager
-        tags={editData.searchTags}
-        onTagsChange={handleTagsChange}
-        isEditMode={true}
-      />
+      <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-xl p-6">
+        <h4 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4">
+          검색 태그
+        </h4>
+        <TagManager
+          tags={editData.searchTags}
+          onTagsChange={handleTagsChange}
+          isEditMode={true}
+        />
+      </div>
     </div>
   );
 
@@ -1485,8 +1590,8 @@ export default function SongCard({
           {song.likeCount !== undefined && (
             <span
               className={`text-xs font-medium transition-all duration-200 min-w-[1rem] text-center ${
-                liked 
-                  ? "text-red-500" 
+                liked
+                  ? "text-red-500"
                   : "text-light-text/70 dark:text-dark-text/70"
               }`}
             >
@@ -1494,18 +1599,20 @@ export default function SongCard({
             </span>
           )}
         </button>
-        
+
         {/* 부른 횟수 표시 */}
         {song.sungCount !== undefined && song.sungCount > 0 && (
-          <div className="flex items-center gap-1 px-2 py-1 rounded-full
+          <div
+            className="flex items-center gap-1 px-2 py-1 rounded-full
                          bg-green-500/10 dark:bg-green-500/20 
-                         border border-green-500/20 dark:border-green-500/30">
+                         border border-green-500/20 dark:border-green-500/30"
+          >
             <span className="text-xs font-medium text-green-600 dark:text-green-400">
               🎤 {song.sungCount}
             </span>
           </div>
         )}
-        
+
         <button
           onClick={handleCardClick}
           className="p-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 
@@ -1541,10 +1648,11 @@ export default function SongCard({
           exit={{ opacity: 0, scale: 0.9, x: "-50%", y: "-10%" }}
           transition={{ duration: 0.3 }}
           className="fixed top-20 sm:top-20 left-1/2 z-40 
-                     w-[95vw] max-w-[1600px] overflow-hidden
+                     w-[95vw] max-w-[1600px] overflow-y-auto xl:overflow-hidden
                      bg-white dark:bg-gray-900 backdrop-blur-sm 
                      rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
-                     shadow-2xl transform -translate-x-1/2 youtube-dialog-container"
+                     shadow-2xl transform -translate-x-1/2 youtube-dialog-container
+                     overscroll-behavior-contain"
           style={{
             top: isMobileScreen ? "4.5rem" : "5rem", // 모바일: 네비게이션 바(4rem) + 0.5rem 여백
             height: isMobileScreen
@@ -1560,12 +1668,12 @@ export default function SongCard({
                           dark:from-dark-accent/5 dark:to-dark-purple/5 rounded-xl"
           ></div>
 
-          <div className="relative p-4 sm:p-6 xl:p-8 flex flex-col xl:flex-row h-full gap-4 sm:gap-6 xl:gap-8">
+          <div className="relative p-4 sm:p-6 xl:p-8 flex flex-col xl:flex-row h-full gap-4 sm:gap-6 xl:gap-8 xl:overflow-hidden">
             {/* 왼쪽: 가사 전용 영역 (XL 이상에서만) */}
             {renderXLLyricsPanel()}
 
             {/* 오른쪽: 모든 다른 요소들 */}
-            <div className="flex-1 xl:w-1/2 flex flex-col min-h-0 relative">
+            <div className="flex-1 xl:w-1/2 flex flex-col min-h-0 relative xl:overflow-y-auto xl:overscroll-behavior-contain">
               {/* Header */}
               <div className="mb-3 sm:mb-4">
                 {isEditMode ? renderEditModeHeader() : renderNormalModeHeader()}
@@ -1663,7 +1771,7 @@ export default function SongCard({
                     } flex-col h-full min-h-0 relative`}
                   >
                     {isEditMode ? (
-                      <div className="h-full overflow-y-auto p-4">
+                      <div className="h-full overflow-y-auto p-4" style={{maxHeight: '1000px'}}>
                         <LiveClipEditor
                           songId={song.id}
                           songTitle={displayTitle}
@@ -1788,7 +1896,7 @@ export default function SongCard({
                         onChange={(e) => handleLyricsChange(e.target.value)}
                         className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-base md:text-lg 
                                    bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
-                                   outline-none resize-none flex-1 min-h-0"
+                                   outline-none resize-none w-full h-full"
                         placeholder="가사를 입력하세요..."
                         style={{
                           willChange: "scroll-position",
@@ -1826,7 +1934,7 @@ export default function SongCard({
                   >
                     {/* 편집 모드일 때는 LiveClipEditor 사용 */}
                     {isEditMode ? (
-                      <div className="h-full overflow-y-auto p-4">
+                      <div className="h-full overflow-y-auto p-4" style={{maxHeight: '1000px'}}>
                         <LiveClipEditor
                           songId={song.id}
                           songTitle={displayTitle}
@@ -1928,10 +2036,16 @@ export default function SongCard({
               {!isEditMode && (song.dateAdded || song.lastSungDate) && (
                 <div className="mt-3 sm:mt-4 text-sm text-light-text/50 dark:text-dark-text/50 flex justify-between items-center">
                   {song.dateAdded && (
-                    <div>추가일: {new Date(song.dateAdded).toLocaleDateString("ko-KR")}</div>
+                    <div>
+                      추가일:{" "}
+                      {new Date(song.dateAdded).toLocaleDateString("ko-KR")}
+                    </div>
                   )}
                   {song.lastSungDate && (
-                    <div>마지막 부른 날: {new Date(song.lastSungDate).toLocaleDateString("ko-KR")}</div>
+                    <div>
+                      마지막 부른 날:{" "}
+                      {new Date(song.lastSungDate).toLocaleDateString("ko-KR")}
+                    </div>
                   )}
                 </div>
               )}
@@ -2030,8 +2144,8 @@ export default function SongCard({
                       {song.likeCount !== undefined && (
                         <span
                           className={`text-xs font-medium transition-all duration-200 min-w-[1rem] text-center ${
-                            liked 
-                              ? "text-red-500" 
+                            liked
+                              ? "text-red-500"
                               : "text-light-text/70 dark:text-dark-text/70"
                           }`}
                         >
@@ -2039,12 +2153,14 @@ export default function SongCard({
                         </span>
                       )}
                     </button>
-                    
+
                     {/* 부른 횟수 표시 */}
                     {song.sungCount !== undefined && song.sungCount > 0 && (
-                      <div className="flex items-center justify-center gap-1 px-2 py-1 rounded-full
+                      <div
+                        className="flex items-center justify-center gap-1 px-2 py-1 rounded-full
                                     bg-green-100/80 dark:bg-green-900/50 
-                                    border border-green-200/50 dark:border-green-700/50">
+                                    border border-green-200/50 dark:border-green-700/50"
+                      >
                         <span className="text-xs font-medium text-green-700 dark:text-green-300">
                           🎤 {song.sungCount}
                         </span>
@@ -2185,8 +2301,8 @@ export default function SongCard({
                       {song.likeCount !== undefined && (
                         <span
                           className={`text-xs font-medium transition-all duration-200 min-w-[1rem] text-center ${
-                            liked 
-                              ? "text-red-500" 
+                            liked
+                              ? "text-red-500"
                               : "text-light-text/70 dark:text-dark-text/70"
                           }`}
                         >
@@ -2194,12 +2310,14 @@ export default function SongCard({
                         </span>
                       )}
                     </button>
-                    
+
                     {/* 부른 횟수 표시 */}
                     {song.sungCount !== undefined && song.sungCount > 0 && (
-                      <div className="flex items-center justify-center gap-1 px-2 py-1 rounded-full
+                      <div
+                        className="flex items-center justify-center gap-1 px-2 py-1 rounded-full
                                     bg-green-100/80 dark:bg-green-900/50 
-                                    border border-green-200/50 dark:border-green-700/50">
+                                    border border-green-200/50 dark:border-green-700/50"
+                      >
                         <span className="text-xs font-medium text-green-700 dark:text-green-300">
                           🎤 {song.sungCount}
                         </span>
