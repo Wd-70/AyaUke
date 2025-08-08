@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SongData } from '@/types';
 import { StarIcon, TrashIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useToast } from './Toast';
@@ -50,6 +50,10 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
   });
   const [isSaving, setIsSaving] = useState(false);
   const [newTag, setNewTag] = useState('');
+  const [keyAdjustmentWidth, setKeyAdjustmentWidth] = useState(0);
+  const keyAdjustmentRef = useRef<HTMLDivElement>(null);
+  const [languageWidth, setLanguageWidth] = useState(0);
+  const languageRef = useRef<HTMLDivElement>(null);
 
   // 현재 표시되는 제목과 아티스트 (alias 우선)
   const displayTitle = song.titleAlias || song.title;
@@ -98,6 +102,42 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
       setEditData(prev => ({ ...prev, lyrics: initialLyrics }));
     }
   }, [initialLyrics]);
+
+  // 키 조절 컨테이너 너비 감지
+  useEffect(() => {
+    if (!keyAdjustmentRef.current) return;
+
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width } = entry.contentRect;
+        setKeyAdjustmentWidth(width);
+      }
+    });
+
+    resizeObserver.observe(keyAdjustmentRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [isVisible]);
+
+  // 언어 선택 컨테이너 너비 감지
+  useEffect(() => {
+    if (!languageRef.current) return;
+
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width } = entry.contentRect;
+        setLanguageWidth(width);
+      }
+    });
+
+    resizeObserver.observe(languageRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [isVisible]);
 
   // 태그 관리 함수들
   const addTag = () => {
@@ -217,6 +257,17 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
     Japanese: 'bg-pink-500',
   };
 
+  // 키 조절 레이아웃 결정: 320px 이상이면 한 줄 레이아웃 사용
+  const useHorizontalLayout = keyAdjustmentWidth >= 320;
+
+  // 언어 선택 레이아웃 결정
+  // 500px 이상: 4개/줄, 250px-500px: 2개/줄, 250px 미만: 1개/줄
+  const getLanguageGridCols = () => {
+    if (languageWidth >= 500) return 4; // 1줄에 4개
+    if (languageWidth >= 250) return 2; // 2줄에 2개씩
+    return 1; // 4줄에 1개씩
+  };
+
   if (!isVisible) return null;
 
   return (
@@ -255,26 +306,16 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
                 <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
                 제목
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={editData.titleAlias}
-                  onChange={(e) => setEditData({...editData, titleAlias: e.target.value})}
-                  className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
-                           bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
-                           focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
-                           transition-all outline-none backdrop-blur-sm"
-                  placeholder={`원본: ${displayTitle}`}
-                />
-                {editData.titleAlias && editData.titleAlias !== displayTitle && (
-                  <div className="absolute -top-2 right-3 px-2 py-1 bg-light-accent dark:bg-dark-accent text-white text-xs rounded-full">
-                    수정됨
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-light-text/50 dark:text-dark-text/50 pl-1">
-                원본: {displayTitle}
-              </p>
+              <input
+                type="text"
+                value={editData.titleAlias}
+                onChange={(e) => setEditData({...editData, titleAlias: e.target.value})}
+                className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
+                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
+                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
+                         transition-all outline-none backdrop-blur-sm"
+                placeholder="제목을 입력하세요"
+              />
             </div>
             
             <div className="space-y-3">
@@ -282,26 +323,16 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
                 <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
                 아티스트
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={editData.artistAlias}
-                  onChange={(e) => setEditData({...editData, artistAlias: e.target.value})}
-                  className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
-                           bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
-                           focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
-                           transition-all outline-none backdrop-blur-sm"
-                  placeholder={`원본: ${displayArtist}`}
-                />
-                {editData.artistAlias && editData.artistAlias !== displayArtist && (
-                  <div className="absolute -top-2 right-3 px-2 py-1 bg-light-accent dark:bg-dark-accent text-white text-xs rounded-full">
-                    수정됨
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-light-text/50 dark:text-dark-text/50 pl-1">
-                원본: {displayArtist}
-              </p>
+              <input
+                type="text"
+                value={editData.artistAlias}
+                onChange={(e) => setEditData({...editData, artistAlias: e.target.value})}
+                className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
+                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
+                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
+                         transition-all outline-none backdrop-blur-sm"
+                placeholder="아티스트를 입력하세요"
+              />
             </div>
           </div>
 
@@ -312,7 +343,11 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
                 <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
                 언어
               </label>
-              <div className="flex flex-wrap gap-2">
+              <div 
+                ref={languageRef}
+                className={`grid gap-2`}
+                style={{ gridTemplateColumns: `repeat(${getLanguageGridCols()}, 1fr)` }}
+              >
                 {[
                   { value: 'Korean', label: '🇰🇷 Korean', color: 'bg-blue-500' },
                   { value: 'English', label: '🇺🇸 English', color: 'bg-purple-500' },
@@ -323,7 +358,7 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
                     key={lang.value}
                     type="button"
                     onClick={() => setEditData({...editData, language: editData.language === lang.value ? '' : lang.value})}
-                    className={`px-4 py-2 rounded-lg border transition-all duration-200 text-sm font-medium ${
+                    className={`w-full px-3 py-2 rounded-lg border transition-all duration-200 text-sm font-medium text-center ${
                       editData.language === lang.value
                         ? `${lang.color} text-white border-transparent shadow-md scale-105`
                         : 'bg-white/80 dark:bg-gray-800/80 text-light-text/70 dark:text-dark-text/70 border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent dark:hover:border-dark-accent hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'
@@ -340,86 +375,79 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
                 <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
                 키 조절
               </label>
-              <div className="flex items-center justify-center gap-3 bg-white/50 dark:bg-gray-800/50 rounded-xl p-3 border border-light-primary/20 dark:border-dark-primary/20">
-                <button
-                  type="button"
-                  onClick={() => setEditData({
-                    ...editData,
-                    keyAdjustment: editData.keyAdjustment === null ? -1 : Math.max(-12, editData.keyAdjustment - 1)
-                  })}
-                  className="w-10 h-10 flex items-center justify-center rounded-full bg-light-accent/10 dark:bg-dark-accent/10 hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors duration-200 text-light-accent dark:text-dark-accent"
-                  title="키 내리기"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                  </svg>
-                </button>
-                
-                <div className="flex-1 text-center">
-                  <div className="text-lg font-bold text-light-text dark:text-dark-text">
-                    {editData.keyAdjustment === null ? '설정없음' : 
-                     editData.keyAdjustment === 0 ? '원본키' : 
-                     `${editData.keyAdjustment > 0 ? '+' : ''}${editData.keyAdjustment}`}
+              <div 
+                ref={keyAdjustmentRef}
+                className={useHorizontalLayout ? "flex items-center gap-2" : "flex flex-col gap-2"}
+              >
+                {/* 키 조절 컨트롤 */}
+                <div className="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 border border-light-primary/20 dark:border-dark-primary/20 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditData({
+                      ...editData,
+                      keyAdjustment: editData.keyAdjustment === null ? -1 : Math.max(-12, editData.keyAdjustment - 1)
+                    })}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-light-accent/10 dark:bg-dark-accent/10 hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors duration-200 text-light-accent dark:text-dark-accent"
+                    title="키 내리기"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                    </svg>
+                  </button>
+                  
+                  <div className="flex-1 text-center">
+                    <div className="text-xs font-medium text-light-text dark:text-dark-text">
+                      {editData.keyAdjustment === null ? '설정없음' : 
+                       editData.keyAdjustment === 0 ? '원본키' : 
+                       `${editData.keyAdjustment > 0 ? '+' : ''}${editData.keyAdjustment}`}
+                    </div>
                   </div>
+                  
+                  <button
+                    type="button"
+                    onClick={() => setEditData({
+                      ...editData,
+                      keyAdjustment: editData.keyAdjustment === null ? 1 : Math.min(12, editData.keyAdjustment + 1)
+                    })}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-light-accent/10 dark:bg-dark-accent/10 hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors duration-200 text-light-accent dark:text-dark-accent"
+                    title="키 올리기"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </button>
                 </div>
                 
-                <button
-                  type="button"
-                  onClick={() => setEditData({
-                    ...editData,
-                    keyAdjustment: editData.keyAdjustment === null ? 1 : Math.min(12, editData.keyAdjustment + 1)
-                  })}
-                  className="w-10 h-10 flex items-center justify-center rounded-full bg-light-accent/10 dark:bg-dark-accent/10 hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors duration-200 text-light-accent dark:text-dark-accent"
-                  title="키 올리기"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="flex justify-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditData({...editData, keyAdjustment: 0})}
-                  className={`px-3 py-1 text-xs rounded-lg transition-colors duration-200 ${
-                    editData.keyAdjustment === 0
-                      ? 'bg-light-accent dark:bg-dark-accent text-white'
-                      : 'bg-light-primary/10 dark:bg-dark-primary/10 text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/20 dark:hover:bg-dark-primary/20'
-                  }`}
-                >
-                  원본키
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditData({...editData, keyAdjustment: null})}
-                  className={`px-3 py-1 text-xs rounded-lg transition-colors duration-200 ${
-                    editData.keyAdjustment === null
-                      ? 'bg-gray-500 text-white'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                  }`}
-                >
-                  미설정
-                </button>
+                {/* 프리셋 버튼들 */}
+                <div className={`flex gap-2 flex-shrink-0 ${useHorizontalLayout ? 'justify-end' : 'justify-center'}`}>
+                  <button
+                    type="button"
+                    onClick={() => setEditData({...editData, keyAdjustment: 0})}
+                    className={`px-2 py-1 text-xs rounded transition-colors duration-200 ${
+                      editData.keyAdjustment === 0
+                        ? 'bg-light-accent dark:bg-dark-accent text-white'
+                        : 'bg-light-primary/10 dark:bg-dark-primary/10 text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/20 dark:hover:bg-dark-primary/20'
+                    }`}
+                    title="원본키"
+                  >
+                    원본
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditData({...editData, keyAdjustment: null})}
+                    className={`px-2 py-1 text-xs rounded transition-colors duration-200 ${
+                      editData.keyAdjustment === null
+                        ? 'bg-gray-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                    title="미설정"
+                  >
+                    미설정
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* 가사 - XL 화면에서는 숨김 (왼쪽에 별도 가사 수정란 있음) */}
-        <div className="xl:hidden">
-          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-            가사
-          </label>
-          <textarea
-            value={editData.lyrics}
-            onChange={(e) => setEditData({...editData, lyrics: e.target.value})}
-            rows={16}
-            className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                     bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
-                     focus:border-light-accent dark:focus:border-dark-accent outline-none resize-none"
-            placeholder="가사를 입력하세요..."
-          />
         </div>
 
         {/* 검색 태그 */}
@@ -462,6 +490,22 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
               </span>
             ))}
           </div>
+        </div>
+
+        {/* 가사 - XL 화면에서는 숨김 (왼쪽에 별도 가사 수정란 있음) */}
+        <div className="xl:hidden">
+          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
+            가사
+          </label>
+          <textarea
+            value={editData.lyrics}
+            onChange={(e) => setEditData({...editData, lyrics: e.target.value})}
+            rows={16}
+            className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
+                     bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
+                     focus:border-light-accent dark:focus:border-dark-accent outline-none resize-none"
+            placeholder="가사를 입력하세요..."
+          />
         </div>
 
         {/* MR 링크 */}

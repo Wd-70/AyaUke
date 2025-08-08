@@ -5,18 +5,9 @@ import { motion } from "framer-motion";
 import { SongData } from "@/types";
 import {
   MusicalNoteIcon,
-  VideoCameraIcon,
-  PlayIcon,
-  PauseIcon,
   XMarkIcon,
   PencilIcon,
-  MagnifyingGlassIcon,
-  HeartIcon,
-  ListBulletIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
 } from "@heroicons/react/24/outline";
-import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import SongEditForm from "./SongEditForm";
 import { useSession } from "next-auth/react";
 

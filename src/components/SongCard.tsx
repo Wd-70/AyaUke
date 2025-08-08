@@ -13,9 +13,6 @@ import {
   ArrowTopRightOnSquareIcon,
   ListBulletIcon,
   PencilIcon,
-  CheckIcon,
-  PlusIcon,
-  MinusIcon,
   ComputerDesktopIcon,
   DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
@@ -27,8 +24,6 @@ import PlaylistContextMenu from "./PlaylistContextMenu";
 import LiveClipManager from "./LiveClipManager";
 import LiveClipEditor from "./LiveClipEditor";
 import SongEditForm from "./SongEditForm";
-import TagManager from "./TagManager";
-import MRLinkManager from "./MRLinkManager";
 import { useSession } from "next-auth/react";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
@@ -84,8 +79,6 @@ export default function SongCard({
 
   // 편집 모드 상태
   const [isEditMode, setIsEditMode] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-
   // 라이브 클립 데이터 상태 (LiveClipManager와 LiveClipEditor 공유)
   const [songVideos, setSongVideos] = useState<any[]>([]);
   const [videosLoading, setVideosLoading] = useState(false);
@@ -97,24 +90,6 @@ export default function SongCard({
 
   // 가사 전용 상태 (성능 최적화를 위해 분리)
   const [lyricsText, setLyricsText] = useState("");
-  const lyricsUpdateTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  // 임시 편집 관련 상태 (제거 예정)
-  const [editData, setEditData] = useState({
-    titleAlias: "",
-    artistAlias: "",
-    keyAdjustment: null as number | null,
-    language: "",
-    searchTags: [] as string[],
-    mrLinks: [] as Array<{
-      url: string;
-      skipSeconds?: number;
-      label?: string;
-      duration?: string;
-    }>,
-    selectedMRIndex: 0,
-    lyrics: "",
-  });
 
   // 관리자 권한 체크
   const isAdmin = session?.user?.isAdmin || false;
@@ -167,32 +142,6 @@ export default function SongCard({
     };
   }, [isXLScreen, currentTab, liveClipPosition]);
 
-  // 편집 데이터 초기화
-  useEffect(() => {
-    if (isEditMode) {
-      const lyrics = song.lyrics || "";
-      setEditData({
-        titleAlias: song.titleAlias || song.title,
-        artistAlias: song.artistAlias || song.artist,
-        keyAdjustment: song.keyAdjustment ?? null,
-        language: song.language || "",
-        searchTags: song.searchTags || [],
-        mrLinks:
-          song.mrLinks && song.mrLinks.length > 0
-            ? song.mrLinks.map((link) => ({
-                url: link.url || "",
-                skipSeconds: link.skipSeconds || 0,
-                label: link.label || "",
-                duration: link.duration || "",
-              }))
-            : [{ url: "", skipSeconds: 0, label: "", duration: "" }],
-        selectedMRIndex: song.selectedMRIndex || 0,
-        lyrics: lyrics,
-      });
-      // 가사 전용 상태도 초기화
-      setLyricsText(lyrics);
-    }
-  }, [isEditMode, song]);
 
   // 라이브 클립 데이터 로드
   const loadSongVideos = useCallback(async () => {
@@ -238,26 +187,8 @@ export default function SongCard({
   const handleLyricsChange = useCallback((newLyrics: string) => {
     // 즉시 UI 업데이트 (사용자 입력 반응성 유지)
     setLyricsText(newLyrics);
-
-    // 기존 타이머 정리
-    if (lyricsUpdateTimeout.current) {
-      clearTimeout(lyricsUpdateTimeout.current);
-    }
-
-    // 300ms 후에 실제 editData 업데이트 (debounce)
-    lyricsUpdateTimeout.current = setTimeout(() => {
-      setEditData((prev) => ({ ...prev, lyrics: newLyrics }));
-    }, 300);
   }, []);
 
-  // 컴포넌트 언마운트 시 타이머 정리
-  useEffect(() => {
-    return () => {
-      if (lyricsUpdateTimeout.current) {
-        clearTimeout(lyricsUpdateTimeout.current);
-      }
-    };
-  }, []);
 
   // XL 화면에서는 MR 탭을 기본으로 설정
   useEffect(() => {
@@ -286,85 +217,17 @@ export default function SongCard({
     setIsEditMode(!isEditMode);
   };
 
-  // 변경사항 확인 함수
-  const hasUnsavedChanges = () => {
-    if (!isEditMode) return false;
-
-    // 가사 변경 확인
-    const currentLyrics = lyricsText.trim();
-    const originalLyrics = (song.lyrics || "").trim();
-    if (currentLyrics !== originalLyrics) return true;
-
-    // 제목 별칭 변경 확인
-    const currentTitleAlias = editData.titleAlias?.trim() || "";
-    const originalTitleAlias =
-      song.titleAlias?.trim() || song.title?.trim() || "";
-    if (currentTitleAlias !== originalTitleAlias) return true;
-
-    // 아티스트 별칭 변경 확인
-    const currentArtistAlias = editData.artistAlias?.trim() || "";
-    const originalArtistAlias =
-      song.artistAlias?.trim() || song.artist?.trim() || "";
-    if (currentArtistAlias !== originalArtistAlias) return true;
-
-    // 키 조정 변경 확인
-    if (editData.keyAdjustment !== (song.keyAdjustment ?? null)) return true;
-
-    // 언어 변경 확인
-    if (editData.language !== song.language) return true;
-
-    // 태그 변경 확인
-    const currentTags = JSON.stringify(editData.searchTags?.sort() || []);
-    const originalTags = JSON.stringify(song.searchTags?.sort() || []);
-    if (currentTags !== originalTags) return true;
-
-    // MR 링크 변경 확인
-    const currentMRLinks = JSON.stringify(editData.mrLinks || []);
-    const originalMRLinks = JSON.stringify(song.mrLinks || []);
-    if (currentMRLinks !== originalMRLinks) return true;
-
-    return false;
-  };
-
-  // 편집 데이터 초기화 함수
-  const resetEditData = () => {
-    setLyricsText(song.lyrics || "");
-    setEditData({
-      titleAlias: song.titleAlias || song.title,
-      artistAlias: song.artistAlias || song.artist,
-      mrLinks: song.mrLinks || [],
-      keyAdjustment: song.keyAdjustment ?? null,
-      language: song.language,
-      searchTags: song.searchTags || [],
-      selectedMRIndex: song.selectedMRIndex || 0,
-      lyrics: song.lyrics || "",
-    });
-  };
 
   // ESC 키 핸들러
   const handleEscapeKey = useCallback(async () => {
     if (isEditMode) {
-      // 수정 모드에서 ESC: 변경사항 확인 후 일반 모드로
-      if (hasUnsavedChanges()) {
-        const confirmed = await confirm.confirm({
-          title: "편집 취소",
-          message: "수정 중인 내용이 있습니다. 정말 취소하시겠습니까?",
-          confirmText: "취소하기",
-          cancelText: "계속 편집",
-          type: "warning",
-        });
-        if (confirmed) {
-          setIsEditMode(false);
-          resetEditData(); // 모든 편집 데이터 초기화
-        }
-      } else {
-        setIsEditMode(false);
-      }
+      // 수정 모드에서 ESC: 일반 모드로
+      setIsEditMode(false);
     } else {
       // 일반 모드에서 ESC: 다이얼로그 닫기
       setIsExpanded(false);
     }
-  }, [isEditMode, hasUnsavedChanges, confirm]);
+  }, [isEditMode]);
 
   // ESC 키 이벤트 리스너 등록
   useEffect(() => {
@@ -384,68 +247,6 @@ export default function SongCard({
     };
   }, [isExpanded, handleEscapeKey]);
 
-  // 편집 저장 핸들러
-
-  // 편집 데이터 저장
-  const saveEditData = async () => {
-    if (!song.id) return;
-
-    setIsSaving(true);
-    try {
-      // 펜딩 중인 가사 업데이트 즉시 반영
-      if (lyricsUpdateTimeout.current) {
-        clearTimeout(lyricsUpdateTimeout.current);
-        setEditData((prev) => ({ ...prev, lyrics: lyricsText }));
-      }
-
-      // 저장할 데이터 준비 - alias 로직 처리
-      const saveData = {
-        ...editData,
-        lyrics: lyricsText, // 최신 가사 텍스트 사용
-        titleAlias:
-          !editData.titleAlias?.trim() ||
-          editData.titleAlias.trim() === song.title.trim()
-            ? null
-            : editData.titleAlias.trim(),
-        artistAlias:
-          !editData.artistAlias?.trim() ||
-          editData.artistAlias.trim() === song.artist.trim()
-            ? null
-            : editData.artistAlias.trim(),
-        mrLinks: editData.mrLinks.filter((link: any) => link.url.trim() !== ""),
-      };
-
-      // 기본값은 제거 (수정 불가능) - title과 artist는 이미 saveData에 포함되지 않음
-
-      console.log("🚀 저장할 데이터:", JSON.stringify(saveData, null, 2));
-
-      const response = await fetch(`/api/songdetails/${song.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(saveData),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        console.log("✅ 저장 성공, 반환된 데이터:", result.song);
-        // 곡 데이터 업데이트
-        Object.assign(song, result.song);
-        setIsEditMode(false);
-        showSuccess("수정 완료", "곡 정보가 성공적으로 수정되었습니다.");
-      } else {
-        showError("저장 실패", result.error || "저장에 실패했습니다.");
-      }
-    } catch (error) {
-      console.error("저장 오류:", error);
-      showError("오류 발생", "저장 중 오류가 발생했습니다.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   // SongEditForm용 저장 핸들러
   const handleSaveEdit = (updatedSong: SongData) => {
     // 곡 데이터 업데이트
@@ -456,19 +257,6 @@ export default function SongCard({
   // 편집 취소
   const cancelEdit = () => {
     setIsEditMode(false);
-    // 편집 데이터 초기화
-    setEditData({
-      titleAlias: song.titleAlias || song.title,
-      artistAlias: song.artistAlias || song.artist,
-      keyAdjustment: song.keyAdjustment ?? null,
-      language: song.language || "",
-      searchTags: song.searchTags || [],
-      mrLinks: song.mrLinks || [
-        { url: "", skipSeconds: 0, label: "", duration: "" },
-      ],
-      selectedMRIndex: song.selectedMRIndex || 0,
-      lyrics: song.lyrics || "",
-    });
   };
 
   // OBS 토글 함수
@@ -560,34 +348,6 @@ export default function SongCard({
   };
 
   // 태그 변경 핸들러
-  const handleTagsChange = (newTags: string[]) => {
-    setEditData({
-      ...editData,
-      searchTags: newTags,
-    });
-  };
-
-  // MR 링크 변경 핸들러들
-  const handleMRLinksChange = (
-    newMRLinks: Array<{
-      url: string;
-      skipSeconds?: number;
-      label?: string;
-      duration?: string;
-    }>
-  ) => {
-    setEditData({
-      ...editData,
-      mrLinks: newMRLinks,
-    });
-  };
-
-  const handleSelectedMRIndexChange = (newIndex: number) => {
-    setEditData({
-      ...editData,
-      selectedMRIndex: newIndex,
-    });
-  };
 
   const languageColors = {
     Korean: "bg-blue-500",
@@ -1214,76 +974,6 @@ export default function SongCard({
     </div>
   );
 
-  // TODO: 기존 인라인 편집 코드 - SongEditForm 컴포넌트로 교체됨
-  /*
-  // 편집 모드 헤더 렌더링
-  const renderEditModeHeader = () => (
-    <div className="space-y-4">
-      // 편집 액션 버튼들 - 맨 위에 배치
-      <div className="flex items-center justify-between">
-        <h4 className="text-lg font-semibold text-light-accent dark:text-dark-accent">
-          곡 정보 편집
-        </h4>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={saveEditData}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 
-                       transition-colors duration-200 disabled:opacity-50 text-green-600 dark:text-green-400"
-            title="저장"
-          >
-            {isSaving ? (
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="w-4 h-4 border-2 border-green-600/30 border-t-green-600 rounded-full"
-              />
-            ) : (
-              <CheckIcon className="w-4 h-4" />
-            )}
-            <span className="text-sm font-medium">저장</span>
-          </button>
-          <button
-            onClick={cancelEdit}
-            disabled={isSaving}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-500/20 hover:bg-gray-500/30 
-                       transition-colors duration-200 disabled:opacity-50 text-gray-600 dark:text-gray-400"
-            title="취소"
-          >
-            <XMarkIcon className="w-4 h-4" />
-            <span className="text-sm font-medium">취소</span>
-          </button>
-          <button
-            onClick={handleCardClick}
-            className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30 
-                       transition-colors duration-200"
-            title="닫기"
-          >
-            <XMarkIcon className="w-5 h-5 text-red-500" />
-          </button>
-        </div>
-      </div>
-
-      // 기본 정보 섹션 
-      <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-xl p-6 space-y-4">
-        // ... 기존 인라인 편집 UI 코드들 ...
-        // (전체 코드는 너무 길어서 생략)
-      </div>
-
-      // 검색 태그 편집 
-      <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-xl p-6">
-        <h4 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4">
-          검색 태그
-        </h4>
-        <TagManager
-          tags={editData.searchTags}
-          onTagsChange={handleTagsChange}
-          isEditMode={true}
-        />
-      </div>
-    </div>
-  );
-  */
 
   // 일반 모드 헤더 렌더링
   const renderNormalModeHeader = () => (
@@ -1323,11 +1013,20 @@ export default function SongCard({
               {song.language}
             </span>
           )}
-          <TagManager
-            tags={song.searchTags || []}
-            onTagsChange={() => {}}
-            isEditMode={false}
-          />
+          {/* 검색 태그들 */}
+          {song.searchTags && song.searchTags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {song.searchTags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="px-2 py-1 text-xs bg-light-secondary/20 dark:bg-dark-secondary/20 
+                           text-light-text/70 dark:text-dark-text/70 rounded-full"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1655,18 +1354,7 @@ export default function SongCard({
                       currentTab === "mr" ? "flex" : "hidden"
                     } flex-col h-full min-h-0`}
                   >
-                    {isEditMode ? (
-                      /* MR 링크 편집 UI */
-                      <MRLinkManager
-                        mrLinks={editData.mrLinks}
-                        selectedMRIndex={editData.selectedMRIndex}
-                        onMRLinksChange={handleMRLinksChange}
-                        onSelectedMRIndexChange={handleSelectedMRIndexChange}
-                        isEditMode={true}
-                        songTitle={displayTitle}
-                        songArtist={displayArtist}
-                      />
-                    ) : (
+                    {!isEditMode && (
                       /* 기존 YouTube 플레이어 */
                       youtubeMR && (
                         <div className="flex-1 flex flex-col min-h-0">

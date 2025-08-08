@@ -533,6 +533,10 @@ export default function SongSearch({
 
             {/* 오른쪽: 정렬 탭 (큰 화면에서만 표시) */}
             <div className="hidden lg:flex items-center gap-1 bg-white/50 dark:bg-gray-800/50 rounded-lg p-1 border border-light-primary/20 dark:border-dark-primary/20 flex-shrink-0">
+              <div className="flex items-center gap-1 text-xs text-light-text/50 dark:text-dark-text/50 px-2">
+                정렬
+              </div>
+              <div className="w-px h-4 bg-light-primary/20 dark:border-dark-primary/20"></div>
               <button
                 onClick={() => setSortBy("default")}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
@@ -711,6 +715,10 @@ export default function SongSearch({
           <div className="lg:hidden">
             <div className="flex items-center justify-center">
               <div className="flex items-center gap-1 bg-white/50 dark:bg-gray-800/50 rounded-lg p-1 border border-light-primary/20 dark:border-dark-primary/20">
+                <div className="flex items-center gap-1 text-xs text-light-text/50 dark:text-dark-text/50 px-2">
+                  정렬
+                </div>
+                <div className="w-px h-4 bg-light-primary/20 dark:border-dark-primary/20"></div>
                 <button
                   onClick={() => setSortBy("default")}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${

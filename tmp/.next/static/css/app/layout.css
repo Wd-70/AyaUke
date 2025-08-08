@@ -1401,6 +1401,9 @@ video {
 .grid-cols-3{
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
+.grid-cols-4{
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
 .flex-row{
   flex-direction: row;
 }
@@ -5803,8 +5806,16 @@ body {
     min-width: 80px;
   }
 
+  .sm\:min-w-\[200px\]{
+    min-width: 200px;
+  }
+
   .sm\:max-w-\[95\%\]{
     max-width: 95%;
+  }
+
+  .sm\:flex-initial{
+    flex: 0 1 auto;
   }
 
   .sm\:grid-cols-2{
@@ -5821,6 +5832,10 @@ body {
 
   .sm\:items-center{
     align-items: center;
+  }
+
+  .sm\:justify-end{
+    justify-content: flex-end;
   }
 
   .sm\:justify-between{
