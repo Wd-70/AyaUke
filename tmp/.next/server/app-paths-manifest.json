@@ -1,8 +1,10 @@
 {
-  "/api/user/playlists/route": "app/api/user/playlists/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/playlist/[shareId]/route": "app/api/playlist/[shareId]/route.js",
   "/api/likes-bulk/route": "app/api/likes-bulk/route.js",
+  "/api/user/playlists/route": "app/api/user/playlists/route.js",
   "/songbook/page": "app/songbook/page.js",
   "/admin/page": "app/admin/page.js",
-  "/admin/songs/page": "app/admin/songs/page.js"
+  "/api/songdetails/[id]/route": "app/api/songdetails/[id]/route.js",
+  "/playlist/[shareId]/page": "app/playlist/[shareId]/page.js"
 }

@@ -14,13 +14,20 @@ import {
   PencilIcon,
   EyeIcon,
   CalendarIcon,
-  ClockIcon
+  ClockIcon,
+  HeartIcon,
+  QueueListIcon
 } from '@heroicons/react/24/outline'
 import { IUser } from '@/models/User'
 import UserDetailModal from '@/components/admin/UserDetailModal'
 
+interface UserWithCounts extends IUser {
+  likesCount: number
+  playlistsCount: number
+}
+
 interface UserListResponse {
-  users: IUser[]
+  users: UserWithCounts[]
   pagination: {
     currentPage: number
     totalPages: number
@@ -56,7 +63,7 @@ const roleIcons = {
 }
 
 export default function UserManagementTab() {
-  const [users, setUsers] = useState<IUser[]>([])
+  const [users, setUsers] = useState<UserWithCounts[]>([])
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -75,7 +82,7 @@ export default function UserManagementTab() {
   const [currentPage, setCurrentPage] = useState(1)
 
   // 모달 상태
-  const [selectedUser, setSelectedUser] = useState<IUser | null>(null)
+  const [selectedUser, setSelectedUser] = useState<UserWithCounts | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   const fetchUsers = async () => {
@@ -248,7 +255,7 @@ export default function UserManagementTab() {
                 </button>
               </div>
               <div className="col-span-2">
-                <span className="text-sm font-medium text-light-text/70 dark:text-dark-text/70">활동 통계</span>
+                <span className="text-sm font-medium text-light-text/70 dark:text-dark-text/70">좋아요/플레이리스트</span>
               </div>
               <div className="col-span-1">
                 <span className="text-sm font-medium text-light-text/70 dark:text-dark-text/70">액션</span>
@@ -320,11 +327,17 @@ export default function UserManagementTab() {
                         </div>
                       </div>
 
-                      {/* 활동 통계 */}
+                      {/* 좋아요/플레이리스트 */}
                       <div className="col-span-2">
                         <div className="text-sm text-light-text/70 dark:text-dark-text/70">
-                          <div>접속일: {user.activityStats?.totalLoginDays || 0}일</div>
-                          <div>연속: {user.activityStats?.currentStreak || 0}일</div>
+                          <div className="flex items-center gap-1 mb-1">
+                            <HeartIcon className="w-3 h-3 text-red-500" />
+                            <span>{user.likesCount || 0}곡</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <QueueListIcon className="w-3 h-3 text-blue-500" />
+                            <span>{user.playlistsCount || 0}개</span>
+                          </div>
                         </div>
                       </div>
 

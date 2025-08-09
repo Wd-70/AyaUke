@@ -19,12 +19,37 @@ import {
   TrashIcon,
   GiftIcon,
   SparklesIcon,
-  ListBulletIcon
+  ListBulletIcon,
+  HeartIcon,
+  QueueListIcon,
+  MusicalNoteIcon,
+  ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline'
 import { IUser } from '@/models/User'
 
+interface UserDetailData {
+  user: IUser & { likesCount?: number; playlistsCount?: number }
+  likedSongs?: Array<{
+    _id: string
+    title: string
+    artist: string
+    titleAlias?: string
+    artistAlias?: string
+  }>
+  playlists?: Array<{
+    _id: string
+    name: string
+    description?: string
+    isPublic: boolean
+    songCount: number
+    shareId: string
+    createdAt: string
+    updatedAt: string
+  }>
+}
+
 interface UserDetailModalProps {
-  user: IUser
+  user: IUser & { likesCount?: number; playlistsCount?: number }
   isOpen: boolean
   onClose: () => void
   onUserUpdate: (updatedUser: IUser) => void
@@ -131,6 +156,13 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
   
+  // 사용자 상세 데이터
+  const [userDetail, setUserDetail] = useState<UserDetailData | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  
+  // 탭 상태
+  const [activeTab, setActiveTab] = useState<'info' | 'likes' | 'playlists'>('info')
+  
   // 타이틀 관리 상태
   const [showTitleForm, setShowTitleForm] = useState(false)
   const [titleForm, setTitleForm] = useState({
@@ -141,6 +173,25 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
   })
   const [titleLoading, setTitleLoading] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
+
+  // 사용자 상세 정보 가져오기
+  const fetchUserDetail = async () => {
+    if (!user._id) return
+    
+    try {
+      setDetailLoading(true)
+      const response = await fetch(`/api/admin/users/${user._id}`)
+      if (!response.ok) throw new Error('사용자 상세 정보를 불러올 수 없습니다.')
+      
+      const data = await response.json()
+      setUserDetail(data)
+    } catch (error) {
+      console.error('사용자 상세 정보 조회 오류:', error)
+      setMessage({ type: 'error', text: '상세 정보를 불러오는데 실패했습니다.' })
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   useEffect(() => {
     setEditForm({
@@ -157,7 +208,13 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
       condition: '',
       rarity: 'common'
     })
-  }, [user])
+    
+    // 모달이 열릴 때 상세 정보 가져오기
+    if (isOpen && user._id) {
+      fetchUserDetail()
+      setActiveTab('info')
+    }
+  }, [user, isOpen])
 
   const handleSave = async () => {
     try {
@@ -342,9 +399,57 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
             </div>
           )}
 
-          <div className="p-6 space-y-8">
-            {/* Basic Info */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="p-6 space-y-6">
+            {/* Tab Navigation */}
+            <div className="border-b border-light-primary/20 dark:border-dark-primary/20">
+              <nav className="flex space-x-8" aria-label="탭">
+                <button
+                  onClick={() => setActiveTab('info')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === 'info'
+                      ? 'border-light-accent dark:border-dark-accent text-light-accent dark:text-dark-accent'
+                      : 'border-transparent text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text hover:border-light-primary/30 dark:hover:border-dark-primary/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <InformationCircleIcon className="w-4 h-4" />
+                    기본 정보
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('likes')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === 'likes'
+                      ? 'border-light-accent dark:border-dark-accent text-light-accent dark:text-dark-accent'
+                      : 'border-transparent text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text hover:border-light-primary/30 dark:hover:border-dark-primary/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <HeartIcon className="w-4 h-4" />
+                    좋아요 곡 ({userDetail?.user.likesCount || user.likesCount || 0})
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('playlists')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === 'playlists'
+                      ? 'border-light-accent dark:border-dark-accent text-light-accent dark:text-dark-accent'
+                      : 'border-transparent text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text hover:border-light-primary/30 dark:hover:border-dark-primary/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <QueueListIcon className="w-4 h-4" />
+                    플레이리스트 ({userDetail?.user.playlistsCount || user.playlistsCount || 0})
+                  </div>
+                </button>
+              </nav>
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'info' && (
+              <div className="space-y-8">
+                {/* Basic Info */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Left Column */}
               <div className="space-y-6">
                 <div>
@@ -764,6 +869,115 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
                 </div>
               </div>
             </div>
+              </div>
+            )}
+
+            {/* 좋아요한 곡 탭 */}
+            {activeTab === 'likes' && (
+              <div className="space-y-4">
+                {detailLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-8 h-8 border-2 border-light-accent/30 dark:border-dark-accent/30 border-t-light-accent dark:border-t-dark-accent rounded-full animate-spin" />
+                  </div>
+                ) : userDetail?.likedSongs?.length ? (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-light-text dark:text-dark-text">
+                      좋아요한 곡 ({userDetail.likedSongs.length}곡)
+                    </h3>
+                    <div className="grid gap-3 max-h-96 overflow-y-auto">
+                      {userDetail.likedSongs.map((song) => (
+                        <div
+                          key={song._id}
+                          className="p-3 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20"
+                        >
+                          <div className="flex items-center gap-3">
+                            <MusicalNoteIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-light-text dark:text-dark-text truncate">
+                                {song.titleAlias || song.title}
+                              </h4>
+                              <p className="text-sm text-light-text/60 dark:text-dark-text/60 truncate">
+                                {song.artistAlias || song.artist}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <HeartIcon className="w-12 h-12 text-light-text/30 dark:text-dark-text/30 mx-auto mb-3" />
+                    <p className="text-light-text/60 dark:text-dark-text/60">아직 좋아요한 곡이 없습니다.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 플레이리스트 탭 */}
+            {activeTab === 'playlists' && (
+              <div className="space-y-4">
+                {detailLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-8 h-8 border-2 border-light-accent/30 dark:border-dark-accent/30 border-t-light-accent dark:border-t-dark-accent rounded-full animate-spin" />
+                  </div>
+                ) : userDetail?.playlists?.length ? (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-light-text dark:text-dark-text">
+                      플레이리스트 ({userDetail.playlists.length}개)
+                    </h3>
+                    <div className="grid gap-3 max-h-96 overflow-y-auto">
+                      {userDetail.playlists.map((playlist) => (
+                        <div
+                          key={playlist._id}
+                          className="p-4 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <QueueListIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
+                                <h4 className="font-medium text-light-text dark:text-dark-text truncate">
+                                  {playlist.name}
+                                </h4>
+                                {playlist.isPublic && (
+                                  <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 text-xs rounded-full">
+                                    공개
+                                  </span>
+                                )}
+                              </div>
+                              {playlist.description && (
+                                <p className="text-sm text-light-text/60 dark:text-dark-text/60 mb-2 line-clamp-2">
+                                  {playlist.description}
+                                </p>
+                              )}
+                              <div className="flex items-center gap-4 text-xs text-light-text/50 dark:text-dark-text/50">
+                                <span>곡 수: {playlist.songCount}개</span>
+                                <span>생성: {new Date(playlist.createdAt).toLocaleDateString()}</span>
+                                {playlist.updatedAt !== playlist.createdAt && (
+                                  <span>수정: {new Date(playlist.updatedAt).toLocaleDateString()}</span>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => window.open(`/playlist/${playlist.shareId}`, '_blank')}
+                              className="ml-3 p-2 text-light-accent dark:text-dark-accent hover:bg-light-accent/10 dark:hover:bg-dark-accent/10 rounded-lg transition-colors flex-shrink-0"
+                              title="플레이리스트 페이지로 이동"
+                            >
+                              <ArrowTopRightOnSquareIcon className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <QueueListIcon className="w-12 h-12 text-light-text/30 dark:text-dark-text/30 mx-auto mb-3" />
+                    <p className="text-light-text/60 dark:text-dark-text/60">아직 생성한 플레이리스트가 없습니다.</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Footer */}

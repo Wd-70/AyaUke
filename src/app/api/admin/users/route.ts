@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
 import { isSuperAdmin, UserRole } from '@/lib/permissions'
-import { connectToDatabase } from '@/lib/mongodb'
+import dbConnect from '@/lib/mongodb'
 import User, { IUser } from '@/models/User'
+import Like from '@/models/Like'
+import Playlist from '@/models/Playlist'
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest) {
     const sortBy = searchParams.get('sortBy') || 'createdAt'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
-    await connectToDatabase()
+    await dbConnect()
 
     // 검색 조건 생성
     const searchQuery: any = {}
@@ -56,13 +58,29 @@ export async function GET(request: NextRequest) {
       .select('-__v')
       .lean()
 
+    // 각 사용자의 좋아요 수와 플레이리스트 수 조회
+    const usersWithCounts = await Promise.all(
+      users.map(async (user) => {
+        const [likesCount, playlistsCount] = await Promise.all([
+          Like.countDocuments({ channelId: user.channelId }),
+          Playlist.countDocuments({ channelId: user.channelId })
+        ]);
+
+        return {
+          ...user,
+          likesCount,
+          playlistsCount
+        };
+      })
+    );
+
     // 페이지네이션 정보
     const totalPages = Math.ceil(totalUsers / limit)
     const hasNextPage = page < totalPages
     const hasPreviousPage = page > 1
 
     return NextResponse.json({
-      users,
+      users: usersWithCounts,
       pagination: {
         currentPage: page,
         totalPages,
