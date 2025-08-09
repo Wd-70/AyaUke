@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { SongData } from '@/types';
 import { StarIcon, TrashIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useToast } from './Toast';
@@ -54,20 +54,22 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
   const keyAdjustmentRef = useRef<HTMLDivElement>(null);
   const [languageWidth, setLanguageWidth] = useState(0);
   const languageRef = useRef<HTMLDivElement>(null);
+  const lastSyncedLyricsRef = useRef<string>('');
 
   // 현재 표시되는 제목과 아티스트 (alias 우선)
   const displayTitle = song.titleAlias || song.title;
   const displayArtist = song.artistAlias || song.artist;
 
   // 편집 데이터 초기화
-  const initializeEditData = () => {
+  const initializeEditData = useCallback(() => {
     const mrLinks = song.mrLinks || [];
+    const lyricsValue = initialLyrics || song.lyrics || '';
     setEditData({
       title: song.title || '',
       artist: song.artist || '',
       titleAlias: displayTitle,
       artistAlias: displayArtist,
-      lyrics: initialLyrics || song.lyrics || '',
+      lyrics: lyricsValue,
       personalNotes: song.personalNotes || '',
       keyAdjustment: song.keyAdjustment ?? null,
       language: song.language || '',
@@ -80,26 +82,32 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
       })) : [{ url: '', skipSeconds: 0, label: '', duration: '' }],
       selectedMRIndex: song.selectedMRIndex || 0,
     });
-  };
+    // 초기화 시점의 가사를 기록
+    lastSyncedLyricsRef.current = lyricsValue;
+  }, [song, displayTitle, displayArtist]);
 
   // 컴포넌트가 보여질 때 데이터 초기화
   useEffect(() => {
     if (isVisible) {
       initializeEditData();
     }
-  }, [isVisible, song]);
+  }, [isVisible, initializeEditData]);
 
-  // 가사 변경사항을 왼쪽 패널에 동기화
-  useEffect(() => {
-    if (onLyricsChange && editData.lyrics !== undefined) {
-      onLyricsChange(editData.lyrics);
+  // 가사 변경 핸들러 (직접 호출용)
+  const handleLyricsTextChange = useCallback((newLyrics: string) => {
+    setEditData(prev => ({ ...prev, lyrics: newLyrics }));
+    // 왼쪽 패널에 동기화 (useEffect 없이 직접 호출)
+    if (onLyricsChange && newLyrics !== lastSyncedLyricsRef.current) {
+      lastSyncedLyricsRef.current = newLyrics;
+      onLyricsChange(newLyrics);
     }
-  }, [editData.lyrics, onLyricsChange]);
+  }, [onLyricsChange]);
 
   // initialLyrics가 변경되면 editData도 업데이트 (왼쪽 패널에서 직접 수정한 경우)
   useEffect(() => {
     if (initialLyrics !== undefined && initialLyrics !== editData.lyrics) {
       setEditData(prev => ({ ...prev, lyrics: initialLyrics }));
+      lastSyncedLyricsRef.current = initialLyrics;
     }
   }, [initialLyrics]);
 
@@ -209,8 +217,8 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
       // 저장할 데이터 준비 - alias 로직 처리
       const saveData = {
         ...editData,
-        titleAlias: (!editData.titleAlias.trim() || editData.titleAlias.trim() === displayTitle.trim()) ? null : editData.titleAlias.trim(),
-        artistAlias: (!editData.artistAlias.trim() || editData.artistAlias.trim() === displayArtist.trim()) ? null : editData.artistAlias.trim(),
+        titleAlias: (!editData.titleAlias.trim() || editData.titleAlias.trim() === song.title.trim()) ? null : editData.titleAlias.trim(),
+        artistAlias: (!editData.artistAlias.trim() || editData.artistAlias.trim() === song.artist.trim()) ? null : editData.artistAlias.trim(),
         mrLinks: editData.mrLinks.filter(link => link.url.trim() !== ''),
       };
       
@@ -499,7 +507,7 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
           </label>
           <textarea
             value={editData.lyrics}
-            onChange={(e) => setEditData({...editData, lyrics: e.target.value})}
+            onChange={(e) => handleLyricsTextChange(e.target.value)}
             rows={16}
             className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
                      bg-white dark:bg-gray-800 text-light-text dark:text-dark-text

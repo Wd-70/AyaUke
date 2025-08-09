@@ -16,19 +16,19 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
   const { data: session, status, update } = useSession(); // 한 번만 호출
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-light-primary/20 dark:border-dark-primary/20">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center h-16">
+      <div className="max-w-[1400px] mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center h-12 sm:h-16">
           {/* Left side - Logo */}
           <div className="flex-1">
             <Link href="/" className="inline-flex items-center space-x-2 group cursor-pointer">
-              <div className="w-10 h-10 bg-gradient-to-br from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary rounded-lg flex items-center justify-center p-1 group-hover:scale-105 transition-transform duration-200">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary rounded-lg flex items-center justify-center p-1 group-hover:scale-105 transition-transform duration-200">
                 <img 
                   src="/honeyz.png" 
                   alt="HONEYZ Logo" 
                   className="w-full h-full object-contain"
                 />
               </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary bg-clip-text text-transparent">AyaUke</span>
+              <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary bg-clip-text text-transparent">AyaUke</span>
             </Link>
           </div>
           
@@ -36,7 +36,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
           <div className="hidden md:flex items-center space-x-8 flex-1 justify-center flex-row">
             <Link 
               href="/" 
-              className={`px-3 py-2 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap ${
+              className={`px-2 py-1 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap ${
                 currentPath === '/' 
                   ? 'text-light-accent dark:text-dark-primary' 
                   : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary'
@@ -46,7 +46,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
             </Link>
             <Link 
               href="/songbook" 
-              className={`px-3 py-2 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap ${
+              className={`px-2 py-1 text-sm font-medium hover:-translate-y-0.5 transition-all duration-200 whitespace-nowrap ${
                 currentPath === '/songbook' 
                   ? 'text-light-accent dark:text-dark-primary' 
                   : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary'
@@ -75,7 +75,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
           </div>
 
           {/* Right side - Controls */}
-          <div className="flex items-center justify-end flex-1 space-x-2">
+          <div className="flex items-center justify-end flex-1 space-x-1 sm:space-x-2">
             {/* Desktop Auth Controls */}
             <div className="hidden md:block">
               <AuthControls session={session} status={status} update={update} />
@@ -83,11 +83,11 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
             
             {/* Mobile menu button */}
             <button 
-              className="md:hidden p-2 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-all duration-300"
+              className="md:hidden p-1.5 sm:p-2 rounded-full bg-light-primary/20 dark:bg-dark-primary/20 hover:bg-light-primary/30 dark:hover:bg-dark-primary/30 transition-all duration-300"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label="Toggle mobile menu"
             >
-              <svg className="w-6 h-6 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600 dark:text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 {isMobileMenuOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 ) : (
@@ -135,14 +135,14 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
         {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-light-primary/20 dark:border-dark-primary/20 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md">
-            <div className="px-4 py-2 space-y-1">
+            <div className="px-3 py-2 space-y-1">
               {/* 1. 사용자 정보 */}
               <MobileUserProfile session={session} status={status} />
               
               {/* 2. 홈, 노래책 링크 */}
               <Link 
                 href="/" 
-                className={`block px-3 py-2 text-base font-medium rounded-lg transition-all duration-200 ${
+                className={`block px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                   currentPath === '/' 
                     ? 'text-light-accent dark:text-dark-primary bg-light-primary/10 dark:bg-dark-primary/10' 
                     : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
@@ -153,7 +153,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
               </Link>
               <Link 
                 href="/songbook" 
-                className={`block px-3 py-2 text-base font-medium rounded-lg transition-all duration-200 ${
+                className={`block px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                   currentPath === '/songbook' 
                     ? 'text-light-accent dark:text-dark-primary bg-light-primary/10 dark:bg-dark-primary/10' 
                     : 'text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
@@ -172,7 +172,7 @@ export default function Navigation({ currentPath = '/' }: NavigationProps) {
               {/* 5. 테마 토글 */}
               <div className="border-t border-light-primary/10 dark:border-dark-primary/10 pt-1 mt-1">
                 <button
-                  className="flex items-center w-full px-3 py-2 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
+                  className="flex items-center w-full px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
                   data-theme-toggle
                   aria-label="Toggle theme"
                 >
@@ -247,10 +247,10 @@ function AuthControls({ session, status, update }: { session: any, status: strin
         ) : (
           <Link
             href="/auth/signin"
-            className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-light-accent to-light-secondary hover:from-light-secondary hover:to-light-accent dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent text-white text-sm font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-gradient-to-r from-light-accent to-light-secondary hover:from-light-secondary hover:to-light-accent dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent text-white text-sm font-medium rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
           >
-            <UserIcon className="w-4 h-4" />
-            <span>로그인</span>
+            <UserIcon className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">로그인</span>
           </Link>
         )}
       </>
@@ -370,7 +370,7 @@ function MobileUserProfile({ session, status }: { session: any, status: string }
       <div className="mb-3 pb-3 border-b border-light-primary/10 dark:border-dark-primary/10">
         <Link
           href="/auth/signin"
-          className="flex items-center w-full px-3 py-2 text-base font-medium text-white bg-gradient-to-r from-light-accent to-light-secondary hover:from-light-secondary hover:to-light-accent dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent rounded-lg transition-all duration-200"
+          className="flex items-center w-full px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-light-accent to-light-secondary hover:from-light-secondary hover:to-light-accent dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent rounded-lg transition-all duration-200"
         >
           <UserIcon className="w-5 h-5 mr-3" />
           <span>로그인</span>
@@ -413,7 +413,7 @@ function MobileUserProfile({ session, status }: { session: any, status: string }
       {/* 프로필 링크도 사용자 정보에 포함 */}
       <Link
         href="/profile"
-        className="block px-3 py-2 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
+        className="block px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
       >
         내 프로필
       </Link>
@@ -433,7 +433,7 @@ function MobileAdminMenus({ session, onMenuClose }: { session: any, onMenuClose:
       {isSuperAdmin(session.user.role as UserRole) && (
         <Link
           href="/admin"
-          className="block px-3 py-2 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
+          className="block px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
           onClick={onMenuClose}
         >
           관리자 대시보드
@@ -441,7 +441,7 @@ function MobileAdminMenus({ session, onMenuClose }: { session: any, onMenuClose:
       )}
       <Link
         href="/admin/songs"
-        className="block px-3 py-2 text-base font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
+        className="block px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-light-accent dark:hover:text-dark-primary hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 rounded-lg transition-all duration-200"
         onClick={onMenuClose}
       >
         노래 관리
@@ -464,7 +464,7 @@ function MobileLogout({ session, onMenuClose }: { session: any, onMenuClose: () 
           onMenuClose();
           signOut();
         }}
-        className="block w-full text-left px-3 py-2 text-base font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+        className="block w-full text-left px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
       >
         로그아웃
       </button>

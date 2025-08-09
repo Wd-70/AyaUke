@@ -36,6 +36,17 @@ body {
   overflow-x: hidden;
 }
 
+/* 모바일 기본 폰트 크기 최적화 */
+@media (max-width: 767px) {
+  html {
+    font-size: 14px; /* 기본 16px에서 14px로 감소 */
+  }
+  
+  body {
+    line-height: 1.5; /* 줄간격 약간 줄임 */
+  }
+}
+
 .glass-effect {
   backdrop-filter: blur(10px);
   background: rgba(255, 255, 255, 0.1);

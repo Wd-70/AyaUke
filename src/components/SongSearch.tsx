@@ -16,6 +16,7 @@ import {
   ChevronUpIcon,
   ArrowsUpDownIcon,
   HashtagIcon,
+  MusicalNoteIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import { isTextMatch } from "@/lib/searchUtils";
@@ -56,6 +57,7 @@ export default function SongSearch({
 }: SongSearchProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isFilterOpen, setIsFilterOpen] = useState(true); // 기본으로 열려있게 변경
+  const [includeLyrics, setIncludeLyrics] = useState(false); // 가사 검색 포함 여부
 
   // 새로운 필터 상태
   const [filterMode, setFilterMode] = useState<FilterMode>("individual");
@@ -136,7 +138,7 @@ export default function SongSearch({
     // 텍스트 검색 필터
     if (debouncedSearchTerm) {
       filtered = filtered.filter((song) => {
-        return (
+        const basicMatch = (
           isTextMatch(debouncedSearchTerm, song.title) ||
           isTextMatch(debouncedSearchTerm, song.artist) ||
           // alias 필드도 검색 대상에 포함
@@ -149,6 +151,12 @@ export default function SongSearch({
             isTextMatch(debouncedSearchTerm, tag)
           )
         );
+
+        // 가사 검색이 활성화된 경우 가사도 검색 대상에 포함
+        const lyricsMatch = includeLyrics && song.lyrics && 
+          isTextMatch(debouncedSearchTerm, song.lyrics);
+
+        return basicMatch || lyricsMatch;
       });
     }
 
@@ -214,6 +222,7 @@ export default function SongSearch({
   }, [
     songs,
     debouncedSearchTerm,
+    includeLyrics,
     activeLanguages,
     showLikedOnly,
     activePlaylists,
@@ -405,6 +414,39 @@ export default function SongSearch({
     }
   }, [filterMode]);
 
+  // 툴팁 컴포넌트
+  const TooltipButton = ({
+    onClick,
+    active,
+    children,
+    tooltip,
+    className = "",
+  }: {
+    onClick: () => void;
+    active: boolean;
+    children: React.ReactNode;
+    tooltip: string;
+    className?: string;
+  }) => (
+    <div className="relative group">
+      <button
+        onClick={onClick}
+        className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 ${
+          active
+            ? "bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent"
+            : "hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent"
+        } ${className}`}
+      >
+        {children}
+      </button>
+      {/* 세련된 툴팁 */}
+      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 dark:bg-gray-700 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+        {tooltip}
+        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+      </div>
+    </div>
+  );
+
   // 뱃지 컴포넌트
   const FilterBadge = ({
     active,
@@ -446,51 +488,54 @@ export default function SongSearch({
                     py-4 shadow-sm -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8"
     >
       {/* Search bar */}
-      <div className="relative mb-4">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <MagnifyingGlassIcon className="h-5 w-5 text-light-text/40 dark:text-dark-text/40" />
+      <div className="relative mb-3 sm:mb-4">
+        <div className="absolute inset-y-0 left-0 pl-2.5 sm:pl-3 flex items-center pointer-events-none">
+          <MagnifyingGlassIcon className="h-4 w-4 sm:h-5 sm:w-5 text-light-text/40 dark:text-dark-text/40" />
         </div>
         <input
           type="text"
           placeholder="노래 제목, 아티스트, 검색태그로 검색... (띄어쓰기 무관, 초성검색, 한/영 오타 허용)"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-10 pr-32 py-3 border border-light-primary/20 dark:border-dark-primary/20 
+          className="block w-full pl-8 sm:pl-10 pr-24 sm:pr-32 py-2.5 sm:py-3 border border-light-primary/20 dark:border-dark-primary/20 
                      rounded-xl bg-light-background/50 dark:bg-dark-background/50 backdrop-blur-sm
-                     text-light-text dark:text-dark-text placeholder-light-text/50 dark:placeholder-dark-text/50
+                     text-sm sm:text-base text-light-text dark:text-dark-text placeholder-light-text/50 dark:placeholder-dark-text/50
                      focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
                      focus:border-transparent transition-all duration-200"
         />
-        <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-1">
+        <div className="absolute inset-y-0 right-0 pr-2 sm:pr-3 flex items-center gap-1">
+          {/* 가사 검색 토글 버튼 */}
+          <TooltipButton
+            onClick={() => setIncludeLyrics(!includeLyrics)}
+            active={includeLyrics}
+            tooltip={includeLyrics ? "가사 검색 제외" : "가사도 검색"}
+          >
+            <MusicalNoteIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+          </TooltipButton>
+
           {/* 번호 표시 토글 버튼 */}
           {onToggleNumbers && (
-            <button
+            <TooltipButton
               onClick={() => onToggleNumbers(!showNumbers)}
-              className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 ${
-                showNumbers
-                  ? "bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent"
-                  : "hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent"
-              }`}
-              title={showNumbers ? "번호 숨기기" : "번호 표시"}
+              active={showNumbers}
+              tooltip={showNumbers ? "번호 숨기기" : "번호 표시"}
             >
-              <HashtagIcon className="h-5 w-5" />
-            </button>
+              <HashtagIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+            </TooltipButton>
           )}
 
           {/* 필터 토글 버튼 */}
-          <button
+          <TooltipButton
             onClick={() => setIsFilterOpen(!isFilterOpen)}
-            className="p-1.5 rounded-lg hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 
-                     text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent 
-                     transition-all duration-200 hover:scale-110"
-            title={isFilterOpen ? "필터 숨기기" : "필터 보기"}
+            active={false}
+            tooltip={isFilterOpen ? "필터 숨기기" : "필터 보기"}
           >
             {isFilterOpen ? (
               <ChevronUpIcon className="h-5 w-5" />
             ) : (
               <ChevronDownIcon className="h-5 w-5" />
             )}
-          </button>
+          </TooltipButton>
         </div>
       </div>
 
@@ -539,7 +584,7 @@ export default function SongSearch({
               <div className="w-px h-4 bg-light-primary/20 dark:border-dark-primary/20"></div>
               <button
                 onClick={() => setSortBy("default")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
                   sortBy === "default"
                     ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                     : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
@@ -721,7 +766,7 @@ export default function SongSearch({
                 <div className="w-px h-4 bg-light-primary/20 dark:border-dark-primary/20"></div>
                 <button
                   onClick={() => setSortBy("default")}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                  className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
                     sortBy === "default"
                       ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                       : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
