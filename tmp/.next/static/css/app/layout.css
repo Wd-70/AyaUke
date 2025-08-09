@@ -6386,6 +6386,10 @@ body {
     padding-right: 1.5rem;
   }
 
+  .xl\:pr-4{
+    padding-right: 1rem;
+  }
+
   .xl\:text-2xl{
     font-size: 1.5rem;
     line-height: 2rem;

@@ -1007,20 +1007,19 @@ export default function SongCard({
           >
             {displayTitle}
           </h3>
-          {formatKeyAdjustment(song.keyAdjustment) && (
-            <span
-              className="px-2 py-1 text-sm font-medium rounded-md 
-                           bg-yellow-100 dark:bg-yellow-900 
-                           text-yellow-800 dark:text-yellow-200 shrink-0"
-            >
-              {formatKeyAdjustment(song.keyAdjustment)}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-1 sm:gap-2 flex-wrap mb-1 sm:mb-2">
           <p className="text-sm sm:text-base md:text-lg lg:text-xl text-light-text/70 dark:text-dark-text/70 line-clamp-1">
             {displayArtist}
           </p>
+          {formatKeyAdjustment(song.keyAdjustment) && (
+            <span
+              className="px-2 py-1 text-xs font-medium rounded-full 
+                           bg-blue-500/20 text-blue-600 dark:text-blue-400"
+            >
+              {formatKeyAdjustment(song.keyAdjustment)}
+            </span>
+          )}
           {song.language && (
             <span
               className={`px-2 py-1 rounded-full text-xs font-medium text-white 
@@ -1205,7 +1204,7 @@ export default function SongCard({
             {renderXLLyricsPanel()}
 
             {/* 오른쪽: 모든 다른 요소들 */}
-            <div className="flex-1 xl:w-1/2 flex flex-col min-h-0 relative xl:overflow-y-auto xl:overscroll-behavior-contain xl:pr-6">
+            <div className={`flex-1 xl:w-1/2 flex flex-col min-h-0 relative xl:overflow-y-auto xl:overscroll-behavior-contain ${isEditMode ? 'xl:pr-6' : ''}`}>
               {/* Header */}
               <div className="mb-3 sm:mb-4">
                 {isEditMode ? (

@@ -127,7 +127,7 @@ export default function SongCardModal({
                         dark:from-dark-accent/5 dark:to-dark-purple/5 rounded-xl"
         ></div>
 
-        <div className="relative p-3 sm:p-4 xl:p-8 flex flex-col xl:flex-row h-full gap-3 sm:gap-4 xl:gap-8">
+        <div className="relative p-3 sm:p-4 xl:p-6 flex flex-col xl:flex-row h-full gap-3 sm:gap-4 xl:gap-8">
           {/* 왼쪽: 가사 전용 영역 (XL 이상에서만) */}
           <div className="hidden xl:flex xl:w-1/2 flex-col min-h-0">
             <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4">
@@ -161,7 +161,7 @@ export default function SongCardModal({
           </div>
 
           {/* 오른쪽: 모든 다른 요소들 */}
-          <div className="flex-1 xl:w-1/2 flex flex-col min-h-0 relative">
+          <div className={`flex-1 xl:w-1/2 flex flex-col min-h-0 relative ${isEditMode ? 'xl:pr-4' : ''}`}>
             {/* 메타데이터 섹션 - Grid 레이아웃으로 공간 활용 최적화 */}
             <div className="mb-3 sm:mb-4 xl:mb-6 relative">
               <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 md:gap-4">
