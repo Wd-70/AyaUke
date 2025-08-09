@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     
     // MongoDB에서 곡 데이터 직접 가져오기 (구글시트 제외)
-    const songDetails = await fetchSongDetailsFromMongo();
+    const { songDetails } = await fetchSongDetailsFromMongo();
     
     // SongDetail을 Song 형태로 변환하여 관리용 데이터 생성
     const songs = songDetails.map(detail => ({

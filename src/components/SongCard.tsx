@@ -899,7 +899,7 @@ export default function SongCard({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <MusicalNoteIcon className="w-6 h-6 text-light-accent dark:text-dark-accent" />
-          <h4 className="text-lg sm:text-xl font-semibold text-light-text dark:text-dark-text">
+          <h4 className="text-lg sm:text-xl md:text-2xl font-semibold text-light-text dark:text-dark-text">
             가사
           </h4>
         </div>
@@ -963,7 +963,7 @@ export default function SongCard({
           <textarea
             value={lyricsText}
             onChange={(e) => handleLyricsChange(e.target.value)}
-            className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-sm sm:text-base 
+            className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-sm sm:text-base md:text-lg 
                        bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-3 sm:p-4 
                        outline-none resize-none flex-1 min-h-0"
             placeholder="가사를 입력하세요..."
@@ -974,7 +974,7 @@ export default function SongCard({
           />
         ) : song.lyrics ? (
           <div
-            className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-sm sm:text-base overflow-y-auto flex-1 min-h-0"
+            className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-sm sm:text-base md:text-lg overflow-y-auto flex-1 min-h-0"
             style={{
               overscrollBehavior: "contain",
               willChange: "scroll-position",
@@ -986,7 +986,7 @@ export default function SongCard({
         ) : (
           <div className="text-center flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50 flex-1">
             <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
-            <p className="text-base sm:text-lg mb-2">아직 가사가 등록되지 않았습니다</p>
+            <p className="text-base sm:text-lg md:text-xl mb-2">아직 가사가 등록되지 않았습니다</p>
             <p className="text-base">곧 업데이트될 예정입니다</p>
           </div>
         )}
@@ -1002,7 +1002,7 @@ export default function SongCard({
       <div className="min-w-0 pr-16 sm:pr-20">
         <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2 mr-20 sm:mr-20 xl:mr-10">
           <h3
-            className="text-lg sm:text-xl md:text-2xl font-semibold text-light-text dark:text-dark-text 
+            className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-semibold text-light-text dark:text-dark-text 
                          text-light-accent dark:text-dark-accent flex-1 min-w-0"
           >
             {displayTitle}
@@ -1018,7 +1018,7 @@ export default function SongCard({
           )}
         </div>
         <div className="flex items-center gap-1 sm:gap-2 flex-wrap mb-1 sm:mb-2">
-          <p className="text-sm sm:text-base md:text-lg text-light-text/70 dark:text-dark-text/70 line-clamp-1">
+          <p className="text-sm sm:text-base md:text-lg lg:text-xl text-light-text/70 dark:text-dark-text/70 line-clamp-1">
             {displayArtist}
           </p>
           {song.language && (
@@ -1403,7 +1403,7 @@ export default function SongCard({
                       <textarea
                         value={lyricsText}
                         onChange={(e) => handleLyricsChange(e.target.value)}
-                        className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-sm sm:text-base 
+                        className="text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-sm sm:text-base md:text-lg 
                                    bg-transparent border border-light-accent/30 dark:border-dark-accent/30 rounded-lg p-4 
                                    outline-none resize-none w-full h-full"
                         placeholder="가사를 입력하세요..."
@@ -1414,7 +1414,7 @@ export default function SongCard({
                       />
                     ) : song.lyrics ? (
                       <div
-                        className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-sm sm:text-base overflow-y-auto flex-1 min-h-0"
+                        className="scrollable-content text-light-text/80 dark:text-dark-text/80 whitespace-pre-line leading-relaxed text-sm sm:text-base md:text-lg overflow-y-auto flex-1 min-h-0"
                         style={{
                           overscrollBehavior: "contain",
                           willChange: "scroll-position",
@@ -1427,7 +1427,7 @@ export default function SongCard({
                     ) : (
                       <div className="text-center h-full flex flex-col items-center justify-center text-light-text/50 dark:text-dark-text/50">
                         <MusicalNoteIcon className="w-16 h-16 mb-4 opacity-30" />
-                        <p className="text-base sm:text-lg mb-2">
+                        <p className="text-base sm:text-lg md:text-xl mb-2">
                           아직 가사가 등록되지 않았습니다
                         </p>
                         <p className="text-base">곧 업데이트될 예정입니다</p>
@@ -1480,7 +1480,7 @@ export default function SongCard({
                       {/* 재생/일시정지 버튼 */}
                       <button
                         onClick={handleModalPlay}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base
+                        className="flex-1 flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base md:text-lg
                                bg-gradient-to-r from-light-accent to-light-purple 
                                dark:from-dark-accent dark:to-dark-purple text-white 
                                rounded-lg hover:shadow-lg transform hover:scale-105 
@@ -1529,7 +1529,7 @@ export default function SongCard({
                     // MR 링크가 없을 때 - 기존 검색 버튼
                     <button
                       onClick={handleMRSearch}
-                      className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 text-sm sm:text-base
+                      className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 text-sm sm:text-base md:text-lg md:text-lg
                              bg-gradient-to-r from-light-accent to-light-purple 
                              dark:from-dark-accent dark:to-dark-purple text-white 
                              rounded-lg hover:shadow-lg transform hover:scale-105 

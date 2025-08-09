@@ -440,7 +440,7 @@ export default function SongSearch({
         {children}
       </button>
       {/* 세련된 툴팁 */}
-      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 dark:bg-gray-700 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs sm:text-sm font-medium text-white bg-gray-900 dark:bg-gray-700 rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
         {tooltip}
         <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
       </div>
@@ -499,7 +499,7 @@ export default function SongSearch({
           onChange={(e) => setSearchTerm(e.target.value)}
           className="block w-full pl-8 sm:pl-10 pr-24 sm:pr-32 py-2.5 sm:py-3 border border-light-primary/20 dark:border-dark-primary/20 
                      rounded-xl bg-light-background/50 dark:bg-dark-background/50 backdrop-blur-sm
-                     text-sm sm:text-base text-light-text dark:text-dark-text placeholder-light-text/50 dark:placeholder-dark-text/50
+                     text-sm sm:text-base md:text-lg text-light-text dark:text-dark-text placeholder-light-text/50 dark:placeholder-dark-text/50
                      focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
                      focus:border-transparent transition-all duration-200"
         />
@@ -584,7 +584,7 @@ export default function SongSearch({
               <div className="w-px h-4 bg-light-primary/20 dark:border-dark-primary/20"></div>
               <button
                 onClick={() => setSortBy("default")}
-                className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
                   sortBy === "default"
                     ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                     : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
@@ -597,7 +597,7 @@ export default function SongSearch({
                   setSortBy("random");
                   setRandomSeed(prev => prev + 1);
                 }}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 ${
                   sortBy === "random"
                     ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                     : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
@@ -615,7 +615,7 @@ export default function SongSearch({
                     setSortOrder("desc");
                   }
                 }}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 ${
                   sortBy === "likes"
                     ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                     : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
@@ -638,7 +638,7 @@ export default function SongSearch({
                     setSortOrder("desc");
                   }
                 }}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 ${
                   sortBy === "sungCount"
                     ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                     : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
@@ -660,7 +660,7 @@ export default function SongSearch({
                     setSortOrder("asc");
                   }
                 }}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 ${
                   sortBy === "title"
                     ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                     : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
@@ -766,7 +766,7 @@ export default function SongSearch({
                 <div className="w-px h-4 bg-light-primary/20 dark:border-dark-primary/20"></div>
                 <button
                   onClick={() => setSortBy("default")}
-                  className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                  className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 ${
                     sortBy === "default"
                       ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                       : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
@@ -779,7 +779,7 @@ export default function SongSearch({
                     setSortBy("random");
                     setRandomSeed(prev => prev + 1);
                   }}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                  className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 ${
                     sortBy === "random"
                       ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                       : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
@@ -797,7 +797,7 @@ export default function SongSearch({
                       setSortOrder("desc");
                     }
                   }}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                  className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 ${
                     sortBy === "likes"
                       ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                       : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
@@ -820,7 +820,7 @@ export default function SongSearch({
                       setSortOrder("desc");
                     }
                   }}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                  className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 ${
                     sortBy === "sungCount"
                       ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                       : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
@@ -842,7 +842,7 @@ export default function SongSearch({
                       setSortOrder("asc");
                     }
                   }}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center gap-1 ${
+                  className={`px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 ${
                     sortBy === "title"
                       ? "bg-light-accent dark:bg-dark-accent text-white shadow-sm"
                       : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
