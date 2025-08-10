@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { 
   MagnifyingGlassIcon, 
   PlusIcon, 
@@ -51,9 +51,70 @@ export default function SongManagementTab() {
     addTags: '' // 기존 태그를 유지하며 추가할 태그들
   });
 
+  // 모달의 formData를 부모에서 관리
+  const [formData, setFormData] = useState({
+    title: '',
+    artist: '',
+    titleAlias: '',
+    artistAlias: '',
+    language: '',
+    lyrics: '',
+    searchTags: [] as string[],
+    sungCount: 0,
+    lastSungDate: '',
+    keyAdjustment: null as number | null,
+    mrLinks: [] as Array<{url: string; skipSeconds: number; label: string; duration: string}>,
+    selectedMRIndex: 0,
+    personalNotes: '',
+    imageUrl: ''
+  });
+
   // MR 링크 자동 추가 상태
   const [bulkMRLoading, setBulkMRLoading] = useState(false);
   const [bulkMRProgress, setBulkMRProgress] = useState({ current: 0, total: 0 });
+
+  // 모달 formData 초기화 useEffect - 부모에서 관리
+  useEffect(() => {
+    if (isModalOpen) {
+      if (modalMode === 'create') {
+        console.log('생성 모드로 formData 설정');
+        setFormData({
+          title: '',
+          artist: '',
+          titleAlias: '',
+          artistAlias: '',
+          language: '',
+          lyrics: '',
+          searchTags: [],
+          sungCount: 0,
+          lastSungDate: '',
+          keyAdjustment: null,
+          mrLinks: [],
+          selectedMRIndex: 0,
+          personalNotes: '',
+          imageUrl: ''
+        });
+      } else if (selectedSong && modalMode === 'edit') {
+        console.log('수정 모드로 formData 설정, 기존 MR 링크:', selectedSong.mrLinks);
+        setFormData({
+          title: selectedSong.title || '',
+          artist: selectedSong.artist || '',
+          titleAlias: selectedSong.titleAlias || '',
+          artistAlias: selectedSong.artistAlias || '',
+          language: selectedSong.language || '',
+          lyrics: selectedSong.lyrics || '',
+          searchTags: selectedSong.searchTags || [],
+          sungCount: selectedSong.sungCount || 0,
+          lastSungDate: selectedSong.lastSungDate || '',
+          keyAdjustment: selectedSong.keyAdjustment ?? null,
+          mrLinks: selectedSong.mrLinks || [],
+          selectedMRIndex: selectedSong.selectedMRIndex || 0,
+          personalNotes: selectedSong.personalNotes || '',
+          imageUrl: selectedSong.imageUrl || ''
+        });
+      }
+    }
+  }, [isModalOpen, modalMode, selectedSong?._id]); // selectedSong._id만 의존성으로 사용
   const [showBulkMRSection, setShowBulkMRSection] = useState(false);
 
   // 곡 목록 로드
@@ -888,7 +949,41 @@ export default function SongManagementTab() {
       </div>
 
       {/* Modal */}
-      {isModalOpen && <SongDetailModal />}
+      <SongDetailModal
+        isOpen={isModalOpen}
+        modalMode={modalMode}
+        selectedSong={selectedSong}
+        formData={formData}
+        setFormData={setFormData}
+        onClose={useCallback(() => setIsModalOpen(false), [])}
+        onSubmit={useCallback(async (submitData: any) => {
+          let response;
+          if (modalMode === 'create') {
+            response = await fetch('/api/songdetails', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(submitData)
+            });
+          } else if (modalMode === 'edit' && selectedSong) {
+            response = await fetch(`/api/songdetails/${selectedSong._id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(submitData)
+            });
+          }
+
+          if (response && response.ok) {
+            await loadSongs();
+            setIsModalOpen(false);
+            showToast(modalMode === 'create' ? '곡이 추가되었습니다.' : '곡이 수정되었습니다.', 'success');
+          } else {
+            const error = await response?.json();
+            showToast(`오류: ${error?.error || '알 수 없는 오류가 발생했습니다.'}`, 'error');
+          }
+        }, [modalMode, selectedSong])}
+        showToast={showToast}
+        searchMRFromYouTube={searchMRFromYouTube}
+      />
 
       {/* Toast 알림 */}
       {toast && (
@@ -926,201 +1021,122 @@ export default function SongManagementTab() {
     </div>
   );
 
-  // 곡 상세 모달 컴포넌트
-  function SongDetailModal() {
-    const [formData, setFormData] = useState({
-      title: '',
-      artist: '',
-      titleAlias: '',
-      artistAlias: '',
-      language: '',
-      lyrics: '',
-      searchTags: [] as string[],
-      sungCount: 0,
-      lastSungDate: '',
-      keyAdjustment: null as number | null,
-      mrLinks: [] as Array<{url: string; skipSeconds: number; label: string; duration: string}>,
-      selectedMRIndex: 0,
-      personalNotes: '',
-      imageUrl: ''
-    });
+}
 
-    // 모달이 처음 열릴 때만 초기화
-    const hasInitializedRef = useRef(false);
-    const modalKeyRef = useRef('');
-    
-    useEffect(() => {
-      const currentModalKey = `${isModalOpen}-${modalMode}-${selectedSong?._id || 'new'}`;
+// 곡 상세 모달 컴포넌트 - 부모 컴포넌트 밖으로 이동하여 재생성 방지
+const SongDetailModal = React.memo(function SongDetailModal({
+  isOpen,
+  modalMode,
+  selectedSong,
+  formData,
+  setFormData,
+  onClose,
+  onSubmit,
+  showToast,
+  searchMRFromYouTube
+}: {
+  isOpen: boolean;
+  modalMode: 'edit' | 'create';
+  selectedSong: SongWithId | null;
+  formData: any;
+  setFormData: React.Dispatch<React.SetStateAction<any>>;
+  onClose: () => void;
+  onSubmit: (data: any) => Promise<void>;
+  showToast: (message: string, type: 'success' | 'error') => void;
+  searchMRFromYouTube: (title: string, artist: string) => Promise<any>;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [tagInput, setTagInput] = useState('');
+
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      const submitData = {
+        ...formData,
+        searchTags: formData.searchTags.filter((tag: string) => tag.trim())
+      };
       
-      if (isModalOpen && currentModalKey !== modalKeyRef.current) {
-        console.log('모달 새로 열림 - 데이터 설정');
-        modalKeyRef.current = currentModalKey;
-        hasInitializedRef.current = true;
-        
-        if (modalMode === 'create') {
-          console.log('생성 모드로 설정');
-          setFormData({
-            title: '',
-            artist: '',
-            titleAlias: '',
-            artistAlias: '',
-            language: '',
-            lyrics: '',
-            searchTags: [],
-            sungCount: 0,
-            lastSungDate: '',
-            keyAdjustment: null,
-            mrLinks: [],
-            selectedMRIndex: 0,
-            personalNotes: '',
-            imageUrl: ''
-          });
-        } else if (selectedSong) {
-          console.log('수정 모드로 설정, 기존 MR 링크:', selectedSong.mrLinks);
-          setFormData({
-            title: selectedSong.title || '',
-            artist: selectedSong.artist || '',
-            titleAlias: selectedSong.titleAlias || '',
-            artistAlias: selectedSong.artistAlias || '',
-            language: selectedSong.language || '',
-            lyrics: selectedSong.lyrics || '',
-            searchTags: selectedSong.searchTags || [],
-            sungCount: selectedSong.sungCount || 0,
-            lastSungDate: selectedSong.lastSungDate || '',
-            keyAdjustment: selectedSong.keyAdjustment ?? null,
-            mrLinks: selectedSong.mrLinks || [],
-            selectedMRIndex: selectedSong.selectedMRIndex || 0,
-            personalNotes: selectedSong.personalNotes || '',
-            imageUrl: selectedSong.imageUrl || ''
-          });
-        }
-      } else if (!isModalOpen) {
-        console.log('모달 닫힘 - 키 리셋');
-        modalKeyRef.current = '';
-        hasInitializedRef.current = false;
-        setTagInput('');
-      } else if (isModalOpen && hasInitializedRef.current) {
-        console.log('모달 이미 초기화됨 - 스킵');
+      // 생성 모드에서는 부른 횟수와 마지막 부른 날짜 제외
+      if (modalMode === 'create') {
+        delete submitData.sungCount;
+        delete submitData.lastSungDate;
       }
-    }, [isModalOpen, modalMode, selectedSong]);
 
-    const [saving, setSaving] = useState(false);
-    const [tagInput, setTagInput] = useState('');
+      await onSubmit(submitData);
+    } catch (error) {
+      console.error('저장 오류:', error);
+      showToast('저장 중 오류가 발생했습니다.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    // MR 링크 변경 감지를 위한 디버깅
-    useEffect(() => {
-      console.log('formData.mrLinks 변경됨:', formData.mrLinks);
-    }, [formData.mrLinks]);
+  const addTag = () => {
+    if (tagInput.trim() && !formData.searchTags.includes(tagInput.trim())) {
+      setFormData(prev => ({ ...prev, searchTags: [...prev.searchTags, tagInput.trim()] }));
+      setTagInput('');
+    }
+  };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setSaving(true);
+  const removeTag = (index: number) => {
+    setFormData(prev => ({ ...prev, searchTags: prev.searchTags.filter((_, i) => i !== index) }));
+  };
 
-      try {
-        const submitData = {
-          ...formData,
-          searchTags: formData.searchTags.filter(tag => tag.trim())
-        };
-        
-        // 생성 모드에서는 부른 횟수와 마지막 부른 날짜 제외
-        if (modalMode === 'create') {
-          delete submitData.sungCount;
-          delete submitData.lastSungDate;
-        }
+  const addMRLink = () => {
+    setFormData(prev => ({
+      ...prev,
+      mrLinks: [...prev.mrLinks, { url: '', skipSeconds: 0, label: '', duration: '' }]
+    }));
+  };
 
-        let response;
-        if (modalMode === 'create') {
-          response = await fetch('/api/songdetails', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(submitData)
-          });
-        } else if (modalMode === 'edit' && selectedSong) {
-          response = await fetch(`/api/songdetails/${selectedSong._id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(submitData)
-          });
-        }
+  const updateMRLink = (index: number, field: string, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      mrLinks: prev.mrLinks.map((link, i) => 
+        i === index ? { ...link, [field]: value } : link
+      )
+    }));
+  };
 
-        if (response && response.ok) {
-          await loadSongs();
-          setIsModalOpen(false);
-          showToast(modalMode === 'create' ? '곡이 추가되었습니다.' : '곡이 수정되었습니다.', 'success');
-        } else {
-          const error = await response?.json();
-          showToast(`오류: ${error?.error || '알 수 없는 오류가 발생했습니다.'}`, 'error');
-        }
-      } catch (error) {
-        console.error('저장 오류:', error);
-        showToast('저장 중 오류가 발생했습니다.', 'error');
-      } finally {
-        setSaving(false);
+  const removeMRLink = (index: number) => {
+    setFormData(prev => {
+      const newMRLinks = prev.mrLinks.filter((_, i) => i !== index);
+      let newSelectedIndex = prev.selectedMRIndex;
+      
+      // 선택된 항목이 삭제되는 경우
+      if (prev.selectedMRIndex === index) {
+        newSelectedIndex = 0; // 첫 번째 항목으로 이동
       }
-    };
-
-    const addTag = () => {
-      if (tagInput.trim() && !formData.searchTags.includes(tagInput.trim())) {
-        setFormData(prev => ({ ...prev, searchTags: [...prev.searchTags, tagInput.trim()] }));
-        setTagInput('');
+      // 선택된 항목보다 앞의 항목이 삭제되는 경우
+      else if (prev.selectedMRIndex > index) {
+        newSelectedIndex = prev.selectedMRIndex - 1; // 인덱스 조정
       }
-    };
-
-    const removeTag = (index: number) => {
-      setFormData(prev => ({ ...prev, searchTags: prev.searchTags.filter((_, i) => i !== index) }));
-    };
-
-
-    const addMRLink = () => {
-      setFormData(prev => ({
+      
+      // MR 링크가 모두 삭제되는 경우
+      if (newMRLinks.length === 0) {
+        newSelectedIndex = 0;
+      }
+      // 선택된 인덱스가 범위를 벗어나는 경우
+      else if (newSelectedIndex >= newMRLinks.length) {
+        newSelectedIndex = newMRLinks.length - 1;
+      }
+      
+      return {
         ...prev,
-        mrLinks: [...prev.mrLinks, { url: '', skipSeconds: 0, label: '', duration: '' }]
-      }));
-    };
+        mrLinks: newMRLinks,
+        selectedMRIndex: newSelectedIndex
+      };
+    });
+  };
 
-    const updateMRLink = (index: number, field: string, value: string | number) => {
-      setFormData(prev => ({
-        ...prev,
-        mrLinks: prev.mrLinks.map((link, i) => 
-          i === index ? { ...link, [field]: value } : link
-        )
-      }));
-    };
+  if (!isOpen) return null;
 
-    const removeMRLink = (index: number) => {
-      setFormData(prev => {
-        const newMRLinks = prev.mrLinks.filter((_, i) => i !== index);
-        let newSelectedIndex = prev.selectedMRIndex;
-        
-        // 선택된 항목이 삭제되는 경우
-        if (prev.selectedMRIndex === index) {
-          newSelectedIndex = 0; // 첫 번째 항목으로 이동
-        }
-        // 선택된 항목보다 앞의 항목이 삭제되는 경우
-        else if (prev.selectedMRIndex > index) {
-          newSelectedIndex = prev.selectedMRIndex - 1; // 인덱스 조정
-        }
-        
-        // MR 링크가 모두 삭제되는 경우
-        if (newMRLinks.length === 0) {
-          newSelectedIndex = 0;
-        }
-        // 선택된 인덱스가 범위를 벗어나는 경우
-        else if (newSelectedIndex >= newMRLinks.length) {
-          newSelectedIndex = newMRLinks.length - 1;
-        }
-        
-        return {
-          ...prev,
-          mrLinks: newMRLinks,
-          selectedMRIndex: newSelectedIndex
-        };
-      });
-    };
-
-    return (
-      <div 
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+  return (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget) {
             const startTime = Date.now();
@@ -1138,7 +1154,7 @@ export default function SongManagementTab() {
               
               // 클릭으로 간주하는 조건: 이동거리 5px 이하, 시간 300ms 이하
               if (distance <= 5 && duration <= 300) {
-                setIsModalOpen(false);
+                onClose();
               }
               
               document.removeEventListener('mouseup', handleMouseUp);
@@ -1157,7 +1173,7 @@ export default function SongManagementTab() {
               {modalMode === 'create' ? '새 곡 추가' : '곡 정보 수정'}
             </h3>
             <button
-              onClick={() => setIsModalOpen(false)}
+              onClick={onClose}
               className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
             >
               ✕
@@ -1585,7 +1601,7 @@ export default function SongManagementTab() {
             <div className="flex justify-end gap-3 pt-6 border-t border-gray-200 dark:border-gray-700">
               <button
                 type="button"
-                onClick={() => setIsModalOpen(false)}
+                onClick={onClose}
                 className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
               >
                 취소
@@ -1604,5 +1620,4 @@ export default function SongManagementTab() {
         </div>
       </div>
     );
-  }
-}
+});

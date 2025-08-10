@@ -194,27 +194,29 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
   }
 
   useEffect(() => {
-    setEditForm({
-      role: user.role,
-      displayName: user.displayName || '',
-      profileImageUrl: user.profileImageUrl || ''
-    })
-    setMessage({ type: '', text: '' })
-    setShowTitleForm(false)
-    setShowTemplates(false)
-    setTitleForm({
-      name: '',
-      description: '',
-      condition: '',
-      rarity: 'common'
-    })
-    
-    // 모달이 열릴 때 상세 정보 가져오기
-    if (isOpen && user._id) {
-      fetchUserDetail()
+    if (isOpen) {
+      setEditForm({
+        role: user.role,
+        displayName: user.displayName || '',
+        profileImageUrl: user.profileImageUrl || ''
+      })
+      setMessage({ type: '', text: '' })
+      setShowTitleForm(false)
+      setShowTemplates(false)
+      setTitleForm({
+        name: '',
+        description: '',
+        condition: '',
+        rarity: 'common'
+      })
       setActiveTab('info')
+      
+      // 상세 정보 가져오기
+      if (user._id) {
+        fetchUserDetail()
+      }
     }
-  }, [user, isOpen])
+  }, [user._id, isOpen])
 
   const handleSave = async () => {
     try {

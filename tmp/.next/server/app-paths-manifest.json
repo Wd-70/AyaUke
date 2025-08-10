@@ -1,9 +1,11 @@
 {
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/page": "app/page.js",
-  "/songbook/page": "app/songbook/page.js",
-  "/api/user/playlists/route": "app/api/user/playlists/route.js",
+  "/api/songs/[songId]/videos/route": "app/api/songs/[songId]/videos/route.js",
+  "/api/videos/[videoId]/route": "app/api/videos/[videoId]/route.js",
+  "/api/user/[userId]/route": "app/api/user/[userId]/route.js",
   "/admin/page": "app/admin/page.js",
+  "/page": "app/page.js",
   "/playlist/[shareId]/page": "app/playlist/[shareId]/page.js",
+  "/songbook/page": "app/songbook/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/admin/songs/page": "app/admin/songs/page.js"
 }

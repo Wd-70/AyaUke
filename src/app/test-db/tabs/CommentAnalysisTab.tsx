@@ -71,6 +71,7 @@ interface CommentAnalysisTabProps {
 export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAnalysisTabProps = {}) {
   const [viewMode, setViewMode] = useState<'comments' | 'timeline'>(propViewMode || 'comments');
   const [loading, setLoading] = useState(false);
+  const [skipProcessed, setSkipProcessed] = useState(true); // 처리완료 댓글 스킵 옵션
   
   // 다이얼로그 상태
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -300,7 +301,8 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'parse-timeline-comments'
+          action: 'parse-timeline-comments',
+          skipProcessed: skipProcessed
         })
       });
 
@@ -426,42 +428,63 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
               )}
               
               {viewMode === 'timeline' && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={parseTimelineComments}
-                    disabled={timelineParsing}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors"
-                  >
-                    {timelineParsing ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        처리 중...
-                      </>
-                    ) : (
-                      <>
-                        <LinkIcon className="w-4 h-4" />
-                        타임라인 파싱
-                      </>
-                    )}
-                  </button>
+                <div className="flex flex-col gap-2">
+                  {/* 파싱 옵션 */}
+                  <div className="flex items-center gap-3 text-sm">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={skipProcessed}
+                        onChange={(e) => setSkipProcessed(e.target.checked)}
+                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-600 dark:text-gray-400">
+                        처리완료된 댓글 스킵
+                      </span>
+                    </label>
+                    <span className="text-xs text-gray-500 dark:text-gray-500">
+                      ({skipProcessed ? '빠른 파싱' : '전체 재파싱'})
+                    </span>
+                  </div>
                   
-                  <button
-                    onClick={triggerUpload}
-                    disabled={timelineStats.matchedSongs === 0 && timelineStats.verifiedItems === 0}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 transition-colors"
-                  >
-                    <ArrowPathIcon className="w-4 h-4" />
-                    라이브 클립 업로드
-                  </button>
-                  
-                  <button
-                    onClick={reprocessAllTimelines}
-                    disabled={timelineParsing}
-                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white rounded-lg flex items-center gap-2 transition-colors"
-                  >
-                    <ChatBubbleBottomCenterTextIcon className="w-4 h-4" />
-                    데이터 업데이트
-                  </button>
+                  {/* 버튼들 */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={parseTimelineComments}
+                      disabled={timelineParsing}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                    >
+                      {timelineParsing ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          처리 중...
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="w-4 h-4" />
+                          타임라인 파싱
+                        </>
+                      )}
+                    </button>
+                    
+                    <button
+                      onClick={triggerUpload}
+                      disabled={timelineStats.matchedSongs === 0 && timelineStats.verifiedItems === 0}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 transition-colors"
+                    >
+                      <ArrowPathIcon className="w-4 h-4" />
+                      라이브 클립 업로드
+                    </button>
+                    
+                    <button
+                      onClick={reprocessAllTimelines}
+                      disabled={timelineParsing}
+                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                    >
+                      <ChatBubbleBottomCenterTextIcon className="w-4 h-4" />
+                      데이터 업데이트
+                    </button>
+                  </div>
                 </div>
               )}
               

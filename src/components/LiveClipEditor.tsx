@@ -378,8 +378,48 @@ export default function LiveClipEditor({
     resetForm();
   };
 
-  // 클립 추가/수정
-  const handleSubmit = async () => {
+  // 클립 추가/수정 (편집 모드 유지)
+  const handleSubmitAndStay = async () => {
+    if (!formData.videoUrl || !formData.sungDate) {
+      setError('YouTube URL과 부른 날짜는 필수입니다.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      const url = editingVideoId 
+        ? `/api/videos/${editingVideoId}`
+        : `/api/songs/${songId}/videos`;
+      
+      const method = editingVideoId ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        await loadSongVideos();
+        // 편집 모드는 유지하되 폼은 초기화하지 않음
+        setError('');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || '저장에 실패했습니다.');
+      }
+    } catch (error) {
+      setError('네트워크 오류가 발생했습니다.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 클립 추가/수정 후 일반 모드로 돌아가기
+  const handleSubmitAndClose = async () => {
     if (!formData.videoUrl || !formData.sungDate) {
       setError('YouTube URL과 부른 날짜는 필수입니다.');
       return;
@@ -698,18 +738,25 @@ export default function LiveClipEditor({
                 />
                 <button
                   type="button"
-                  onClick={() => {
-                    const duration = parseInt(durationInput) || 0;
-                    if (duration > 0) {
-                      setFormData(prev => ({ 
-                        ...prev, 
-                        endTime: (prev.startTime || 0) + duration 
-                      }));
+                  onClick={async () => {
+                    try {
+                      const text = await navigator.clipboard.readText();
+                      const duration = parseInt(text) || 0;
+                      if (duration > 0) {
+                        setDurationInput(text);
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          endTime: (prev.startTime || 0) + duration 
+                        }));
+                      }
+                    } catch (error) {
+                      console.error('클립보드 읽기 실패:', error);
                     }
                   }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                  title="클립보드에서 재생시간 붙여넣기"
                 >
-                  적용
+                  📋 붙여넣기
                 </button>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -747,10 +794,12 @@ export default function LiveClipEditor({
 
             {/* 버튼들 */}
             <div className="flex gap-3 pt-2">
+              {/* 저장 후 편집 모드 유지 */}
               <button
-                onClick={handleSubmit}
+                onClick={handleSubmitAndStay}
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-4 py-2 bg-light-accent dark:bg-dark-accent text-white rounded-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 dark:bg-green-600 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-700 transition-colors duration-200 disabled:opacity-50"
+                title="저장하고 편집 계속"
               >
                 {isSubmitting ? (
                   <>
@@ -760,10 +809,31 @@ export default function LiveClipEditor({
                 ) : (
                   <>
                     <CheckIcon className="w-4 h-4" />
-                    {editingVideoId ? '수정' : '추가'}
+                    저장
                   </>
                 )}
               </button>
+              
+              {/* 저장 후 일반 모드로 돌아가기 */}
+              <button
+                onClick={handleSubmitAndClose}
+                disabled={isSubmitting}
+                className="flex items-center gap-2 px-4 py-2 bg-light-accent dark:bg-dark-accent text-white rounded-lg hover:opacity-90 transition-opacity duration-200 disabled:opacity-50"
+                title="저장하고 편집 종료"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    저장 중...
+                  </>
+                ) : (
+                  <>
+                    <CheckIcon className="w-4 h-4" />
+                    완료
+                  </>
+                )}
+              </button>
+              
               <button
                 onClick={() => {
                   if (editingVideoId) {

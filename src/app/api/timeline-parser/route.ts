@@ -834,7 +834,7 @@ export async function POST(request: NextRequest) {
     await dbConnect();
 
     const body = await request.json();
-    const { action, itemId, isRelevant, isExcluded } = body;
+    const { action, itemId, isRelevant, isExcluded, skipProcessed = true } = body;
 
     switch (action) {
       case 'reprocess-timeline-comments':
@@ -944,12 +944,15 @@ export async function POST(request: NextRequest) {
         });
 
       case 'parse-timeline-comments':
-        console.log('🔄 타임라인 댓글 파싱 시작...');
+        console.log(`🔄 타임라인 댓글 파싱 시작... (처리완료 댓글 스킵: ${skipProcessed ? '예' : '아니오'})`);
         
-        // 모든 타임라인 댓글 조회 (처리완료 여부 무관)
-        const timelineComments = await YouTubeComment.find({ 
-          isTimeline: true
-        });
+        // 타임라인 댓글 조회 (skipProcessed 옵션에 따라 필터링)
+        const queryFilter: any = { isTimeline: true };
+        if (skipProcessed) {
+          queryFilter.isProcessed = { $ne: true }; // isProcessed가 true가 아닌 것들만
+        }
+        
+        const timelineComments = await YouTubeComment.find(queryFilter);
         
         console.log(`📝 총 ${timelineComments.length}개 타임라인 댓글 발견`);
         
@@ -957,12 +960,26 @@ export async function POST(request: NextRequest) {
         const existingCommentIds = await ParsedTimeline.distinct('commentId');
         console.log(`📊 기존에 파싱된 댓글: ${existingCommentIds.length}개`);
         
-        // 새로운 댓글만 필터링
-        const newTimelineComments = timelineComments.filter(
-          comment => !existingCommentIds.includes(comment.commentId)
-        );
+        // 새로운 댓글과 최근에 업데이트된 댓글 필터링 (최근 7일 이내 업데이트된 댓글 재처리)
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        
+        const newTimelineComments = timelineComments.filter(comment => {
+          const isNotProcessed = !existingCommentIds.includes(comment.commentId);
+          const isRecentlyUpdated = comment.updatedAt && new Date(comment.updatedAt) > sevenDaysAgo;
+          
+          if (skipProcessed) {
+            // skipProcessed가 true면 이미 DB 쿼리에서 필터링했으므로 추가 필터링 불필요
+            return isNotProcessed || isRecentlyUpdated;
+          } else {
+            // skipProcessed가 false면 모든 댓글 처리 (처리완료 여부 무관)
+            return isNotProcessed || isRecentlyUpdated;
+          }
+        });
 
         console.log(`📝 새로 처리할 댓글: ${newTimelineComments.length}개`);
+        console.log(`   - 완전히 새로운 댓글: ${timelineComments.filter(c => !existingCommentIds.includes(c.commentId)).length}개`);
+        console.log(`   - 최근 업데이트된 댓글: ${timelineComments.filter(c => existingCommentIds.includes(c.commentId) && c.updatedAt && new Date(c.updatedAt) > sevenDaysAgo).length}개`);
 
         if (newTimelineComments.length === 0) {
           return NextResponse.json({
@@ -1010,13 +1027,20 @@ export async function POST(request: NextRequest) {
                 for (const clipData of liveClips) {
                   const clipId = `${comment.commentId}_${clipData.startTimeSeconds}`;
                   
-                  // 기존 파싱된 타임라인이 있는지 확인
+                  // 기존 파싱된 타임라인이 있는지 확인 (videoId + startTimeSeconds ±10초 범위로)
                   const existingClip = await ParsedTimeline.findOne({
                     videoId: comment.videoId,
-                    startTimeSeconds: clipData.startTimeSeconds
+                    startTimeSeconds: {
+                      $gte: clipData.startTimeSeconds - 10,
+                      $lte: clipData.startTimeSeconds + 10
+                    }
                   });
 
-                  if (!existingClip) {
+                  if (existingClip) {
+                    // 기존 데이터가 있으면 스킵
+                    console.log(`⏭️ 스킵 (기존 데이터 존재): ${clipData.artist} - ${clipData.songTitle} (${formatSeconds(clipData.startTimeSeconds)}, 기존: ${formatSeconds(existingClip.startTimeSeconds)})`);
+                  } else {
+                    // 새로운 데이터 생성
                     const parsedTimeline = new ParsedTimeline({
                       id: clipId,
                       videoId: comment.videoId,
@@ -1040,7 +1064,7 @@ export async function POST(request: NextRequest) {
                     await parsedTimeline.save();
                     totalLiveClips++;
                     
-                    console.log(`💾 저장: ${clipData.artist} - ${clipData.songTitle} (${formatSeconds(clipData.startTimeSeconds)}${clipData.endTimeSeconds ? ` ~ ${formatSeconds(clipData.endTimeSeconds)}` : ''}) ${clipData.isRelevant ? '[관련성 있음]' : '[관련성 없음]'}`);
+                    console.log(`💾 새로 저장: ${clipData.artist} - ${clipData.songTitle} (${formatSeconds(clipData.startTimeSeconds)}${clipData.endTimeSeconds ? ` ~ ${formatSeconds(clipData.endTimeSeconds)}` : ''}) ${clipData.isRelevant ? '[관련성 있음]' : '[관련성 없음]'}`);
                   }
                 }
               }

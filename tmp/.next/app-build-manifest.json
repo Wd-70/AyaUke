@@ -105,6 +105,31 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/user/[userId]/route.js"
+    ],
+    "/api/timeline-parser/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/timeline-parser/route.js"
+    ],
+    "/api/youtube-comments/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/youtube-comments/route.js"
+    ],
+    "/api/test-db/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/test-db/route.js"
+    ],
+    "/api/admin/clips/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/clips/route.js"
+    ],
+    "/api/videos/[videoId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/videos/[videoId]/route.js"
     ]
   }
 }

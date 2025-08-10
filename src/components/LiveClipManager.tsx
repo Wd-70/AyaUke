@@ -739,8 +739,55 @@ export default function LiveClipManager({
     setIsVideoPlaying(false);
   }, [selectedVideoIndex]);
 
-  // 영상 수정 핸들러
-  const handleEditVideo = async (e: React.FormEvent) => {
+  // 영상 수정 핸들러 (편집 모드 유지)
+  const handleEditVideoAndStay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVideoId) return;
+
+    setIsEditingVideo(true);
+    try {
+      // 관리자가 아닌 경우 URL 수정 제외
+      const updateData = isAdmin() 
+        ? {
+            ...editingVideoData,
+            videoUrl: cleanYouTubeUrl(editingVideoData.videoUrl) // URL 정리
+          }
+        : {
+            sungDate: editingVideoData.sungDate,
+            description: editingVideoData.description,
+            startTime: editingVideoData.startTime,
+            endTime: editingVideoData.endTime
+          };
+
+      const response = await fetch(`/api/videos/${editingVideoId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        // 상위 컴포넌트에서 데이터 새로고침
+        await loadSongVideos();
+        // 편집 모드는 유지
+        console.log('라이브 클립이 성공적으로 수정되었습니다!');
+      } else {
+        const error = await response.json();
+        console.error('라이브 클립 수정 실패:', error.error);
+        showError('수정 실패', error.error || '라이브 클립 수정에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('라이브 클립 수정 오류:', error);
+      showError('오류 발생', '라이브 클립 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsEditingVideo(false);
+    }
+  };
+
+  // 영상 수정 후 편집 종료
+  const handleEditVideoAndClose = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingVideoId) return;
 
@@ -1278,7 +1325,7 @@ export default function LiveClipManager({
                   return editingVideoId === video._id ? (
                     // 편집 모드
                     <div key={video._id} className="p-3 sm:p-4 rounded-lg border border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20">
-                      <form onSubmit={handleEditVideo} className="space-y-2 sm:space-y-3">
+                      <div className="space-y-2 sm:space-y-3">
                         <div className="flex items-center justify-between mb-3">
                           <h6 className="text-sm font-medium text-blue-800 dark:text-blue-200">
                             클립 수정 {isAdmin() ? <span className="text-xs opacity-60">(관리자 - 모든 항목 수정 가능)</span> : <span className="text-xs opacity-60">(일부 항목만 수정 가능)</span>}
@@ -1337,7 +1384,7 @@ export default function LiveClipManager({
                         </div>
                         
                         
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
                             <label className="block text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
                               시작 시간 (초)
@@ -1347,36 +1394,25 @@ export default function LiveClipManager({
                                 </span>
                               )}
                             </label>
-                            <div className="flex gap-1">
-                              <input
-                                type="number"
-                                value={editingVideoData.startTime}
-                                onChange={(e) => setEditingVideoData(prev => ({...prev, startTime: parseInt(e.target.value) || 0}))}
-                                onPaste={(e) => {
-                                  const pastedText = e.clipboardData.getData('text');
-                                  // URL인지 확인 (프로토콜 포함)
-                                  if (pastedText.includes('://')) {
-                                    const parsedTime = extractTimeFromUrl(pastedText);
-                                    if (parsedTime > 0) {
-                                      e.preventDefault();
-                                      setEditingVideoData(prev => ({...prev, startTime: parsedTime}));
-                                    }
+                            <input
+                              type="number"
+                              value={editingVideoData.startTime}
+                              onChange={(e) => setEditingVideoData(prev => ({...prev, startTime: parseInt(e.target.value) || 0}))}
+                              onPaste={(e) => {
+                                const pastedText = e.clipboardData.getData('text');
+                                // URL인지 확인 (프로토콜 포함)
+                                if (pastedText.includes('://')) {
+                                  const parsedTime = extractTimeFromUrl(pastedText);
+                                  if (parsedTime > 0) {
+                                    e.preventDefault();
+                                    setEditingVideoData(prev => ({...prev, startTime: parsedTime}));
                                   }
-                                }}
-                                className="flex-1 px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
-                                min="0"
-                                placeholder="시간(s) 또는 URL"
-                              />
-                              <button
-                                type="button"
-                                onClick={setCurrentTimeAsStart}
-                                disabled={!videoPlayer}
-                                className="px-2 py-1 text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                title="현재 재생 시간을 시작 시간으로 설정"
-                              >
-                                ⏯️
-                              </button>
-                            </div>
+                                }
+                              }}
+                              className="w-full px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
+                              min="0"
+                              placeholder="시간(s) 또는 URL"
+                            />
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">
@@ -1387,36 +1423,25 @@ export default function LiveClipManager({
                                 </span>
                               )}
                             </label>
-                            <div className="flex gap-1">
-                              <input
-                                type="number"
-                                value={editingVideoData.endTime || ''}
-                                onChange={(e) => setEditingVideoData(prev => ({...prev, endTime: e.target.value ? parseInt(e.target.value) : undefined}))}
-                                onPaste={(e) => {
-                                  const pastedText = e.clipboardData.getData('text');
-                                  // URL인지 확인 (프로토콜 포함)
-                                  if (pastedText.includes('://')) {
-                                    const parsedTime = extractTimeFromUrl(pastedText);
-                                    if (parsedTime > 0) {
-                                      e.preventDefault();
-                                      setEditingVideoData(prev => ({...prev, endTime: parsedTime}));
-                                    }
+                            <input
+                              type="number"
+                              value={editingVideoData.endTime || ''}
+                              onChange={(e) => setEditingVideoData(prev => ({...prev, endTime: e.target.value ? parseInt(e.target.value) : undefined}))}
+                              onPaste={(e) => {
+                                const pastedText = e.clipboardData.getData('text');
+                                // URL인지 확인 (프로토콜 포함)
+                                if (pastedText.includes('://')) {
+                                  const parsedTime = extractTimeFromUrl(pastedText);
+                                  if (parsedTime > 0) {
+                                    e.preventDefault();
+                                    setEditingVideoData(prev => ({...prev, endTime: parsedTime}));
                                   }
-                                }}
-                                className="flex-1 px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
-                                placeholder="시간(s) 또는 URL"
-                                min="0"
-                              />
-                              <button
-                                type="button"
-                                onClick={setCurrentTimeAsEnd}
-                                disabled={!videoPlayer}
-                                className="px-2 py-1 text-xs bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded hover:bg-red-200 dark:hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                title="현재 재생 시간을 종료 시간으로 설정"
-                              >
-                                ⏹️
-                              </button>
-                            </div>
+                                }
+                              }}
+                              className="w-full px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
+                              placeholder="시간(s) 또는 URL"
+                              min="0"
+                            />
                           </div>
                         </div>
                         
@@ -1435,18 +1460,25 @@ export default function LiveClipManager({
                             />
                             <button
                               type="button"
-                              onClick={() => {
-                                const duration = parseTimeToSeconds(durationInput);
-                                if (duration > 0) {
-                                  setEditingVideoData(prev => ({ 
-                                    ...prev, 
-                                    endTime: (prev.startTime || 0) + duration 
-                                  }));
+                              onClick={async () => {
+                                try {
+                                  const text = await navigator.clipboard.readText();
+                                  const duration = parseTimeToSeconds(text);
+                                  if (duration > 0) {
+                                    setDurationInput(text);
+                                    setEditingVideoData(prev => ({ 
+                                      ...prev, 
+                                      endTime: (prev.startTime || 0) + duration 
+                                    }));
+                                  }
+                                } catch (error) {
+                                  console.error('클립보드 읽기 실패:', error);
                                 }
                               }}
-                              className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                              className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                              title="클립보드에서 재생시간 붙여넣기"
                             >
-                              적용
+                              📋 붙여넣기
                             </button>
                           </div>
                           <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
@@ -1502,19 +1534,30 @@ export default function LiveClipManager({
                           <button
                             type="button"
                             onClick={cancelEditVideo}
-                            className="flex-1 px-3 py-1.5 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                            className="px-3 py-1.5 text-xs bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                           >
                             취소
                           </button>
                           <button
-                            type="submit"
+                            type="button"
+                            onClick={handleEditVideoAndStay}
                             disabled={isEditingVideo}
-                            className="flex-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+                            className="flex-1 px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+                            title="저장하고 편집 계속"
                           >
                             {isEditingVideo ? '저장 중...' : '저장'}
                           </button>
+                          <button
+                            type="button"
+                            onClick={handleEditVideoAndClose}
+                            disabled={isEditingVideo}
+                            className="flex-1 px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+                            title="저장하고 편집 종료"
+                          >
+                            {isEditingVideo ? '저장 중...' : '완료'}
+                          </button>
                         </div>
-                      </form>
+                      </div>
                     </div>
                   ) : (
                     // 일반 모드
