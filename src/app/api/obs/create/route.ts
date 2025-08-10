@@ -39,6 +39,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing song information' }, { status: 400 });
     }
 
+    // 기존 데이터가 있으면 에러 반환 (먼저 삭제해야 함)
+    if (activeOBSUsers.has(session.user.userId)) {
+      return NextResponse.json({ 
+        error: 'OBS already active. Please delete existing state first.' 
+      }, { status: 409 });
+    }
+
     // OBS 상태 생성
     const obsState: OBSUserState = {
       userId: session.user.userId,
