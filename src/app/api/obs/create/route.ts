@@ -1,28 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
-
-interface OBSUserState {
-  userId: string;
-  currentSong: {
-    title: string;
-    artist: string;
-  };
-  createdAt: Date;
-}
-
-// 메모리에 저장되는 활성 OBS 사용자들
-const activeOBSUsers = new Map<string, OBSUserState>();
-
-// 초기화시 더미 데이터 추가 (안정성을 위해)
-activeOBSUsers.set('__dummy__', {
-  userId: '__dummy__',
-  currentSong: {
-    title: 'System Placeholder',
-    artist: 'Internal'
-  },
-  createdAt: new Date()
-});
+import { activeOBSUsers, OBSUserState } from '@/lib/obsState';
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +17,7 @@ export async function POST(request: NextRequest) {
     if (!currentSong || !currentSong.title || !currentSong.artist) {
       return NextResponse.json({ error: 'Missing song information' }, { status: 400 });
     }
+
 
     // 기존 데이터가 있으면 에러 반환 (먼저 삭제해야 함)
     if (activeOBSUsers.has(session.user.userId)) {
@@ -58,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     activeOBSUsers.set(session.user.userId, obsState);
 
-    // console.log(`OBS 상태 생성: ${session.user.userId} - ${currentSong.artist} - ${currentSong.title}`);
+    console.log(`OBS 상태 생성: ${session.user.userId} - ${currentSong.artist} - ${currentSong.title}`);
 
     return NextResponse.json({ 
       success: true,
@@ -71,5 +51,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// 다른 API에서 activeOBSUsers에 접근할 수 있도록 export
-export { activeOBSUsers };

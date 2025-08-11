@@ -313,27 +313,9 @@ export default function SongCard({
           setObsActive(true);
           console.log(`OBS 상태 ON: ${result.obsUrl}`);
         } else if (response.status === 409) {
-          // 기존 데이터가 있으면 먼저 삭제하고 다시 생성
-          console.log("기존 OBS 상태 감지, 삭제 후 재생성");
-          await fetch("/api/obs/delete", { method: "DELETE" });
-          
-          // 다시 생성 시도
-          const retryResponse = await fetch("/api/obs/create", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ currentSong }),
-          });
-          
-          const retryResult = await retryResponse.json();
-          
-          if (retryResult.success) {
-            setObsActive(true);
-            console.log(`OBS 상태 ON (재생성): ${retryResult.obsUrl}`);
-          } else {
-            showError("OBS 오류", "OBS 켜기에 실패했습니다.");
-          }
+          // 기존 OBS가 활성화되어 있지만 UI상 ON 상태로 표시 (수동으로 끌 수 있도록)
+          setObsActive(true);
+          showError("OBS 이미 활성화됨", "다른 곡의 OBS가 활성화되어 있습니다. 먼저 끄고 다시 시도하세요.");
         } else {
           showError("OBS 오류", result.error || "OBS 켜기에 실패했습니다.");
         }

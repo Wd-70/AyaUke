@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { activeOBSUsers } from '../../create/route';
+import { activeOBSUsers } from '@/lib/obsState';
 
 // 세션 없이 순수 메모리 기반 조회 (초고속)
 export async function GET(
@@ -11,6 +11,7 @@ export async function GET(
   if (!userId) {
     return NextResponse.json({ error: 'User ID required' }, { status: 400 });
   }
+
 
   // 메모리에서 직접 조회 (DB 연결, 세션 확인 없음)
   const obsState = activeOBSUsers.get(userId);

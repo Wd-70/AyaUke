@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
-import { activeOBSUsers } from '../create/route';
+import { activeOBSUsers } from '@/lib/obsState';
 
 export async function DELETE(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function DELETE(request: NextRequest) {
     // OBS 상태 삭제
     const deleted = activeOBSUsers.delete(session.user.userId);
 
-    // console.log(`OBS 상태 삭제: ${session.user.userId} - ${deleted ? '성공' : '이미 없음'}`);
+    console.log(`OBS 상태 삭제: ${session.user.userId} - ${deleted ? '성공' : '이미 없음'}`);
 
     return NextResponse.json({ 
       success: true,

@@ -130,6 +130,31 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/videos/[videoId]/route.js"
+    ],
+    "/api/youtube-search/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/youtube-search/route.js"
+    ],
+    "/api/obs/create/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/obs/create/route.js"
+    ],
+    "/obs/overlay/[userId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/obs/overlay/[userId]/page.js"
+    ],
+    "/api/obs/status/[userId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/obs/status/[userId]/route.js"
+    ],
+    "/api/obs/delete/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/obs/delete/route.js"
     ]
   }
 }

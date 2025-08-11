@@ -1,10 +1,12 @@
 {
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/likes-bulk/route": "app/api/likes-bulk/route.js",
+  "/api/obs/status/[userId]/route": "app/api/obs/status/[userId]/route.js",
   "/api/user/playlists/route": "app/api/user/playlists/route.js",
-  "/admin/page": "app/admin/page.js",
-  "/playlist/[shareId]/page": "app/playlist/[shareId]/page.js",
-  "/songbook/page": "app/songbook/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/obs/create/route": "app/api/obs/create/route.js",
+  "/api/obs/delete/route": "app/api/obs/delete/route.js",
   "/page": "app/page.js",
-  "/admin/songs/page": "app/admin/songs/page.js"
+  "/playlist/[shareId]/page": "app/playlist/[shareId]/page.js",
+  "/obs/overlay/[userId]/page": "app/obs/overlay/[userId]/page.js",
+  "/admin/songs/page": "app/admin/songs/page.js",
+  "/songbook/page": "app/songbook/page.js"
 }
