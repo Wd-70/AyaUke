@@ -79,6 +79,8 @@ const tabs = [
     name: "타임스탬프 파서",
     icon: ClockIcon,
     description: "댓글 타임스탬프로 라이브 클립 일괄 등록",
+    externalLink: "/tools/timeline?tab=parser",
+    external: true,
   },
   {
     id: "timeline" as const,
@@ -265,10 +267,15 @@ export default function AdminClient() {
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
+                  const TabElement = (tab as any).external ? 'a' : 'button';
+                  const tabProps = (tab as any).external 
+                    ? { href: (tab as any).externalLink, target: '_blank', rel: 'noopener noreferrer' }
+                    : { onClick: () => setActiveTab(tab.id) };
+                  
                   return (
-                    <button
+                    <TabElement
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
+                      {...tabProps}
                       title={sidebarCollapsed ? tab.name : undefined}
                       className={`w-full flex items-center px-3 xl:px-4 py-2 xl:py-3 rounded-lg transition-all duration-200 text-left ${
                         isActive
@@ -297,7 +304,7 @@ export default function AdminClient() {
                           </div>
                         </div>
                       )}
-                    </button>
+                    </TabElement>
                   );
                 })}
               </nav>
@@ -311,10 +318,15 @@ export default function AdminClient() {
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
+                  const TabElement = (tab as any).external ? 'a' : 'button';
+                  const tabProps = (tab as any).external 
+                    ? { href: (tab as any).externalLink, target: '_blank', rel: 'noopener noreferrer' }
+                    : { onClick: () => setActiveTab(tab.id) };
+                    
                   return (
-                    <button
+                    <TabElement
                       key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
+                      {...tabProps}
                       title={tab.name}
                       className={`w-full flex items-center justify-center p-3 rounded-lg transition-all duration-200 ${
                         isActive
@@ -323,7 +335,7 @@ export default function AdminClient() {
                       }`}
                     >
                       <Icon className="w-5 h-5 flex-shrink-0" />
-                    </button>
+                    </TabElement>
                   );
                 })}
               </nav>
@@ -336,10 +348,15 @@ export default function AdminClient() {
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
+                const TabElement = (tab as any).external ? 'a' : 'button';
+                const tabProps = (tab as any).external 
+                  ? { href: (tab as any).externalLink, target: '_blank', rel: 'noopener noreferrer' }
+                  : { onClick: () => setActiveTab(tab.id) };
+                  
                 return (
-                  <button
+                  <TabElement
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    {...tabProps}
                     className={`flex-shrink-0 flex flex-col items-center px-2 sm:px-3 py-2 rounded-lg transition-all duration-200 min-w-[70px] sm:min-w-[80px] ${
                       isActive
                         ? "bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent border border-light-accent/20 dark:border-dark-accent/20"
@@ -350,7 +367,7 @@ export default function AdminClient() {
                     <div className="text-xs font-medium text-center leading-tight">
                       {tab.name.replace(" ", "\n")}
                     </div>
-                  </button>
+                  </TabElement>
                 );
               })}
             </nav>

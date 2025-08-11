@@ -9,7 +9,6 @@ import {
   SparklesIcon,
   InformationCircleIcon
 } from '@heroicons/react/24/outline';
-import Navigation from '@/components/Navigation';
 
 export default function TimelineAdjusterClient() {
   const [inputText, setInputText] = useState('');
@@ -235,10 +234,8 @@ export default function TimelineAdjusterClient() {
     : calculateOffsetFromReference();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-light-bg to-light-primary/10 dark:from-dark-bg dark:to-dark-primary/10">
-      <Navigation />
-      
-      <div className="pt-20 pb-12 px-4">
+    <div>
+      <div className="pb-12">
         <div className="max-w-7xl mx-auto">
           {/* 헤더 섹션 */}
           <motion.div
