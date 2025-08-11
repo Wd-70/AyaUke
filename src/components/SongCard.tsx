@@ -222,6 +222,27 @@ export default function SongCard({
     setIsEditMode(!isEditMode);
   };
 
+  // 다이얼로그 닫기 공통 함수
+  const handleCloseDialog = useCallback(() => {
+    setIsExpanded(false);
+    setIsEditMode(false);
+    setCurrentTab("lyrics");
+    
+    // 모든 플레이어 상태 초기화
+    setYoutubePlayer(null);
+    setIsPlaying(false);
+    
+    // OBS가 ON 상태인 경우에만 다이얼로그 닫을 때 OFF
+    if (obsActive && session?.user?.userId) {
+      // 즉시 UI 상태 업데이트
+      setObsActive(false);
+      // API 요청은 백그라운드에서 처리 (응답 대기 안함)
+      fetch("/api/obs/delete", { method: "DELETE" }).catch((error) => {
+        console.error("OBS 상태 정리 오류:", error);
+      });
+      console.log("다이얼로그 닫힘으로 인한 OBS 상태 OFF");
+    }
+  }, [obsActive, session?.user?.userId]);
 
   // ESC 키 핸들러
   const handleEscapeKey = useCallback(async () => {
@@ -230,9 +251,9 @@ export default function SongCard({
       setIsEditMode(false);
     } else {
       // 일반 모드에서 ESC: 다이얼로그 닫기
-      setIsExpanded(false);
+      handleCloseDialog();
     }
-  }, [isEditMode]);
+  }, [isEditMode, handleCloseDialog]);
 
   // ESC 키 이벤트 리스너 등록
   useEffect(() => {
@@ -872,27 +893,12 @@ export default function SongCard({
     console.log("🔍 전체 객체:", song);
     console.groupEnd();
 
-    // 다이얼로그 닫을 때 편집 모드 및 비디오 상태 초기화
+    // 다이얼로그 토글 - 닫을 때는 공통 함수 사용
     if (isExpanded) {
-      setIsEditMode(false);
-      setCurrentTab("lyrics");
-      // 모든 플레이어 상태 초기화
-      setYoutubePlayer(null);
-      setIsPlaying(false);
-
-      // OBS가 ON 상태인 경우에만 다이얼로그 닫을 때 OFF
-      if (obsActive && session?.user?.userId) {
-        // 즉시 UI 상태 업데이트
-        setObsActive(false);
-        // API 요청은 백그라운드에서 처리 (응답 대기 안함)
-        fetch("/api/obs/delete", { method: "DELETE" }).catch((error) => {
-          console.error("OBS 상태 정리 오류:", error);
-        });
-        console.log("다이얼로그 닫힘으로 인한 OBS 상태 OFF");
-      }
+      handleCloseDialog();
+    } else {
+      setIsExpanded(true);
     }
-
-    setIsExpanded(!isExpanded);
   };
 
   // ================ UI 렌더링 함수들 ================
@@ -1149,7 +1155,7 @@ export default function SongCard({
         )}
 
         <button
-          onClick={handleCardClick}
+          onClick={handleCloseDialog}
           className="p-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 
                      transition-colors duration-200"
           title="닫기"
@@ -1171,7 +1177,7 @@ export default function SongCard({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
           className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
-          onClick={handleCardClick}
+          onClick={handleCloseDialog}
         />
       )}
 
