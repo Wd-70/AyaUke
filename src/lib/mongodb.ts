@@ -35,8 +35,17 @@ async function dbConnect(): Promise<typeof mongoose> {
     
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 5000, // 5초로 단축
-      connectTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 8000, // 8초로 증가
+      connectTimeoutMS: 8000,
+      socketTimeoutMS: 8000,
+      // 재시도 옵션
+      retryWrites: true,
+      retryReads: true,
+      maxPoolSize: 10,
+      minPoolSize: 1,
+      maxIdleTimeMS: 30000,
+      // Heartbeat 옵션
+      heartbeatFrequencyMS: 10000,
     };
 
     cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {

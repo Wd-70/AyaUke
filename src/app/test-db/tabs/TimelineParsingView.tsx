@@ -1108,134 +1108,180 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
     );
   }, [parsedTimelines]);
 
-  // 라이브 클립 업로드 함수 (병렬 처리로 최적화)
+  // 라이브 클립 업로드 함수 (클라이언트 중복검사 + 배치 API)
   const uploadToLiveClips = async (timelines: ParsedTimelineItem[]) => {
     try {
       setUploadLoading(true);
       setUploadProgress({ current: 0, total: timelines.length, message: '업로드 준비 중...' });
+      console.log('🚀 새로운 배치 업로드 시작...');
 
-      let successCount = 0;
-      let failCount = 0;
-      let skipCount = 0; // 중복으로 스킵된 수
+      // 1단계: 전체 기존 클립 데이터 로드
+      setUploadProgress({ current: 1, total: timelines.length, message: '기존 클립 데이터 로딩 중...' });
+      console.log('📊 전체 라이브클립 데이터 로딩 중...');
       
-      // 병렬 처리를 위한 배치 크기 (동시에 10개씩 처리)
-      const batchSize = 10;
-      const batches = [];
+      const existingClipsResponse = await fetch('/api/admin/clips?getAllForDuplicateCheck=true');
       
-      for (let i = 0; i < timelines.length; i += batchSize) {
-        batches.push(timelines.slice(i, i + batchSize));
+      if (!existingClipsResponse.ok) {
+        throw new Error('기존 클립 데이터를 불러올 수 없습니다.');
       }
 
-      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-        const batch = batches[batchIndex];
+      const existingClipsData = await existingClipsResponse.json();
+      const existingClips = existingClipsData.clips || [];
+      
+      console.log(`📊 기존 클립 ${existingClips.length}개 로드 완료 (${existingClipsData.meta?.dataSizeMB || 'N/A'}MB)`);
+
+      // 2단계: 클라이언트에서 중복검사 수행
+      setUploadProgress({ current: 2, total: timelines.length, message: '중복검사 수행 중...' });
+      console.log('🔍 클라이언트 중복검사 시작...');
+      
+      const duplicateCheckResults = timelines.map((timeline, index) => {
+        // YouTube URL에서 videoId 추출
+        const videoIdMatch = timeline.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+        const videoId = videoIdMatch ? videoIdMatch[1] : '';
         
-        // 배치 단위로 병렬 처리
-        const batchPromises = batch.map(async (timeline, indexInBatch) => {
-          const overallIndex = batchIndex * batchSize + indexInBatch;
-          
-          setUploadProgress({ 
-            current: overallIndex + 1, 
-            total: timelines.length, 
-            message: `${timeline.matchedSong?.title || timeline.songTitle} 업로드 중...` 
-          });
+        if (!videoId) {
+          return { ...timeline, isDuplicate: false, error: 'YouTube URL에서 비디오 ID를 추출할 수 없습니다.' };
+        }
 
-          try {
-            // 기본 설명 생성
-            const defaultDescription = timeline.customDescription || 
-              `${timeline.commentAuthor}님의 댓글로부터 생성되었습니다`;
+        const isDuplicate = existingClips.some((existing: any) => 
+          existing.videoId === videoId &&
+          Math.abs(existing.startTime - timeline.startTimeSeconds) <= 10
+        );
+        
+        return {
+          ...timeline,
+          isDuplicate,
+          originalIndex: index
+        };
+      });
 
-            // 라이브 클립 데이터 준비
-            const clipData = {
-              videoUrl: timeline.videoUrl,
-              sungDate: timeline.originalDateString || timeline.uploadedDate,
-              description: defaultDescription,
-              startTime: timeline.startTimeSeconds,
-              endTime: timeline.endTimeSeconds
-            };
+      const duplicateCount = duplicateCheckResults.filter(item => item.isDuplicate).length;
+      const validClips = duplicateCheckResults.filter(item => !item.isDuplicate && !item.error);
+      const errorClips = duplicateCheckResults.filter(item => item.error);
 
-            // 라이브 클립 생성 API 호출
-            const response = await fetch(`/api/songs/${timeline.matchedSong!.songId}/videos`, {
-              method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'x-batch-upload': 'true' // 배치 업로드 헤더 추가
-              },
-              body: JSON.stringify(clipData)
-            });
-
-            if (response.ok) {
-              return { status: 'success', timeline };
-            } else if (response.status === 409) {
-              // 중복으로 인한 스킵
-              return { status: 'skip', timeline, message: '중복' };
-            } else {
-              const error = await response.json();
-              console.error(`타임라인 ${timeline.id} 업로드 실패:`, error);
-              return { status: 'error', timeline, error };
-            }
-          } catch (error) {
-            console.error(`타임라인 ${timeline.id} 업로드 오류:`, error);
-            return { status: 'error', timeline, error };
-          }
+      console.log(`🔍 중복검사 완료: 중복 ${duplicateCount}개, 업로드 대상 ${validClips.length}개, 오류 ${errorClips.length}개`);
+      
+      // 🔍 중복 항목 로그
+      const duplicateItems = duplicateCheckResults.filter(item => item.isDuplicate);
+      if (duplicateItems.length > 0) {
+        console.log('🔄 중복 제외된 항목들:');
+        duplicateItems.slice(0, 5).forEach((item, index) => {
+          const videoIdMatch = item.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+          const videoId = videoIdMatch ? videoIdMatch[1] : 'Unknown';
+          console.log(`  ${index + 1}. ${item.artist} - ${item.songTitle} (${item.startTimeSeconds}초, ${videoId})`);
         });
+        if (duplicateItems.length > 5) {
+          console.log(`  ... 외 ${duplicateItems.length - 5}개 더`);
+        }
+      }
+      
+      // 📤 업로드 대상 항목 로그
+      if (validClips.length > 0) {
+        console.log('📤 업로드 대상 항목들:');
+        validClips.forEach((item, index) => {
+          const videoIdMatch = item.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+          const videoId = videoIdMatch ? videoIdMatch[1] : 'Unknown';
+          console.log(`  ${index + 1}. ${item.artist} - ${item.songTitle}`);
+          console.log(`     매칭된 곡: ${item.matchedSong?.artist} - ${item.matchedSong?.title} (ID: ${item.matchedSong?.songId})`);
+          console.log(`     시간: ${item.startTimeSeconds}초 - ${item.endTimeSeconds || '끝까지'}초, 비디오: ${videoId}`);
+        });
+      }
+      
+      // ❌ 오류 항목 로그  
+      if (errorClips.length > 0) {
+        console.log('❌ 오류 항목들:');
+        errorClips.forEach((item, index) => {
+          console.log(`  ${index + 1}. ${item.artist} - ${item.songTitle}: ${item.error}`);
+        });
+      }
 
-        // 배치 결과 처리
-        const batchResults = await Promise.all(batchPromises);
-        batchResults.forEach(result => {
-          if (result.status === 'success') {
-            successCount++;
-          } else if (result.status === 'skip') {
-            skipCount++;
-          } else {
-            failCount++;
-          }
+      if (validClips.length === 0) {
+        const message = duplicateCount > 0 ? 
+          `모든 클립이 중복되어 업로드할 항목이 없습니다. (중복: ${duplicateCount}개)` :
+          '업로드할 수 있는 클립이 없습니다.';
+        alert(message);
+        return;
+      }
+
+      // 3단계: 배치 업로드 데이터 준비
+      setUploadProgress({ current: 3, total: timelines.length, message: '배치 업로드 데이터 준비 중...' });
+      
+      const bulkClipData = validClips.map(timeline => {
+        const defaultDescription = timeline.customDescription || 
+          `${timeline.commentAuthor}님의 댓글로부터 생성되었습니다`;
+
+        return {
+          songId: timeline.matchedSong!.songId,
+          videoUrl: timeline.videoUrl,
+          sungDate: timeline.originalDateString || timeline.uploadedDate,
+          description: defaultDescription,
+          startTime: timeline.startTimeSeconds,
+          endTime: timeline.endTimeSeconds
+        };
+      });
+
+      // 4단계: 배치 업로드 실행
+      setUploadProgress({ current: 4, total: timelines.length, message: '배치 업로드 실행 중...' });
+      console.log('📤 배치 업로드 실행...');
+      
+      const bulkUploadResponse = await fetch('/api/admin/clips/bulk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ clips: bulkClipData })
+      });
+
+      if (!bulkUploadResponse.ok) {
+        const errorData = await bulkUploadResponse.json();
+        throw new Error(errorData.error || '배치 업로드에 실패했습니다.');
+      }
+
+      const uploadResult = await bulkUploadResponse.json();
+      
+      // 5단계: 결과 처리
+      console.log('✅ 배치 업로드 완료:', uploadResult);
+      
+      const successCount = uploadResult.results?.success || 0;
+      const failCount = uploadResult.results?.failed || 0;
+      const skipCount = uploadResult.results?.duplicates || 0;
+      const totalSkipped = duplicateCount + skipCount; // 클라이언트 중복 + 서버 중복
+      
+      // 📊 결과 상세 로그
+      console.log('📊 배치 업로드 결과 상세:');
+      console.log(`  🟢 성공: ${successCount}개`);
+      console.log(`  🔴 실패: ${failCount}개`);
+      console.log(`  🔄 서버 중복: ${skipCount}개`);
+      console.log(`  🔄 클라이언트 중복: ${duplicateCount}개`);
+      console.log(`  📝 총 처리: ${timelines.length}개`);
+      
+      // 실패 원인 분석
+      if (uploadResult.results?.errors && uploadResult.results.errors.length > 0) {
+        console.log('❌ 실패 원인들:');
+        uploadResult.results.errors.forEach((error: string, index: number) => {
+          console.log(`  ${index + 1}. ${error}`);
         });
       }
 
       setUploadProgress(null);
       
-      // 배치 업로드 완료 후 영향받은 곡들의 정확한 통계 재계산
-      if (successCount > 0) {
-        setUploadProgress({ 
-          current: timelines.length, 
-          total: timelines.length, 
-          message: '통계 재계산 중...' 
-        });
-        
-        try {
-          // 업로드된 곡들의 고유 ID 수집
-          const affectedSongIds = new Set(
-            timelines
-              .filter(t => t.matchedSong)
-              .map(t => t.matchedSong!.songId)
-          );
-          
-          // 각 곡의 정확한 통계 재계산
-          for (const songId of affectedSongIds) {
-            await fetch('/api/admin/recalculate-song-stats', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ songId }) // 특정 곡만 재계산
-            });
-          }
-        } catch (error) {
-          console.error('배치 업로드 후 통계 재계산 오류:', error);
-        }
-        
-        setUploadProgress(null);
-      }
-      
       // 결과 알림
-      if (successCount > 0 && failCount === 0 && skipCount === 0) {
+      if (successCount > 0 && failCount === 0 && totalSkipped === 0) {
         alert(`✅ 모든 클립이 성공적으로 업로드되었습니다! (${successCount}개)`);
-      } else if (successCount > 0 || skipCount > 0) {
+      } else if (successCount > 0 || totalSkipped > 0) {
         const parts = [];
         if (successCount > 0) parts.push(`성공: ${successCount}개`);
-        if (skipCount > 0) parts.push(`중복 스킵: ${skipCount}개`);
+        if (totalSkipped > 0) parts.push(`중복 스킵: ${totalSkipped}개`);
         if (failCount > 0) parts.push(`실패: ${failCount}개`);
         
-        const icon = failCount > 0 ? '⚠️' : (skipCount > 0 ? '🔄' : '✅');
-        alert(`${icon} 업로드 완료!\n${parts.join('\n')}`);
+        const icon = failCount > 0 ? '⚠️' : (totalSkipped > 0 ? '🔄' : '✅');
+        let message = `${icon} 배치 업로드 완료!\n${parts.join('\n')}`;
+        
+        if (uploadResult.message) {
+          message += `\n\n${uploadResult.message}`;
+        }
+        
+        alert(message);
       } else {
         alert(`❌ 클립 업로드에 실패했습니다. (실패: ${failCount}개)`);
       }

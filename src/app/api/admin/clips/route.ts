@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
 import { isSuperAdmin, UserRole } from '@/lib/permissions'
-import dbConnect from '@/lib/mongodb'
+import { connectToDatabase } from '@/lib/mongodb'
 import SongVideo from '@/models/SongVideo'
 import SongDetail from '@/models/SongDetail'
 import { updateVideoData, validateYouTubeUrl } from '@/lib/youtube'
@@ -15,9 +15,46 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    await dbConnect()
+    await connectToDatabase()
 
     const { searchParams } = new URL(request.url)
+    
+    // 전체 클립 데이터 조회 요청인지 확인 (중복검사용)
+    const getAllForDuplicateCheck = searchParams.get('getAllForDuplicateCheck') === 'true'
+    
+    if (getAllForDuplicateCheck) {
+      // 중복검사용 전체 클립 데이터 (최소한의 필드만)
+      const clips = await SongVideo.find({}, {
+        songId: 1,
+        videoId: 1, 
+        startTime: 1,
+        endTime: 1,
+        sungDate: 1,
+        createdAt: 1
+      }).lean().sort({ createdAt: -1 })
+
+      const totalCount = clips.length
+      const dataSize = JSON.stringify(clips).length
+
+      console.log(`📊 중복검사용 전체 라이브클립 조회: ${totalCount}개, 데이터 크기: ${(dataSize / 1024 / 1024).toFixed(2)}MB`)
+
+      return NextResponse.json({
+        success: true,
+        clips: clips.map(clip => ({
+          songId: clip.songId,
+          videoId: clip.videoId,
+          startTime: clip.startTime || 0,
+          endTime: clip.endTime,
+          sungDate: clip.sungDate
+        })),
+        meta: {
+          totalCount,
+          dataSizeMB: Math.round(dataSize / 1024 / 1024 * 100) / 100
+        }
+      })
+    }
+
+    // 기존 페이지네이션 기반 조회 로직
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
     const sortBy = searchParams.get('sortBy') || 'recent' // recent, addedBy, songTitle, verified
@@ -278,7 +315,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    await dbConnect()
+    await connectToDatabase()
 
     const { clipId, action, data } = await request.json()
 
@@ -386,7 +423,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    await dbConnect()
+    await connectToDatabase()
 
     const { searchParams } = new URL(request.url)
     const clipId = searchParams.get('clipId')

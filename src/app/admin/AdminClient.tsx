@@ -29,8 +29,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 // Import tabs from test-db
-import TimestampParserTab from "../test-db/tabs/TimestampParserTab";
-import TimelineAdjusterTab from "../test-db/tabs/TimelineAdjusterTab";
+import TimelineParsingView from "../test-db/tabs/TimelineParsingView";
 import CommentAnalysisTab from "../test-db/tabs/CommentAnalysisTab";
 import SongManagementTab from "./tabs/SongManagementTab";
 import BackupManagementTab from "./tabs/BackupManagementTab";
@@ -43,7 +42,6 @@ type TabType =
   | "clips"
   | "songs"
   | "backup"
-  | "timestamp"
   | "timeline"
   | "comments"
   | "users"
@@ -73,14 +71,6 @@ const tabs = [
     name: "백업 관리",
     icon: DocumentDuplicateIcon,
     description: "DB 백업, 복원, 통계",
-  },
-  {
-    id: "timestamp" as const,
-    name: "타임스탬프 파서",
-    icon: ClockIcon,
-    description: "댓글 타임스탬프로 라이브 클립 일괄 등록",
-    externalLink: "/tools/timeline?tab=parser",
-    external: true,
   },
   {
     id: "timeline" as const,
@@ -163,9 +153,6 @@ export default function AdminClient() {
 
       case "backup":
         return <BackupManagementTab />;
-
-      case "timestamp":
-        return <TimestampParserTab />;
 
       case "timeline":
         return <CommentAnalysisTab viewMode="timeline" />;

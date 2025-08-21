@@ -909,7 +909,7 @@ export default function LiveClipEditor({
 
                   {/* 설명 */}
                   {video.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 whitespace-pre-line">
                       {video.description}
                     </p>
                   )}

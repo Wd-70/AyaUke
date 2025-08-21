@@ -1594,7 +1594,7 @@ export default function LiveClipManager({
                             )}
                           </div>
                           {video.description && (
-                            <div className="text-xs text-light-text/60 dark:text-dark-text/60 mt-1 truncate">
+                            <div className="text-xs text-light-text/60 dark:text-dark-text/60 mt-1 whitespace-pre-line">
                               {video.description}
                             </div>
                           )}
@@ -1681,7 +1681,7 @@ export default function LiveClipManager({
                                     <div>중복 클립: {formatTime(video2Start)} ~ {typeof video2End === 'number' ? formatTime(video2End) : video2End}</div>
                                   </div>
                                   {overlappingVideo.description && (
-                                    <div className="text-amber-600 dark:text-amber-400 mt-1 italic">
+                                    <div className="text-amber-600 dark:text-amber-400 mt-1 italic whitespace-pre-line">
                                       "{overlappingVideo.description}"
                                     </div>
                                   )}
@@ -1962,7 +1962,7 @@ export default function LiveClipManager({
                           기존 클립: {formatTime(overlappingVideo.startTime || 0)} ~ {overlappingVideo.endTime ? formatTime(overlappingVideo.endTime) : '∞'}
                         </div>
                         {overlappingVideo.description && (
-                          <div className="italic">"{overlappingVideo.description}"</div>
+                          <div className="italic whitespace-pre-line">"{overlappingVideo.description}"</div>
                         )}
                       </div>
                     ))}

@@ -1,15 +1,5 @@
 {
   "pages": {
-    "/api/auth/[...nextauth]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/[...nextauth]/route.js"
-    ],
-    "/api/obs/status/[userId]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/obs/status/[userId]/route.js"
-    ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -21,20 +11,35 @@
       "static/chunks/main-app.js",
       "static/chunks/app/error.js"
     ],
-    "/tools/timeline/page": [
+    "/songbook/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/tools/timeline/page.js"
+      "static/chunks/app/songbook/page.js"
     ],
-    "/api/songdetails/route": [
+    "/api/auth/[...nextauth]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/songdetails/route.js"
+      "static/chunks/app/api/auth/[...nextauth]/route.js"
     ],
-    "/tools/timeline-adjuster/page": [
+    "/api/likes-bulk/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/tools/timeline-adjuster/page.js"
+      "static/chunks/app/api/likes-bulk/route.js"
+    ],
+    "/api/user/playlists/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/user/playlists/route.js"
+    ],
+    "/api/songs/[songId]/videos/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/songs/[songId]/videos/route.js"
+    ],
+    "/api/user/[userId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/user/[userId]/route.js"
     ]
   }
 }

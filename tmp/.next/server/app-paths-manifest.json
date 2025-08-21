@@ -1,6 +1,4 @@
 {
-  "/api/obs/status/[userId]/route": "app/api/obs/status/[userId]/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/tools/timeline/page": "app/tools/timeline/page.js",
-  "/tools/timeline-adjuster/page": "app/tools/timeline-adjuster/page.js"
+  "/songbook/page": "app/songbook/page.js"
 }

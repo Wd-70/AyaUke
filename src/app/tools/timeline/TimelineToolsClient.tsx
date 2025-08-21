@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ClockIcon, DocumentTextIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import Navigation from '@/components/Navigation';
-import TimelineAdjusterClient from '../timeline-adjuster/TimelineAdjusterClient';
+import TimelineAdjusterClient from '@/components/TimelineAdjusterClient';
 import TimestampParserTab from '../../test-db/tabs/TimestampParserTab';
 
 type TabType = 'adjuster' | 'parser';
