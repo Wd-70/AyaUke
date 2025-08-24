@@ -44,6 +44,8 @@ interface CommentData {
   processedBy?: string;
   processedAt?: string;
   manuallyMarked?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface ChannelStats {
@@ -494,8 +496,8 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
   }, [sortBy]);
 
   return (
-    <div className={`h-full bg-gray-50 dark:bg-gray-900 ${isMobile ? 'p-2 overflow-auto' : 'p-6 overflow-hidden'}`}>
-      <div className={`w-full h-full flex flex-col ${isMobile ? 'space-y-3' : 'space-y-6'}`}>
+    <div className={`h-full bg-gray-50 dark:bg-gray-900 ${isMobile ? 'p-2' : 'p-6'} overflow-hidden`}>
+      <div className={`w-full h-full flex flex-col ${isMobile ? 'space-y-3' : 'space-y-6'} min-h-0`}>
         {/* 헤더 */}
         <div className={`bg-white dark:bg-gray-800 rounded-lg ${isMobile ? 'p-3' : 'p-6'} border border-gray-200 dark:border-gray-700 shadow-sm flex-shrink-0`}>
           <div className={`flex flex-col lg:flex-row lg:items-center justify-between ${isMobile ? 'gap-3' : 'gap-6'}`}>
@@ -781,9 +783,9 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
         {viewMode === 'timeline' ? (
           <TimelineParsingView onStatsUpdate={setTimelineStats} onUploadRequest={triggerUpload} />
         ) : (
-          <div className="flex flex-col xl:flex-row gap-6 flex-1 min-h-0">
+          <div className={`flex ${isMobile ? 'flex-col' : 'flex-col xl:flex-row'} gap-6 flex-1 min-h-0`}>
             {/* 비디오 목록 */}
-            <div className="flex-1 xl:flex-[1] bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col h-full">
+            <div className="flex-1 xl:flex-[1] bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col h-screen min-h-0">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -974,7 +976,7 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
         </div>
 
         {/* 댓글 상세 */}
-        <div className="flex-1 xl:flex-[1] bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col h-full">
+        <div className="flex-1 xl:flex-[1] bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col h-screen min-h-0">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -1017,31 +1019,51 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {comment.authorName}
-                        </span>
-                        <div className="flex gap-1">
-                          {comment.isTimeline && (
-                            <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs">
-                              타임라인
-                            </span>
-                          )}
-                          {comment.isProcessed && (
-                            <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs">
-                              처리완료
-                            </span>
-                          )}
-                          {comment.manuallyMarked && (
-                            <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded text-xs">
-                              수동수정
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-medium text-gray-900 dark:text-white truncate">
+                            {comment.authorName}
+                          </span>
+                          <div className="flex gap-1 flex-shrink-0">
+                            {comment.isTimeline && (
+                              <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded text-xs">
+                                타임라인
+                              </span>
+                            )}
+                            {comment.isProcessed && (
+                              <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-xs">
+                                처리완료
+                              </span>
+                            )}
+                            {comment.manuallyMarked && (
+                              <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded text-xs">
+                                수동수정
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                          <span>
+                            작성: {new Date(comment.publishedAt).toLocaleDateString('ko-KR', {
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                          {comment.createdAt && (
+                            <span>
+                              수집: {new Date(comment.createdAt).toLocaleDateString('ko-KR', {
+                                month: 'short',
+                                day: 'numeric'
+                              })}
                             </span>
                           )}
                         </div>
                       </div>
-                      <p className="text-gray-700 dark:text-gray-300 text-sm mb-2 whitespace-pre-wrap leading-relaxed">
+                      <p className="text-gray-700 dark:text-gray-300 text-sm mb-3 whitespace-pre-wrap leading-relaxed">
                         {stripHtmlTags(comment.textContent)}
                       </p>
+                      
+                      {/* 타임스탬프 */}
                       {comment.extractedTimestamps.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-2">
                           {comment.extractedTimestamps.map((timestamp, idx) => (
