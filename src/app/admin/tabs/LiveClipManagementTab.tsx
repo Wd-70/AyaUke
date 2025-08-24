@@ -148,6 +148,10 @@ export default function LiveClipManagementTab() {
   const playerRef = useRef<HTMLIFrameElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
+  // 전체 클립 데이터 상태 (중복 검사용)
+  const [allClipsForDuplicateCheck, setAllClipsForDuplicateCheck] = useState<any[]>([]);
+  const [allClipsLoaded, setAllClipsLoaded] = useState(false);
+
   // 시간 중복 검사 함수들
   const checkTimeOverlap = (clip1: ClipData, clip2: ClipData): boolean => {
     // 같은 영상이 아니면 중복 아님
@@ -168,47 +172,126 @@ export default function LiveClipManagementTab() {
     return Math.max(start1, start2) < Math.min(end1, end2);
   };
 
-  // 곡별로 클립들을 그룹화
-  const getClipsBySong = () => {
-    const songGroups: { [key: string]: ClipData[] } = {};
+  // 전체 클립 데이터에서 중복 검사 (비디오ID별로 그룹화)
+  const loadAllClipsForDuplicateCheck = async () => {
+    if (allClipsLoaded) return; // 이미 로드했으면 스킵
     
-    clips.forEach(clip => {
-      const key = `${clip.songId}`;
-      if (!songGroups[key]) {
-        songGroups[key] = [];
-      }
-      songGroups[key].push(clip);
-    });
-    
-    return songGroups;
+    try {
+      const response = await fetch('/api/admin/clips?getAllForDuplicateCheck=true');
+      if (!response.ok) throw new Error('Failed to fetch all clips');
+
+      const data = await response.json();
+      setAllClipsForDuplicateCheck(data.clips || []);
+      setAllClipsLoaded(true);
+      console.log(`📊 전체 클립 로드 완료: ${data.clips?.length}개`);
+    } catch (error) {
+      console.error('전체 클립 로드 오류:', error);
+    }
   };
 
-  // 시간 중복이 있는 클립들 찾기
-  const getOverlappingClips = () => {
-    const songGroups = getClipsBySong();
-    const overlappingClips = new Set<string>();
+  // 비디오ID별로 클립들을 그룹화 (전체 데이터 기준)
+  const getClipsByVideoId = () => {
+    const videoGroups: { [key: string]: any[] } = {};
     
-    Object.values(songGroups).forEach(songClips => {
-      // 같은 곡 내에서만 중복 검사
-      for (let i = 0; i < songClips.length; i++) {
-        for (let j = i + 1; j < songClips.length; j++) {
-          if (checkTimeOverlap(songClips[i], songClips[j])) {
-            overlappingClips.add(songClips[i]._id);
-            overlappingClips.add(songClips[j]._id);
+    allClipsForDuplicateCheck.forEach(clip => {
+      const key = clip.videoId;
+      if (!videoGroups[key]) {
+        videoGroups[key] = [];
+      }
+      videoGroups[key].push(clip);
+    });
+    
+    return videoGroups;
+  };
+
+  // 시간 중복이 있는 클립들 찾기 (전체 데이터 기준)
+  const getOverlappingClips = () => {
+    if (!allClipsLoaded) {
+      loadAllClipsForDuplicateCheck();
+      return new Set<string>(); // 아직 로드 중이면 빈 세트 반환
+    }
+
+    const videoGroups = getClipsByVideoId();
+    const overlappingClipIds = new Set<string>();
+    
+    Object.values(videoGroups).forEach(videoClips => {
+      // 같은 비디오 내에서만 중복 검사
+      for (let i = 0; i < videoClips.length; i++) {
+        for (let j = i + 1; j < videoClips.length; j++) {
+          // 임시로 ClipData 형식으로 변환해서 검사
+          const clip1 = { 
+            _id: `${videoClips[i].songId}_${videoClips[i].videoId}_${videoClips[i].startTime}`,
+            videoId: videoClips[i].videoId,
+            startTime: videoClips[i].startTime,
+            endTime: videoClips[i].endTime
+          } as ClipData;
+          
+          const clip2 = { 
+            _id: `${videoClips[j].songId}_${videoClips[j].videoId}_${videoClips[j].startTime}`,
+            videoId: videoClips[j].videoId,
+            startTime: videoClips[j].startTime,
+            endTime: videoClips[j].endTime
+          } as ClipData;
+
+          if (checkTimeOverlap(clip1, clip2)) {
+            // 현재 페이지의 클립들 중에서 해당하는 것들만 추가
+            const currentClip1 = clips.find(c => 
+              c.videoId === videoClips[i].videoId && 
+              c.startTime === videoClips[i].startTime
+            );
+            const currentClip2 = clips.find(c => 
+              c.videoId === videoClips[j].videoId && 
+              c.startTime === videoClips[j].startTime
+            );
+            
+            if (currentClip1) overlappingClipIds.add(currentClip1._id);
+            if (currentClip2) overlappingClipIds.add(currentClip2._id);
           }
         }
       }
     });
     
-    return overlappingClips;
+    return overlappingClipIds;
   };
 
-  // 특정 클립의 중복 정보 가져오기
+  // 특정 클립의 중복 정보 가져오기 (전체 데이터 기준)
   const getClipOverlapInfo = (clip: ClipData) => {
-    const songClips = clips.filter(c => c.songId === clip.songId);
-    const overlappingClips = songClips.filter(otherClip => 
-      checkTimeOverlap(clip, otherClip)
-    );
+    if (!allClipsLoaded) return { hasOverlap: false, overlappingClips: [], overlappingCount: 0 };
+
+    // 같은 비디오의 모든 클립들 찾기
+    const sameVideoClips = allClipsForDuplicateCheck.filter(c => c.videoId === clip.videoId);
+    const overlappingClips: ClipData[] = [];
+    
+    sameVideoClips.forEach(otherClip => {
+      if (otherClip.startTime === clip.startTime) return; // 같은 클립 스킵
+      
+      const tempOtherClip = {
+        _id: `${otherClip.songId}_${otherClip.videoId}_${otherClip.startTime}`,
+        videoId: otherClip.videoId,
+        startTime: otherClip.startTime,
+        endTime: otherClip.endTime
+      } as ClipData;
+
+      if (checkTimeOverlap(clip, tempOtherClip)) {
+        // 현재 페이지에서 찾을 수 있는 클립 정보 사용
+        const foundClip = clips.find(c => 
+          c.videoId === otherClip.videoId && 
+          c.startTime === otherClip.startTime
+        );
+        
+        if (foundClip) {
+          overlappingClips.push(foundClip);
+        } else {
+          // 현재 페이지에 없는 클립은 기본 정보만 표시
+          overlappingClips.push({
+            ...tempOtherClip,
+            title: '다른 페이지의 클립',
+            artist: '',
+            songId: otherClip.songId
+          } as ClipData);
+        }
+      }
+    });
     
     return {
       hasOverlap: overlappingClips.length > 0,
@@ -318,29 +401,17 @@ export default function LiveClipManagementTab() {
     }
   };
 
-  // 데이터 배열에서 시간 중복이 있는 클립들 찾기
+  // 데이터 배열에서 시간 중복이 있는 클립들 찾기 (현재 페이지 데이터 기준)
   const getOverlappingClipsFromData = (clipsData: ClipData[]) => {
-    const songGroups: { [key: string]: ClipData[] } = {};
+    if (!allClipsLoaded) return new Set<string>();
+    
     const overlappingClips = new Set<string>();
     
-    // 곡별로 그룹화
+    // 현재 페이지의 각 클립에 대해 전체 데이터와 중복 검사
     clipsData.forEach(clip => {
-      const key = `${clip.songId}`;
-      if (!songGroups[key]) {
-        songGroups[key] = [];
-      }
-      songGroups[key].push(clip);
-    });
-    
-    // 각 곡 내에서 중복 검사
-    Object.values(songGroups).forEach(songClips => {
-      for (let i = 0; i < songClips.length; i++) {
-        for (let j = i + 1; j < songClips.length; j++) {
-          if (checkTimeOverlap(songClips[i], songClips[j])) {
-            overlappingClips.add(songClips[i]._id);
-            overlappingClips.add(songClips[j]._id);
-          }
-        }
+      const overlapInfo = getClipOverlapInfo(clip);
+      if (overlapInfo.hasOverlap) {
+        overlappingClips.add(clip._id);
       }
     });
     
@@ -350,6 +421,10 @@ export default function LiveClipManagementTab() {
   // 초기 로드 및 페이지 변경 시
   useEffect(() => {
     loadClips();
+    // 처음 로드할 때 중복 검사를 위한 전체 데이터도 미리 로드
+    if (!allClipsLoaded) {
+      loadAllClipsForDuplicateCheck();
+    }
   }, [pagination.page]);
 
   // 정렬/필터 변경 시 즉시 로드
@@ -360,6 +435,13 @@ export default function LiveClipManagementTab() {
       loadClips();
     }
   }, [sortBy, filterBy, selectedSongId, addedBy]);
+
+  // 시간 중복 필터가 선택되었을 때 전체 데이터 로드
+  useEffect(() => {
+    if (filterBy === 'time-overlap' && !allClipsLoaded) {
+      loadAllClipsForDuplicateCheck();
+    }
+  }, [filterBy, allClipsLoaded]);
 
   // 검색 관련 디바운스 처리
   useEffect(() => {
@@ -661,14 +743,17 @@ export default function LiveClipManagementTab() {
             </div>
             <div 
               className="bg-amber-500/10 rounded-lg p-4 cursor-pointer hover:bg-amber-500/20 transition-colors" 
-              onClick={() => {
+              onClick={async () => {
+                if (!allClipsLoaded) {
+                  await loadAllClipsForDuplicateCheck();
+                }
                 setFilterBy('time-overlap');
                 setViewMode('list');
               }}
               title="클릭하여 시간 중복 클립만 보기"
             >
               <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                {getOverlappingClips().size.toLocaleString()}
+                {allClipsLoaded ? getOverlappingClips().size.toLocaleString() : '로딩중...'}
               </div>
               <div className="text-sm text-light-text/60 dark:text-dark-text/60">
                 시간 중복 클립 ⚠️
