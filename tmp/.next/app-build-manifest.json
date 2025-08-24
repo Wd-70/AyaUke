@@ -11,40 +11,50 @@
       "static/chunks/main-app.js",
       "static/chunks/app/error.js"
     ],
-    "/songbook/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/songbook/page.js"
+      "static/chunks/app/page.js"
+    ],
+    "/api/chzzk-videos/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/chzzk-videos/route.js"
     ],
     "/api/auth/[...nextauth]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/[...nextauth]/route.js"
     ],
-    "/api/likes-bulk/route": [
+    "/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/likes-bulk/route.js"
+      "static/chunks/app/admin/page.js"
     ],
-    "/api/user/playlists/route": [
+    "/api/admin/dashboard-stats/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/user/playlists/route.js"
+      "static/chunks/app/api/admin/dashboard-stats/route.js"
     ],
-    "/api/songs/[songId]/videos/route": [
+    "/api/youtube-comments/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/songs/[songId]/videos/route.js"
+      "static/chunks/app/api/youtube-comments/route.js"
     ],
-    "/api/user/[userId]/route": [
+    "/api/timeline-parser/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/user/[userId]/route.js"
+      "static/chunks/app/api/timeline-parser/route.js"
     ],
-    "/_not-found/page": [
+    "/api/test-db/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/api/test-db/route.js"
+    ],
+    "/api/admin/users/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/users/route.js"
     ]
   }
 }

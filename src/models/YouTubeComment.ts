@@ -36,6 +36,7 @@ export interface VideoData extends Document {
   totalComments: number;
   timelineComments: number;
   lastCommentSync: Date;
+  lastNewCommentAt?: Date;
   thumbnailUrl: string;
   createdAt: Date;
   updatedAt: Date;
@@ -51,6 +52,7 @@ const VideoSchema = new Schema<VideoData>({
   totalComments: { type: Number, default: 0 },
   timelineComments: { type: Number, default: 0 },
   lastCommentSync: { type: Date, default: Date.now },
+  lastNewCommentAt: { type: Date },
   thumbnailUrl: { type: String, default: '' }
 }, {
   timestamps: true

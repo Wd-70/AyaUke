@@ -176,12 +176,12 @@ export async function GET(request: NextRequest) {
 
     switch (action) {
       case 'channel-stats':
-        // 채널 통계 조회
+        // 채널 통계 조회 (모든 채널 포함)
         const channelId = AYAUKE_ARCHIVE_CHANNEL_ID;
         
         const channel = await YouTubeChannel.findOne({ channelId });
-        // 검색 조건 구성
-        const searchQuery: any = { channelId };
+        // 검색 조건 구성 (채널 제한 없이 모든 영상 조회)
+        const searchQuery: any = {};
         if (search) {
           searchQuery.title = { $regex: search, $options: 'i' };
         }
@@ -191,6 +191,39 @@ export async function GET(request: NextRequest) {
           .sort({ publishedAt: -1 })
           .skip((page - 1) * limit)
           .limit(limit);
+
+        // 각 비디오의 채널 정보 추가 및 lastNewCommentAt 마이그레이션
+        const videosWithChannelInfo = await Promise.all(
+          videos.map(async (video) => {
+            const channelInfo = await YouTubeChannel.findOne({ channelId: video.channelId });
+            const videoObj = video.toObject();
+            
+            // lastNewCommentAt 필드가 없는 기존 데이터 마이그레이션
+            if (!videoObj.lastNewCommentAt) {
+              // 해당 비디오의 가장 최근에 시스템에서 인식한 댓글 날짜 찾기
+              const latestComment = await YouTubeComment.findOne(
+                { videoId: video.videoId },
+                { updatedAt: 1, createdAt: 1 }
+              ).sort({ updatedAt: -1, createdAt: -1 });
+              
+              // 시스템에서 마지막으로 인식한 댓글 날짜 (updatedAt 우선, 없으면 createdAt)
+              const initDate = latestComment 
+                ? (latestComment.updatedAt || latestComment.createdAt)
+                : video.publishedAt;
+              
+              await YouTubeVideo.updateOne(
+                { videoId: video.videoId },
+                { lastNewCommentAt: initDate }
+              );
+              videoObj.lastNewCommentAt = initDate;
+            }
+            
+            return {
+              ...videoObj,
+              channelName: channelInfo?.channelName || video.channelId
+            };
+          })
+        );
         
         const totalComments = await YouTubeComment.countDocuments();
         const timelineComments = await YouTubeComment.countDocuments({ isTimeline: true });
@@ -199,7 +232,7 @@ export async function GET(request: NextRequest) {
           success: true,
           data: {
             channel,
-            videos,
+            videos: videosWithChannelInfo,
             pagination: {
               currentPage: page,
               totalPages: Math.ceil(totalVideos / limit),
@@ -316,15 +349,23 @@ export async function POST(request: NextRequest) {
           const existingVideo = await YouTubeVideo.findOne({ videoId });
           const isNewVideo = !existingVideo;
           
+          const videoUpdateData: any = {
+            channelId: syncChannelId,
+            title: snippet.title,
+            publishedAt: new Date(snippet.publishedAt),
+            thumbnailUrl: snippet.thumbnails?.medium?.url || '',
+            lastCommentSync: new Date()
+          };
+          
+          // 새로운 비디오인 경우에만 lastNewCommentAt 초기화 (기존 값 보존)
+          if (isNewVideo) {
+            // 새 비디오는 일단 업로드 날짜로 초기화 (댓글 수집 후 나중에 업데이트)
+            videoUpdateData.lastNewCommentAt = new Date(snippet.publishedAt);
+          }
+          
           await YouTubeVideo.findOneAndUpdate(
             { videoId },
-            {
-              channelId: syncChannelId,
-              title: snippet.title,
-              publishedAt: new Date(snippet.publishedAt),
-              thumbnailUrl: snippet.thumbnails?.medium?.url || '',
-              lastCommentSync: new Date()
-            },
+            videoUpdateData,
             { upsert: true, new: true }
           );
           
@@ -359,9 +400,10 @@ export async function POST(request: NextRequest) {
                 const existingComment = await YouTubeComment.findOne({ commentId: commentItem.id });
                 const isNewComment = !existingComment;
 
-                await YouTubeComment.findOneAndUpdate(
-                  { commentId: commentItem.id },
-                  {
+                // 새로운 댓글만 저장 (기존 댓글은 건드리지 않음)
+                if (isNewComment) {
+                  await YouTubeComment.create({
+                    commentId: commentItem.id,
                     videoId,
                     authorName: comment.authorDisplayName,
                     textContent: comment.textDisplay,
@@ -369,25 +411,33 @@ export async function POST(request: NextRequest) {
                     likeCount: comment.likeCount || 0,
                     isTimeline,
                     extractedTimestamps: isTimeline ? extractTimestamps(comment.textDisplay) : []
-                  },
-                  { upsert: true, new: true }
-                );
+                  });
 
-                // 새로운 댓글 카운트
-                if (isNewComment) {
+                  // 새로운 댓글 카운트
                   videoNewComments++;
                   if (isTimeline) videoNewTimelineComments++;
                 }
               }
 
               // 비디오 통계 업데이트
-              await YouTubeVideo.updateOne(
-                { videoId },
-                {
-                  totalComments: comments.length,
-                  timelineComments: videoTimelineComments
+              const updateData: any = {
+                totalComments: comments.length,
+                timelineComments: videoTimelineComments
+              };
+              
+              // 새로운 댓글이 있을 때만 lastNewCommentAt 업데이트
+              if (videoNewComments > 0) {
+                updateData.lastNewCommentAt = new Date();
+              } else {
+                // 새로운 비디오인 경우, 시스템에서 방금 저장한 댓글들의 날짜로 초기화
+                const videoResult = videoResults.find(result => result.videoId === videoId);
+                if (videoResult && videoResult.isNewVideo && comments.length > 0) {
+                  // 방금 저장된 댓글들 중 가장 최근 것의 시스템 날짜 (현재 시간)
+                  updateData.lastNewCommentAt = new Date();
                 }
-              );
+              }
+              
+              await YouTubeVideo.updateOne({ videoId }, updateData);
 
               return {
                 videoId,
@@ -497,9 +547,10 @@ export async function POST(request: NextRequest) {
           const existingComment = await YouTubeComment.findOne({ commentId: commentItem.id });
           const isNewComment = !existingComment;
 
-          await YouTubeComment.findOneAndUpdate(
-            { commentId: commentItem.id },
-            {
+          // 새로운 댓글만 저장 (기존 댓글은 건드리지 않음)
+          if (isNewComment) {
+            await YouTubeComment.create({
+              commentId: commentItem.id,
               videoId,
               authorName: comment.authorDisplayName,
               textContent: comment.textDisplay,
@@ -507,25 +558,26 @@ export async function POST(request: NextRequest) {
               likeCount: comment.likeCount || 0,
               isTimeline,
               extractedTimestamps: isTimeline ? extractTimestamps(comment.textDisplay) : []
-            },
-            { upsert: true, new: true }
-          );
+            });
 
-          // 새로운 댓글 카운트
-          if (isNewComment) {
+            // 새로운 댓글 카운트
             newCommentsCount++;
             if (isTimeline) newTimelineCount++;
           }
         }
 
-        await YouTubeVideo.updateOne(
-          { videoId },
-          {
-            totalComments: comments.length,
-            timelineComments: timelineCount,
-            lastCommentSync: new Date()
-          }
-        );
+        const syncUpdateData: any = {
+          totalComments: comments.length,
+          timelineComments: timelineCount,
+          lastCommentSync: new Date()
+        };
+        
+        // 새로운 댓글이 있을 때만 lastNewCommentAt 업데이트
+        if (newCommentsCount > 0) {
+          syncUpdateData.lastNewCommentAt = new Date();
+        }
+        
+        await YouTubeVideo.updateOne({ videoId }, syncUpdateData);
 
         // 결과 메시지 생성
         let videoResultMessage = '';
@@ -549,6 +601,174 @@ export async function POST(request: NextRequest) {
             newTimelineComments: newTimelineCount
           }
         });
+
+      case 'add-manual-video':
+        // 수동 영상 추가 (다른 채널의 영상도 추가 가능)
+        if (!videoId) {
+          return NextResponse.json(
+            { success: false, error: 'videoId가 필요합니다.' },
+            { status: 400 }
+          );
+        }
+
+        try {
+          // YouTube API에서 비디오 정보 가져오기
+          const API_KEY = process.env.YOUTUBE_API_KEY;
+          if (!API_KEY) {
+            return NextResponse.json(
+              { success: false, error: 'YouTube API 키가 설정되지 않았습니다.' },
+              { status: 500 }
+            );
+          }
+
+          const videoResponse = await fetch(
+            `https://www.googleapis.com/youtube/v3/videos?key=${API_KEY}&id=${videoId}&part=snippet,contentDetails`
+          );
+
+          if (!videoResponse.ok) {
+            return NextResponse.json(
+              { success: false, error: '비디오 정보를 가져올 수 없습니다.' },
+              { status: 400 }
+            );
+          }
+
+          const videoData = await videoResponse.json();
+          if (!videoData.items || videoData.items.length === 0) {
+            return NextResponse.json(
+              { success: false, error: '비디오를 찾을 수 없습니다.' },
+              { status: 404 }
+            );
+          }
+
+          const snippet = videoData.items[0].snippet;
+          
+          // 기존 비디오 확인
+          const existingVideo = await YouTubeVideo.findOne({ videoId });
+          const isNewVideo = !existingVideo;
+
+          // 채널 정보 저장/업데이트
+          await YouTubeChannel.findOneAndUpdate(
+            { channelId: snippet.channelId },
+            {
+              channelName: snippet.channelTitle,
+              lastUpdate: new Date()
+            },
+            { upsert: true, new: true }
+          );
+
+          // 비디오 정보 저장 (채널 ID는 실제 채널 ID 사용)
+          const manualVideoUpdateData: any = {
+            channelId: snippet.channelId,
+            title: snippet.title,
+            publishedAt: new Date(snippet.publishedAt),
+            thumbnailUrl: snippet.thumbnails?.medium?.url || '',
+            lastCommentSync: new Date()
+          };
+          
+          // 새로운 비디오인 경우에만 lastNewCommentAt 초기화 (기존 값 보존)
+          if (isNewVideo) {
+            // 새 비디오는 일단 업로드 날짜로 초기화 (댓글 수집 후 나중에 업데이트)
+            manualVideoUpdateData.lastNewCommentAt = new Date(snippet.publishedAt);
+          }
+          
+          await YouTubeVideo.findOneAndUpdate(
+            { videoId },
+            manualVideoUpdateData,
+            { upsert: true, new: true }
+          );
+
+          // 댓글 수집
+          const manualComments = await getVideoComments(videoId);
+          let manualTimelineCount = 0;
+          let manualNewComments = 0;
+          let manualNewTimelineComments = 0;
+
+          for (const commentItem of manualComments) {
+            const comment = commentItem.snippet.topLevelComment.snippet;
+            const isTimeline = isTimelineComment(comment.textDisplay);
+            
+            if (isTimeline) manualTimelineCount++;
+
+            // 기존 댓글 확인
+            const existingComment = await YouTubeComment.findOne({ commentId: commentItem.id });
+            const isNewComment = !existingComment;
+
+            // 새로운 댓글만 저장 (기존 댓글은 건드리지 않음)
+            if (isNewComment) {
+              await YouTubeComment.create({
+                commentId: commentItem.id,
+                videoId,
+                authorName: comment.authorDisplayName,
+                textContent: comment.textDisplay,
+                publishedAt: new Date(comment.publishedAt),
+                likeCount: comment.likeCount || 0,
+                isTimeline,
+                extractedTimestamps: isTimeline ? extractTimestamps(comment.textDisplay) : []
+              });
+
+              // 새로운 댓글 카운트
+              manualNewComments++;
+              if (isTimeline) manualNewTimelineComments++;
+            }
+          }
+
+          // 비디오 댓글 통계 업데이트
+          const manualUpdateData: any = {
+            totalComments: manualComments.length,
+            timelineComments: manualTimelineCount,
+            lastCommentSync: new Date()
+          };
+          
+          // 새로운 댓글이 있을 때만 lastNewCommentAt 업데이트
+          if (manualNewComments > 0) {
+            manualUpdateData.lastNewCommentAt = new Date();
+          } else {
+            // 새로운 비디오인 경우, 시스템에서 방금 저장한 댓글들의 날짜로 초기화
+            if (isNewVideo && manualComments.length > 0) {
+              // 방금 저장된 댓글들의 시스템 날짜 (현재 시간)
+              manualUpdateData.lastNewCommentAt = new Date();
+            }
+          }
+          
+          await YouTubeVideo.updateOne({ videoId }, manualUpdateData);
+
+          // 결과 메시지 생성
+          let manualResultMessage = '';
+          
+          if (isNewVideo) {
+            manualResultMessage = `새로운 영상이 추가되었습니다: "${snippet.title}"`;
+          } else {
+            manualResultMessage = `기존 영상이 업데이트되었습니다: "${snippet.title}"`;
+          }
+
+          if (manualNewComments > 0) {
+            const newParts = [`새로운 댓글 ${manualNewComments}개`];
+            if (manualNewTimelineComments > 0) newParts.push(`새로운 타임라인 댓글 ${manualNewTimelineComments}개`);
+            manualResultMessage += ` (${newParts.join(', ')} 수집됨)`;
+          }
+
+          return NextResponse.json({
+            success: true,
+            message: manualResultMessage,
+            data: {
+              videoId,
+              channelId: snippet.channelId,
+              title: snippet.title,
+              isNewVideo,
+              totalComments: manualComments.length,
+              timelineCount: manualTimelineCount,
+              newComments: manualNewComments,
+              newTimelineComments: manualNewTimelineComments
+            }
+          });
+
+        } catch (error) {
+          console.error('수동 영상 추가 오류:', error);
+          return NextResponse.json(
+            { success: false, error: '영상 추가 중 오류가 발생했습니다.' },
+            { status: 500 }
+          );
+        }
 
       case 'update-comment':
         // 댓글 상태 업데이트

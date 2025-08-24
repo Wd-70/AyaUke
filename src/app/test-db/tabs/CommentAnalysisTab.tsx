@@ -24,7 +24,11 @@ interface VideoData {
   totalComments: number;
   timelineComments: number;
   lastCommentSync: string;
+  lastNewCommentAt?: string;
   thumbnailUrl: string;
+  channelName?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 interface CommentData {
@@ -126,6 +130,65 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'timeline' | 'non-timeline' | 'processed' | 'unprocessed'>('all');
+  
+  // 수동 영상 추가 상태
+  const [showManualAdd, setShowManualAdd] = useState(false);
+  const [manualVideoUrl, setManualVideoUrl] = useState('');
+  const [addingVideo, setAddingVideo] = useState(false);
+  
+  // 정렬 옵션
+  const [sortBy, setSortBy] = useState<'uploadDate' | 'titleDate' | 'recentUpdate'>('uploadDate');
+
+  // 제목에서 날짜 추출 함수 (YY.MM.DD 형식)
+  const extractDateFromTitle = (title: string): Date | null => {
+    const dateMatch = title.match(/\[?(\d{2})\.(\d{2})\.(\d{2})\]?/);
+    if (!dateMatch) return null;
+    
+    const [, year, month, day] = dateMatch;
+    // 20XX년으로 가정 (25 이하면 2025년, 그 이상이면 19XX년)
+    const fullYear = parseInt(year) <= 25 ? 2000 + parseInt(year) : 1900 + parseInt(year);
+    
+    return new Date(fullYear, parseInt(month) - 1, parseInt(day));
+  };
+
+  // 비디오 정렬 함수
+  const sortVideos = (videos: VideoData[]): VideoData[] => {
+    return [...videos].sort((a, b) => {
+      if (sortBy === 'titleDate') {
+        const dateA = extractDateFromTitle(a.title);
+        const dateB = extractDateFromTitle(b.title);
+        
+        // 날짜가 있는 것을 우선으로, 없으면 업로드 날짜 사용
+        if (dateA && dateB) {
+          return dateB.getTime() - dateA.getTime(); // 최신순
+        } else if (dateA && !dateB) {
+          return -1; // dateA 우선
+        } else if (!dateA && dateB) {
+          return 1; // dateB 우선
+        } else {
+          // 둘 다 날짜가 없으면 업로드 날짜로 정렬
+          return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+        }
+      } else if (sortBy === 'recentUpdate') {
+        // 최근 수정된 순 정렬 (lastNewCommentAt 최우선, 없으면 lastCommentSync, updatedAt, createdAt 순)
+        const getLatestDate = (video: VideoData) => {
+          const dates = [
+            video.lastNewCommentAt ? new Date(video.lastNewCommentAt) : null,
+            video.lastCommentSync ? new Date(video.lastCommentSync) : null,
+            video.updatedAt ? new Date(video.updatedAt) : null,
+            video.createdAt ? new Date(video.createdAt) : null
+          ].filter(Boolean) as Date[];
+          
+          return dates.length > 0 ? Math.max(...dates.map(d => d.getTime())) : 0;
+        };
+        
+        return getLatestDate(b) - getLatestDate(a); // 최신순
+      } else {
+        // 업로드 날짜순 정렬
+        return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+      }
+    });
+  };
 
   // 채널 데이터 로드
   const loadChannelData = async (page: number = 1, search: string = '') => {
@@ -142,7 +205,7 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
       const result = await response.json();
       
       if (result.success) {
-        setVideos(result.data.videos);
+        setVideos(sortVideos(result.data.videos));
         setStats(result.data.stats);
         setPagination(result.data.pagination);
       } else {
@@ -222,6 +285,52 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
     } catch (error) {
       console.error('비디오 새로고침 오류:', error);
       showDialog('새로고침 오류', '새로고침 중 네트워크 오류가 발생했습니다.', null, true);
+    }
+  };
+
+  // 수동 영상 추가
+  const addManualVideo = async () => {
+    if (!manualVideoUrl.trim()) {
+      alert('YouTube URL을 입력해주세요.');
+      return;
+    }
+
+    // YouTube URL에서 비디오 ID 추출
+    const videoIdMatch = manualVideoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+    if (!videoIdMatch) {
+      alert('올바른 YouTube URL을 입력해주세요.');
+      return;
+    }
+
+    const videoId = videoIdMatch[1];
+    setAddingVideo(true);
+
+    try {
+      const response = await fetch('/api/youtube-comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add-manual-video',
+          videoId: videoId,
+          videoUrl: manualVideoUrl
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        showDialog('영상 추가 완료', result.message, result.data);
+        setManualVideoUrl('');
+        setShowManualAdd(false);
+        await loadChannelData(pagination.currentPage, searchQuery);
+      } else {
+        showDialog('영상 추가 실패', result.error || '영상 추가 중 오류가 발생했습니다.', null, true);
+      }
+    } catch (error) {
+      console.error('수동 영상 추가 오류:', error);
+      showDialog('영상 추가 오류', '영상 추가 중 네트워크 오류가 발생했습니다.', null, true);
+    } finally {
+      setAddingVideo(false);
     }
   };
 
@@ -379,6 +488,11 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
     loadChannelData();
   }, []);
 
+  // 정렬 옵션 변경 시 비디오 목록 재정렬
+  useEffect(() => {
+    setVideos(prevVideos => sortVideos(prevVideos));
+  }, [sortBy]);
+
   return (
     <div className={`h-full bg-gray-50 dark:bg-gray-900 ${isMobile ? 'p-2 overflow-auto' : 'p-6 overflow-hidden'}`}>
       <div className={`w-full h-full flex flex-col ${isMobile ? 'space-y-3' : 'space-y-6'}`}>
@@ -424,7 +538,106 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                       </>
                     )}
                   </button>
+                  <button
+                    onClick={() => setShowManualAdd(!showManualAdd)}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                  >
+                    <LinkIcon className="w-4 h-4" />
+                    영상 추가
+                  </button>
                 </>
+              )}
+
+              {/* 수동 영상 추가 폼 */}
+              {viewMode === 'comments' && showManualAdd && (
+                <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-medium text-purple-800 dark:text-purple-200 mb-3">
+                    영상 추가
+                  </h4>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={manualVideoUrl}
+                      onChange={(e) => setManualVideoUrl(e.target.value)}
+                      placeholder="YouTube URL을 입력하세요 (예: https://www.youtube.com/watch?v=...)"
+                      className="flex-1 px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg 
+                               bg-white dark:bg-gray-800 text-gray-900 dark:text-white
+                               focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                      disabled={addingVideo}
+                    />
+                    <button
+                      onClick={addManualVideo}
+                      disabled={addingVideo || !manualVideoUrl.trim()}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 
+                               text-white rounded-lg flex items-center gap-2 transition-colors"
+                    >
+                      {addingVideo ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          추가 중...
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircleIcon className="w-4 h-4" />
+                          추가
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowManualAdd(false);
+                        setManualVideoUrl('');
+                      }}
+                      className="px-3 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg"
+                      disabled={addingVideo}
+                    >
+                      취소
+                    </button>
+                  </div>
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mt-2">
+                    다른 채널의 YouTube 영상도 추가할 수 있습니다.
+                  </p>
+                </div>
+              )}
+
+              {/* 정렬 옵션 */}
+              {viewMode === 'comments' && (
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="text-gray-600 dark:text-gray-400 font-medium">정렬:</span>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="sortBy"
+                      value="uploadDate"
+                      checked={sortBy === 'uploadDate'}
+                      onChange={(e) => setSortBy(e.target.value as 'uploadDate' | 'titleDate' | 'recentUpdate')}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-600 dark:text-gray-400">업로드 날짜순</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="sortBy"
+                      value="titleDate"
+                      checked={sortBy === 'titleDate'}
+                      onChange={(e) => setSortBy(e.target.value as 'uploadDate' | 'titleDate' | 'recentUpdate')}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-600 dark:text-gray-400">제목 날짜순</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="sortBy"
+                      value="recentUpdate"
+                      checked={sortBy === 'recentUpdate'}
+                      onChange={(e) => setSortBy(e.target.value as 'uploadDate' | 'titleDate' | 'recentUpdate')}
+                      className="text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-gray-600 dark:text-gray-400">최근 수정순</span>
+                  </label>
+                </div>
               )}
               
               {viewMode === 'timeline' && (
@@ -646,6 +859,11 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                           }}>
                         {video.title}
                       </h4>
+                      {/* 채널 정보 */}
+                      <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                        📺 {video.channelName || '알 수 없는 채널'}
+                      </div>
+                      
                       <div className="flex items-center gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
                         <span className="flex items-center gap-1">
                           <ChatBubbleBottomCenterTextIcon className="w-4 h-4" />
@@ -656,8 +874,32 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                           {video.timelineComments}개
                         </span>
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        {new Date(video.publishedAt).toLocaleDateString('ko-KR')}
+                      
+                      <div className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-500 mt-1">
+                        <div className="flex items-center gap-4">
+                          <span>업로드: {new Date(video.publishedAt).toLocaleDateString('ko-KR')}</span>
+                          {(() => {
+                            const titleDate = extractDateFromTitle(video.title);
+                            return titleDate ? (
+                              <span className="text-green-600 dark:text-green-400">
+                                제목: {titleDate.toLocaleDateString('ko-KR')}
+                              </span>
+                            ) : null;
+                          })()}
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span>마지막 동기화: {new Date(video.lastCommentSync).toLocaleDateString('ko-KR')}</span>
+                          {video.lastNewCommentAt && (
+                            <span className="text-red-600 dark:text-red-400">
+                              새 댓글: {new Date(video.lastNewCommentAt).toLocaleDateString('ko-KR')}
+                            </span>
+                          )}
+                          {video.updatedAt && (
+                            <span className="text-orange-600 dark:text-orange-400">
+                              수정: {new Date(video.updatedAt).toLocaleDateString('ko-KR')}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex flex-col gap-1">
