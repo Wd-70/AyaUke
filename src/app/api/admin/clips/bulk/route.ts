@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
         const existingClipsForVideo = existingClipsMap.get(clipKey) || [];
         
         const isDuplicate = existingClipsForVideo.some((existing: any) => 
-          Math.abs(existing.startTime - currentStartTime) <= 10
+          Math.abs(existing.startTime - currentStartTime) <= 30
         );
 
         if (isDuplicate) {

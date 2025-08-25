@@ -152,7 +152,7 @@ export const ConfirmProvider: React.FC<ConfirmProviderProps> = ({ children }) =>
                 
                 {/* 내용 */}
                 <div className="p-6">
-                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
                     {confirmState.message}
                   </p>
                 </div>

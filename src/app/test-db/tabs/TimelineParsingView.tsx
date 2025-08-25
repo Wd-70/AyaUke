@@ -1145,7 +1145,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
 
         const isDuplicate = existingClips.some((existing: any) => 
           existing.videoId === videoId &&
-          Math.abs(existing.startTime - timeline.startTimeSeconds) <= 10
+          Math.abs(existing.startTime - timeline.startTimeSeconds) <= 30
         );
         
         return {

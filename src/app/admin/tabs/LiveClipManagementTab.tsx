@@ -21,8 +21,6 @@ import {
   ClockIcon,
   UserIcon,
   MusicalNoteIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   ChevronDownIcon,
   ExclamationTriangleIcon,
   TrophyIcon,
@@ -89,25 +87,17 @@ interface ClipStats {
   }>;
 }
 
-interface PaginationInfo {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
 
 type SortBy = 'recent' | 'addedBy' | 'songTitle' | 'verified' | 'sungDate';
 type FilterBy = 'all' | 'verified' | 'unverified' | 'time-overlap';
 
 export default function LiveClipManagementTab() {
   const [clips, setClips] = useState<ClipData[]>([]);
+  const [allClips, setAllClips] = useState<ClipData[]>([]);
+  const [filteredClips, setFilteredClips] = useState<ClipData[]>([]);
+  const [displayedClips, setDisplayedClips] = useState<ClipData[]>([]);
   const [stats, setStats] = useState<ClipStats | null>(null);
-  const [pagination, setPagination] = useState<PaginationInfo>({
-    page: 1,
-    limit: 20,
-    total: 0,
-    totalPages: 0,
-  });
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -148,10 +138,6 @@ export default function LiveClipManagementTab() {
   const playerRef = useRef<HTMLIFrameElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // 전체 클립 데이터 상태 (중복 검사용)
-  const [allClipsForDuplicateCheck, setAllClipsForDuplicateCheck] = useState<any[]>([]);
-  const [allClipsLoaded, setAllClipsLoaded] = useState(false);
-
   // 시간 중복 검사 함수들
   const checkTimeOverlap = (clip1: ClipData, clip2: ClipData): boolean => {
     // 같은 영상이 아니면 중복 아님
@@ -172,80 +158,77 @@ export default function LiveClipManagementTab() {
     return Math.max(start1, start2) < Math.min(end1, end2);
   };
 
-  // 전체 클립 데이터에서 중복 검사 (비디오ID별로 그룹화)
-  const loadAllClipsForDuplicateCheck = async () => {
-    if (allClipsLoaded) return; // 이미 로드했으면 스킵
-    
+  // 전체 클립 데이터 로드
+  const loadAllClips = async () => {
     try {
-      const response = await fetch('/api/admin/clips?getAllForDuplicateCheck=true');
-      if (!response.ok) throw new Error('Failed to fetch all clips');
+      setLoading(true);
+      const response = await fetch('/api/admin/clips?limit=999999'); // 모든 클립 가져오기
+      if (!response.ok) throw new Error('Failed to fetch clips');
 
       const data = await response.json();
-      setAllClipsForDuplicateCheck(data.clips || []);
-      setAllClipsLoaded(true);
+      setAllClips(data.clips || []);
+      setStats(data.stats);
       console.log(`📊 전체 클립 로드 완료: ${data.clips?.length}개`);
-    } catch (error) {
-      console.error('전체 클립 로드 오류:', error);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      setAllClips([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 비디오ID별로 클립들을 그룹화 (전체 데이터 기준)
-  const getClipsByVideoId = () => {
-    const videoGroups: { [key: string]: any[] } = {};
+  // 비디오ID + 곡ID별로 클립들을 그룹화 (같은 영상의 같은 곡만 중복 검사)
+  const getClipsByVideoAndSong = (clips: ClipData[]) => {
+    const videoSongGroups: { [key: string]: ClipData[] } = {};
     
-    allClipsForDuplicateCheck.forEach(clip => {
-      const key = clip.videoId;
-      if (!videoGroups[key]) {
-        videoGroups[key] = [];
+    clips.forEach(clip => {
+      const key = `${clip.videoId}-${clip.songId}`; // videoId와 songId 조합으로 키 생성
+      if (!videoSongGroups[key]) {
+        videoSongGroups[key] = [];
       }
-      videoGroups[key].push(clip);
+      videoSongGroups[key].push(clip);
     });
     
-    return videoGroups;
+    return videoSongGroups;
   };
 
-  // 시간 중복이 있는 클립들 찾기 (전체 데이터 기준)
+  // 시간 중복이 있는 클립들 찾기
   const getOverlappingClips = () => {
-    if (!allClipsLoaded) {
-      loadAllClipsForDuplicateCheck();
-      return new Set<string>(); // 아직 로드 중이면 빈 세트 반환
-    }
-
-    const videoGroups = getClipsByVideoId();
+    const videoSongGroups = getClipsByVideoAndSong(allClips);
     const overlappingClipIds = new Set<string>();
     
-    Object.values(videoGroups).forEach(videoClips => {
-      // 같은 비디오 내에서만 중복 검사
-      for (let i = 0; i < videoClips.length; i++) {
-        for (let j = i + 1; j < videoClips.length; j++) {
-          // 임시로 ClipData 형식으로 변환해서 검사
-          const clip1 = { 
-            _id: `${videoClips[i].songId}_${videoClips[i].videoId}_${videoClips[i].startTime}`,
-            videoId: videoClips[i].videoId,
-            startTime: videoClips[i].startTime,
-            endTime: videoClips[i].endTime
-          } as ClipData;
-          
-          const clip2 = { 
-            _id: `${videoClips[j].songId}_${videoClips[j].videoId}_${videoClips[j].startTime}`,
-            videoId: videoClips[j].videoId,
-            startTime: videoClips[j].startTime,
-            endTime: videoClips[j].endTime
-          } as ClipData;
+    Object.values(videoSongGroups).forEach(videoSongClips => {
+      // 같은 영상의 같은 곡 내에서만 중복 검사
+      for (let i = 0; i < videoSongClips.length; i++) {
+        for (let j = i + 1; j < videoSongClips.length; j++) {
+          const clip1 = videoSongClips[i];
+          const clip2 = videoSongClips[j];
 
           if (checkTimeOverlap(clip1, clip2)) {
-            // 현재 페이지의 클립들 중에서 해당하는 것들만 추가
-            const currentClip1 = clips.find(c => 
-              c.videoId === videoClips[i].videoId && 
-              c.startTime === videoClips[i].startTime
-            );
-            const currentClip2 = clips.find(c => 
-              c.videoId === videoClips[j].videoId && 
-              c.startTime === videoClips[j].startTime
-            );
-            
-            if (currentClip1) overlappingClipIds.add(currentClip1._id);
-            if (currentClip2) overlappingClipIds.add(currentClip2._id);
+            // 디버깅 로그 추가
+            console.log('🔍 중복 감지된 클립들:', {
+              clip1: {
+                videoId: clip1.videoId,
+                songId: clip1.songId,
+                title: clip1.title,
+                startTime: clip1.startTime,
+                endTime: clip1.endTime,
+                sungDate: clip1.sungDate
+              },
+              clip2: {
+                videoId: clip2.videoId,
+                songId: clip2.songId,
+                title: clip2.title,
+                startTime: clip2.startTime,
+                endTime: clip2.endTime,
+                sungDate: clip2.sungDate
+              },
+              overlapReason: `start1: ${clip1.startTime}, end1: ${clip1.endTime}, start2: ${clip2.startTime}, end2: ${clip2.endTime}`
+            });
+
+            overlappingClipIds.add(clip1._id);
+            overlappingClipIds.add(clip2._id);
           }
         }
       }
@@ -254,42 +237,19 @@ export default function LiveClipManagementTab() {
     return overlappingClipIds;
   };
 
-  // 특정 클립의 중복 정보 가져오기 (전체 데이터 기준)
+  // 특정 클립의 중복 정보 가져오기
   const getClipOverlapInfo = (clip: ClipData) => {
-    if (!allClipsLoaded) return { hasOverlap: false, overlappingClips: [], overlappingCount: 0 };
-
-    // 같은 비디오의 모든 클립들 찾기
-    const sameVideoClips = allClipsForDuplicateCheck.filter(c => c.videoId === clip.videoId);
+    // 같은 영상의 같은 곡 클립들만 찾기
+    const sameVideoSongClips = allClips.filter(c => 
+      c.videoId === clip.videoId && 
+      c.songId === clip.songId && 
+      c._id !== clip._id
+    );
     const overlappingClips: ClipData[] = [];
     
-    sameVideoClips.forEach(otherClip => {
-      if (otherClip.startTime === clip.startTime) return; // 같은 클립 스킵
-      
-      const tempOtherClip = {
-        _id: `${otherClip.songId}_${otherClip.videoId}_${otherClip.startTime}`,
-        videoId: otherClip.videoId,
-        startTime: otherClip.startTime,
-        endTime: otherClip.endTime
-      } as ClipData;
-
-      if (checkTimeOverlap(clip, tempOtherClip)) {
-        // 현재 페이지에서 찾을 수 있는 클립 정보 사용
-        const foundClip = clips.find(c => 
-          c.videoId === otherClip.videoId && 
-          c.startTime === otherClip.startTime
-        );
-        
-        if (foundClip) {
-          overlappingClips.push(foundClip);
-        } else {
-          // 현재 페이지에 없는 클립은 기본 정보만 표시
-          overlappingClips.push({
-            ...tempOtherClip,
-            title: '다른 페이지의 클립',
-            artist: '',
-            songId: otherClip.songId
-          } as ClipData);
-        }
+    sameVideoSongClips.forEach(otherClip => {
+      if (checkTimeOverlap(clip, otherClip)) {
+        overlappingClips.push(otherClip);
       }
     });
     
@@ -345,7 +305,8 @@ export default function LiveClipManagementTab() {
           endTime: 0,
           description: ''
         });
-        loadClips(); // 리스트 새로고침
+        // 전체 데이터 다시 로드
+        await loadAllClips();
       } else {
         console.error('클립 수정 실패');
       }
@@ -354,94 +315,80 @@ export default function LiveClipManagementTab() {
     }
   };
 
-  // 클립 데이터 로드
-  const loadClips = async () => {
-    try {
-      setLoading(true);
-      // 시간 중복 필터는 클라이언트에서 처리하므로 서버에는 보내지 않음
-      const serverFilterBy = filterBy === 'time-overlap' ? 'all' : filterBy;
-      
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-        sortBy,
-        filterBy: serverFilterBy,
-        ...(search && { search }),
-        ...(addedBy && { addedBy }),
-        ...(selectedSongId && { songId: selectedSongId }),
-      });
+  // 클라이언트 사이드 필터링 및 정렬
+  const applyFiltersAndSorting = useCallback(() => {
+    let filtered = [...allClips];
 
-      const response = await fetch(`/api/admin/clips?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch clips');
-
-      const data = await response.json();
-      
-      // 시간 중복 필터가 활성화된 경우 클라이언트에서 추가 필터링
-      let filteredClips = data.clips;
-      if (filterBy === 'time-overlap') {
-        const overlappingClipIds = getOverlappingClipsFromData(data.clips);
-        filteredClips = data.clips.filter((clip: ClipData) => 
-          overlappingClipIds.has(clip._id)
-        );
-      }
-      
-      setClips(filteredClips);
-      setStats(data.stats);
-      setPagination(prev => ({
-        ...prev,
-        total: filterBy === 'time-overlap' ? filteredClips.length : data.pagination.total,
-        totalPages: filterBy === 'time-overlap' ? Math.ceil(filteredClips.length / prev.limit) : data.pagination.totalPages,
-        limit: data.pagination.limit
-      }));
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
+    // 검색 필터
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(clip => 
+        getDisplayTitle(clip.title, clip.songDetail?.titleAlias).toLowerCase().includes(searchLower) ||
+        getDisplayArtist(clip.artist, clip.songDetail?.artistAlias).toLowerCase().includes(searchLower) ||
+        clip.addedByName.toLowerCase().includes(searchLower) ||
+        (clip.description && clip.description.toLowerCase().includes(searchLower))
+      );
     }
-  };
 
-  // 데이터 배열에서 시간 중복이 있는 클립들 찾기 (현재 페이지 데이터 기준)
-  const getOverlappingClipsFromData = (clipsData: ClipData[]) => {
-    if (!allClipsLoaded) return new Set<string>();
-    
-    const overlappingClips = new Set<string>();
-    
-    // 현재 페이지의 각 클립에 대해 전체 데이터와 중복 검사
-    clipsData.forEach(clip => {
-      const overlapInfo = getClipOverlapInfo(clip);
-      if (overlapInfo.hasOverlap) {
-        overlappingClips.add(clip._id);
+    // 등록자 필터
+    if (addedBy) {
+      filtered = filtered.filter(clip => 
+        clip.addedByName.toLowerCase().includes(addedBy.toLowerCase())
+      );
+    }
+
+    // 곡 필터
+    if (selectedSongId) {
+      filtered = filtered.filter(clip => clip.songId === selectedSongId);
+    }
+
+    // 상태 필터
+    if (filterBy === 'verified') {
+      filtered = filtered.filter(clip => clip.isVerified);
+    } else if (filterBy === 'unverified') {
+      filtered = filtered.filter(clip => !clip.isVerified);
+    } else if (filterBy === 'time-overlap') {
+      const overlappingClipIds = getOverlappingClips();
+      filtered = filtered.filter(clip => overlappingClipIds.has(clip._id));
+    }
+
+    // 정렬
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'recent':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'addedBy':
+          return a.addedByName.localeCompare(b.addedByName);
+        case 'songTitle':
+          return getDisplayTitle(a.title, a.songDetail?.titleAlias).localeCompare(
+            getDisplayTitle(b.title, b.songDetail?.titleAlias)
+          );
+        case 'verified':
+          if (a.isVerified && !b.isVerified) return -1;
+          if (!a.isVerified && b.isVerified) return 1;
+          return 0;
+        case 'sungDate':
+          return new Date(b.sungDate).getTime() - new Date(a.sungDate).getTime();
+        default:
+          return 0;
       }
     });
-    
-    return overlappingClips;
-  };
 
-  // 초기 로드 및 페이지 변경 시
-  useEffect(() => {
-    loadClips();
-    // 처음 로드할 때 중복 검사를 위한 전체 데이터도 미리 로드
-    if (!allClipsLoaded) {
-      loadAllClipsForDuplicateCheck();
-    }
-  }, [pagination.page]);
+    setFilteredClips(filtered);
+    setClips(filtered); // 표시용으로도 설정
+  }, [allClips, search, addedBy, selectedSongId, filterBy, sortBy]);
 
-  // 정렬/필터 변경 시 즉시 로드
+  // 초기 로드
   useEffect(() => {
-    if (pagination.page !== 1) {
-      setPagination(prev => ({ ...prev, page: 1 }));
-    } else {
-      loadClips();
-    }
-  }, [sortBy, filterBy, selectedSongId, addedBy]);
+    loadAllClips();
+  }, []);
 
-  // 시간 중복 필터가 선택되었을 때 전체 데이터 로드
+  // 필터링 및 정렬 적용
   useEffect(() => {
-    if (filterBy === 'time-overlap' && !allClipsLoaded) {
-      loadAllClipsForDuplicateCheck();
+    if (allClips.length > 0) {
+      applyFiltersAndSorting();
     }
-  }, [filterBy, allClipsLoaded]);
+  }, [allClips, applyFiltersAndSorting]);
 
   // 검색 관련 디바운스 처리
   useEffect(() => {
@@ -450,11 +397,7 @@ export default function LiveClipManagementTab() {
     }
 
     searchTimeoutRef.current = setTimeout(() => {
-      if (pagination.page !== 1) {
-        setPagination(prev => ({ ...prev, page: 1 }));
-      } else {
-        loadClips();
-      }
+      applyFiltersAndSorting();
     }, 300);
 
     return () => {
@@ -615,7 +558,6 @@ export default function LiveClipManagementTab() {
       setSelectedSongId('');
     }
     setSearch('');
-    setPagination(prev => ({ ...prev, page: 1 }));
     setViewMode('list');
   };
 
@@ -629,10 +571,12 @@ export default function LiveClipManagementTab() {
       });
 
       if (!response.ok) throw new Error('Failed to update clip');
-      loadClips();
+      
+      // 전체 데이터 다시 로드
+      await loadAllClips();
       
       if (selectedClip && selectedClip._id === clipId) {
-        const updatedClip = clips.find(c => c._id === clipId);
+        const updatedClip = allClips.find(c => c._id === clipId);
         if (updatedClip) setSelectedClip(updatedClip);
       }
     } catch (err) {
@@ -643,7 +587,17 @@ export default function LiveClipManagementTab() {
 
   // 클립 삭제
   const handleDeleteClip = async (clipId: string) => {
-    if (!confirm('정말로 이 클립을 삭제하시겠습니까?')) return;
+    const clip = allClips.find(c => c._id === clipId);
+    if (!clip) return;
+
+    const clipInfo = [
+      `곡: ${getDisplayTitle(clip.title, clip.songDetail?.titleAlias)} - ${getDisplayArtist(clip.artist, clip.songDetail?.artistAlias)}`,
+      `부른날: ${new Date(clip.sungDate).toLocaleDateString()}`,
+      `시간: ${formatTime(clip.startTime || 0)} - ${formatTime(clip.endTime || 0)}`,
+      clip.description ? `설명: ${clip.description}` : '설명: 없음'
+    ].join('\n');
+
+    if (!confirm(`정말로 이 클립을 삭제하시겠습니까?\n\n${clipInfo}`)) return;
 
     try {
       const response = await fetch(`/api/admin/clips?clipId=${clipId}`, {
@@ -651,7 +605,10 @@ export default function LiveClipManagementTab() {
       });
 
       if (!response.ok) throw new Error('Failed to delete clip');
-      loadClips();
+      
+      // 전체 데이터 다시 로드
+      await loadAllClips();
+      
       if (selectedClip && selectedClip._id === clipId) {
         setSelectedClip(null);
       }
@@ -743,17 +700,14 @@ export default function LiveClipManagementTab() {
             </div>
             <div 
               className="bg-amber-500/10 rounded-lg p-4 cursor-pointer hover:bg-amber-500/20 transition-colors" 
-              onClick={async () => {
-                if (!allClipsLoaded) {
-                  await loadAllClipsForDuplicateCheck();
-                }
+              onClick={() => {
                 setFilterBy('time-overlap');
                 setViewMode('list');
               }}
               title="클릭하여 시간 중복 클립만 보기"
             >
               <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                {allClipsLoaded ? getOverlappingClips().size.toLocaleString() : '로딩중...'}
+                {allClips.length > 0 ? getOverlappingClips().size.toLocaleString() : '로딩중...'}
               </div>
               <div className="text-sm text-light-text/60 dark:text-dark-text/60">
                 시간 중복 클립 ⚠️
@@ -1467,13 +1421,19 @@ export default function LiveClipManagementTab() {
                           </p>
                           <div className="flex items-center gap-4 mt-1 text-xs text-light-text/60 dark:text-dark-text/60">
                             <span>{clip.addedByName}</span>
-                            <span>{new Date(clip.createdAt).toLocaleDateString()}</span>
+                            <span>부른날: {new Date(clip.sungDate).toLocaleDateString()}</span>
+                            <span>등록: {new Date(clip.createdAt).toLocaleDateString()}</span>
                             {(clip.startTime || clip.endTime) && (
                               <span>
                                 {formatTime(clip.startTime || 0)} - {formatTime(clip.endTime || 0)}
                               </span>
                             )}
                           </div>
+                          {clip.description && (
+                            <div className="mt-2 text-xs text-light-text/50 dark:text-dark-text/50 bg-light-primary/5 dark:bg-dark-primary/5 px-2 py-1 rounded">
+                              {clip.description}
+                            </div>
+                          )}
                         </div>
 
                         {/* 상태 및 액션 */}
@@ -1541,36 +1501,14 @@ export default function LiveClipManagementTab() {
             </div>
           )}
 
-          {/* 페이지네이션 */}
-          {pagination.totalPages > 1 && (
+          {/* 총 클립 수 표시 */}
+          {clips.length > 0 && (
             <div className="p-4 border-t border-light-primary/20 dark:border-dark-primary/20">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-light-text/60 dark:text-dark-text/60">
-                  전체 {pagination.total}개 중 {((pagination.page - 1) * pagination.limit) + 1}-
-                  {Math.min(pagination.page * pagination.limit, pagination.total)}개 표시
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                    disabled={pagination.page === 1}
-                    className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeftIcon className="w-4 h-4" />
-                  </button>
-                  
-                  <span className="px-3 py-1 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded">
-                    {pagination.page} / {pagination.totalPages}
-                  </span>
-                  
-                  <button
-                    onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                    disabled={pagination.page === pagination.totalPages}
-                    className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRightIcon className="w-4 h-4" />
-                  </button>
-                </div>
+              <div className="text-sm text-light-text/60 dark:text-dark-text/60 text-center">
+                총 {clips.length.toLocaleString()}개의 클립이 표시되고 있습니다
+                {filteredClips.length !== allClips.length && (
+                  <span> (전체 {allClips.length.toLocaleString()}개 중 필터링됨)</span>
+                )}
               </div>
             </div>
           )}

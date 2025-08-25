@@ -585,7 +585,7 @@ export default function TimestampParserTab() {
       const duplicateCheckResults = matchedTimestamps.map((timestamp, index) => {
         const isDuplicate = existingClips.some((existing: any) => 
           existing.videoId === videoId &&
-          Math.abs(existing.startTime - timestamp.startTime) <= 10
+          Math.abs(existing.startTime - timestamp.startTime) <= 30
         );
         
         return {

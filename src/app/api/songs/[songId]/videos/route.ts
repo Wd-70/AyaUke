@@ -162,14 +162,14 @@ export async function POST(
       );
     }
 
-    // 중복 검사 (동일한 영상+시작시간±10초 중복 방지)
+    // 중복 검사 (동일한 영상+시작시간±30초 중복 방지)
     const currentStartTime = startTime || 0;
     const existingVideo = await SongVideo.findOne({
       songId,
       videoId: videoData.videoId,
       startTime: {
-        $gte: currentStartTime - 10,
-        $lte: currentStartTime + 10
+        $gte: currentStartTime - 30,
+        $lte: currentStartTime + 30
       }
     });
 

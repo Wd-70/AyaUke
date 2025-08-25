@@ -835,9 +835,31 @@ export default function LiveClipManager({
 
   // 영상 삭제 핸들러
   const handleDeleteVideo = async (videoId: string) => {
+    const video = songVideos.find(v => v._id === videoId);
+    if (!video) return;
+
+    // 시간 포맷 함수
+    const formatTime = (seconds: number) => {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const remainingSeconds = Math.floor(seconds % 60);
+      
+      if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+      } else {
+        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+      }
+    };
+
+    const clipInfo = [
+      `부른날: ${new Date(video.sungDate).toLocaleDateString()}`,
+      `시간: ${formatTime(video.startTime || 0)} - ${formatTime(video.endTime || 0)}`,
+      video.description ? `설명: ${video.description}` : '설명: 없음'
+    ].join('\n');
+
     const confirmed = await confirm.confirm({
       title: '라이브 클립 삭제',
-      message: '정말로 이 라이브 클립을 삭제하시겠습니까?',
+      message: `정말로 이 라이브 클립을 삭제하시겠습니까?\n\n${clipInfo}`,
       confirmText: '삭제',
       cancelText: '취소',
       type: 'danger'
