@@ -11,6 +11,7 @@ declare global {
 }
 import { motion, AnimatePresence } from 'framer-motion';
 import { SongVideo } from '@/types';
+import { parseOriginalDateString, formatOriginalDateForDisplay } from '@/utils/dateUtils';
 import { 
   PlusIcon, 
   XMarkIcon, 
@@ -354,14 +355,8 @@ export default function LiveClipEditor({
   const startEdit = (video: SongVideo) => {
     setEditingVideoId(video._id);
     
-    // 날짜를 YYYY-MM-DD 형식으로 변환 (HTML input[type="date"] 호환)
-    let formattedDate = '';
-    if (video.sungDate) {
-      const date = new Date(video.sungDate);
-      if (!isNaN(date.getTime())) {
-        formattedDate = date.toISOString().split('T')[0];
-      }
-    }
+    // originalDateString을 파싱해서 정확한 날짜 사용 (fallback으로 기존 sungDate 사용)
+    const formattedDate = parseOriginalDateString(video.originalDateString, video.sungDate);
     
     setFormData({
       videoUrl: video.videoUrl,
@@ -894,7 +889,7 @@ export default function LiveClipEditor({
                       <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mt-1">
                         <span className="flex items-center gap-1">
                           <CalendarIcon className="w-3 h-3" />
-                          {new Date(video.sungDate).toLocaleDateString('ko-KR')}
+                          {formatOriginalDateForDisplay(video.originalDateString, video.sungDate)}
                         </span>
                         {video.startTime && (
                           <span className="flex items-center gap-1">

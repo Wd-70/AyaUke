@@ -1,11 +1,8 @@
 {
-  "/api/timeline-parser/route": "app/api/timeline-parser/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/admin/dashboard-stats/route": "app/api/admin/dashboard-stats/route.js",
-  "/api/youtube-comments/route": "app/api/youtube-comments/route.js",
-  "/page": "app/page.js",
   "/auth/signin/page": "app/auth/signin/page.js",
+  "/page": "app/page.js",
   "/songbook/page": "app/songbook/page.js",
-  "/tools/timeline/page": "app/tools/timeline/page.js",
-  "/admin/page": "app/admin/page.js"
+  "/admin/page": "app/admin/page.js",
+  "/tools/timeline/page": "app/tools/timeline/page.js"
 }

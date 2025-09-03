@@ -13,6 +13,7 @@ const ParsedTimelineSchema = new mongoose.Schema({
   videoId: { type: String, required: true },
   videoTitle: { type: String, required: true },
   uploadedDate: { type: Date, required: true }, // 파싱된 날짜
+  videoPublishedAt: { type: Date }, // 실제 YouTube 영상 업로드 날짜
   originalDateString: { type: String }, // 원본 날짜 문자열
   artist: { type: String, required: true }, // songData1
   songTitle: { type: String, required: true }, // songData2
@@ -37,6 +38,7 @@ const ParsedTimelineSchema = new mongoose.Schema({
   verifiedBy: { type: String }, // 검증한 사용자 ID/이름
   verifiedAt: { type: Date }, // 검증 완료 시간
   verificationNotes: { type: String }, // 검증 관련 메모
+  customDescription: { type: String }, // 커스텀 설명 (라이브 클립 업로드용)
   specialTags: [{ type: String }], // 특별 태그 (모르는 곡, 곡 없음 등)
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
@@ -1252,7 +1254,7 @@ export async function POST(request: NextRequest) {
         });
 
       case 'update-live-clip':
-        const { artist, songTitle, startTimeSeconds, endTimeSeconds } = body;
+        const { artist, songTitle, startTimeSeconds, endTimeSeconds, customDescription } = body;
         
         if (!itemId) {
           return NextResponse.json(
@@ -1267,6 +1269,7 @@ export async function POST(request: NextRequest) {
         if (songTitle !== undefined) updateFields.songTitle = songTitle.trim();
         if (startTimeSeconds !== undefined) updateFields.startTimeSeconds = startTimeSeconds;
         if (endTimeSeconds !== undefined) updateFields.endTimeSeconds = endTimeSeconds;
+        if (customDescription !== undefined) updateFields.customDescription = customDescription;
 
         // 지속 시간 재계산 (종료 시간이 있는 경우)
         if (endTimeSeconds !== undefined && startTimeSeconds !== undefined) {

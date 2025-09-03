@@ -1216,28 +1216,17 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
       setUploadProgress({ current: 3, total: timelines.length, message: '배치 업로드 데이터 준비 중...' });
       
       const bulkClipData = validClips.map(timeline => {
-        // 현재 선택된 타임라인이고 편집 중인 경우, 편집된 데이터 사용
-        const isCurrentlyEditing = selectedTimeline?.id === timeline.id && editingData;
-        
-        const finalDescription = isCurrentlyEditing && editingData.customDescription
-          ? editingData.customDescription
-          : (timeline.customDescription || `${timeline.commentAuthor}님의 댓글로부터 생성되었습니다`);
-        
-        const finalStartTime = isCurrentlyEditing 
-          ? editingData.startTimeSeconds 
-          : timeline.startTimeSeconds;
-          
-        const finalEndTime = isCurrentlyEditing 
-          ? editingData.endTimeSeconds 
-          : timeline.endTimeSeconds;
+        // DB에 저장된 customDescription 우선 사용, 없으면 기본 설명
+        const finalDescription = timeline.customDescription || 
+          `${timeline.commentAuthor}님의 댓글로부터 생성되었습니다`;
 
         return {
           songId: timeline.matchedSong!.songId,
           videoUrl: timeline.videoUrl,
           sungDate: timeline.originalDateString || timeline.uploadedDate,
           description: finalDescription,
-          startTime: finalStartTime,
-          endTime: finalEndTime
+          startTime: timeline.startTimeSeconds,
+          endTime: timeline.endTimeSeconds
         };
       });
 

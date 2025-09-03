@@ -21,6 +21,7 @@ import { UserRole, roleToIsAdmin } from '@/lib/permissions';
 import { updateVideoData } from '@/lib/youtube';
 import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
+import { parseOriginalDateString, formatOriginalDateForDisplay } from '@/utils/dateUtils';
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -504,7 +505,7 @@ export default function LiveClipManager({
     setEditingVideoId(video._id);
     setEditingVideoData({
       videoUrl: video.videoUrl,
-      sungDate: new Date(video.sungDate).toISOString().split('T')[0],
+      sungDate: parseOriginalDateString(video.originalDateString, video.sungDate),
       description: video.description || '',
       startTime: video.startTime || 0,
       endTime: video.endTime
@@ -896,7 +897,7 @@ export default function LiveClipManager({
     };
 
     const clipInfo = [
-      `부른날: ${new Date(video.sungDate).toLocaleDateString()}`,
+      `부른날: ${formatOriginalDateForDisplay(video.originalDateString, video.sungDate)}`,
       `시간: ${formatTime(video.startTime || 0)} - ${formatTime(video.endTime || 0)}`,
       video.description ? `설명: ${video.description}` : '설명: 없음'
     ].join('\n');
@@ -967,8 +968,8 @@ export default function LiveClipManager({
     e.preventDefault();
     if (!songId || !addVideoData.videoUrl) return;
     
-    // 날짜가 없으면 기본값으로 오늘 날짜 사용
-    const sungDate = addVideoData.sungDate || new Date().toISOString().split('T')[0];
+    // originalDateString을 파싱해서 정확한 날짜 사용 (fallback으로 addVideoData.sungDate 사용)
+    const sungDate = parseOriginalDateString(selectedTimeline?.originalDateString, addVideoData.sungDate) || new Date().toISOString().split('T')[0];
 
     setIsAddingVideo(true);
     try {
@@ -1595,7 +1596,7 @@ export default function LiveClipManager({
                               <div className="space-y-1">
                                 {editOverlapInfo.overlappingVideos.map((overlappingVideo) => (
                                   <div key={overlappingVideo._id} className="text-xs text-amber-700 dark:text-amber-300">
-                                    • {new Date(overlappingVideo.sungDate).toLocaleDateString('ko-KR')} ({overlappingVideo.addedByName}) - {formatTime(overlappingVideo.startTime || 0)} ~ {overlappingVideo.endTime ? formatTime(overlappingVideo.endTime) : '∞'}
+                                    • {formatOriginalDateForDisplay(overlappingVideo.originalDateString, overlappingVideo.sungDate)} ({overlappingVideo.addedByName}) - {formatTime(overlappingVideo.startTime || 0)} ~ {overlappingVideo.endTime ? formatTime(overlappingVideo.endTime) : '∞'}
                                   </div>
                                 ))}
                               </div>
@@ -1667,7 +1668,7 @@ export default function LiveClipManager({
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-light-text dark:text-dark-text truncate">
-                            {new Date(video.sungDate).toLocaleDateString('ko-KR')}
+                            {formatOriginalDateForDisplay(video.originalDateString, video.sungDate)}
                             {/* 재생시간 표시 */}
                             {video.startTime !== undefined && video.endTime !== undefined && video.endTime > video.startTime && (
                               <span className="ml-2 text-blue-600 dark:text-blue-400">
@@ -1756,7 +1757,7 @@ export default function LiveClipManager({
                               return (
                                 <div key={overlappingVideo._id} className="text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 p-2 rounded border border-amber-200 dark:border-amber-800">
                                   <div className="font-medium mb-1">
-                                    📅 {new Date(overlappingVideo.sungDate).toLocaleDateString('ko-KR')} ({overlappingVideo.addedByName})
+                                    📅 {formatOriginalDateForDisplay(overlappingVideo.originalDateString, overlappingVideo.sungDate)} ({overlappingVideo.addedByName})
                                   </div>
                                   <div className="space-y-1 text-amber-600 dark:text-amber-400">
                                     <div>현재 클립: {formatTime(video1Start)} ~ {typeof video1End === 'number' ? formatTime(video1End) : video1End}</div>
@@ -2038,7 +2039,7 @@ export default function LiveClipManager({
                     {addOverlapInfo.overlappingVideos.map((overlappingVideo) => (
                       <div key={overlappingVideo._id} className="text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 p-2 rounded border border-amber-200 dark:border-amber-800">
                         <div className="font-medium">
-                          📅 {new Date(overlappingVideo.sungDate).toLocaleDateString('ko-KR')} ({overlappingVideo.addedByName})
+                          📅 {formatOriginalDateForDisplay(overlappingVideo.originalDateString, overlappingVideo.sungDate)} ({overlappingVideo.addedByName})
                         </div>
                         <div className="text-amber-600 dark:text-amber-400">
                           기존 클립: {formatTime(overlappingVideo.startTime || 0)} ~ {overlappingVideo.endTime ? formatTime(overlappingVideo.endTime) : '∞'}
