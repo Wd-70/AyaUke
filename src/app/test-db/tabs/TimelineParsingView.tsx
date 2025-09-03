@@ -124,6 +124,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
   const [selectedTimelineIds, setSelectedTimelineIds] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number>(-1);
   const [filterType, setFilterType] = useState<'all' | 'relevant' | 'irrelevant' | 'excluded' | 'matched' | 'unmatched' | 'relevantUnmatched' | 'relevantUnverified'>('relevant');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [autoPlay, setAutoPlay] = useState(true); // 자동 재생 옵션
   const [showMatchModal, setShowMatchModal] = useState(false);
   const [matchingTimeline, setMatchingTimeline] = useState<ParsedTimelineItem | null>(null);
@@ -1215,16 +1216,28 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
       setUploadProgress({ current: 3, total: timelines.length, message: '배치 업로드 데이터 준비 중...' });
       
       const bulkClipData = validClips.map(timeline => {
-        const defaultDescription = timeline.customDescription || 
-          `${timeline.commentAuthor}님의 댓글로부터 생성되었습니다`;
+        // 현재 선택된 타임라인이고 편집 중인 경우, 편집된 데이터 사용
+        const isCurrentlyEditing = selectedTimeline?.id === timeline.id && editingData;
+        
+        const finalDescription = isCurrentlyEditing && editingData.customDescription
+          ? editingData.customDescription
+          : (timeline.customDescription || `${timeline.commentAuthor}님의 댓글로부터 생성되었습니다`);
+        
+        const finalStartTime = isCurrentlyEditing 
+          ? editingData.startTimeSeconds 
+          : timeline.startTimeSeconds;
+          
+        const finalEndTime = isCurrentlyEditing 
+          ? editingData.endTimeSeconds 
+          : timeline.endTimeSeconds;
 
         return {
           songId: timeline.matchedSong!.songId,
           videoUrl: timeline.videoUrl,
           sungDate: timeline.originalDateString || timeline.uploadedDate,
-          description: defaultDescription,
-          startTime: timeline.startTimeSeconds,
-          endTime: timeline.endTimeSeconds
+          description: finalDescription,
+          startTime: finalStartTime,
+          endTime: finalEndTime
         };
       });
 
@@ -1377,21 +1390,47 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
     }
   };
 
+  // 검색어 정규화 함수 (공백 제거)
+  const normalizeSearchText = (text: string): string => {
+    return text.replace(/\s+/g, '').toLowerCase();
+  };
+
   // 필터링된 타임라인들 (메모이제이션으로 성능 최적화)
   const filteredTimelines = useMemo(() => {
     return parsedTimelines.filter(timeline => {
+      // 필터 타입 체크
+      let matchesFilter = false;
       switch (filterType) {
-        case 'relevant': return timeline.isRelevant && !timeline.isExcluded;
-        case 'irrelevant': return !timeline.isRelevant && !timeline.isExcluded;
-        case 'excluded': return timeline.isExcluded;
-        case 'matched': return timeline.matchedSong;
-        case 'unmatched': return !timeline.matchedSong;
-        case 'relevantUnmatched': return timeline.isRelevant && !timeline.isExcluded && !timeline.matchedSong;
-        case 'relevantUnverified': return timeline.isRelevant && !timeline.isExcluded && !timeline.isTimeVerified;
-        default: return true;
+        case 'relevant': matchesFilter = timeline.isRelevant && !timeline.isExcluded; break;
+        case 'irrelevant': matchesFilter = !timeline.isRelevant && !timeline.isExcluded; break;
+        case 'excluded': matchesFilter = timeline.isExcluded; break;
+        case 'matched': matchesFilter = !!timeline.matchedSong; break;
+        case 'unmatched': matchesFilter = !timeline.matchedSong; break;
+        case 'relevantUnmatched': matchesFilter = timeline.isRelevant && !timeline.isExcluded && !timeline.matchedSong; break;
+        case 'relevantUnverified': matchesFilter = timeline.isRelevant && !timeline.isExcluded && !timeline.isTimeVerified; break;
+        default: matchesFilter = true; break;
       }
+      
+      // 검색어 체크
+      if (searchQuery.trim()) {
+        const normalizedQuery = normalizeSearchText(searchQuery);
+        const searchTargets = [
+          timeline.artist,
+          timeline.songTitle,
+          timeline.commentAuthor,
+          timeline.videoTitle
+        ];
+        
+        const matchesSearch = searchTargets.some(target => 
+          normalizeSearchText(target || '').includes(normalizedQuery)
+        );
+        
+        return matchesFilter && matchesSearch;
+      }
+      
+      return matchesFilter;
     });
-  }, [parsedTimelines, filterType]);
+  }, [parsedTimelines, filterType, searchQuery]);
 
   // 페이지네이션 계산 (메모이제이션으로 성능 최적화)
   const paginationInfo = useMemo(() => {
@@ -2598,74 +2637,44 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
         isMobile && showMobileDetail ? 'hidden' : ''
       }`}>
         <div className={`${isMobile ? 'p-2' : 'p-4'} border-b border-gray-200 dark:border-gray-700`}>
-          <div className={`flex items-center justify-between ${isMobile ? 'mb-2' : 'mb-4'}`}>
-            <div className="flex items-center gap-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                파싱된 타임라인 ({paginationInfo.totalItems}개)
-              </h3>
-              {paginationInfo.totalPages > 1 && (
-                <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {paginationInfo.startIndex + 1}-{paginationInfo.endIndex} / {paginationInfo.totalItems}
-                </span>
-              )}
-              {selectedTimelineIds.size > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-blue-600 dark:text-blue-400">
-                    {selectedTimelineIds.size}개 선택됨
-                  </span>
-                  {!isMobile && (
-                    <span className="text-xs text-gray-500 dark:text-gray-500">
-                      Shift+클릭으로 범위 선택, Ctrl+클릭으로 개별 선택
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {selectedTimelineIds.size > 0 && !isMobile && (
-                <div className="flex items-center gap-1 mr-2">
+          {/* 검색 및 필터 */}
+          <div className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-col lg:flex-row gap-4'} ${isMobile ? 'mb-3' : 'mb-4'}`}>
+            {/* 검색 박스 */}
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="아티스트, 곡제목, 댓글작성자, 영상제목 검색..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm
+                             bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                             placeholder-gray-500 dark:placeholder-gray-400
+                             focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+                {searchQuery && (
                   <button
-                    onClick={() => bulkUpdateRelevance(true)}
-                    className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition-colors"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                   >
-                    관련성 있음
+                    <XMarkIcon className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => bulkUpdateRelevance(false)}
-                    className="px-2 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs transition-colors"
-                  >
-                    관련성 없음
-                  </button>
-                </div>
-              )}
-              <button
-                onClick={performBatchSearch}
-                disabled={batchSearchLoading}
-                className="px-3 py-1 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed text-white rounded text-xs transition-colors flex items-center gap-1"
-              >
-                {batchSearchLoading ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    일괄 검색 중...
-                  </>
-                ) : (
-                  <>
-                    <Square3Stack3DIcon className="w-3 h-3" />
-                    일괄 검색
-                  </>
                 )}
-              </button>
-              <button
-                onClick={toggleSelectAll}
-                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs transition-colors"
-              >
-                {paginationInfo.currentPageItems.every(timeline => selectedTimelineIds.has(timeline.id)) ? '페이지 해제' : '페이지 선택'}
-              </button>
+              </div>
+            </div>
+
+            {/* 필터 드롭다운 */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                필터:
+              </label>
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as any)}
-                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm 
-                           bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm 
+                           bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                           focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
                 <option value="all">전체</option>
                 <option value="relevant">관련성 있음</option>
@@ -2677,6 +2686,86 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
                 <option value="relevantUnverified">관련성 있음 (검증완료 제외)</option>
               </select>
             </div>
+          </div>
+
+          {/* 제목 및 통계 정보 */}
+          <div className="flex items-center gap-4 mb-3">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              파싱된 타임라인
+            </h3>
+            <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-full text-sm">
+              {paginationInfo.totalItems}개
+            </span>
+            {searchQuery && (
+              <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs">
+                검색 결과
+              </span>
+            )}
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {paginationInfo.startIndex + 1}-{paginationInfo.endIndex} / {paginationInfo.totalItems}
+            </span>
+            {selectedTimelineIds.size > 0 && (
+              <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+                {selectedTimelineIds.size}개 선택됨
+              </span>
+            )}
+            {selectedTimelineIds.size > 0 && !isMobile && (
+              <span className="text-xs text-gray-500 dark:text-gray-500">
+                Shift+클릭: 범위선택, Ctrl+클릭: 개별선택
+              </span>
+            )}
+          </div>
+
+          {/* 액션 버튼들 */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* 선택된 항목 일괄 작업 */}
+            {selectedTimelineIds.size > 0 && (
+              <div className="flex items-center gap-1 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <span className="text-xs text-blue-700 dark:text-blue-300 mr-1">
+                  일괄:
+                </span>
+                <button
+                  onClick={() => bulkUpdateRelevance(true)}
+                  className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition-colors"
+                >
+                  관련성 있음
+                </button>
+                <button
+                  onClick={() => bulkUpdateRelevance(false)}
+                  className="px-2 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs transition-colors"
+                >
+                  관련성 없음
+                </button>
+              </div>
+            )}
+            
+            {/* 일괄 검색 */}
+            <button
+              onClick={performBatchSearch}
+              disabled={batchSearchLoading}
+              className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center gap-2"
+            >
+              {batchSearchLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  일괄검색 중...
+                </>
+              ) : (
+                <>
+                  <Square3Stack3DIcon className="w-4 h-4" />
+                  일괄검색
+                </>
+              )}
+            </button>
+            
+            {/* 페이지 전체 선택/해제 */}
+            <button
+              onClick={toggleSelectAll}
+              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors flex items-center gap-2"
+            >
+              <CheckIcon className="w-4 h-4" />
+              {paginationInfo.currentPageItems.every(timeline => selectedTimelineIds.has(timeline.id)) ? '페이지해제' : '페이지선택'}
+            </button>
           </div>
           
           {/* 일괄 검색 진행 상황 */}

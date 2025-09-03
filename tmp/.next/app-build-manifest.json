@@ -110,6 +110,11 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/timeline-parser/route.js"
+    ],
+    "/api/videos/[videoId]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/videos/[videoId]/route.js"
     ]
   }
 }

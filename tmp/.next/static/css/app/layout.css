@@ -3091,6 +3091,14 @@ video {
 .placeholder-light-text\/50::placeholder{
   color: rgb(31 41 55 / 0.5);
 }
+.placeholder-gray-500::-moz-placeholder{
+  --tw-placeholder-opacity: 1;
+  color: rgb(107 114 128 / var(--tw-placeholder-opacity, 1));
+}
+.placeholder-gray-500::placeholder{
+  --tw-placeholder-opacity: 1;
+  color: rgb(107 114 128 / var(--tw-placeholder-opacity, 1));
+}
 .opacity-0{
   opacity: 0;
 }
@@ -5381,6 +5389,16 @@ body {
 
 .dark\:placeholder-dark-text\/50:is(.dark *)::placeholder{
   color: rgb(249 250 251 / 0.5);
+}
+
+.dark\:placeholder-gray-400:is(.dark *)::-moz-placeholder{
+  --tw-placeholder-opacity: 1;
+  color: rgb(156 163 175 / var(--tw-placeholder-opacity, 1));
+}
+
+.dark\:placeholder-gray-400:is(.dark *)::placeholder{
+  --tw-placeholder-opacity: 1;
+  color: rgb(156 163 175 / var(--tw-placeholder-opacity, 1));
 }
 
 .dark\:opacity-0:is(.dark *){
