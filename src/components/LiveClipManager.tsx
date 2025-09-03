@@ -833,6 +833,50 @@ export default function LiveClipManager({
     }
   };
 
+  // 관리자 전용: 같은 곡의 다른 모든 클립들에게 현재 클립의 길이 적용
+  const applyDurationToSameSongClips = async (currentVideoId: string, duration: number) => {
+    try {
+      const confirmed = await confirm.confirm({
+        title: '같은 곡 클립들에 길이 일괄 적용',
+        message: `현재 클립의 길이(${formatTime(duration)})를 "${songTitle}" 곡의 다른 모든 클립들에게 적용하시겠습니까?\n\n시작시간은 그대로 유지되고 종료시간만 조정됩니다.`,
+        confirmText: '적용',
+        cancelText: '취소',
+        type: 'warning'
+      });
+
+      if (!confirmed) return;
+
+      const response = await fetch('/api/admin/clips', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clipId: currentVideoId, // 더미 값 (사실상 사용되지 않음)
+          action: 'bulkUpdateDuration',
+          data: {
+            songId,
+            duration,
+            excludeVideoId: currentVideoId // 현재 편집 중인 클립은 제외
+          }
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        showSuccess('성공', `${result.updatedCount}개의 클립에 길이가 적용되었습니다.`);
+        // 데이터 새로고침
+        await loadSongVideos();
+      } else {
+        const error = await response.json();
+        showError('적용 실패', error.error || '길이 일괄 적용에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('길이 일괄 적용 오류:', error);
+      showError('오류 발생', '길이 일괄 적용 중 오류가 발생했습니다.');
+    }
+  };
+
   // 영상 삭제 핸들러
   const handleDeleteVideo = async (videoId: string) => {
     const video = songVideos.find(v => v._id === videoId);
@@ -1502,6 +1546,22 @@ export default function LiveClipManager({
                             >
                               📋 붙여넣기
                             </button>
+                            
+                            {/* 관리자 전용: 같은 곡 모든 클립에 길이 적용 */}
+                            {isAdmin() && (
+                              <button
+                                onClick={() => {
+                                  const currentDuration = editingVideoData.endTime - editingVideoData.startTime;
+                                  if (currentDuration > 0 && editingVideoId) {
+                                    applyDurationToSameSongClips(editingVideoId, currentDuration);
+                                  }
+                                }}
+                                className="px-3 py-1 text-xs bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
+                                title="현재 클립의 길이를 같은 곡의 모든 다른 클립들에게 적용 (관리자 전용)"
+                              >
+                                🎵 모든 클립에 적용
+                              </button>
+                            )}
                           </div>
                           <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                             시간 형식: 180(초) 또는 3:05.0(mm:ss.d)

@@ -390,6 +390,47 @@ export async function PATCH(request: Request) {
         if (data.endTime !== undefined) updateData.endTime = data.endTime
         if (data.description !== undefined) updateData.description = data.description
         break
+      case 'bulkUpdateDuration':
+        // 같은 곡의 모든 클립들에게 길이 일괄 적용
+        const { songId, duration, excludeVideoId } = data;
+        
+        if (!songId || !duration || duration <= 0) {
+          return NextResponse.json(
+            { error: 'songId와 올바른 duration이 필요합니다.' },
+            { status: 400 }
+          );
+        }
+
+        // 같은 곡의 모든 클립들을 찾기 (현재 편집 중인 클립은 제외)
+        const clipsToUpdate = await SongVideo.find({
+          songId: songId,
+          ...(excludeVideoId && { _id: { $ne: excludeVideoId } })
+        });
+
+        if (clipsToUpdate.length === 0) {
+          return NextResponse.json({
+            success: true,
+            message: '업데이트할 클립이 없습니다.',
+            updatedCount: 0
+          });
+        }
+
+        // 각 클립의 종료시간을 (시작시간 + 새로운 길이)로 업데이트
+        const updatePromises = clipsToUpdate.map(clip => 
+          SongVideo.findByIdAndUpdate(clip._id, {
+            $set: {
+              endTime: (clip.startTime || 0) + duration
+            }
+          })
+        );
+
+        await Promise.all(updatePromises);
+
+        return NextResponse.json({
+          success: true,
+          message: `${clipsToUpdate.length}개의 클립에 길이가 적용되었습니다.`,
+          updatedCount: clipsToUpdate.length
+        });
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }

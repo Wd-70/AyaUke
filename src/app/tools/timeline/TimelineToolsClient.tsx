@@ -40,7 +40,7 @@ export default function TimelineToolsClient() {
   return (
     <div className="min-h-screen">
       <Navigation currentPath="/tools/timeline" />
-      <div className="flex h-[calc(100vh-4rem)] pt-16">
+      <div className="flex h-screen pt-16">
         {/* 왼쪽 고정 사이드바 */}
         <div className={`fixed left-0 top-16 h-[calc(100vh-4rem)] z-30 transition-all duration-300 ${
           sidebarCollapsed ? 'w-16' : 'w-64'
@@ -126,18 +126,13 @@ export default function TimelineToolsClient() {
         }`}>
           <div className="h-full overflow-y-auto">
             <div className="p-6">
-              {activeTab === 'adjuster' && (
-                <div>
-                  <TimelineAdjusterClient />
-                </div>
-              )}
+              <div className={activeTab === 'adjuster' ? 'block' : 'hidden'}>
+                <TimelineAdjusterClient />
+              </div>
               
-              {activeTab === 'parser' && (
-                <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-xl 
-                                border border-light-primary/20 dark:border-dark-primary/20 p-6">
-                  <TimestampParserTab />
-                </div>
-              )}
+              <div className={`${activeTab === 'parser' ? 'block' : 'hidden'} bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 p-6`}>
+                <TimestampParserTab />
+              </div>
             </div>
           </div>
         </div>

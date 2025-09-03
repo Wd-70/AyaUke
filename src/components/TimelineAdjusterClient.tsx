@@ -41,10 +41,11 @@ export default function TimelineAdjusterClient() {
   };
 
   // 입력 텍스트에서 첫 번째 타임스탬프 추출
-  const getFirstTimestamp = () => {
-    if (!inputText.trim()) return null;
+  const getFirstTimestamp = (customInputText?: string) => {
+    const currentInputText = customInputText ?? inputText;
+    if (!currentInputText.trim()) return null;
     
-    const lines = inputText.split('\n');
+    const lines = currentInputText.split('\n');
     for (const line of lines) {
       const trimmedLine = line.trim();
       if (!trimmedLine) continue;
@@ -59,18 +60,21 @@ export default function TimelineAdjusterClient() {
   };
 
   // 기준 시간 기반 오프셋 계산
-  const calculateOffsetFromReference = () => {
-    const firstTimestamp = getFirstTimestamp();
-    if (!firstTimestamp || !targetTime.trim()) return 0;
+  const calculateOffsetFromReference = (customInputText?: string, customTargetTime?: string) => {
+    const firstTimestamp = getFirstTimestamp(customInputText);
+    const currentTargetTime = customTargetTime ?? targetTime;
+    if (!firstTimestamp || !currentTargetTime.trim()) return 0;
     
     const refSeconds = timeToSeconds(firstTimestamp);
-    const targetSeconds = timeToSeconds(targetTime);
+    const targetSeconds = timeToSeconds(currentTargetTime);
     return targetSeconds - refSeconds;
   };
 
   // 타임라인 조정 처리
-  const adjustTimeline = () => {
-    if (!inputText.trim()) {
+  const adjustTimeline = (customInputText?: string, customOffsetMinutes?: number, customOffsetSeconds?: number, customOffsetSign?: number, customTargetTime?: string) => {
+    const currentInputText = customInputText ?? inputText;
+    
+    if (!currentInputText.trim()) {
       setOutputText('');
       return;
     }
@@ -78,12 +82,15 @@ export default function TimelineAdjusterClient() {
     let totalOffsetSeconds: number;
     
     if (adjustmentMode === 'manual') {
-      totalOffsetSeconds = offsetSign * (offsetMinutes * 60 + offsetSeconds);
+      const currentOffsetMinutes = customOffsetMinutes ?? offsetMinutes;
+      const currentOffsetSeconds = customOffsetSeconds ?? offsetSeconds;
+      const currentOffsetSign = customOffsetSign ?? offsetSign;
+      totalOffsetSeconds = currentOffsetSign * (currentOffsetMinutes * 60 + currentOffsetSeconds);
     } else {
-      totalOffsetSeconds = calculateOffsetFromReference();
+      totalOffsetSeconds = calculateOffsetFromReference(customInputText, customTargetTime);
     }
     
-    const lines = inputText.split('\n');
+    const lines = currentInputText.split('\n');
     
     const adjustedLines = lines.map(line => {
       const line_trimmed = line.trim();
@@ -111,9 +118,11 @@ export default function TimelineAdjusterClient() {
   // 입력 텍스트 변경 시 자동 조정
   const handleInputChange = (value: string) => {
     setInputText(value);
-    // 입력이 있고 설정이 되어있는 경우 자동으로 조정
-    if (value.trim() && shouldAutoAdjust()) {
-      setTimeout(() => adjustTimeline(), 100);
+    // 입력이 있는 경우 항상 자동으로 조정 (현재 값을 직접 전달)
+    if (value.trim()) {
+      setTimeout(() => adjustTimeline(value), 10);
+    } else {
+      setOutputText(''); // 입력이 없으면 결과도 비움
     }
   };
 
@@ -131,9 +140,9 @@ export default function TimelineAdjusterClient() {
     setOffsetMinutes(minutes);
     setOffsetSeconds(seconds);
     setOffsetSign(sign);
-    // 입력이 있는 경우 자동으로 조정
+    // 입력이 있는 경우 자동으로 조정 (현재 값들을 직접 전달)
     if (inputText.trim()) {
-      setTimeout(() => adjustTimeline(), 100);
+      setTimeout(() => adjustTimeline(inputText, minutes, seconds, sign), 10);
     }
   };
 
@@ -203,9 +212,9 @@ export default function TimelineAdjusterClient() {
       const extractedTime = extractTimeFromYouTubeUrl(value);
       if (extractedTime) {
         setTargetTime(extractedTime);
-        // 자동 조정 실행
-        if (inputText.trim() && getFirstTimestamp()) {
-          setTimeout(() => adjustTimeline(), 100);
+        // 자동 조정 실행 (현재 inputText와 새로운 목표 시간을 직접 전달)
+        if (inputText.trim()) {
+          setTimeout(() => adjustTimeline(inputText, undefined, undefined, undefined, extractedTime), 10);
         }
         return;
       }
@@ -215,9 +224,9 @@ export default function TimelineAdjusterClient() {
     const filtered = filterTimeInput(value);
     setTargetTime(filtered);
     
-    // 입력이 있고 첫 번째 타임스탬프가 있으며 목표 시간이 설정된 경우 자동으로 조정
-    if (inputText.trim() && getFirstTimestamp() && filtered.trim()) {
-      setTimeout(() => adjustTimeline(), 100);
+    // 입력이 있으면 자동으로 조정 (현재 inputText와 새로운 목표 시간을 직접 전달)
+    if (inputText.trim()) {
+      setTimeout(() => adjustTimeline(inputText, undefined, undefined, undefined, filtered), 10);
     }
   };
 
@@ -258,7 +267,7 @@ export default function TimelineAdjusterClient() {
   };
 
   return (
-    <div className="p-6">
+    <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 p-6">
       <div className="max-w-6xl mx-auto">
         {/* 제목 및 설명 */}
         <div className="mb-6">
@@ -419,17 +428,10 @@ export default function TimelineAdjusterClient() {
             </div>
 
             {/* 컨트롤 버튼 */}
-            <div className="flex gap-3">
-              <button
-                onClick={adjustTimeline}
-                className="flex-1 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg
-                         transition-colors duration-200 font-medium"
-              >
-                조정 적용
-              </button>
+            <div className="flex justify-center">
               <button
                 onClick={reset}
-                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg
+                className="px-6 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-lg
                          transition-colors duration-200"
               >
                 초기화

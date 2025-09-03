@@ -11,6 +11,16 @@
       "static/chunks/main-app.js",
       "static/chunks/app/error.js"
     ],
+    "/auth/signin/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/auth/signin/page.js"
+    ],
+    "/api/auth/[...nextauth]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/[...nextauth]/route.js"
+    ],
     "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -21,80 +31,25 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/chzzk-videos/route.js"
     ],
-    "/api/auth/[...nextauth]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/[...nextauth]/route.js"
-    ],
-    "/admin/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/admin/page.js"
-    ],
-    "/api/admin/dashboard-stats/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/dashboard-stats/route.js"
-    ],
-    "/api/youtube-comments/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/youtube-comments/route.js"
-    ],
-    "/api/timeline-parser/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/timeline-parser/route.js"
-    ],
-    "/api/test-db/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/test-db/route.js"
-    ],
-    "/api/admin/users/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/users/route.js"
-    ],
-    "/tools/timeline/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/tools/timeline/page.js"
-    ],
-    "/api/songdetails/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/songdetails/route.js"
-    ],
-    "/api/admin/clips/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/clips/route.js"
-    ],
-    "/api/admin/clips/bulk/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/clips/bulk/route.js"
-    ],
-    "/api/admin/recalculate-song-stats/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/recalculate-song-stats/route.js"
-    ],
     "/songbook/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/songbook/page.js"
     ],
-    "/api/user/playlists/route": [
+    "/api/user/activity/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/user/playlists/route.js"
+      "static/chunks/app/api/user/activity/route.js"
     ],
     "/api/likes-bulk/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/likes-bulk/route.js"
+    ],
+    "/api/user/playlists/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/user/playlists/route.js"
     ],
     "/api/songs/[songId]/videos/route": [
       "static/chunks/webpack.js",
@@ -106,15 +61,55 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/user/[userId]/route.js"
     ],
-    "/api/videos/[videoId]/route": [
+    "/api/songdetails/[id]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/videos/[videoId]/route.js"
+      "static/chunks/app/api/songdetails/[id]/route.js"
     ],
-    "/_not-found/page": [
+    "/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/admin/page.js"
+    ],
+    "/api/admin/dashboard-stats/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/dashboard-stats/route.js"
+    ],
+    "/api/songdetails/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/songdetails/route.js"
+    ],
+    "/api/youtube-search/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/youtube-search/route.js"
+    ],
+    "/tools/timeline/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/tools/timeline/page.js"
+    ],
+    "/api/youtube-comments/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/youtube-comments/route.js"
+    ],
+    "/api/admin/clips/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/clips/route.js"
+    ],
+    "/api/admin/clips/bulk/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/clips/bulk/route.js"
+    ],
+    "/api/timeline-parser/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/timeline-parser/route.js"
     ]
   }
 }

@@ -136,6 +136,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
     songTitle: string;
     startTimeSeconds: number;
     endTimeSeconds?: number;
+    customDescription?: string;
   } | null>(null);
   
   // 곡 매칭 다이얼로그 상태
@@ -731,11 +732,15 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
   // selectedTimeline이 변경될 때 editingData 초기화 (항상 편집 모드)
   useEffect(() => {
     if (selectedTimeline) {
+      const defaultDescription = selectedTimeline.customDescription || 
+        `${selectedTimeline.commentAuthor}님의 댓글로부터 생성되었습니다`;
+      
       setEditingData({
         artist: selectedTimeline.artist,
         songTitle: selectedTimeline.songTitle,
         startTimeSeconds: selectedTimeline.startTimeSeconds,
-        endTimeSeconds: selectedTimeline.endTimeSeconds
+        endTimeSeconds: selectedTimeline.endTimeSeconds,
+        customDescription: defaultDescription
       });
     } else {
       setEditingData(null);
@@ -775,7 +780,8 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
           artist: artist,
           songTitle: songTitle,
           startTimeSeconds: editingData.startTimeSeconds,
-          endTimeSeconds: editingData.endTimeSeconds
+          endTimeSeconds: editingData.endTimeSeconds,
+          customDescription: editingData.customDescription
         })
       });
 
@@ -791,6 +797,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
                 songTitle: songTitle,
                 startTimeSeconds: editingData.startTimeSeconds,
                 endTimeSeconds: editingData.endTimeSeconds,
+                customDescription: editingData.customDescription,
                 duration: editingData.endTimeSeconds && editingData.endTimeSeconds > editingData.startTimeSeconds
                   ? editingData.endTimeSeconds - editingData.startTimeSeconds
                   : timeline.duration
@@ -805,6 +812,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
           songTitle: songTitle,
           startTimeSeconds: editingData.startTimeSeconds,
           endTimeSeconds: editingData.endTimeSeconds,
+          customDescription: editingData.customDescription,
           duration: editingData.endTimeSeconds && editingData.endTimeSeconds > editingData.startTimeSeconds
             ? editingData.endTimeSeconds - editingData.startTimeSeconds
             : prev.duration
@@ -2087,6 +2095,24 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
               >
                 YouTube에서 보기
               </a>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                클립 설명 (라이브 클립 업로드용)
+              </label>
+              <textarea
+                value={editingData?.customDescription || ''}
+                onChange={(e) => {
+                  setEditingData(prev => prev ? { ...prev, customDescription: e.target.value } : null);
+                }}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
+                           bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-vertical min-h-[80px]"
+                placeholder="라이브 클립 업로드 시 사용될 설명을 입력하세요"
+                rows={3}
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                이 설명은 라이브 클립 업로드 시 사용됩니다. 비워두면 기본값이 사용됩니다.
+              </p>
             </div>
           </div>
         </div>

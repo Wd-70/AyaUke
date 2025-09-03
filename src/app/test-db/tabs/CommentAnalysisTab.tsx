@@ -172,19 +172,20 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
           return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
         }
       } else if (sortBy === 'recentUpdate') {
-        // 최근 수정된 순 정렬 (lastNewCommentAt 최우선, 없으면 lastCommentSync, updatedAt, createdAt 순)
-        const getLatestDate = (video: VideoData) => {
-          const dates = [
-            video.lastNewCommentAt ? new Date(video.lastNewCommentAt) : null,
-            video.lastCommentSync ? new Date(video.lastCommentSync) : null,
-            video.updatedAt ? new Date(video.updatedAt) : null,
-            video.createdAt ? new Date(video.createdAt) : null
-          ].filter(Boolean) as Date[];
-          
-          return dates.length > 0 ? Math.max(...dates.map(d => d.getTime())) : 0;
+        // 최근 댓글순 정렬 (lastNewCommentAt 기준, 새 댓글이 없으면 맨 뒤로)
+        const getCommentDate = (video: VideoData) => {
+          return video.lastNewCommentAt ? new Date(video.lastNewCommentAt).getTime() : 0;
         };
         
-        return getLatestDate(b) - getLatestDate(a); // 최신순
+        const dateA = getCommentDate(a);
+        const dateB = getCommentDate(b);
+        
+        // 둘 다 새 댓글이 없으면 업로드 날짜로 정렬
+        if (dateA === 0 && dateB === 0) {
+          return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+        }
+        
+        return dateB - dateA; // 최신 댓글순
       } else {
         // 업로드 날짜순 정렬
         return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
@@ -637,7 +638,7 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                       onChange={(e) => setSortBy(e.target.value as 'uploadDate' | 'titleDate' | 'recentUpdate')}
                       className="text-blue-600 focus:ring-blue-500"
                     />
-                    <span className="text-gray-600 dark:text-gray-400">최근 수정순</span>
+                    <span className="text-gray-600 dark:text-gray-400">최근 댓글순</span>
                   </label>
                 </div>
               )}
@@ -684,7 +685,7 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                     
                     <button
                       onClick={triggerUpload}
-                      disabled={timelineStats.matchedSongs === 0 && timelineStats.verifiedItems === 0}
+                      disabled={(timelineStats?.matchedSongs || 0) === 0 && (timelineStats?.verifiedItems || 0) === 0}
                       className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 transition-colors"
                     >
                       <ArrowPathIcon className="w-4 h-4" />
@@ -756,23 +757,23 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
           ) : (
             <div className={`grid grid-cols-2 lg:grid-cols-5 ${isMobile ? 'gap-2 mt-3' : 'gap-4 mt-6'}`}>
               <div className={`bg-green-50 dark:bg-green-900/20 ${isMobile ? 'p-2' : 'p-4'} rounded-lg`}>
-                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-green-600 dark:text-green-400`}>{timelineStats.parsedItems}</div>
+                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-green-600 dark:text-green-400`}>{timelineStats?.parsedItems || 0}</div>
                 <div className="text-xs text-green-700 dark:text-green-300">파싱된 항목</div>
               </div>
               <div className={`bg-yellow-50 dark:bg-yellow-900/20 ${isMobile ? 'p-2' : 'p-4'} rounded-lg`}>
-                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-yellow-600 dark:text-yellow-400`}>{timelineStats.relevantItems}</div>
+                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-yellow-600 dark:text-yellow-400`}>{timelineStats?.relevantItems || 0}</div>
                 <div className="text-xs text-yellow-700 dark:text-yellow-300">관련성 있음</div>
               </div>
               <div className={`bg-indigo-50 dark:bg-indigo-900/20 ${isMobile ? 'p-2' : 'p-4'} rounded-lg`}>
-                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-indigo-600 dark:text-indigo-400`}>{timelineStats.matchedSongs}</div>
+                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-indigo-600 dark:text-indigo-400`}>{timelineStats?.matchedSongs || 0}</div>
                 <div className="text-xs text-indigo-700 dark:text-indigo-300">매칭된 곡</div>
               </div>
               <div className={`bg-pink-50 dark:bg-pink-900/20 ${isMobile ? 'p-2' : 'p-4'} rounded-lg`}>
-                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-pink-600 dark:text-pink-400`}>{timelineStats.uniqueMatchedSongs}</div>
+                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-pink-600 dark:text-pink-400`}>{timelineStats?.uniqueMatchedSongs || 0}</div>
                 <div className="text-xs text-pink-700 dark:text-pink-300">고유 곡</div>
               </div>
               <div className={`bg-blue-50 dark:bg-blue-900/20 ${isMobile ? 'p-2' : 'p-4'} rounded-lg`}>
-                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-blue-600 dark:text-blue-400`}>{timelineStats.verifiedItems}</div>
+                <div className={`${isMobile ? 'text-lg' : 'text-2xl'} font-bold text-blue-600 dark:text-blue-400`}>{timelineStats?.verifiedItems || 0}</div>
                 <div className="text-xs text-blue-700 dark:text-blue-300">검증완료</div>
               </div>
             </div>
@@ -894,11 +895,6 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                           {video.lastNewCommentAt && (
                             <span className="text-red-600 dark:text-red-400">
                               새 댓글: {new Date(video.lastNewCommentAt).toLocaleDateString('ko-KR')}
-                            </span>
-                          )}
-                          {video.updatedAt && (
-                            <span className="text-orange-600 dark:text-orange-400">
-                              수정: {new Date(video.updatedAt).toLocaleDateString('ko-KR')}
                             </span>
                           )}
                         </div>
