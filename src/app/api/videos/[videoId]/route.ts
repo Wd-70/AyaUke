@@ -132,6 +132,40 @@ export async function PUT(
       { new: true, runValidators: true }
     );
 
+    // sungDate가 수정된 경우 해당 곡의 lastSungDate 재계산 (수정된 클립이 최신일 경우만)
+    if (sungDate !== undefined && updatedVideo) {
+      try {
+        const songId = updatedVideo.songId;
+        
+        // 해당 곡의 모든 클립 중 가장 최신 날짜 찾기
+        const latestClip = await SongVideo.findOne({ songId })
+          .sort({ sungDate: -1 })
+          .lean();
+        
+        // 수정된 클립이 해당 곡의 최신 클립인지 확인
+        if (latestClip && latestClip._id.toString() === videoId) {
+          // 로컬 시간 기준으로 날짜 문자열 생성 (UTC 변환 방지)
+          const date = new Date(latestClip.sungDate);
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const sungDateString = `${year}-${month}-${day}`;
+          
+          // 곡의 lastSungDate 업데이트
+          await SongDetail.findByIdAndUpdate(songId, {
+            $set: { lastSungDate: sungDateString }
+          });
+          
+          console.log(`📅 곡 ${songId}의 lastSungDate가 ${sungDateString}으로 업데이트되었습니다 (최신 클립 수정).`);
+        } else {
+          console.log(`📅 곡 ${songId}: 수정된 클립이 최신이 아니므로 lastSungDate를 업데이트하지 않습니다.`);
+        }
+      } catch (statsError) {
+        console.error('곡 통계 업데이트 오류:', statsError);
+        // 에러가 발생해도 클립 수정은 성공으로 처리
+      }
+    }
+
     return NextResponse.json({
       success: true,
       video: {

@@ -1124,14 +1124,14 @@ export default function TimestampParserTab() {
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm text-blue-800 dark:text-blue-200 mb-1">
-                    모든 클립에 적용될 설명
+                    모든 클립에 적용될 설명 (여러 줄 입력 가능)
                   </label>
-                  <input
-                    type="text"
+                  <textarea
                     value={descriptionTemplate}
                     onChange={(e) => setDescriptionTemplate(e.target.value)}
-                    placeholder="타임스탬프 파서로 자동 등록"
-                    className="w-full px-3 py-2 border border-blue-300 dark:border-blue-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm"
+                    placeholder="타임스탬프 파서로 자동 등록&#10;&#10;여러 줄로 설명을 작성할 수 있습니다.&#10;각 줄은 자동으로 개행됩니다."
+                    rows={4}
+                    className="w-full px-3 py-2 border border-blue-300 dark:border-blue-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent text-sm resize-vertical"
                   />
                 </div>
                 

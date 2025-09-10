@@ -233,7 +233,12 @@ export async function POST(request: NextRequest) {
         };
         
         if (latestClip?.sungDate) {
-          const sungDateString = new Date(latestClip.sungDate).toISOString().split('T')[0];
+          // 로컬 시간 기준으로 날짜 문자열 생성 (UTC 변환 방지)
+          const date = new Date(latestClip.sungDate);
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const sungDateString = `${year}-${month}-${day}`;
           updateData.$set.lastSungDate = sungDateString;
         }
         

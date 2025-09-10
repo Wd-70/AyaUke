@@ -206,7 +206,11 @@ export async function POST(
 
     // 곡 통계 업데이트 (효율적인 하이브리드 방식)
     try {
-      const sungDateString = validSungDate.toISOString().split('T')[0]; // YYYY-MM-DD 형식
+      // 로컬 시간 기준으로 날짜 문자열 생성 (UTC 변환 방지)
+      const year = validSungDate.getFullYear();
+      const month = String(validSungDate.getMonth() + 1).padStart(2, '0');
+      const day = String(validSungDate.getDate()).padStart(2, '0');
+      const sungDateString = `${year}-${month}-${day}`; // YYYY-MM-DD 형식
       
       // 요청 헤더에서 배치 업로드 여부 확인
       const isBatchUpload = request.headers.get('x-batch-upload') === 'true';
