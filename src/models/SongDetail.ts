@@ -52,6 +52,41 @@ const SongDetailSchema: Schema = new Schema({
     type: String,
     trim: true,
   },
+  lyricsLinks: [{
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    url: {
+      type: String,
+      required: true,
+      trim: true,
+      validate: {
+        validator: function(v: string) {
+          try {
+            new URL(v);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        message: '올바른 URL 형식을 입력해주세요.'
+      }
+    },
+    verified: {
+      type: Boolean,
+      default: false,
+    },
+    addedBy: {
+      type: String,
+      trim: true,
+    },
+    addedAt: {
+      type: Date,
+      default: Date.now,
+    },
+  }],
   searchTags: [{
     type: String,
     trim: true,

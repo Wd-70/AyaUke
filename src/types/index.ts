@@ -37,6 +37,14 @@ export interface MRLink {
   duration?: string;
 }
 
+export interface LyricsLink {
+  title: string;
+  url: string;
+  verified: boolean;
+  addedBy?: string;
+  addedAt?: Date;
+}
+
 export interface SongDetail {
   _id?: string;                            // MongoDB ObjectId
   title: string;
@@ -45,6 +53,7 @@ export interface SongDetail {
   artistAlias?: string;
   language?: string;
   lyrics?: string;
+  lyricsLinks?: LyricsLink[];
   searchTags?: string[];
   sungCount?: number;
   likeCount?: number;

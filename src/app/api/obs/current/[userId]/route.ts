@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { activeOBSUsers } from '../../create/route';
+import { activeOBSUsers } from '@/lib/obsState';
 
 export async function GET(
   request: NextRequest,
