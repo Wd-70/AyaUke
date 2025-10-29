@@ -1,6 +1,6 @@
-# 아야 AyaUke 공식 웹사이트
+# 아야 AyaUke 비공식 팬사이트
 
-HONEYZ의 따뜻한 목소리, 게임과 노래를 사랑하는 버튜버 아야 AyaUke의 공식 웹사이트입니다.
+HONEYZ의 따뜻한 목소리, 게임과 노래를 사랑하는 버튜버 아야 AyaUke의 비공식 팬사이트입니다.
 
 ## ✨ 특징
 
@@ -185,13 +185,3 @@ CNAME www          -> yourdomain.com
 
 이 프로젝트는 MIT 라이선스를 따릅니다.
 
-## 📞 연락처
-
-- **아야 AyaUke**
-- Chzzk: [https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc](https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc)
-- YouTube: [@AyaUke_Projecti](https://youtube.com/@AyaUke_Projecti)
-- X (Twitter): [@AyaUke_V](https://twitter.com/AyaUke_V)
-
----
-
-💜 HONEYZ의 아야를 응원해주세요! 💜
