@@ -241,6 +241,7 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const search = searchParams.get('search') || '';
+    const sortBy = searchParams.get('sortBy') || 'uploadDate';  // 정렬 옵션
 
     switch (action) {
       case 'channel-stats':
@@ -255,8 +256,21 @@ export async function GET(request: NextRequest) {
         }
         
         const totalVideos = await YouTubeVideo.countDocuments(searchQuery);
+        
+        // 정렬 옵션에 따른 sort 설정
+        let sortOption: any = { publishedAt: -1 };  // 기본: 업로드 날짜순
+        
+        if (sortBy === 'recentUpdate') {
+          // 최근 댓글순 (lastNewCommentAt 기준, null은 맨 뒤로)
+          sortOption = { lastNewCommentAt: -1, publishedAt: -1 };
+        } else if (sortBy === 'titleDate') {
+          // titleDate는 클라이언트에서 처리 (제목 파싱 필요)
+          // 일단 전체 데이터를 가져와서 클라이언트로 전달
+          sortOption = { publishedAt: -1 };
+        }
+        
         const videos = await YouTubeVideo.find(searchQuery)
-          .sort({ publishedAt: -1 })
+          .sort(sortOption)
           .skip((page - 1) * limit)
           .limit(limit);
 

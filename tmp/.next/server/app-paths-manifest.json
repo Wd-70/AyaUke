@@ -1,13 +1,9 @@
 {
   "/api/admin/users/route": "app/api/admin/users/route.js",
-  "/api/chzzk-videos/route": "app/api/chzzk-videos/route.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/user/activity/route": "app/api/user/activity/route.js",
-  "/api/likes-bulk/route": "app/api/likes-bulk/route.js",
-  "/api/admin/dashboard-stats/route": "app/api/admin/dashboard-stats/route.js",
-  "/api/user/playlists/route": "app/api/user/playlists/route.js",
   "/api/youtube-comments/route": "app/api/youtube-comments/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/page": "app/page.js",
+  "/api/admin/dashboard-stats/route": "app/api/admin/dashboard-stats/route.js",
   "/admin/page": "app/admin/page.js",
   "/songbook/page": "app/songbook/page.js"
 }

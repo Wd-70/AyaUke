@@ -201,6 +201,7 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
         action: 'channel-stats',
         page: page.toString(),
         limit: '20',
+        sortBy: sortBy,  // 정렬 옵션 전달
         ...(search && { search })
       });
       
@@ -208,7 +209,8 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
       const result = await response.json();
       
       if (result.success) {
-        setVideos(sortVideos(result.data.videos));
+        // titleDate는 클라이언트에서 정렬 (제목 파싱 필요)
+        setVideos(sortBy === 'titleDate' ? sortVideos(result.data.videos) : result.data.videos);
         setStats(result.data.stats);
         setPagination(result.data.pagination);
       } else {
@@ -491,9 +493,9 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
     loadChannelData();
   }, []);
 
-  // 정렬 옵션 변경 시 비디오 목록 재정렬
+  // 정렬 옵션 변경 시 데이터 새로고침
   useEffect(() => {
-    setVideos(prevVideos => sortVideos(prevVideos));
+    loadChannelData(pagination?.currentPage || 1, searchQuery);
   }, [sortBy]);
 
   return (
