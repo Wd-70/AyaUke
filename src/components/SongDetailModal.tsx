@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
-import { SongData, LyricsLink } from "@/types";
+import { SongData, LyricsLink, MRLink } from "@/types";
 import {
   MusicalNoteIcon,
   XMarkIcon,
@@ -45,6 +45,10 @@ interface SongDetailModalProps {
   onClose: () => void;
   onPlay?: (song: SongData) => void;
   isMobileScreen: boolean;
+  songVideos?: any[];
+  setSongVideos?: (videos: any[]) => void;
+  videosLoading?: boolean;
+  loadSongVideos?: () => void;
 }
 
 export default function SongDetailModal({
@@ -53,7 +57,16 @@ export default function SongDetailModal({
   onClose,
   onPlay,
   isMobileScreen,
+  songVideos = [],
+  setSongVideos,
+  videosLoading = false,
+  loadSongVideos,
 }: SongDetailModalProps) {
+  // 디버그: 받은 song 데이터 확인
+  console.log('🔍 SongDetailModal - 전체 song 데이터:', song);
+  console.log('🔍 SongDetailModal - songVideos:', songVideos);
+  console.log('🔍 SongDetailModal - loadSongVideos:', !!loadSongVideos);
+  
   const { data: session } = useSession();
   const { liked, isLoading: likeLoading, toggleLike } = useLike(song.id);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
@@ -76,6 +89,101 @@ export default function SongDetailModal({
   // 현재 표시되는 제목과 아티스트 (alias 우선)
   const displayTitle = song.titleAlias || song.title;
   const displayArtist = song.artistAlias || song.artist;
+
+  // YouTube MR 데이터 처리
+  const youtubeMRs = useMemo(() => {
+    console.log('🔍 SongDetailModal - song.mrLinks:', song.mrLinks);
+    if (!song.mrLinks || !Array.isArray(song.mrLinks)) {
+      console.log('❌ MR links가 없거나 배열이 아님');
+      return [];
+    }
+    const processed = song.mrLinks
+      .map((link, index) => {
+        // MRLink 객체인지 문자열인지 확인
+        let url: string;
+        let skipSeconds = 0;
+        
+        if (typeof link === 'string') {
+          // 기존 문자열 형태
+          url = link;
+          const skipMatch = link.match(/[?&]t=(\d+)/);
+          skipSeconds = skipMatch ? parseInt(skipMatch[1]) : 0;
+        } else if (typeof link === 'object' && link.url) {
+          // MRLink 객체 형태
+          url = link.url;
+          skipSeconds = link.skipSeconds || 0;
+          console.log(`🔍 MRLink 객체 ${index}:`, link);
+        } else {
+          console.log(`❌ Link ${index}가 올바른 형식이 아님:`, link);
+          return null;
+        }
+        
+        const match = url.match(/(?:v=|\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        if (match) {
+          const videoId = match[1];
+          console.log(`✅ MR 링크 ${index} 처리됨:`, { videoId, skipSeconds, originalUrl: url });
+          return { videoId, skipSeconds, originalUrl: url, index };
+        } else {
+          console.log(`❌ YouTube URL 매칭 실패:`, url);
+        }
+        return null;
+      })
+      .filter(Boolean) as Array<{
+        videoId: string;
+        skipSeconds: number;
+        originalUrl: string;
+        index: number;
+      }>;
+    console.log('🎵 최종 처리된 MR 목록:', processed);
+    return processed;
+  }, [song.mrLinks]);
+
+  const youtubeMR = youtubeMRs[selectedMRIndex] || null;
+
+  // 모달이 열릴 때 라이브 클립 자동 로드
+  useEffect(() => {
+    if (isExpanded && loadSongVideos && songVideos.length === 0 && !videosLoading) {
+      console.log('🚀 모달 열림 - 라이브 클립 자동 로드 시작');
+      loadSongVideos();
+    }
+  }, [isExpanded, loadSongVideos, songVideos.length, videosLoading]);
+
+  // 탭 변경 시 라이브 클립 로드
+  useEffect(() => {
+    if (isExpanded && activeTab === 'clips' && loadSongVideos && songVideos.length === 0 && !videosLoading) {
+      console.log('🚀 라이브 클립 탭 활성화 - 자동 로드 시작');
+      loadSongVideos();
+    }
+  }, [activeTab, isExpanded, loadSongVideos, songVideos.length, videosLoading]);
+
+  // YouTube 플레이어 이벤트 핸들러
+  const onYouTubeReady = useCallback((event: any) => {
+    playerRef.current = event.target;
+  }, []);
+
+  const onYouTubeStateChange = useCallback((event: any) => {
+    const YT = (window as any).YT;
+    if (YT) {
+      if (event.data === YT.PlayerState.PLAYING) {
+        setIsPlaying(true);
+      } else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
+        setIsPlaying(false);
+      }
+    }
+  }, []);
+
+  // 플레이어 제어 함수들
+  const handlePlay = useCallback(() => {
+    if (playerRef.current) {
+      playerRef.current.playVideo();
+    }
+  }, []);
+
+  const handlePause = useCallback(() => {
+    if (playerRef.current) {
+      playerRef.current.pauseVideo();
+    }
+  }, []);
 
   // 키 조절 포맷팅 함수
   const formatKeyAdjustment = (keyAdjustment: number | null | undefined) => {
@@ -183,13 +291,13 @@ export default function SongDetailModal({
         <div className="absolute inset-0 bg-gradient-to-br from-light-accent/5 to-light-purple/5 
                         dark:from-dark-accent/5 dark:to-dark-purple/5 rounded-xl"></div>
 
-        <div className="relative p-4 xl:p-6 flex flex-col h-full gap-4">
+        <div className="relative p-4 md:p-5 lg:p-6 flex flex-col h-full gap-4">
           {/* 메타데이터 헤더 */}
-          <div className="flex flex-col xl:flex-row gap-2 xl:gap-4 xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-2">
             {/* 첫 번째 줄: 제목, 키, 편집/닫기 버튼 */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <h3 className="text-xl xl:text-2xl font-bold text-light-text dark:text-dark-text truncate">
+                <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-light-text dark:text-dark-text truncate">
                   {displayTitle}
                 </h3>
                 {song.keyAdjustment !== null && song.keyAdjustment !== undefined && (
@@ -226,7 +334,7 @@ export default function SongDetailModal({
 
             {/* 두 번째 줄: 아티스트, 언어, 태그들 */}
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-base xl:text-lg text-light-text/70 dark:text-dark-text/70">
+              <p className="text-sm md:text-base lg:text-lg text-light-text/70 dark:text-dark-text/70">
                 {displayArtist}
               </p>
               
@@ -260,9 +368,9 @@ export default function SongDetailModal({
           </div>
 
           {/* 메인 콘텐츠 영역 */}
-          <div className="flex flex-col xl:flex-row gap-4 xl:gap-6 flex-1 min-h-0">
-            {/* 왼쪽: MR 영상 / 라이브클립 (70% 공간) */}
-            <div className="flex-1 xl:w-[70%] flex flex-col min-h-0">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-4 lg:gap-6 flex-1 min-h-0">
+            {/* 왼쪽: MR 영상 / 라이브클립 (md: 60%, lg: 70% 공간) */}
+            <div className="flex-1 md:flex-none md:w-[60%] lg:flex-none lg:w-[70%] flex flex-col min-h-0">
               {isEditMode ? (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -311,15 +419,60 @@ export default function SongDetailModal({
                   {/* 탭 콘텐츠 */}
                   <div className="flex-1 min-h-0 p-4">
                     {activeTab === 'mr' ? (
-                      <div className="h-full">
-                        {/* MR 영상 콘텐츠 - SongCard에서 가져올 예정 */}
-                        <div className="text-center text-light-text/50 dark:text-dark-text/50">
-                          MR 영상 플레이어 영역
-                        </div>
+                      <div className="h-full flex flex-col justify-center">
+                        {youtubeMR ? (
+                          <div className="w-full aspect-video bg-black rounded-lg overflow-hidden">
+                            <YouTube
+                              key={`modal-mr-${song.id}-${youtubeMR.videoId}`}
+                              videoId={youtubeMR.videoId}
+                              opts={{
+                                width: "100%",
+                                height: "100%",
+                                playerVars: {
+                                  autoplay: 0,
+                                  controls: 1,
+                                  rel: 0,
+                                  modestbranding: 1,
+                                  start: youtubeMR.skipSeconds || 0,
+                                  iv_load_policy: 3,
+                                  cc_load_policy: 0,
+                                },
+                              }}
+                              onReady={onYouTubeReady}
+                              onStateChange={onYouTubeStateChange}
+                              onPlay={() => setIsPlaying(true)}
+                              onPause={() => setIsPlaying(false)}
+                              onEnd={() => setIsPlaying(false)}
+                              className="w-full h-full"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex-1 flex items-center justify-center">
+                            <div className="text-center text-light-text/50 dark:text-dark-text/50">
+                              <MusicalNoteIcon className="w-16 h-16 mx-auto mb-4" />
+                              <p>MR 영상이 없습니다</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="h-full">
-                        <LiveClipManager songId={song.id} />
+                        {/* 디버그 정보 출력 */}
+                        {console.log('🔍 LiveClipManager props:', { 
+                          songId: song.id, 
+                          songTitle: song.title,
+                          songVideos: songVideos, 
+                          videosLoading: videosLoading,
+                          loadSongVideos: !!loadSongVideos 
+                        })}
+                        <LiveClipManager 
+                          songId={song.id}
+                          songTitle={song.title}
+                          songVideos={songVideos}
+                          setSongVideos={setSongVideos}
+                          videosLoading={videosLoading}
+                          loadSongVideos={loadSongVideos}
+                        />
                       </div>
                     )}
                   </div>
@@ -327,8 +480,8 @@ export default function SongDetailModal({
               )}
             </div>
 
-            {/* 오른쪽: 사이드바 (30% 공간) */}
-            <div className="w-full xl:w-[30%] flex flex-col gap-4 min-h-0">
+            {/* 오른쪽: 사이드바 (md: 40%, lg: 30% 공간) */}
+            <div className="w-full md:flex-none md:w-[40%] lg:flex-none lg:w-[30%] flex flex-col gap-4 min-h-0">
               {/* 가사 링크 섹션 */}
               <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 p-4">
                 <div className="flex items-center justify-between mb-3">

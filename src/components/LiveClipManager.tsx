@@ -344,7 +344,7 @@ export default function LiveClipManager({
 
   // 닉네임 동기화는 props로 받은 데이터에 대해서만 수행
   useEffect(() => {
-    if (songVideos.length === 0) return;
+    if (!songVideos || songVideos.length === 0) return;
     
     // 백그라운드에서 닉네임 동기화 처리
     setTimeout(async () => {
@@ -376,7 +376,7 @@ export default function LiveClipManager({
       const updatePromises = Array.from(uploaderGroups.entries()).map(async ([uploaderId, group]) => {
         try {
           // 업로더 정보 조회 (업로더당 1회만)  
-          const firstVideoName = group.videoNames[0];
+          const firstVideoName = group.videoNames?.[0] || 'Unknown';
           console.log(`🔍 업로더 "${uploaderId}" (${firstVideoName}) 정보 확인`);
           const uploaderInfo = await getUploaderInfo(uploaderId);
           const currentDisplayName = uploaderInfo.displayName || uploaderInfo.channelName;
@@ -388,10 +388,10 @@ export default function LiveClipManager({
           
           // 모든 클립의 닉네임과 비교하여 동기화 필요 여부 확인
           const outdatedIndexes: number[] = [];
-          const uniqueCurrentNames = [...new Set(group.videoNames)];
+          const uniqueCurrentNames = [...new Set(group.videoNames || [])];
           
-          group.videoIndexes.forEach((videoIndex, i) => {
-            const currentVideoName = group.videoNames[i];
+          group.videoIndexes?.forEach((videoIndex, i) => {
+            const currentVideoName = group.videoNames?.[i];
             if (currentVideoName !== currentDisplayName) {
               outdatedIndexes.push(videoIndex);
             }
