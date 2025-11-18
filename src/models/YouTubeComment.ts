@@ -62,6 +62,8 @@ const VideoSchema = new Schema<VideoData>({
 export interface CommentData extends Document {
   commentId: string;
   videoId: string;
+  parentCommentId?: string;  // 답글인 경우 부모 댓글 ID
+  isReply: boolean;          // 답글 여부
   authorName: string;
   textContent: string;
   publishedAt: Date;
@@ -79,6 +81,8 @@ export interface CommentData extends Document {
 const CommentSchema = new Schema<CommentData>({
   commentId: { type: String, required: true, unique: true },
   videoId: { type: String, required: true },
+  parentCommentId: { type: String },  // 답글인 경우 부모 댓글 ID
+  isReply: { type: Boolean, default: false },  // 답글 여부
   authorName: { type: String, required: true },
   textContent: { type: String, required: true },
   publishedAt: { type: Date, required: true },
@@ -97,6 +101,7 @@ const CommentSchema = new Schema<CommentData>({
 VideoSchema.index({ channelId: 1, publishedAt: -1 });
 CommentSchema.index({ videoId: 1, isTimeline: 1 });
 CommentSchema.index({ isProcessed: 1, isTimeline: 1 });
+CommentSchema.index({ parentCommentId: 1 });  // 답글 조회용 인덱스
 
 export const YouTubeChannel = mongoose.models.YouTubeChannel || mongoose.model<ChannelData>('YouTubeChannel', ChannelSchema);
 export const YouTubeVideo = mongoose.models.YouTubeVideo || mongoose.model<VideoData>('YouTubeVideo', VideoSchema);

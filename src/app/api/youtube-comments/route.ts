@@ -133,13 +133,13 @@ async function getChannelVideos(channelId: string, publishedAfter?: Date) {
   }));
 }
 
-// YouTube API에서 비디오 댓글 가져오기
+// YouTube API에서 비디오 댓글 가져오기 (답글 포함)
 async function getVideoComments(videoId: string) {
   const API_KEY = process.env.YOUTUBE_API_KEY;
   if (!API_KEY) throw new Error('YouTube API 키가 설정되지 않았습니다.');
 
   const url = `https://www.googleapis.com/youtube/v3/commentThreads?` +
-    `key=${API_KEY}&videoId=${videoId}&part=snippet&maxResults=100&order=time`;
+    `key=${API_KEY}&videoId=${videoId}&part=snippet,replies&maxResults=100&order=time`;
 
   const response = await fetch(url);
   
@@ -154,6 +154,74 @@ async function getVideoComments(videoId: string) {
   const data = await response.json();
   return data.items || [];
 }
+
+// 댓글 및 답글 저장 헬퍼 함수
+async function saveCommentWithReplies(commentThread: any, videoId: string) {
+  const topLevelComment = commentThread.snippet.topLevelComment.snippet;
+  const topLevelCommentId = commentThread.id;
+  
+  // 최상위 댓글 저장
+  const isTimeline = isTimelineComment(topLevelComment.textDisplay);
+  const existingComment = await YouTubeComment.findOne({ commentId: topLevelCommentId });
+  const isNewComment = !existingComment;
+
+  if (isNewComment) {
+    await YouTubeComment.create({
+      commentId: topLevelCommentId,
+      videoId,
+      parentCommentId: undefined,  // 최상위 댓글은 부모가 없음
+      isReply: false,              // 최상위 댓글
+      authorName: topLevelComment.authorDisplayName,
+      textContent: topLevelComment.textDisplay,
+      publishedAt: new Date(topLevelComment.publishedAt),
+      likeCount: topLevelComment.likeCount || 0,
+      isTimeline,
+      extractedTimestamps: isTimeline ? extractTimestamps(topLevelComment.textDisplay) : []
+    });
+  }
+
+  let stats = {
+    totalComments: 1,  // 최상위 댓글 1개
+    newComments: isNewComment ? 1 : 0,
+    newTimelineComments: (isNewComment && isTimeline) ? 1 : 0,
+    timelineComments: isTimeline ? 1 : 0
+  };
+
+  // 답글 처리
+  if (commentThread.replies && commentThread.replies.comments) {
+    for (const reply of commentThread.replies.comments) {
+      const replySnippet = reply.snippet;
+      const replyIsTimeline = isTimelineComment(replySnippet.textDisplay);
+      
+      stats.totalComments++;  // 답글 1개 추가
+      if (replyIsTimeline) stats.timelineComments++;
+
+      const existingReply = await YouTubeComment.findOne({ commentId: reply.id });
+      const isNewReply = !existingReply;
+
+      if (isNewReply) {
+        await YouTubeComment.create({
+          commentId: reply.id,
+          videoId,
+          parentCommentId: topLevelCommentId,  // 부모 댓글 ID
+          isReply: true,                        // 답글
+          authorName: replySnippet.authorDisplayName,
+          textContent: replySnippet.textDisplay,
+          publishedAt: new Date(replySnippet.publishedAt),
+          likeCount: replySnippet.likeCount || 0,
+          isTimeline: replyIsTimeline,
+          extractedTimestamps: replyIsTimeline ? extractTimestamps(replySnippet.textDisplay) : []
+        });
+
+        stats.newComments++;
+        if (replyIsTimeline) stats.newTimelineComments++;
+      }
+    }
+  }
+
+  return stats;
+}
+
 
 export async function GET(request: NextRequest) {
   try {
@@ -386,42 +454,22 @@ export async function POST(request: NextRequest) {
 
             try {
               const comments = await getVideoComments(videoId);
+              let videoTotalComments = 0;
               let videoTimelineComments = 0;
               let videoNewComments = 0;
               let videoNewTimelineComments = 0;
 
-              for (const commentItem of comments) {
-                const comment = commentItem.snippet.topLevelComment.snippet;
-                const isTimeline = isTimelineComment(comment.textDisplay);
-                
-                if (isTimeline) videoTimelineComments++;
-
-                // 기존 댓글 확인
-                const existingComment = await YouTubeComment.findOne({ commentId: commentItem.id });
-                const isNewComment = !existingComment;
-
-                // 새로운 댓글만 저장 (기존 댓글은 건드리지 않음)
-                if (isNewComment) {
-                  await YouTubeComment.create({
-                    commentId: commentItem.id,
-                    videoId,
-                    authorName: comment.authorDisplayName,
-                    textContent: comment.textDisplay,
-                    publishedAt: new Date(comment.publishedAt),
-                    likeCount: comment.likeCount || 0,
-                    isTimeline,
-                    extractedTimestamps: isTimeline ? extractTimestamps(comment.textDisplay) : []
-                  });
-
-                  // 새로운 댓글 카운트
-                  videoNewComments++;
-                  if (isTimeline) videoNewTimelineComments++;
-                }
+              for (const commentThread of comments) {
+                const threadStats = await saveCommentWithReplies(commentThread, videoId);
+                videoTotalComments += threadStats.totalComments;
+                videoTimelineComments += threadStats.timelineComments;
+                videoNewComments += threadStats.newComments;
+                videoNewTimelineComments += threadStats.newTimelineComments;
               }
 
               // 비디오 통계 업데이트
               const updateData: any = {
-                totalComments: comments.length,
+                totalComments: videoTotalComments,  // 최상위 댓글 + 답글
                 timelineComments: videoTimelineComments
               };
               
@@ -533,41 +581,21 @@ export async function POST(request: NextRequest) {
         }
 
         const comments = await getVideoComments(videoId);
+        let totalCommentsCount = 0;
         let timelineCount = 0;
         let newCommentsCount = 0;
         let newTimelineCount = 0;
 
-        for (const commentItem of comments) {
-          const comment = commentItem.snippet.topLevelComment.snippet;
-          const isTimeline = isTimelineComment(comment.textDisplay);
-          
-          if (isTimeline) timelineCount++;
-
-          // 기존 댓글 확인
-          const existingComment = await YouTubeComment.findOne({ commentId: commentItem.id });
-          const isNewComment = !existingComment;
-
-          // 새로운 댓글만 저장 (기존 댓글은 건드리지 않음)
-          if (isNewComment) {
-            await YouTubeComment.create({
-              commentId: commentItem.id,
-              videoId,
-              authorName: comment.authorDisplayName,
-              textContent: comment.textDisplay,
-              publishedAt: new Date(comment.publishedAt),
-              likeCount: comment.likeCount || 0,
-              isTimeline,
-              extractedTimestamps: isTimeline ? extractTimestamps(comment.textDisplay) : []
-            });
-
-            // 새로운 댓글 카운트
-            newCommentsCount++;
-            if (isTimeline) newTimelineCount++;
-          }
+        for (const commentThread of comments) {
+          const threadStats = await saveCommentWithReplies(commentThread, videoId);
+          totalCommentsCount += threadStats.totalComments;
+          timelineCount += threadStats.timelineComments;
+          newCommentsCount += threadStats.newComments;
+          newTimelineCount += threadStats.newTimelineComments;
         }
 
         const syncUpdateData: any = {
-          totalComments: comments.length,
+          totalComments: totalCommentsCount,  // 최상위 댓글 + 답글
           timelineComments: timelineCount,
           lastCommentSync: new Date()
         };
@@ -679,42 +707,22 @@ export async function POST(request: NextRequest) {
 
           // 댓글 수집
           const manualComments = await getVideoComments(videoId);
+          let manualTotalComments = 0;
           let manualTimelineCount = 0;
           let manualNewComments = 0;
           let manualNewTimelineComments = 0;
 
-          for (const commentItem of manualComments) {
-            const comment = commentItem.snippet.topLevelComment.snippet;
-            const isTimeline = isTimelineComment(comment.textDisplay);
-            
-            if (isTimeline) manualTimelineCount++;
-
-            // 기존 댓글 확인
-            const existingComment = await YouTubeComment.findOne({ commentId: commentItem.id });
-            const isNewComment = !existingComment;
-
-            // 새로운 댓글만 저장 (기존 댓글은 건드리지 않음)
-            if (isNewComment) {
-              await YouTubeComment.create({
-                commentId: commentItem.id,
-                videoId,
-                authorName: comment.authorDisplayName,
-                textContent: comment.textDisplay,
-                publishedAt: new Date(comment.publishedAt),
-                likeCount: comment.likeCount || 0,
-                isTimeline,
-                extractedTimestamps: isTimeline ? extractTimestamps(comment.textDisplay) : []
-              });
-
-              // 새로운 댓글 카운트
-              manualNewComments++;
-              if (isTimeline) manualNewTimelineComments++;
-            }
+          for (const commentThread of manualComments) {
+            const threadStats = await saveCommentWithReplies(commentThread, videoId);
+            manualTotalComments += threadStats.totalComments;
+            manualTimelineCount += threadStats.timelineComments;
+            manualNewComments += threadStats.newComments;
+            manualNewTimelineComments += threadStats.newTimelineComments;
           }
 
           // 비디오 댓글 통계 업데이트
           const manualUpdateData: any = {
-            totalComments: manualComments.length,
+            totalComments: manualTotalComments,  // 최상위 댓글 + 답글
             timelineComments: manualTimelineCount,
             lastCommentSync: new Date()
           };
