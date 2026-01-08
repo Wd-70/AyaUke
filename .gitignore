@@ -43,3 +43,13 @@ next-env.d.ts
 
 # YoYo AI version control directory
 .yoyo/
+
+# Build output
+/dist
+
+# Backup files
+*.backup
+*.backup.*
+
+# Claude settings
+.claude/

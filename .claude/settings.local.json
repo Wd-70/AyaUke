@@ -30,7 +30,9 @@
       "Bash(npm install:*)",
       "Bash(env)",
       "Bash(sed:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "mcp__playwright__playwright_evaluate",
+      "mcp__playwright__playwright_get_visible_text"
     ],
     "deny": []
   }
