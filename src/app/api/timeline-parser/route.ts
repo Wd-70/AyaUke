@@ -660,10 +660,17 @@ function parseSongInfo(songText: string) {
 
 // 초를 HH:MM:SS 또는 MM:SS 형식으로 변환
 function formatSeconds(seconds: number): string {
+  // Handle negative timestamps - clamp to 0:00
+  // Negative values occur when YouTube video starts before Chzzk video (negative timeOffset)
+  // Clamping to 0:00 provides clearest user experience
+  if (seconds < 0) {
+    return '0:00';
+  }
+
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
-  
+
   if (hours > 0) {
     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   } else {

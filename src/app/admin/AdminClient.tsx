@@ -36,6 +36,7 @@ import BackupManagementTab from "./tabs/BackupManagementTab";
 import UserManagementTab from "./tabs/UserManagementTab";
 import DashboardTab from "./tabs/DashboardTab";
 import LiveClipManagementTab from "./tabs/LiveClipManagementTab";
+import ChzzkYoutubeConverterTab from "./tabs/ChzzkYoutubeConverterTab";
 
 type TabType =
   | "dashboard"
@@ -44,6 +45,7 @@ type TabType =
   | "backup"
   | "timeline"
   | "comments"
+  | "converter"
   | "users"
   | "system";
 
@@ -83,6 +85,12 @@ const tabs = [
     name: "댓글 분석",
     icon: ChatBubbleBottomCenterTextIcon,
     description: "댓글 분석 도구",
+  },
+  {
+    id: "converter" as const,
+    name: "치지직→유튜브",
+    icon: AdjustmentsHorizontalIcon,
+    description: "타임라인 댓글 변환",
   },
   {
     id: "users" as const,
@@ -159,6 +167,9 @@ export default function AdminClient() {
 
       case "comments":
         return <CommentAnalysisTab viewMode="comments" />;
+
+      case "converter":
+        return <ChzzkYoutubeConverterTab />;
 
       case "users":
         return <UserManagementTab />;

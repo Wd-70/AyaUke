@@ -1,0 +1,435 @@
+{
+  "version": "1.0",
+  "tasks": [
+    {
+      "id": "task-018",
+      "type": "feature_implementation",
+      "priority": "low",
+      "title": "Add accessibility improvements and aria-labels",
+      "description": "Improve accessibility of the Chzzk-YouTube converter interface for screen reader users and keyboard navigation.\n\nImplementation requirements:\n1. Add aria-labels to all icon-only buttons:\n   - Pagination buttons (ChevronLeft, ChevronRight)\n   - Search clear button\n   - Copy to clipboard button\n   - Sync button with icon\n2. Add aria-live regions for dynamic content:\n   - Video loading status\n   - Comment conversion toggle\n   - Sync progress updates\n3. Ensure keyboard navigation works:\n   - Tab order is logical\n   - Focus indicators are visible\n   - Enter key works on all interactive elements\n4. Add proper semantic HTML:\n   - Use <nav> for pagination\n   - Use <main> for content area\n   - Use proper heading hierarchy\n5. Test with screen reader (NVDA or VoiceOver)\n\nReference:\n- BUGS_FOUND.md BUG-014 (lines 724-762)\n- WCAG 2.1 Level AA compliance",
+      "acceptanceCriteria": [
+        "All icon buttons have descriptive aria-labels",
+        "Screen reader announces button purposes correctly",
+        "Keyboard navigation flows logically through interface",
+        "Focus indicators are clearly visible",
+        "Enter key activates all buttons and controls",
+        "Dynamic content updates announced to screen readers",
+        "No accessibility errors in axe DevTools",
+        "Passes WAVE accessibility evaluation"
+      ],
+      "status": "in_progress",
+      "createdAt": "2026-01-10T00:17:00.000Z",
+      "updatedAt": "2026-01-10T05:00:58.435Z"
+    },
+    {
+      "id": "task-021",
+      "type": "feature_implementation",
+      "priority": "low",
+      "title": "Add empty state message for videos with no timeline comments",
+      "description": "Improve UX by showing a helpful message when a video has zero timeline comments instead of displaying an empty comments area.\n\nImplementation requirements:\n1. Add conditional rendering in comments display section\n2. Show message: \"이 영상에는 타임라인 댓글이 없습니다.\"\n3. Add helpful icon (ChatBubbleLeftIcon with slash)\n4. Style consistently with other empty states\n5. Ensure message appears in both light and dark modes\n6. Consider adding tip: \"타임라인 댓글은 '0:00' 같은 시간 표시가 포함된 댓글입니다.\"\n\nReference:\n- BUGS_FOUND.md BUG-004 (lines 608-634)\n- Current empty behavior: ChzzkYoutubeConverterTab.tsx comments section",
+      "acceptanceCriteria": [
+        "Empty state message displays when timelineComments = 0",
+        "Message is clear and helpful",
+        "Styling matches app design system",
+        "Works in both light and dark modes",
+        "Checkbox to toggle conversion is disabled (already implemented)",
+        "No layout shift when switching between videos",
+        "Message is center-aligned and properly padded"
+      ],
+      "status": "in_progress",
+      "createdAt": "2026-01-10T00:20:00.000Z",
+      "updatedAt": "2026-01-10T05:01:14.667Z"
+    },
+    {
+      "id": "task-022",
+      "type": "bug_fix",
+      "priority": "high",
+      "title": "CRITICAL FIX: Restore API connectivity and fix runtime ReferenceErrors",
+      "description": "URGENT REGRESSION FIX: Recent changes caused widespread API failures. Fix the following specific errors found in logs:\n\nERROR 1: Connection Timeout in /api/chzzk-videos\n- Location: src/app/api/chzzk-videos/route.ts:8:21\n- Error: TypeError: fetch failed [ConnectTimeoutError]\n- Context: The fetch call to 'https://api.chzzk.naver.com/service/v1/channels/.../videos' is timing out. Check if recent timeout logic is too aggressive or headers are incorrect.\n\nERROR 2: 400 Bad Request in /api/chzzk-sync\n- Location: src/app/api/chzzk-sync/route.ts:167:12 (fetchChzzkVideos)\n- Error: Chzzk API error: 400\n- Log Data: { size: 100, channelId: 'abe8...' }\n- Action: Verify URL construction and parameters for the Chzzk API request.\n\nERROR 3: ReferenceError: sendEvent is not defined\n- Location: src/app/api/chzzk-sync/route.ts:472 & 495\n- Context: In the catch block, `sendEvent('error', ...)` is called but not defined/imported, causing 'failed to pipe response' and crashing the stream.\n- Action: Define or import the `sendEvent` helper function inside route.ts.\n\nERROR 4: Missing Export\n- Location: src/app/admin/tabs/ChzzkYoutubeConverterTab.tsx\n- Error: Attempted import error: 'retryWithBackoff' is not exported from '@/lib/retryUtils'.\n- Action: Export `retryWithBackoff` correctly from the utility file.",
+      "acceptanceCriteria": [
+        "src/app/api/chzzk-videos/route.ts returns 200 OK without timeouts",
+        "src/app/api/chzzk-sync/route.ts properly handles errors without 'sendEvent is not defined' crash",
+        "fetchChzzkVideos sends valid requests (no 400 errors)",
+        "retryWithBackoff is properly exported and imported",
+        "All provided stack traces are resolved"
+      ],
+      "status": "in_progress",
+      "createdAt": "2026-01-10T05:45:00.000Z",
+      "updatedAt": "2026-01-10T05:01:29.561Z"
+    }
+  ],
+  "completed": [
+    {
+      "id": "task-001",
+      "type": "feature_implementation",
+      "priority": "high",
+      "title": "Implement dual video player (Chzzk + YouTube)",
+      "description": "Implement the dual video player functionality to allow side-by-side comparison of Chzzk and YouTube videos. This includes:\n\n1. Add react-youtube dependency if not already installed\n2. Create video player components for both Chzzk (iframe or video element) and YouTube\n3. Track current playback time for both players\n4. Display current time for each player below the video\n5. Handle Chzzk video deletion cases (show placeholder when video is deleted)\n6. Add sync point setting UI that captures current time from both players\n7. Calculate and display time offset between the two videos\n8. Responsive layout that works on desktop and mobile (stacked on mobile, side-by-side on desktop)\n\nThe UI should match the plan in CHZZK_YOUTUBE_CONVERTER_PLAN.md lines 228-233.",
+      "acceptanceCriteria": [
+        "Both video players display correctly when YouTube URL is set",
+        "Current playback time is tracked and displayed for both players",
+        "Sync point can be set by clicking a button",
+        "Time offset is calculated correctly (youtube time - chzzk time)",
+        "Offset is saved to database via API",
+        "Chzzk video deletion is handled gracefully with appropriate message",
+        "Layout is responsive and works on mobile and desktop",
+        "Players can be controlled independently (play/pause/seek)"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T00:00:00.000Z",
+      "updatedAt": "2026-01-08T17:56:23.417Z"
+    },
+    {
+      "id": "task-004",
+      "type": "feature_implementation",
+      "priority": "low",
+      "title": "Add statistics dashboard for converter tab",
+      "description": "Add a statistics section to the converter tab showing aggregate data about videos, comments, and conversion status.\n\n1. Create a stats panel showing:\n   - Total videos collected\n   - Total timeline comments\n   - Videos with YouTube URL mapped\n   - Videos with time offset set\n   - Most recent sync timestamp\n   - Average timeline comments per video\n2. Add charts or visualizations (optional)\n3. Add filter options to view stats by date range\n4. Show top videos by timeline comment count\n\nReference: CHZZK_YOUTUBE_CONVERTER_PLAN.md lines 204-206 mentions statistics display.",
+      "acceptanceCriteria": [
+        "Statistics panel displays key metrics correctly",
+        "Metrics update when new videos are synced",
+        "Stats accurately reflect current database state",
+        "Visual presentation is clear and easy to understand",
+        "Stats panel is responsive on all screen sizes",
+        "Optional: Charts/graphs visualize trends over time"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T00:00:00.000Z",
+      "updatedAt": "2026-01-08T22:28:17.801Z"
+    },
+    {
+      "id": "task-003",
+      "type": "feature_implementation",
+      "priority": "medium",
+      "title": "Enhance UX with loading states and error handling",
+      "description": "Improve the user experience by adding better loading states, error handling, and feedback throughout the application.\n\n1. Add skeleton loaders for video list while loading\n2. Add loading spinner for video details panel\n3. Improve error messages to be more user-friendly\n4. Add toast notifications instead of alert() calls\n5. Add confirmation dialogs for destructive actions\n6. Show loading state on all buttons during async operations\n7. Add empty states with helpful messages and call-to-action buttons\n8. Implement retry logic for failed API calls\n\nReference: Phase 5 in CHZZK_YOUTUBE_CONVERTER_PLAN.md lines 479-488.",
+      "acceptanceCriteria": [
+        "Skeleton loaders show while video list is loading",
+        "Loading spinners appear during async operations",
+        "Error messages are user-friendly and actionable",
+        "Toast notifications replace alert() dialogs",
+        "Buttons show loading state when clicked",
+        "Empty states guide users on what to do next",
+        "Failed API calls can be retried without refreshing page",
+        "All user actions provide clear feedback"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T00:00:00.000Z",
+      "updatedAt": "2026-01-09T08:32:32.911Z"
+    },
+    {
+      "id": "task-006",
+      "type": "feature_implementation",
+      "priority": "high",
+      "title": "Add API authentication middleware for /api/chzzk-sync",
+      "description": "CRITICAL SECURITY: The /api/chzzk-sync API routes are currently accessible without authentication, allowing anyone to:\n- Trigger expensive channel sync operations\n- Modify video data (YouTube URLs, time offsets)\n- Access all video and comment data\n- Overload server with sync requests\n\nImplement authentication checks in both GET and POST handlers:\n\n1. Import getServerSession and authOptions\n2. Add session validation at the beginning of each handler\n3. Check if user is authenticated AND has admin privileges\n4. Return 403 Forbidden for non-admin users\n5. Return 401 Unauthorized for unauthenticated users\n\nReference: BUGS_FOUND.md BUG-015 (lines 62-136)",
+      "acceptanceCriteria": [
+        "GET /api/chzzk-sync requires authentication",
+        "POST /api/chzzk-sync requires authentication",
+        "Only users with isAdmin=true can access routes",
+        "Unauthenticated requests return 401 status",
+        "Non-admin authenticated requests return 403 status",
+        "Error responses include clear messages",
+        "All existing admin functionality still works for authorized users"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T08:32:37.946Z",
+      "updatedAt": "2026-01-09T08:49:23.774Z"
+    },
+    {
+      "id": "task-007",
+      "type": "feature_implementation",
+      "priority": "high",
+      "title": "Fix negative timestamp handling in formatSeconds()",
+      "description": "CRITICAL: When timeOffset is negative (YouTube video starts before Chzzk video), converted timestamps can become negative numbers, resulting in invalid display like '-3:00'.\n\nImplement proper handling for negative timestamps:\n\n1. Add validation in formatSeconds() function (src/app/api/chzzk-sync/route.ts:98-108)\n2. Choose handling strategy:\n   - Option A: Return '[INVALID]' for negative values\n   - Option B: Clamp to '0:00'\n   - Option C: Return descriptive message like '[before start]'\n3. Update any duplicate formatSeconds() functions in other files\n4. Test with negative offsets to verify conversion\n\nReference: BUGS_FOUND.md BUG-009 (lines 10-59)",
+      "acceptanceCriteria": [
+        "formatSeconds() handles negative input gracefully",
+        "No negative timestamps displayed in UI",
+        "Converted comments with negative timestamps show appropriate message",
+        "Function works correctly for positive timestamps (no regression)",
+        "Edge case tested: offset of -300s with comment at 0:02:00"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T08:32:37.946Z",
+      "updatedAt": "2026-01-09T13:11:35.044Z"
+    },
+    {
+      "id": "task-008",
+      "type": "feature_implementation",
+      "priority": "high",
+      "title": "Add regex injection protection for search query",
+      "description": "HIGH SECURITY RISK: Search query directly uses user input in MongoDB $regex without escaping, enabling:\n- Regex Denial of Service (ReDoS) attacks with patterns like (a+)+$\n- Unintended results with special regex characters\n- Potential NoSQL injection attempts\n\nImplement input sanitization:\n\n1. Create escapeRegex() utility function to escape special characters: .*+?^${}()|[]\\n2. Apply escaping to search parameter before using in MongoDB query\n3. Test with malicious patterns to verify protection\n4. Alternative: Consider using MongoDB text search index instead\n\nReference: BUGS_FOUND.md BUG-011 (lines 262-321)",
+      "acceptanceCriteria": [
+        "Search input escapes all regex special characters",
+        "Search query treats input as literal string",
+        "ReDoS patterns like (a+)+$ don't cause performance issues",
+        "Normal searches still work correctly",
+        "Special characters like .*+?^${}()|[] are escaped properly",
+        "No console errors or database query failures"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T08:32:37.946Z",
+      "updatedAt": "2026-01-09T13:26:06.327Z"
+    },
+    {
+      "id": "task-009",
+      "type": "feature_implementation",
+      "priority": "high",
+      "title": "Update YouTube URL regex to support embed format",
+      "description": "CRITICAL FUNCTIONALITY: Current YouTube URL regex only matches watch?v= and youtu.be/ formats, but NOT /embed/ URLs. This causes:\n- youtubeVideoId = null for embed URLs\n- YouTube player fails to load\n- Poor user experience\n\nUpdate regex pattern to support all YouTube URL formats:\n\n1. Update regex in /src/app/api/chzzk-sync/route.ts:715\n2. Add /embed/ support to pattern\n3. Test with all URL formats:\n   - https://www.youtube.com/watch?v=VIDEO_ID\n   - https://youtu.be/VIDEO_ID\n   - https://www.youtube.com/embed/VIDEO_ID\n   - URLs with query parameters like &t=30s\n\nReference: BUGS_FOUND.md BUG-006 (lines 139-182)",
+      "acceptanceCriteria": [
+        "Regex extracts video ID from /watch?v= URLs",
+        "Regex extracts video ID from /youtu.be/ URLs",
+        "Regex extracts video ID from /embed/ URLs",
+        "Query parameters (&t=30s) don't break extraction",
+        "All three formats save correct youtubeVideoId to database",
+        "DualVideoPlayer loads correctly for all URL formats"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T08:32:37.946Z",
+      "updatedAt": "2026-01-09T13:36:17.084Z"
+    },
+    {
+      "id": "task-010",
+      "type": "feature_implementation",
+      "priority": "medium",
+      "title": "Implement retry logic with exponential backoff",
+      "description": "HIGH RELIABILITY: Network failures during channel sync cause permanent data loss with no retry mechanism. Affects:\n- Transient network errors\n- API rate limiting (429 status)\n- Server errors (5xx status)\n- Timeout issues\n\nImplement robust retry system:\n\n1. Create fetchWithRetry() utility function\n2. Implement exponential backoff: 1s, 2s, 4s, 8s delays\n3. Retry on: network errors, 429 status, 500-599 status\n4. Don't retry on: 400-499 status (except 429), successful responses\n5. Apply to all Chzzk API calls in sync operation\n6. Track and report retry counts in sync results\n\nReference: BUGS_FOUND.md BUG-003 (lines 185-257) and BUG-012 (lines 472-502)",
+      "acceptanceCriteria": [
+        "fetchWithRetry() function implemented with exponential backoff",
+        "Network errors trigger automatic retry (max 3 attempts)",
+        "429 rate limit status triggers retry with backoff",
+        "5xx server errors trigger retry",
+        "4xx errors (except 429) fail immediately without retry",
+        "Retry delays increase exponentially: 1s, 2s, 4s",
+        "Final stats include retry count",
+        "Failed videos logged separately after all retries exhausted"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T08:32:37.946Z",
+      "updatedAt": "2026-01-09T14:05:09.898Z"
+    },
+    {
+      "id": "task-012",
+      "type": "feature_implementation",
+      "priority": "medium",
+      "title": "Add client-side YouTube URL validation",
+      "description": "HIGH UX: Invalid YouTube URLs currently save to database, causing:\n- Wasted API calls\n- Confusing error discovery (only when player fails)\n- Poor user experience\n- Database pollution with invalid data\n\nImplement client-side validation:\n\n1. Add YouTube URL format validation before save\n2. Show error message for invalid URLs\n3. Suggest valid formats in placeholder\n4. Prevent API call for invalid input\n5. Test with various URL formats\n\nReference: BUGS_FOUND.md BUG-007 (lines 405-468)",
+      "acceptanceCriteria": [
+        "Invalid URLs show error before API call",
+        "Error message is clear and actionable",
+        "Valid URLs still save correctly (no regression)",
+        "Placeholder shows example URL format",
+        "All valid YouTube URL formats accepted (watch, youtu.be, embed)",
+        "URLs with query parameters accepted",
+        "Empty URL allowed (to clear existing URL)"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T08:32:37.946Z",
+      "updatedAt": "2026-01-09T18:16:01.070Z"
+    },
+    {
+      "id": "task-013",
+      "type": "feature_implementation",
+      "priority": "low",
+      "title": "Add timeout handling to all fetch requests",
+      "description": "MEDIUM RELIABILITY: Slow or hanging API requests cause indefinite loading states with no timeout. Users see infinite spinners.\n\nImplement timeout handling:\n\n1. Create fetchWithTimeout() utility function\n2. Set default timeout to 30 seconds\n3. Use AbortController to cancel after timeout\n4. Show clear error message on timeout\n5. Apply to all fetch calls in route.ts and components\n6. Test with slow network throttling\n\nReference: BUGS_FOUND.md BUG-013 (lines 506-566)",
+      "acceptanceCriteria": [
+        "fetchWithTimeout() utility function created",
+        "Default 30-second timeout implemented",
+        "Timeout shows clear error message",
+        "Loading state clears on timeout",
+        "User can retry after timeout",
+        "All API calls use timeout mechanism",
+        "Timeout doesn't affect fast requests (no regression)"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T08:32:37.946Z",
+      "updatedAt": "2026-01-09T18:37:28.665Z"
+    },
+    {
+      "id": "task-014",
+      "type": "feature_implementation",
+      "priority": "low",
+      "title": "Implement search input debouncing",
+      "description": "MEDIUM PERFORMANCE: Search input triggers API call on every keystroke, causing excessive requests. Typing 'karaoke' (8 characters) makes 8 API requests.\n\nImplement debouncing:\n\n1. Add debounced search state (300ms delay)\n2. Update useEffect to use debounced value\n3. Show loading indicator while debouncing\n4. Test that only final value triggers API call\n5. Ensure immediate load on page change\n\nReference: BUGS_FOUND.md BUG-010 (lines 680-720)",
+      "acceptanceCriteria": [
+        "Search waits 300ms after typing stops",
+        "Typing 'karaoke' makes only 1 API request (not 8)",
+        "Loading indicator shows during debounce period",
+        "Clearing search immediately loads all videos",
+        "Page navigation doesn't wait for debounce",
+        "No console errors",
+        "Search results are accurate and responsive"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T08:32:37.946Z",
+      "updatedAt": "2026-01-09T18:53:37.590Z"
+    },
+    {
+      "id": "task-015",
+      "type": "bug_fix",
+      "priority": "high",
+      "title": "Fix critical Chzzk sync runtime errors and export issues",
+      "description": "CRITICAL: The Chzzk sync operation is failing due to multiple runtime errors and missing exports. This blocks the core video collection functionality.\n\nErrors to fix:\n1. 400 Bad Request in fetchChzzkVideos: Investigate and fix the API request parameters to Chzzk.\n2. ReferenceError: 'sendEvent' is not defined: Implement or properly import the SSE event helper in route.ts.\n3. Import Error: 'retryWithBackoff' is not exported from '@/lib/retryUtils': Fix the export statement in the utility file.\n4. Metadata Warning: Set 'metadataBase' in the root metadata export to resolve social image paths.",
+      "acceptanceCriteria": [
+        "GET /api/chzzk-sync returns 200 instead of 500",
+        "fetchChzzkVideos successfully calls Chzzk API without 400 error",
+        "sendEvent is correctly defined and handles SSE streaming without crashing",
+        "retryWithBackoff is correctly exported and imported",
+        "metadataBase warning is resolved in layout.ts or metadata config",
+        "Channel sync operation completes without piping response errors"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-09T14:10:00.000Z",
+      "updatedAt": "2026-01-09T23:24:12.030Z"
+    },
+    {
+      "id": "task-016",
+      "type": "feature_implementation",
+      "priority": "high",
+      "title": "Implement request cancellation with AbortController for video selection",
+      "description": "Re-implement the request cancellation feature that was rejected in task-011. The current implementation lacks proper request cancellation when users rapidly switch between videos, causing race conditions and displaying wrong comments.\n\nImplementation requirements:\n1. Add AbortController ref to ChzzkYoutubeConverterTab component\n2. Cancel previous fetch request when new video is selected\n3. Create new AbortController for each video selection\n4. Pass abort signal to fetch calls in handleSelectVideo\n5. Handle AbortError gracefully in catch blocks\n6. Ensure only the latest selected video's comments are displayed\n7. Update loading states to reflect actual fetch status\n\nReference:\n- BUGS_FOUND.md BUG-005 (lines 323-401)\n- Previous task-011 rejection (queue.json lines 3-23)\n\nKey implementation points:\n- Use useRef hook to store AbortController instance\n- Abort previous controller before creating new one\n- Ignore AbortError in error handling (name === 'AbortError')\n- Test with rapid video selection (10 clicks in 10 seconds)",
+      "acceptanceCriteria": [
+        "AbortController ref added to component state",
+        "Previous fetch is cancelled when new video selected",
+        "Network tab shows cancelled requests (not all completing)",
+        "No race condition: displayed comments always match selected video",
+        "Rapid clicking through 10 videos works correctly",
+        "No console errors from aborted requests",
+        "Loading state accurately reflects current fetch operation",
+        "Only final video's data updates the UI state"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-10T00:15:00.000Z",
+      "updatedAt": "2026-01-09T23:41:15.184Z"
+    },
+    {
+      "id": "task-017",
+      "type": "feature_implementation",
+      "priority": "medium",
+      "title": "Add SSE streaming progress support for channel sync",
+      "description": "Enhance the channel sync operation with real-time progress tracking using Server-Sent Events (SSE). While the SSE infrastructure exists in the code, it needs proper integration and testing.\n\nImplementation requirements:\n1. Verify SSE endpoint '/api/chzzk-sync?action=sync-channel-stream' is working\n2. Implement SyncProgressModal component integration\n3. Add progress event handlers for:\n   - video_start: Show current video being processed\n   - video_complete: Update progress bar\n   - video_error: Display error but continue\n   - sync_complete: Show final statistics\n4. Display real-time metrics:\n   - Videos processed (X/Y)\n   - Current video title\n   - Total comments collected\n   - Timeline comments found\n5. Allow cancellation mid-sync\n6. Handle connection errors and reconnection\n\nReference:\n- CHZZK_YOUTUBE_CONVERTER_PLAN.md lines 531-533\n- Previous task-002 (queue.json lines 252-271)\n- Existing useSyncProgress hook (src/hooks/useSyncProgress.ts)\n- Existing SyncProgressModal component",
+      "acceptanceCriteria": [
+        "SSE connection establishes successfully on sync start",
+        "Progress updates display in real-time during sync",
+        "Progress bar shows accurate completion percentage",
+        "Current video title displays during processing",
+        "Error messages show but don't stop sync operation",
+        "User can cancel sync mid-operation",
+        "Final summary shows total videos and comments processed",
+        "Modal closes automatically on completion",
+        "SSE connection cleanup on unmount/cancel"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-10T00:16:00.000Z",
+      "updatedAt": "2026-01-10T00:00:47.161Z"
+    },
+    {
+      "id": "task-019",
+      "type": "testing",
+      "priority": "medium",
+      "title": "Comprehensive responsive design and cross-browser testing",
+      "description": "Manually test the Chzzk-YouTube converter feature across different devices, screen sizes, and browsers to ensure consistent UX.\n\nTesting requirements:\n\n1. Screen Sizes:\n   - Desktop: 1920x1080, 1366x768\n   - Tablet: 768px-1024px (portrait and landscape)\n   - Mobile: iPhone (375px), Android (414px)\n   - Large: 4K (3840x2160)\n   - Small: 320px width\n\n2. Browsers:\n   - Chrome (latest)\n   - Firefox (latest)\n   - Safari (latest, macOS and iOS)\n   - Edge (latest)\n\n3. Test Scenarios:\n   - Video list layout and scrolling\n   - Dual player stacking on mobile\n   - Search input on small screens\n   - Pagination controls on mobile\n   - Modal dialogs on various sizes\n   - Statistics panel on mobile\n   - Long video titles truncation\n   - Comment display overflow\n\n4. Dark Mode:\n   - All screens in dark mode\n   - Theme toggle functionality\n   - Color contrast ratios\n\n5. Performance:\n   - Page load time\n   - Video list rendering with 100+ items\n   - Comment conversion speed\n\nReference:\n- BUGS_FOUND.md Testing Requirements (lines 765-792)\n- TEST_EXECUTION_REPORT.md Responsive Design section",
+      "acceptanceCriteria": [
+        "Layout works correctly on all screen sizes",
+        "No horizontal scrolling on mobile devices",
+        "Touch targets are at least 44x44px on mobile",
+        "Text is readable without zooming",
+        "Dual video player stacks properly on mobile",
+        "All features work in all tested browsers",
+        "Dark mode displays correctly everywhere",
+        "No CSS rendering issues or layout breaks",
+        "Performance is acceptable on all devices",
+        "Document any browser-specific issues found"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-10T00:18:00.000Z",
+      "updatedAt": "2026-01-10T04:23:20.074Z"
+    },
+    {
+      "id": "task-020",
+      "type": "bug_fix",
+      "priority": "low",
+      "title": "Clarify timeOffset persistence behavior when YouTube URL is cleared",
+      "description": "Address the ambiguous behavior where timeOffset value persists in the database even when the YouTube URL is cleared. This can confuse users who might expect the offset to reset.\n\nImplementation options:\n\nOption A (Recommended): Clear timeOffset when URL cleared\n- Automatically reset timeOffset and syncSetAt to null\n- Clean state for new URL entry\n\nOption B: Keep timeOffset (current behavior)\n- Add UI indicator showing offset is still set\n- Add manual reset button\n- Show warning when changing URL\n\nOption C: Prompt user\n- Ask: \"오프셋이 설정되어 있습니다. 초기화하시겠습니까?\"\n- Let user choose to keep or reset\n\nDecide which option best fits user workflow, then implement.\n\nReference:\n- BUGS_FOUND.md BUG-008 (lines 638-677)\n- Current behavior: /src/app/api/chzzk-sync/route.ts lines 710-730",
+      "acceptanceCriteria": [
+        "Decision made on which option to implement",
+        "Chosen behavior is implemented correctly",
+        "UI clearly indicates timeOffset state",
+        "User is not confused by offset persistence",
+        "Database updates correctly based on chosen option",
+        "No regression: normal URL updates still work",
+        "Edge case tested: clearing URL then re-entering same URL"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-10T00:19:00.000Z",
+      "updatedAt": "2026-01-10T04:45:41.278Z"
+    }
+  ],
+  "rejected": [
+    {
+      "id": "task-002",
+      "type": "feature_implementation",
+      "priority": "medium",
+      "title": "Add progress tracking for channel sync operation",
+      "description": "Enhance the channel sync operation to provide real-time progress feedback to the user. Currently the sync operation runs without feedback, which can be confusing for long operations.\n\n1. Implement progress tracking in the API route (update after each video processed)\n2. Consider using Server-Sent Events (SSE) or polling to get progress updates\n3. Display progress bar or counter showing: X/Y videos processed\n4. Show current video being processed\n5. Display running totals for comments and timeline comments\n6. Handle errors gracefully without stopping the entire sync\n\nReference: CHZZK_YOUTUBE_CONVERTER_PLAN.md lines 531-533 mentions this optimization.",
+      "acceptanceCriteria": [
+        "Progress updates are sent from server during sync operation",
+        "UI displays real-time progress (videos processed, current video, etc.)",
+        "Progress bar or counter shows completion percentage",
+        "Errors during sync are logged but don't stop the entire process",
+        "Final summary shows total videos, comments, and timeline comments processed",
+        "User can see which video is currently being processed"
+      ],
+      "status": "rejected",
+      "createdAt": "2026-01-09T00:00:00.000Z",
+      "updatedAt": "2026-01-08T18:19:32.851Z",
+      "rejectionReason": "Review failed"
+    },
+    {
+      "id": "task-005",
+      "type": "testing",
+      "priority": "medium",
+      "title": "Comprehensive testing and edge case validation",
+      "description": "Test the entire Chzzk-YouTube converter feature end-to-end and validate all edge cases mentioned in the plan.\n\n1. Test channel sync with various scenarios (empty channel, large channel, API failures)\n2. Test video selection and comment loading\n3. Test YouTube URL validation and extraction\n4. Test sync point setting with various time offsets (positive, negative, zero)\n5. Test timestamp conversion accuracy\n6. Test with videos that have been deleted from Chzzk\n7. Test with videos that have no timeline comments\n8. Test pagination and search functionality\n9. Test responsive design on mobile, tablet, and desktop\n10. Test dark mode compatibility\n11. Verify all validation scenarios from CHZZK_YOUTUBE_CONVERTER_PLAN.md lines 502-525\n\nDocument any bugs found and create follow-up tasks for fixes.",
+      "acceptanceCriteria": [
+        "All functional requirements from the plan are working",
+        "Edge cases are handled gracefully",
+        "No console errors during normal operation",
+        "UI works correctly in light and dark modes",
+        "Responsive design works on all screen sizes",
+        "All validation checks pass",
+        "Timestamp conversion is accurate for all formats",
+        "Deleted videos show appropriate error messages",
+        "Videos without timeline comments display correctly"
+      ],
+      "status": "rejected",
+      "createdAt": "2026-01-09T00:00:00.000Z",
+      "updatedAt": "2026-01-09T03:50:45.478Z",
+      "rejectionReason": "Developer summary incorrectly claims \"production-ready with only 1 minor bug\" when the detailed bug report documents 15 bugs including 4 critical severity issues (especially BUG-015: critical security vulnerability with no API authentication). The testing work is thorough and valuable, but the feature requires critical bug fixes before approval. Developer should address at minimum the 4 critical bugs (BUG-003, BUG-006, BUG-009, BUG-015) before resubmitting.**"
+    },
+    {
+      "id": "task-011",
+      "type": "feature_implementation",
+      "priority": "medium",
+      "title": "Add request cancellation for rapid video selection",
+      "description": "HIGH UX ISSUE: Rapidly clicking through videos causes:\n- Race conditions (slowest request overrides faster ones)\n- Wasted bandwidth (all requests complete)\n- Wrong comments displayed (don't match selected video)\n- Poor user experience\n\nImplement request cancellation:\n\n1. Add AbortController ref to component\n2. Cancel previous request when new video selected\n3. Create new AbortController for each request\n4. Pass abort signal to fetch calls\n5. Ignore AbortError in catch blocks\n6. Verify only latest request updates state\n\nReference: BUGS_FOUND.md BUG-005 (lines 323-401)",
+      "acceptanceCriteria": [
+        "Previous fetch cancelled when new video selected",
+        "Only final video's comments loaded and displayed",
+        "Network tab shows cancelled requests (not 200 OK)",
+        "No race condition: comments always match selected video",
+        "Rapid clicking (10 videos in 10 seconds) works correctly",
+        "No console errors from aborted requests",
+        "Loading state reflects actual fetch status"
+      ],
+      "status": "rejected",
+      "createdAt": "2026-01-09T08:32:37.946Z",
+      "updatedAt": "2026-01-09T14:15:17.157Z",
+      "rejectionReason": "Review failed"
+    }
+  ],
+  "current": "task-022",
+  "lastUpdated": "2026-01-10T05:01:29.561Z"
+}

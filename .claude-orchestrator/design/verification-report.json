@@ -1,0 +1,268 @@
+{
+  "type": "design_verification",
+  "taskId": "task-020",
+  "platform": "web",
+  "timestamp": "2026-01-10T04:45:41.269Z",
+  "verified": false,
+  "matchPercentage": 0,
+  "totalChecked": 32,
+  "discrepancies": [
+    {
+      "type": "color",
+      "tokenName": "primary-light",
+      "expectedValue": "#D1AFE3",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "primary-dark",
+      "expectedValue": "#E35874",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "accent-light",
+      "expectedValue": "#E38BFF",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "accent-dark",
+      "expectedValue": "#E38BFF",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "secondary-light",
+      "expectedValue": "#F9D891",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "secondary-dark",
+      "expectedValue": "#9875BB",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "background-light",
+      "expectedValue": "#FFFFFF",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "background-dark",
+      "expectedValue": "#000000",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "text-primary-light",
+      "expectedValue": "#1F2937",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "text-primary-dark",
+      "expectedValue": "#F9FAFB",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "text-secondary-light",
+      "expectedValue": "rgba(31, 41, 55, 0.6)",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "text-secondary-dark",
+      "expectedValue": "rgba(249, 250, 251, 0.6)",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "success",
+      "expectedValue": "#10B981",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "warning",
+      "expectedValue": "#F59E0B",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "error",
+      "expectedValue": "#EF4444",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "info",
+      "expectedValue": "#3B82F6",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "badge-set-bg-light",
+      "expectedValue": "rgba(16, 185, 129, 0.1)",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "badge-set-text",
+      "expectedValue": "#10B981",
+      "actualValue": "#1F2937",
+      "difference": "Color difference: 36.8%",
+      "severity": "error"
+    },
+    {
+      "type": "color",
+      "tokenName": "badge-not-set-bg-light",
+      "expectedValue": "rgba(156, 163, 175, 0.1)",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "badge-not-set-text",
+      "expectedValue": "#6B7280",
+      "actualValue": "#1F2937",
+      "difference": "Color difference: 29.0%",
+      "severity": "error"
+    },
+    {
+      "type": "color",
+      "tokenName": "border-light",
+      "expectedValue": "rgba(209, 175, 227, 0.2)",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "border-dark",
+      "expectedValue": "rgba(227, 88, 116, 0.2)",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "color",
+      "tokenName": "overlay",
+      "expectedValue": "rgba(0, 0, 0, 0.5)",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "spacing",
+      "tokenName": "xs",
+      "expectedValue": "4px",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "spacing",
+      "tokenName": "sm",
+      "expectedValue": "8px",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "spacing",
+      "tokenName": "md",
+      "expectedValue": "16px",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "spacing",
+      "tokenName": "lg",
+      "expectedValue": "24px",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "spacing",
+      "tokenName": "xl",
+      "expectedValue": "32px",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "borderRadius",
+      "tokenName": "sm",
+      "expectedValue": "6px",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "borderRadius",
+      "tokenName": "md",
+      "expectedValue": "8px",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "borderRadius",
+      "tokenName": "lg",
+      "expectedValue": "12px",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    },
+    {
+      "type": "borderRadius",
+      "tokenName": "full",
+      "expectedValue": "9999px",
+      "actualValue": "NOT_FOUND",
+      "difference": "Token not found in CSS",
+      "severity": "warning"
+    }
+  ],
+  "summary": "## Design Verification Report\n\n**Status:** NEEDS ATTENTION\n**Match Rate:** 0%\n**Total Tokens Checked:** 32\n\n### Discrepancies Found (32)\n\n#### Color (23)\n\n| Token | Expected | Actual | Difference |\n|-------|----------|--------|------------|\n| primary-light | #D1AFE3 | NOT_FOUND | Token not found in CSS |\n| primary-dark | #E35874 | NOT_FOUND | Token not found in CSS |\n| accent-light | #E38BFF | NOT_FOUND | Token not found in CSS |\n| accent-dark | #E38BFF | NOT_FOUND | Token not found in CSS |\n| secondary-light | #F9D891 | NOT_FOUND | Token not found in CSS |\n| secondary-dark | #9875BB | NOT_FOUND | Token not found in CSS |\n| background-light | #FFFFFF | NOT_FOUND | Token not found in CSS |\n| background-dark | #000000 | NOT_FOUND | Token not found in CSS |\n| text-primary-light | #1F2937 | NOT_FOUND | Token not found in CSS |\n| text-primary-dark | #F9FAFB | NOT_FOUND | Token not found in CSS |\n| text-secondary-light | rgba(31, 41, 55, 0.6) | NOT_FOUND | Token not found in CSS |\n| text-secondary-dark | rgba(249, 250, 251, 0.6) | NOT_FOUND | Token not found in CSS |\n| success | #10B981 | NOT_FOUND | Token not found in CSS |\n| warning | #F59E0B | NOT_FOUND | Token not found in CSS |\n| error | #EF4444 | NOT_FOUND | Token not found in CSS |\n| info | #3B82F6 | NOT_FOUND | Token not found in CSS |\n| badge-set-bg-light | rgba(16, 185, 129, 0.1) | NOT_FOUND | Token not found in CSS |\n| badge-set-text | #10B981 | #1F2937 | Color difference: 36.8% |\n| badge-not-set-bg-light | rgba(156, 163, 175, 0.1) | NOT_FOUND | Token not found in CSS |\n| badge-not-set-text | #6B7280 | #1F2937 | Color difference: 29.0% |\n| border-light | rgba(209, 175, 227, 0.2) | NOT_FOUND | Token not found in CSS |\n| border-dark | rgba(227, 88, 116, 0.2) | NOT_FOUND | Token not found in CSS |\n| overlay | rgba(0, 0, 0, 0.5) | NOT_FOUND | Token not found in CSS |\n\n#### Spacing (5)\n\n| Token | Expected | Actual | Difference |\n|-------|----------|--------|------------|\n| xs | 4px | NOT_FOUND | Token not found in CSS |\n| sm | 8px | NOT_FOUND | Token not found in CSS |\n| md | 16px | NOT_FOUND | Token not found in CSS |\n| lg | 24px | NOT_FOUND | Token not found in CSS |\n| xl | 32px | NOT_FOUND | Token not found in CSS |\n\n#### BorderRadius (4)\n\n| Token | Expected | Actual | Difference |\n|-------|----------|--------|------------|\n| sm | 6px | NOT_FOUND | Token not found in CSS |\n| md | 8px | NOT_FOUND | Token not found in CSS |\n| lg | 12px | NOT_FOUND | Token not found in CSS |\n| full | 9999px | NOT_FOUND | Token not found in CSS |\n"
+}

@@ -1,0 +1,14 @@
+{
+  "project": {
+    "name": "ayauke-page",
+    "path": "F:\\Data\\Git\\claude-code\\ayauke-page\\ayauke-page"
+  },
+  "scope": "CHZZK_YOUTUBE_CONVERTER_PLAN.md 이 파일을 읽고 계획대로 구현해 줘.",
+  "goals": [
+    "CHZZK_YOUTUBE_CONVERTER_PLAN.md 이 파일을 읽고 계획대로 구현해 줘."
+  ],
+  "platform": "web",
+  "maxTasks": 10,
+  "continuous": true,
+  "initialized": "2026-01-08T17:03:44.180Z"
+}

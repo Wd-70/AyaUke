@@ -18,6 +18,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'),
   title: "아야 AyaUke",
   description: "아야가 부르는 노래들을 모아둔 노래책 사이트. K-pop, J-pop, 최신곡까지 다양한 곡들과 라이브 클립을 확인하고 플레이리스트를 만들어보세요.",
   keywords: ["아야", "AyaUke", "HONEYZ", "버튜버", "VTuber", "노래방송", "노래책", "플레이리스트"],

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/authOptions';
 import { hasPermission, Permission, UserRole } from '@/lib/permissions';
 import dbConnect from '@/lib/mongodb';
 import { YouTubeChannel, YouTubeVideo, YouTubeComment } from '@/models/YouTubeComment';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 // 타임라인 패턴 정규식 (시간:분:초 형식도 지원)
 const TIMELINE_PATTERNS = [
@@ -63,8 +64,10 @@ async function getChannelVideos(channelId: string, publishedAfter?: Date) {
   if (!API_KEY) throw new Error('YouTube API 키가 설정되지 않았습니다.');
 
   // 1단계: 채널의 uploads 플레이리스트 ID 가져오기
-  const channelResponse = await fetch(
-    `https://www.googleapis.com/youtube/v3/channels?key=${API_KEY}&id=${channelId}&part=contentDetails`
+  const channelResponse = await fetchWithTimeout(
+    `https://www.googleapis.com/youtube/v3/channels?key=${API_KEY}&id=${channelId}&part=contentDetails`,
+    {},
+    30000 // 30 second timeout
   );
 
   if (!channelResponse.ok) {
@@ -94,10 +97,12 @@ async function getChannelVideos(channelId: string, publishedAfter?: Date) {
       params.append('pageToken', nextPageToken);
     }
 
-    const playlistResponse = await fetch(
-      `https://www.googleapis.com/youtube/v3/playlistItems?${params}`
+    const playlistResponse = await fetchWithTimeout(
+      `https://www.googleapis.com/youtube/v3/playlistItems?${params}`,
+      {},
+      30000 // 30 second timeout
     );
-    
+
     if (!playlistResponse.ok) {
       throw new Error(`플레이리스트 조회 오류: ${playlistResponse.status}`);
     }
@@ -141,8 +146,8 @@ async function getVideoComments(videoId: string) {
   const url = `https://www.googleapis.com/youtube/v3/commentThreads?` +
     `key=${API_KEY}&videoId=${videoId}&part=snippet,replies&maxResults=100&order=time`;
 
-  const response = await fetch(url);
-  
+  const response = await fetchWithTimeout(url, {}, 30000); // 30 second timeout
+
   if (!response.ok) {
     if (response.status === 403) {
       // 댓글이 비활성화된 경우
@@ -361,14 +366,26 @@ export async function GET(request: NextRequest) {
         );
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('YouTube 댓글 API 오류:', error);
-    
+
+    // Check if it's a timeout error
+    if (error.message?.includes('timeout')) {
+      return NextResponse.json(
+        {
+          error: 'Request Timeout',
+          message: error.message,
+          code: 'TIMEOUT'
+        },
+        { status: 504 } // Gateway Timeout
+      );
+    }
+
     // 더 자세한 에러 정보 제공
     let errorMessage = '알 수 없는 오류가 발생했습니다.';
     if (error instanceof Error) {
       errorMessage = error.message;
-      
+
       // YouTube API 관련 에러 메시지 개선
       if (error.message.includes('채널 정보 조회 오류: 403')) {
         errorMessage = 'YouTube API 키 권한이 부족합니다. API 키를 확인해주세요.';
@@ -378,7 +395,7 @@ export async function GET(request: NextRequest) {
         errorMessage = '채널의 비디오 목록을 가져올 수 없습니다.';
       }
     }
-    
+
     return NextResponse.json(
       { success: false, error: errorMessage },
       { status: 500 }
@@ -663,8 +680,10 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          const videoResponse = await fetch(
-            `https://www.googleapis.com/youtube/v3/videos?key=${API_KEY}&id=${videoId}&part=snippet,contentDetails`
+          const videoResponse = await fetchWithTimeout(
+            `https://www.googleapis.com/youtube/v3/videos?key=${API_KEY}&id=${videoId}&part=snippet,contentDetails`,
+            {},
+            30000 // 30 second timeout
           );
 
           if (!videoResponse.ok) {
@@ -835,14 +854,26 @@ export async function POST(request: NextRequest) {
         );
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('YouTube 댓글 처리 오류:', error);
-    
+
+    // Check if it's a timeout error
+    if (error.message?.includes('timeout')) {
+      return NextResponse.json(
+        {
+          error: 'Request Timeout',
+          message: error.message,
+          code: 'TIMEOUT'
+        },
+        { status: 504 } // Gateway Timeout
+      );
+    }
+
     // 더 자세한 에러 정보 제공
     let errorMessage = '알 수 없는 오류가 발생했습니다.';
     if (error instanceof Error) {
       errorMessage = error.message;
-      
+
       // YouTube API 관련 에러 메시지 개선
       if (error.message.includes('채널 정보 조회 오류: 403')) {
         errorMessage = 'YouTube API 키 권한이 부족합니다. API 키를 확인해주세요.';
@@ -852,7 +883,7 @@ export async function POST(request: NextRequest) {
         errorMessage = '채널의 비디오 목록을 가져올 수 없습니다.';
       }
     }
-    
+
     return NextResponse.json(
       { success: false, error: errorMessage },
       { status: 500 }
