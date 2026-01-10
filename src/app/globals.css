@@ -177,3 +177,37 @@ body {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+
+/* Accessibility: Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Accessibility: Focus visible styles - WCAG AA compliant */
+*:focus-visible {
+  outline: 2px solid #A171D5; /* focus-ring-light from design tokens */
+  outline-offset: 2px;
+}
+
+.dark *:focus-visible {
+  outline-color: #E38BFF; /* focus-ring-dark from design tokens */
+}
+
+/* Accessibility: Focus background for interactive elements */
+*:focus-visible {
+  background-color: rgba(227, 139, 255, 0.1); /* focus-background from design tokens */
+}
+
+/* Accessibility: High contrast focus for error states */
+button[aria-invalid="true"]:focus-visible,
+input[aria-invalid="true"]:focus-visible {
+  outline-color: #E35874; /* error-focus from design tokens */
+}

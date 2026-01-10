@@ -31,6 +31,8 @@ import { DebouncedInput } from "@/components/admin/DebouncedInput";
 import { SSEConnectionStatus } from "@/components/admin/SSEConnectionStatus";
 import OffsetStatusBadge from '@/components/admin/OffsetStatusBadge';
 import ManualResetButton from '@/components/admin/ManualResetButton';
+import { AccessiblePagination } from '@/components/admin/AccessiblePagination';
+import { LiveRegionAnnouncer } from '@/components/admin/LiveRegionAnnouncer';
 
 const AYAUKE_CHANNEL_ID = "abe8aa82baf3d3ef54ad8468ee73e7fc";
 
@@ -99,6 +101,10 @@ export default function ChzzkYoutubeConverterTab() {
   const [showStatistics, setShowStatistics] = useState(false);
   const [isResettingOffset, setIsResettingOffset] = useState(false);
 
+  // Accessibility: Live region announcements
+  const [loadingAnnouncement, setLoadingAnnouncement] = useState('');
+  const [syncAnnouncement, setSyncAnnouncement] = useState('');
+
   // Progress tracking
   const { progress, finalStats, startSync, cancelSync } = useSyncProgress();
 
@@ -145,6 +151,7 @@ export default function ChzzkYoutubeConverterTab() {
     try {
       setLoading(true);
       setError(null);
+      setLoadingAnnouncement('영상 목록을 불러오는 중입니다');
 
       const result = await retryWithBackoff(
         async () => {
@@ -167,6 +174,9 @@ export default function ChzzkYoutubeConverterTab() {
       if (result.success) {
         setVideos(result.data.videos);
         setPagination(result.data.pagination);
+        setLoadingAnnouncement(
+          `영상 ${result.data.pagination.totalCount}개를 불러왔습니다. 현재 페이지 ${result.data.pagination.currentPage}`
+        );
       } else {
         throw new Error(result.error);
       }
@@ -174,6 +184,7 @@ export default function ChzzkYoutubeConverterTab() {
       const friendlyError = transformError(err);
       setError(friendlyError);
       showErrorToast('영상 불러오기 실패', friendlyError);
+      setLoadingAnnouncement('영상 불러오기 실패');
     } finally {
       setLoading(false);
     }
@@ -207,6 +218,9 @@ export default function ChzzkYoutubeConverterTab() {
   useEffect(() => {
     if (progress.stage === 'complete' && finalStats) {
       loadVideos();
+      setSyncAnnouncement(
+        `동기화 완료: 총 ${finalStats.totalVideos}개 영상 처리, ${finalStats.timelineComments}개 타임라인 댓글 발견`
+      );
 
       // Optional: Browser notification
       if ('Notification' in window && Notification.permission === 'granted') {
@@ -214,8 +228,12 @@ export default function ChzzkYoutubeConverterTab() {
           body: `Processed ${finalStats.totalVideos} videos, found ${finalStats.timelineComments} timeline comments`,
         });
       }
+    } else if (progress.stage === 'videos') {
+      setSyncAnnouncement(`영상 수집 중: ${progress.current}/${progress.total}`);
+    } else if (progress.stage === 'comments') {
+      setSyncAnnouncement(`댓글 수집 중: ${progress.current}/${progress.total}`);
     }
-  }, [progress.stage, finalStats]);
+  }, [progress.stage, finalStats, progress.current, progress.total]);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -480,13 +498,18 @@ export default function ChzzkYoutubeConverterTab() {
 
   return (
     <div className="space-y-6">
+      {/* Live region announcers */}
+      <LiveRegionAnnouncer message={loadingAnnouncement} politeness="polite" />
+      <LiveRegionAnnouncer message={syncAnnouncement} politeness="assertive" />
+      <LiveRegionAnnouncer message={error || ''} politeness="assertive" />
+
       {/* Header */}
-      <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20">
+      <header className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h3 className="text-2xl font-bold text-light-text dark:text-dark-text mb-2">
+            <h1 className="text-2xl font-bold text-light-text dark:text-dark-text mb-2">
               치지직→유튜브 타임라인 변환
-            </h3>
+            </h1>
             <p className="text-light-text/60 dark:text-dark-text/60 text-sm">
               {statsText}
             </p>
@@ -496,7 +519,7 @@ export default function ChzzkYoutubeConverterTab() {
               </div>
             )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2" role="group" aria-label="도구 모음">
             <LoadingButton
               onClick={() => setShowStatistics(!showStatistics)}
               variant="primary"
@@ -508,36 +531,40 @@ export default function ChzzkYoutubeConverterTab() {
               isLoading={progress.isActive}
               variant="accent"
               icon={<ArrowPathIcon className="w-5 h-5" />}
+              aria-label="치지직 채널 영상 및 댓글 수집"
             >
               {progress.isActive ? "수집 중..." : "채널 수집"}
             </LoadingButton>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Error Display */}
       {error && (
         <motion.div
+          role="alert"
+          aria-live="assertive"
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
           className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-xl p-4 flex items-start gap-3"
         >
-          <XCircleIcon className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <XCircleIcon className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-semibold text-red-800 dark:text-red-300 mb-1">
+            <h2 className="text-sm font-semibold text-red-800 dark:text-red-300 mb-1">
               오류가 발생했습니다
-            </h4>
+            </h2>
             <p className="text-sm text-red-600 dark:text-red-400">
               {error}
             </p>
           </div>
           <button
             onClick={() => setError(null)}
-            className="p-1 rounded-lg hover:bg-red-100 dark:hover:bg-red-800/30 transition-colors"
+            aria-label="오류 메시지 닫기"
+            className="p-1 rounded-lg hover:bg-red-100 dark:hover:bg-red-800/30 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-light-purple dark:focus-visible:outline-dark-accent"
           >
-            <XMarkIcon className="w-4 h-4 text-red-500" />
+            <XMarkIcon className="w-4 h-4 text-red-500" aria-hidden="true" />
           </button>
         </motion.div>
       )}
@@ -548,13 +575,16 @@ export default function ChzzkYoutubeConverterTab() {
       )}
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Panel: Video List */}
-        <div className="lg:col-span-1 bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 overflow-hidden">
+        <aside
+          className="lg:col-span-1 bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 overflow-hidden"
+          aria-label="영상 목록"
+        >
           {/* Search */}
           <div className="p-4 border-b border-light-primary/20 dark:border-dark-primary/20">
             <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-light-text/40 dark:text-dark-text/40 pointer-events-none z-10" />
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-light-text/40 dark:text-dark-text/40 pointer-events-none z-10" aria-hidden="true" />
               <DebouncedInput
                 type="text"
                 placeholder="영상 검색..."
@@ -562,13 +592,20 @@ export default function ChzzkYoutubeConverterTab() {
                 onChange={setSearchQuery}
                 debounceMs={300}
                 isLoading={loading}
+                showClearButton={true}
+                aria-label="영상 제목 검색"
                 className="w-full pl-10 pr-10 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 rounded-lg text-light-text dark:text-dark-text placeholder:text-light-text/40 dark:placeholder:text-dark-text/40 focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent"
               />
             </div>
           </div>
 
           {/* Video List */}
-          <div className="overflow-y-auto max-h-[600px]">
+          <div
+            className="overflow-y-auto max-h-[600px]"
+            role="list"
+            aria-label="영상 목록"
+            aria-busy={loading}
+          >
             {loading && videos.length === 0 ? (
               <div className="divide-y divide-light-primary/10 dark:divide-dark-primary/10">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -587,7 +624,11 @@ export default function ChzzkYoutubeConverterTab() {
                   <button
                     key={video.videoNo}
                     onClick={() => handleSelectVideo(video)}
-                    className={`w-full p-4 text-left transition-colors ${
+                    aria-label={`${video.videoTitle}, 타임라인 댓글 ${video.timelineComments}개, ${
+                      video.youtubeUrl ? '유튜브 매핑 완료' : '유튜브 매핑 필요'
+                    }`}
+                    aria-current={selectedVideo?.videoNo === video.videoNo ? 'true' : undefined}
+                    className={`w-full p-4 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-light-purple dark:focus-visible:outline-dark-accent ${
                       selectedVideo?.videoNo === video.videoNo
                         ? "bg-light-accent/10 dark:bg-dark-accent/10"
                         : "hover:bg-white/30 dark:hover:bg-gray-800/30"
@@ -597,21 +638,21 @@ export default function ChzzkYoutubeConverterTab() {
                       <div className="relative w-32 h-18 flex-shrink-0 rounded-lg overflow-hidden">
                         <Image
                           src={video.thumbnailImageUrl}
-                          alt={video.videoTitle}
+                          alt=""
                           fill
                           className="object-cover"
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-light-text dark:text-dark-text mb-1 line-clamp-2">
+                        <h3 className="text-sm font-medium text-light-text dark:text-dark-text mb-1 line-clamp-2">
                           {video.videoTitle}
-                        </h4>
+                        </h3>
                         <div className="flex items-center gap-2 text-xs text-light-text/60 dark:text-dark-text/60">
                           <span>타임라인 {video.timelineComments}개</span>
                           {video.youtubeUrl ? (
-                            <CheckCircleIcon className="w-4 h-4 text-green-500" />
+                            <CheckCircleIcon className="w-4 h-4 text-green-500" aria-hidden="true" />
                           ) : (
-                            <XCircleIcon className="w-4 h-4 text-gray-400" />
+                            <XCircleIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
                           )}
                         </div>
                       </div>
@@ -624,30 +665,19 @@ export default function ChzzkYoutubeConverterTab() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="p-4 border-t border-light-primary/20 dark:border-dark-primary/20 flex items-center justify-between">
-              <button
-                onClick={() => setPagination({ ...pagination, currentPage: pagination.currentPage - 1 })}
-                disabled={pagination.currentPage === 1}
-                className="p-2 rounded-lg hover:bg-white/30 dark:hover:bg-gray-800/30 disabled:opacity-50"
-              >
-                <ChevronLeftIcon className="w-5 h-5" />
-              </button>
-              <span className="text-sm text-light-text/60 dark:text-dark-text/60">
-                {pagination.currentPage} / {pagination.totalPages}
-              </span>
-              <button
-                onClick={() => setPagination({ ...pagination, currentPage: pagination.currentPage + 1 })}
-                disabled={pagination.currentPage === pagination.totalPages}
-                className="p-2 rounded-lg hover:bg-white/30 dark:hover:bg-gray-800/30 disabled:opacity-50"
-              >
-                <ChevronRightIcon className="w-5 h-5" />
-              </button>
-            </div>
+            <AccessiblePagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              onPageChange={(page) => setPagination({ ...pagination, currentPage: page })}
+            />
           )}
-        </div>
+        </aside>
 
         {/* Right Panel: Details */}
-        <div className="lg:col-span-2 space-y-6">
+        <article
+          className="lg:col-span-2 space-y-6"
+          aria-label="선택된 영상 상세 정보"
+        >
           {!selectedVideo ? (
             <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-12 border border-light-primary/20 dark:border-dark-primary/20 text-center">
               <p className="text-light-text/60 dark:text-dark-text/60">
@@ -662,9 +692,9 @@ export default function ChzzkYoutubeConverterTab() {
             <>
               {/* Video Info */}
               <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20">
-                <h4 className="text-xl font-semibold text-light-text dark:text-dark-text mb-4">
+                <h2 className="text-xl font-semibold text-light-text dark:text-dark-text mb-4">
                   {selectedVideo.videoTitle}
-                </h4>
+                </h2>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-light-text/60 dark:text-dark-text/60">게시일:</span>{" "}
@@ -696,9 +726,9 @@ export default function ChzzkYoutubeConverterTab() {
               {/* YouTube URL */}
               <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20">
                 <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-lg font-semibold text-light-text dark:text-dark-text">
+                  <h2 className="text-lg font-semibold text-light-text dark:text-dark-text">
                     유튜브 URL
-                  </h4>
+                  </h2>
                   {/* Offset Status Badge */}
                   <OffsetStatusBadge
                     timeOffset={timeOffset}
@@ -783,27 +813,42 @@ export default function ChzzkYoutubeConverterTab() {
               {comments.length > 0 && (
                 <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20">
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-lg font-semibold text-light-text dark:text-dark-text">
+                    <h2 className="text-lg font-semibold text-light-text dark:text-dark-text">
                       타임라인 댓글
-                    </h4>
+                    </h2>
                     <div className="flex items-center gap-4">
                       <label className="flex items-center gap-2 text-sm text-light-text/60 dark:text-dark-text/60">
                         <input
                           type="checkbox"
                           checked={showConverted}
-                          onChange={(e) => setShowConverted(e.target.checked)}
+                          onChange={(e) => {
+                            setShowConverted(e.target.checked);
+                            if (e.target.checked) {
+                              setLoadingAnnouncement('타임스탬프 변환 모드 활성화');
+                            } else {
+                              setLoadingAnnouncement('원본 타임스탬프 모드 활성화');
+                            }
+                          }}
                           disabled={timeOffset === null}
+                          aria-label="유튜브 타임스탬프로 변환하여 보기"
+                          aria-describedby="convert-help-text"
                           className="rounded"
                         />
                         변환 보기
+                        <span id="convert-help-text" className="sr-only">
+                          {timeOffset === null
+                            ? '오프셋이 설정되지 않아 변환 기능을 사용할 수 없습니다'
+                            : '체크하면 치지직 타임스탬프를 유튜브 타임스탬프로 변환하여 표시합니다'}
+                        </span>
                       </label>
                       {displayedComments.length > 0 && (
                         <button
                           onClick={handleCopyComments}
-                          className="flex items-center gap-2 px-4 py-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors"
+                          aria-label="타임라인 댓글 복사하기"
+                          className="flex items-center gap-2 px-4 py-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-light-purple dark:focus-visible:outline-dark-accent"
                         >
-                          <ClipboardDocumentIcon className="w-4 h-4" />
-                          복사
+                          <ClipboardDocumentIcon className="w-4 h-4" aria-hidden="true" />
+                          <span>복사</span>
                         </button>
                       )}
                     </div>
@@ -825,8 +870,8 @@ export default function ChzzkYoutubeConverterTab() {
               )}
             </>
           )}
-        </div>
-      </div>
+        </article>
+      </main>
 
       {/* Progress Modal */}
       <SyncProgressModal

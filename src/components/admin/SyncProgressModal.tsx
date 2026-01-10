@@ -87,10 +87,10 @@ export default function SyncProgressModal({
                   {canClose && (
                     <button
                       onClick={onClose}
-                      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                      className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-light-purple dark:focus-visible:outline-dark-accent"
                       aria-label="Close"
                     >
-                      <XMarkIcon className="w-5 h-5 text-light-text/60 dark:text-dark-text/60" />
+                      <XMarkIcon className="w-5 h-5 text-light-text/60 dark:text-dark-text/60" aria-hidden="true" />
                     </button>
                   )}
                 </div>
@@ -141,9 +141,9 @@ export default function SyncProgressModal({
 
                 {/* Errors */}
                 {progress.errors.length > 0 && (
-                  <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg" role="alert">
                     <div className="flex items-start gap-2">
-                      <ExclamationTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                      <ExclamationTriangleIcon className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-red-600 dark:text-red-400 mb-2">
                           {progress.errors.length} error(s) occurred:
@@ -162,9 +162,9 @@ export default function SyncProgressModal({
 
                 {/* Success Message */}
                 {progress.stage === 'complete' && (
-                  <div className="mt-4 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                  <div className="mt-4 p-4 bg-green-500/10 border border-green-500/20 rounded-lg" role="status">
                     <div className="flex items-center gap-2">
-                      <CheckCircleIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      <CheckCircleIcon className="w-5 h-5 text-green-600 dark:text-green-400" aria-hidden="true" />
                       <p className="text-sm font-medium text-green-600 dark:text-green-400">
                         Sync completed successfully!
                       </p>
@@ -177,7 +177,7 @@ export default function SyncProgressModal({
                   {progress.isActive && progress.stage !== 'complete' && (
                     <button
                       onClick={onCancel}
-                      className="px-4 py-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/20 transition-colors font-medium"
+                      className="px-4 py-2 bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/20 transition-colors font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-light-purple dark:focus-visible:outline-dark-accent"
                     >
                       Cancel
                     </button>
@@ -185,7 +185,7 @@ export default function SyncProgressModal({
                   {canClose && (
                     <button
                       onClick={onClose}
-                      className="px-4 py-2 bg-light-accent dark:bg-dark-accent text-white rounded-lg hover:opacity-90 transition-opacity font-medium"
+                      className="px-4 py-2 bg-light-accent dark:bg-dark-accent text-white rounded-lg hover:opacity-90 transition-opacity font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-light-purple dark:focus-visible:outline-dark-accent"
                     >
                       Close
                     </button>

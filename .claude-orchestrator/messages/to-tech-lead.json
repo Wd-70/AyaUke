@@ -1,4 +1,209 @@
 {
-  "messages": [],
-  "lastRead": "2026-01-10T05:01:29.482Z"
+  "messages": [
+    {
+      "type": "design_specification",
+      "taskId": "task-021",
+      "platform": "web",
+      "timestamp": "2026-01-10T10:05:54.877Z",
+      "designTokens": {
+        "colors": {
+          "light-text-primary": "#1F2937",
+          "light-text-secondary": "rgba(31, 41, 55, 0.6)",
+          "light-text-tertiary": "rgba(31, 41, 55, 0.4)",
+          "dark-text-primary": "#F9FAFB",
+          "dark-text-secondary": "rgba(249, 250, 251, 0.6)",
+          "dark-text-tertiary": "rgba(249, 250, 251, 0.4)",
+          "light-background": "rgba(255, 255, 255, 0.5)",
+          "dark-background": "rgba(31, 41, 55, 0.5)",
+          "icon-light": "rgba(31, 41, 55, 0.4)",
+          "icon-dark": "rgba(249, 250, 251, 0.4)"
+        },
+        "fonts": {
+          "title": {
+            "family": "Inter, system-ui, sans-serif",
+            "size": "18px",
+            "lineHeight": "28px",
+            "weight": "600",
+            "letterSpacing": "normal"
+          },
+          "message": {
+            "family": "Inter, system-ui, sans-serif",
+            "size": "14px",
+            "lineHeight": "20px",
+            "weight": "400",
+            "letterSpacing": "normal"
+          },
+          "tip": {
+            "family": "Inter, system-ui, sans-serif",
+            "size": "14px",
+            "lineHeight": "20px",
+            "weight": "400",
+            "letterSpacing": "normal"
+          }
+        },
+        "spacing": {
+          "icon-size": "64px",
+          "icon-margin-bottom": "16px",
+          "title-margin-bottom": "8px",
+          "message-margin-bottom": "24px",
+          "container-padding-y": "48px",
+          "container-padding-x": "24px",
+          "tip-margin-top": "12px"
+        },
+        "effects": {
+          "animation-duration": "0.3s",
+          "animation-easing": "ease-out",
+          "animation-properties": "opacity, transform"
+        },
+        "layout": {
+          "max-width": "448px",
+          "text-align": "center"
+        }
+      },
+      "componentSpecs": [
+        {
+          "name": "EmptyState (Timeline Comments)",
+          "description": "Empty state component displayed when a video has comments but no timeline comments (comments with timestamps) are visible in the current view mode. This provides clear feedback and educational guidance to users.",
+          "location": "ChzzkYoutubeConverterTab.tsx, lines 863-867 (to be replaced with conditional rendering)",
+          "visualHierarchy": [
+            "ChatBubbleLeftIcon (64x64px, centered)",
+            "Title: '타임라인 댓글이 없습니다' (semibold, 18px)",
+            "Primary message: '이 영상에는 타임스탬프가 포함된 댓글이 없습니다.' (14px)",
+            "Educational tip: '💡 타임라인 댓글은 댓글 내용에 00:00 형식의 타임스탬프가 포함된 댓글입니다.' (14px, subtle styling)"
+          ],
+          "usedTokens": [
+            "light-text-secondary",
+            "dark-text-secondary",
+            "light-text-tertiary",
+            "dark-text-tertiary",
+            "icon-light",
+            "icon-dark",
+            "container-padding-y",
+            "container-padding-x",
+            "icon-size",
+            "title-margin-bottom",
+            "message-margin-bottom",
+            "tip-margin-top"
+          ],
+          "states": {
+            "visible": "When comments.length > 0 AND displayedComments.length === 0",
+            "hidden": "When comments.length === 0 OR displayedComments.length > 0"
+          },
+          "accessibility": {
+            "role": "status",
+            "aria-live": "polite",
+            "screenReaderText": "이 영상에는 타임라인 댓글이 없습니다. 타임라인 댓글은 댓글 내용에 00:00 형식의 타임스탬프가 포함된 댓글입니다."
+          },
+          "implementation": {
+            "component": "EmptyState",
+            "props": {
+              "icon": "<ChatBubbleLeftIcon className=\"w-16 h-16\" />",
+              "title": "타임라인 댓글이 없습니다",
+              "message": "이 영상에는 타임스탬프가 포함된 댓글이 없습니다."
+            },
+            "additionalElements": [
+              {
+                "type": "Educational tip text",
+                "content": "💡 타임라인 댓글은 댓글 내용에 00:00 형식의 타임스탬프가 포함된 댓글입니다.",
+                "styling": "text-sm text-light-text/50 dark:text-dark-text/50 mt-3 max-w-md",
+                "placement": "Below the EmptyState component message"
+              }
+            ]
+          },
+          "conditionalRendering": {
+            "condition": "displayedComments.length === 0 (line 856 check)",
+            "replaceContent": "Lines 857-861 (the existing <pre> tag with displayedComments.join())",
+            "newStructure": "if (displayedComments.length > 0) { show <pre> } else { show EmptyState with tip }"
+          }
+        }
+      ],
+      "layoutStructure": {
+        "container": "Centered flex column layout within the comments section card",
+        "elements": [
+          {
+            "element": "Icon container",
+            "styling": "w-16 h-16 mb-4 text-light-text/40 dark:text-dark-text/40"
+          },
+          {
+            "element": "Title",
+            "styling": "text-lg font-semibold text-light-text/60 dark:text-dark-text/60 mb-2"
+          },
+          {
+            "element": "Primary message",
+            "styling": "text-sm text-light-text/50 dark:text-dark-text/50 mb-6 max-w-md"
+          },
+          {
+            "element": "Educational tip",
+            "styling": "text-sm text-light-text/50 dark:text-dark-text/50 mt-3 max-w-md"
+          }
+        ]
+      },
+      "themeSupport": {
+        "lightMode": {
+          "iconColor": "text-light-text/40 (rgba(31, 41, 55, 0.4))",
+          "titleColor": "text-light-text/60 (rgba(31, 41, 55, 0.6))",
+          "messageColor": "text-light-text/50 (rgba(31, 41, 55, 0.5))",
+          "tipColor": "text-light-text/50 (rgba(31, 41, 55, 0.5))"
+        },
+        "darkMode": {
+          "iconColor": "dark:text-dark-text/40 (rgba(249, 250, 251, 0.4))",
+          "titleColor": "dark:text-dark-text/60 (rgba(249, 250, 251, 0.6))",
+          "messageColor": "dark:text-dark-text/50 (rgba(249, 250, 251, 0.5))",
+          "tipColor": "dark:text-dark-text/50 (rgba(249, 250, 251, 0.5))"
+        }
+      },
+      "contentGuidelines": {
+        "title": {
+          "text": "타임라인 댓글이 없습니다",
+          "tone": "Neutral, informative",
+          "language": "Korean (ko-KR)"
+        },
+        "primaryMessage": {
+          "text": "이 영상에는 타임스탬프가 포함된 댓글이 없습니다.",
+          "tone": "Explanatory, clear",
+          "language": "Korean (ko-KR)"
+        },
+        "educationalTip": {
+          "text": "💡 타임라인 댓글은 댓글 내용에 00:00 형식의 타임스탬프가 포함된 댓글입니다.",
+          "tone": "Helpful, educational",
+          "language": "Korean (ko-KR)",
+          "icon": "💡 (light bulb emoji for visual cue)"
+        }
+      },
+      "designNotes": [
+        "This empty state is ONLY shown when comments exist but none are timeline comments (have timestamps)",
+        "The existing EmptyState component at lines 863-867 already provides the correct structure",
+        "The educational tip text should be added as an additional element below the EmptyState component",
+        "Maintain consistency with existing empty states (e.g., lines 616-620 for no videos)",
+        "The icon used is ChatBubbleLeftIcon from @heroicons/react/24/outline (already imported at line 14)",
+        "The component must respect the theme toggle and display correct colors for both light and dark modes",
+        "Animation properties inherit from EmptyState component (motion.div with initial/animate states)",
+        "The conditional rendering ensures this state never conflicts with the 'no comments at all' scenario",
+        "The educational tip helps users understand what timeline comments are, improving UX and reducing confusion"
+      ],
+      "interactionStates": {
+        "default": "Static display with no interactive elements",
+        "animation": "Fade-in on mount using Framer Motion (opacity 0→1, translateY 10→0, duration 0.3s)"
+      },
+      "responsiveDesign": {
+        "mobile": {
+          "fontSize": "Base size reduced by 14/16 ratio (see globals.css lines 42-50)",
+          "padding": "Maintains py-12 px-6 from EmptyState component",
+          "iconSize": "Remains 64px (w-16 h-16)"
+        },
+        "tablet": "Same as desktop",
+        "desktop": "Full design as specified"
+      },
+      "testingConsiderations": [
+        "Test with screen readers to ensure ARIA attributes are properly announced",
+        "Verify message displays when toggling between original and converted comment views",
+        "Confirm empty state does NOT appear when comments.length === 0 (entire comments section hidden)",
+        "Test both light and dark theme rendering",
+        "Validate animation timing and smoothness",
+        "Check text wrapping on narrow viewports",
+        "Verify emoji (💡) displays correctly across browsers"
+      ]
+    }
+  ],
+  "lastRead": null
 }

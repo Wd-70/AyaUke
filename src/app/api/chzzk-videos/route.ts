@@ -1,16 +1,24 @@
 import { NextResponse } from 'next/server';
+import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 
 export async function GET() {
   try {
     console.log('치지직 영상 API 호출 시작');
-    
+
     // Chzzk 공식 API를 사용하여 영상 데이터 가져오기
-    const response = await fetch('https://api.chzzk.naver.com/service/v1/channels/abe8aa82baf3d3ef54ad8468ee73e7fc/videos?size=3', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'application/json',
-      }
-    });
+    const response = await fetchWithTimeout(
+      'https://api.chzzk.naver.com/service/v1/channels/abe8aa82baf3d3ef54ad8468ee73e7fc/videos?size=3',
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'application/json',
+          'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Referer': 'https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc',
+          'Origin': 'https://chzzk.naver.com',
+        }
+      },
+      30000 // 30 second timeout
+    );
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);

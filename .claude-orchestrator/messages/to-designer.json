@@ -1,4 +1,105 @@
 {
-  "messages": [],
-  "lastRead": "2026-01-10T05:01:29.567Z"
+  "messages": [{
+    "type": "planning_document",
+    "taskId": "task-021",
+    "platform": "web",
+    "timestamp": "2026-01-10T10:04:09.538Z",
+    "productVision": "Provide clear, helpful feedback when videos have no timeline comments, improving user understanding and reducing confusion in the Chzzk-to-YouTube timeline converter interface.",
+    "coreFeatures": [
+      {
+        "name": "Empty State Message Display",
+        "description": "Show a friendly message with icon when a video has zero timeline comments instead of displaying an empty comments area",
+        "priority": "high",
+        "acceptanceCriteria": [
+          "Message displays: '이 영상에는 타임라인 댓글이 없습니다.'",
+          "ChatBubbleLeftIcon is shown prominently in the empty state",
+          "Message appears when displayedComments.length === 0",
+          "Message is styled consistently with existing EmptyState component pattern"
+        ]
+      },
+      {
+        "name": "Educational Tip Text",
+        "description": "Provide contextual information about what timeline comments are to help users understand the feature",
+        "priority": "medium",
+        "acceptanceCriteria": [
+          "Tip text explains: '타임라인 댓글은 '0:00' 같은 시간 표시가 포함된 댓글입니다.'",
+          "Tip is displayed below the main empty state message",
+          "Tip text is visually de-emphasized (smaller font, lighter color)"
+        ]
+      },
+      {
+        "name": "Theme Support",
+        "description": "Ensure empty state message works correctly in both light and dark themes",
+        "priority": "high",
+        "acceptanceCriteria": [
+          "Text colors adapt to light mode (light-text)",
+          "Text colors adapt to dark mode (dark-text)",
+          "Background and borders follow existing theme patterns",
+          "Icon colors are appropriately styled for both themes"
+        ]
+      },
+      {
+        "name": "Accessibility Support",
+        "description": "Ensure screen readers can properly announce the empty state",
+        "priority": "medium",
+        "acceptanceCriteria": [
+          "Empty state has appropriate ARIA labels",
+          "Icon has aria-hidden='true' since it's decorative",
+          "Message is announced by screen readers when displayed"
+        ]
+      }
+    ],
+    "userFlows": [
+      {
+        "name": "Viewing Video with No Timeline Comments",
+        "description": "User selects a video that has comments but none contain timestamps",
+        "steps": [
+          {
+            "step": 1,
+            "action": "User clicks on a video in the left panel that shows '타임라인 0개'",
+            "expectedResult": "Video details load, comments section shows empty state with icon and message"
+          },
+          {
+            "step": 2,
+            "action": "User reads the empty state message",
+            "expectedResult": "User understands why no comments are shown and what timeline comments are"
+          },
+          {
+            "step": 3,
+            "action": "User toggles between light and dark mode",
+            "expectedResult": "Empty state message remains readable and properly styled in both themes"
+          }
+        ]
+      },
+      {
+        "name": "Viewing Video After Timeline Comments Are Filtered Out",
+        "description": "User has conversion mode enabled but all timeline comments are filtered out",
+        "steps": [
+          {
+            "step": 1,
+            "action": "User selects a video and enables '변환 보기' mode",
+            "expectedResult": "If no timeline comments exist, empty state displays instead of empty <pre> tag"
+          },
+          {
+            "step": 2,
+            "action": "User sees the empty state with contextual message",
+            "expectedResult": "User understands there are no timeline comments to convert"
+          }
+        ]
+      }
+    ],
+    "requirements": [
+      "Use existing EmptyState component pattern from ChzzkYoutubeConverterTab.tsx (lines 863-867)",
+      "Replace current empty <pre> tag display with EmptyState component when displayedComments.length === 0",
+      "Use ChatBubbleLeftIcon from @heroicons/react/24/outline (already imported at line 14)",
+      "Add educational tip text below the main message using consistent text styling",
+      "Ensure proper conditional rendering: only show when comments.length > 0 but displayedComments.length === 0",
+      "Follow existing color patterns: text-light-text/60 dark:text-dark-text/60 for secondary text",
+      "Maintain existing layout structure within the comments section div (lines 813-870)",
+      "Test with screen readers to ensure accessibility",
+      "Verify message displays correctly when toggling between original and converted comment views",
+      "Ensure the empty state does not appear when the entire comments section should be hidden (comments.length === 0)"
+    ]
+  }],
+  "lastRead": null
 }

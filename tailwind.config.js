@@ -32,7 +32,29 @@ module.exports = {
           from: '#D1AFE3',
           via: '#E38BFF',
           to: '#A171D5',
-        }
+        },
+        // Accessibility colors from design tokens
+        'focus-ring': {
+          light: '#A171D5',
+          dark: '#E38BFF',
+        },
+        'focus-background': 'rgba(227, 139, 255, 0.1)',
+        'error-focus': '#E35874',
+        'success-focus': '#4CAF50',
+        'contrast-text': {
+          light: '#1F2937',
+          dark: '#F9FAFB',
+        },
+        'contrast-border': {
+          light: '#6B7280',
+          dark: '#D1D5DB',
+        },
+        'disabled-text': {
+          light: '#9CA3AF',
+          dark: '#6B7280',
+        },
+        'disabled-background': '#F3F4F6',
+        'live-region-highlight': 'rgba(249, 216, 145, 0.2)',
       },
       fontFamily: {
         sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],

@@ -2,26 +2,6 @@
   "version": "1.0",
   "tasks": [
     {
-      "id": "task-018",
-      "type": "feature_implementation",
-      "priority": "low",
-      "title": "Add accessibility improvements and aria-labels",
-      "description": "Improve accessibility of the Chzzk-YouTube converter interface for screen reader users and keyboard navigation.\n\nImplementation requirements:\n1. Add aria-labels to all icon-only buttons:\n   - Pagination buttons (ChevronLeft, ChevronRight)\n   - Search clear button\n   - Copy to clipboard button\n   - Sync button with icon\n2. Add aria-live regions for dynamic content:\n   - Video loading status\n   - Comment conversion toggle\n   - Sync progress updates\n3. Ensure keyboard navigation works:\n   - Tab order is logical\n   - Focus indicators are visible\n   - Enter key works on all interactive elements\n4. Add proper semantic HTML:\n   - Use <nav> for pagination\n   - Use <main> for content area\n   - Use proper heading hierarchy\n5. Test with screen reader (NVDA or VoiceOver)\n\nReference:\n- BUGS_FOUND.md BUG-014 (lines 724-762)\n- WCAG 2.1 Level AA compliance",
-      "acceptanceCriteria": [
-        "All icon buttons have descriptive aria-labels",
-        "Screen reader announces button purposes correctly",
-        "Keyboard navigation flows logically through interface",
-        "Focus indicators are clearly visible",
-        "Enter key activates all buttons and controls",
-        "Dynamic content updates announced to screen readers",
-        "No accessibility errors in axe DevTools",
-        "Passes WAVE accessibility evaluation"
-      ],
-      "status": "in_progress",
-      "createdAt": "2026-01-10T00:17:00.000Z",
-      "updatedAt": "2026-01-10T05:00:58.435Z"
-    },
-    {
       "id": "task-021",
       "type": "feature_implementation",
       "priority": "low",
@@ -38,24 +18,24 @@
       ],
       "status": "in_progress",
       "createdAt": "2026-01-10T00:20:00.000Z",
-      "updatedAt": "2026-01-10T05:01:14.667Z"
+      "updatedAt": "2026-01-10T10:04:09.531Z"
     },
     {
-      "id": "task-022",
+      "id": "task-023",
       "type": "bug_fix",
       "priority": "high",
-      "title": "CRITICAL FIX: Restore API connectivity and fix runtime ReferenceErrors",
-      "description": "URGENT REGRESSION FIX: Recent changes caused widespread API failures. Fix the following specific errors found in logs:\n\nERROR 1: Connection Timeout in /api/chzzk-videos\n- Location: src/app/api/chzzk-videos/route.ts:8:21\n- Error: TypeError: fetch failed [ConnectTimeoutError]\n- Context: The fetch call to 'https://api.chzzk.naver.com/service/v1/channels/.../videos' is timing out. Check if recent timeout logic is too aggressive or headers are incorrect.\n\nERROR 2: 400 Bad Request in /api/chzzk-sync\n- Location: src/app/api/chzzk-sync/route.ts:167:12 (fetchChzzkVideos)\n- Error: Chzzk API error: 400\n- Log Data: { size: 100, channelId: 'abe8...' }\n- Action: Verify URL construction and parameters for the Chzzk API request.\n\nERROR 3: ReferenceError: sendEvent is not defined\n- Location: src/app/api/chzzk-sync/route.ts:472 & 495\n- Context: In the catch block, `sendEvent('error', ...)` is called but not defined/imported, causing 'failed to pipe response' and crashing the stream.\n- Action: Define or import the `sendEvent` helper function inside route.ts.\n\nERROR 4: Missing Export\n- Location: src/app/admin/tabs/ChzzkYoutubeConverterTab.tsx\n- Error: Attempted import error: 'retryWithBackoff' is not exported from '@/lib/retryUtils'.\n- Action: Export `retryWithBackoff` correctly from the utility file.",
+      "title": "Fix persistent 400 Bad Request in Chzzk Sync API and improve error propagation",
+      "description": "CRITICAL BUG: The channel sync feature is still failing with a 400 Bad Request error, despite previous fixes. The client also receives an empty error object.\n\n1. Fix 'Chzzk API error: 400' in `fetchChzzkVideos`:\n   - File: `src/app/api/chzzk-sync/route.ts`\n   - Context: Request with `size: 100` and valid `channelId` fails.\n   - Action: \n     a) Verify if `size=100` is too large for this specific endpoint (try reducing to 50 or 20).\n     b) Log the EXACT URL and Headers being sent to Chzzk before the fetch call.\n     c) Check if the API endpoint URL path is correct (compare with the working `/api/chzzk-videos` endpoint).\n\n2. Fix Empty SSE Error in Client:\n   - File: `src/hooks/useSyncProgress.ts` & `src/app/api/chzzk-sync/route.ts`\n   - Context: Client logs `Error: SSE error: {}`.\n   - Action: Ensure the server sends a proper JSON string in the `sendEvent('error', ...)` payload, and the client properly parses the `event.data`.\n\nReference Logs:\n- Stack: `at fetchChzzkVideos (.../route.ts:137:19)`\n- Error: `Chzzk API error: 400`\n- Client Error: `Error: SSE error: {}`",
       "acceptanceCriteria": [
-        "src/app/api/chzzk-videos/route.ts returns 200 OK without timeouts",
-        "src/app/api/chzzk-sync/route.ts properly handles errors without 'sendEvent is not defined' crash",
-        "fetchChzzkVideos sends valid requests (no 400 errors)",
-        "retryWithBackoff is properly exported and imported",
-        "All provided stack traces are resolved"
+        "fetchChzzkVideos executes without returning 400 Bad Request",
+        "Sync operation successfully retrieves video list from Chzzk",
+        "If an error occurs, the server logs the full URL and response body",
+        "Client-side useSyncProgress correctly displays the actual error message instead of '{}'",
+        "Verify if reducing 'size' parameter resolves the 400 error"
       ],
       "status": "in_progress",
-      "createdAt": "2026-01-10T05:45:00.000Z",
-      "updatedAt": "2026-01-10T05:01:29.561Z"
+      "createdAt": "2026-01-10T09:30:00.000Z",
+      "updatedAt": "2026-01-10T09:30:00.000Z"
     }
   ],
   "completed": [
@@ -365,6 +345,43 @@
       "status": "completed",
       "createdAt": "2026-01-10T00:19:00.000Z",
       "updatedAt": "2026-01-10T04:45:41.278Z"
+    },
+    {
+      "id": "task-022",
+      "type": "bug_fix",
+      "priority": "high",
+      "title": "CRITICAL FIX: Restore API connectivity and fix runtime ReferenceErrors",
+      "description": "URGENT REGRESSION FIX: Recent changes caused widespread API failures. Fix the following specific errors found in logs:\n\nERROR 1: Connection Timeout in /api/chzzk-videos\n- Location: src/app/api/chzzk-videos/route.ts:8:21\n- Error: TypeError: fetch failed [ConnectTimeoutError]\n- Context: The fetch call to 'https://api.chzzk.naver.com/service/v1/channels/.../videos' is timing out. Check if recent timeout logic is too aggressive or headers are incorrect.\n\nERROR 2: 400 Bad Request in /api/chzzk-sync\n- Location: src/app/api/chzzk-sync/route.ts:167:12 (fetchChzzkVideos)\n- Error: Chzzk API error: 400\n- Log Data: { size: 100, channelId: 'abe8...' }\n- Action: Verify URL construction and parameters for the Chzzk API request.\n\nERROR 3: ReferenceError: sendEvent is not defined\n- Location: src/app/api/chzzk-sync/route.ts:472 & 495\n- Context: In the catch block, `sendEvent('error', ...)` is called but not defined/imported, causing 'failed to pipe response' and crashing the stream.\n- Action: Define or import the `sendEvent` helper function inside route.ts.\n\nERROR 4: Missing Export\n- Location: src/app/admin/tabs/ChzzkYoutubeConverterTab.tsx\n- Error: Attempted import error: 'retryWithBackoff' is not exported from '@/lib/retryUtils'.\n- Action: Export `retryWithBackoff` correctly from the utility file.",
+      "acceptanceCriteria": [
+        "src/app/api/chzzk-videos/route.ts returns 200 OK without timeouts",
+        "src/app/api/chzzk-sync/route.ts properly handles errors without 'sendEvent is not defined' crash",
+        "fetchChzzkVideos sends valid requests (no 400 errors)",
+        "retryWithBackoff is properly exported and imported",
+        "All provided stack traces are resolved"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-10T05:45:00.000Z",
+      "updatedAt": "2026-01-10T09:17:29.776Z"
+    },
+    {
+      "id": "task-018",
+      "type": "feature_implementation",
+      "priority": "low",
+      "title": "Add accessibility improvements and aria-labels",
+      "description": "Improve accessibility of the Chzzk-YouTube converter interface for screen reader users and keyboard navigation.\n\nImplementation requirements:\n1. Add aria-labels to all icon-only buttons:\n   - Pagination buttons (ChevronLeft, ChevronRight)\n   - Search clear button\n   - Copy to clipboard button\n   - Sync button with icon\n2. Add aria-live regions for dynamic content:\n   - Video loading status\n   - Comment conversion toggle\n   - Sync progress updates\n3. Ensure keyboard navigation works:\n   - Tab order is logical\n   - Focus indicators are visible\n   - Enter key works on all interactive elements\n4. Add proper semantic HTML:\n   - Use <nav> for pagination\n   - Use <main> for content area\n   - Use proper heading hierarchy\n5. Test with screen reader (NVDA or VoiceOver)\n\nReference:\n- BUGS_FOUND.md BUG-014 (lines 724-762)\n- WCAG 2.1 Level AA compliance",
+      "acceptanceCriteria": [
+        "All icon buttons have descriptive aria-labels",
+        "Screen reader announces button purposes correctly",
+        "Keyboard navigation flows logically through interface",
+        "Focus indicators are clearly visible",
+        "Enter key activates all buttons and controls",
+        "Dynamic content updates announced to screen readers",
+        "No accessibility errors in axe DevTools",
+        "Passes WAVE accessibility evaluation"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-10T00:17:00.000Z",
+      "updatedAt": "2026-01-10T10:04:09.514Z"
     }
   ],
   "rejected": [
@@ -430,6 +447,6 @@
       "rejectionReason": "Review failed"
     }
   ],
-  "current": "task-022",
-  "lastUpdated": "2026-01-10T05:01:29.561Z"
+  "current": "task-023",
+  "lastUpdated": "2026-01-10T10:04:09.531Z"
 }

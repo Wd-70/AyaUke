@@ -301,17 +301,13 @@ export async function GET(request: NextRequest) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
-          try {
-            // Defensive check for SSE setup
-            if (typeof encoder === 'undefined' || typeof controller === 'undefined') {
-              throw new Error('[SSE Setup] TextEncoder or ReadableStreamController is undefined');
-            }
+          // Helper to send SSE message - MUST be defined before try-catch blocks
+          const sendEvent = (event: string, data: any) => {
+            const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+            controller.enqueue(encoder.encode(message));
+          };
 
-            // Helper to send SSE message
-            const sendEvent = (event: string, data: any) => {
-              const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-              controller.enqueue(encoder.encode(message));
-            };
+          try {
 
             // Initialize retry statistics tracker
             const retryTracker = createRetryStatisticsTracker();
