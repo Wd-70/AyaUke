@@ -1,9 +1,5 @@
 {
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/api/chzzk-videos/route": "app/api/chzzk-videos/route.js",
-  "/api/chzzk-sync/route": "app/api/chzzk-sync/route.js",
-  "/api/admin/dashboard-stats/route": "app/api/admin/dashboard-stats/route.js",
+  "/auth/signin/page": "app/auth/signin/page.js",
   "/admin/page": "app/admin/page.js",
-  "/page": "app/page.js",
-  "/auth/signin/page": "app/auth/signin/page.js"
+  "/page": "app/page.js"
 }

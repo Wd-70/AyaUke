@@ -2,40 +2,25 @@
   "version": "1.0",
   "tasks": [
     {
-      "id": "task-021",
-      "type": "feature_implementation",
-      "priority": "low",
-      "title": "Add empty state message for videos with no timeline comments",
-      "description": "Improve UX by showing a helpful message when a video has zero timeline comments instead of displaying an empty comments area.\n\nImplementation requirements:\n1. Add conditional rendering in comments display section\n2. Show message: \"이 영상에는 타임라인 댓글이 없습니다.\"\n3. Add helpful icon (ChatBubbleLeftIcon with slash)\n4. Style consistently with other empty states\n5. Ensure message appears in both light and dark modes\n6. Consider adding tip: \"타임라인 댓글은 '0:00' 같은 시간 표시가 포함된 댓글입니다.\"\n\nReference:\n- BUGS_FOUND.md BUG-004 (lines 608-634)\n- Current empty behavior: ChzzkYoutubeConverterTab.tsx comments section",
-      "acceptanceCriteria": [
-        "Empty state message displays when timelineComments = 0",
-        "Message is clear and helpful",
-        "Styling matches app design system",
-        "Works in both light and dark modes",
-        "Checkbox to toggle conversion is disabled (already implemented)",
-        "No layout shift when switching between videos",
-        "Message is center-aligned and properly padded"
-      ],
-      "status": "in_progress",
-      "createdAt": "2026-01-10T00:20:00.000Z",
-      "updatedAt": "2026-01-10T10:04:09.531Z"
-    },
-    {
-      "id": "task-023",
+      "id": "task-024",
       "type": "bug_fix",
-      "priority": "high",
-      "title": "Fix persistent 400 Bad Request in Chzzk Sync API and improve error propagation",
-      "description": "CRITICAL BUG: The channel sync feature is still failing with a 400 Bad Request error, despite previous fixes. The client also receives an empty error object.\n\n1. Fix 'Chzzk API error: 400' in `fetchChzzkVideos`:\n   - File: `src/app/api/chzzk-sync/route.ts`\n   - Context: Request with `size: 100` and valid `channelId` fails.\n   - Action: \n     a) Verify if `size=100` is too large for this specific endpoint (try reducing to 50 or 20).\n     b) Log the EXACT URL and Headers being sent to Chzzk before the fetch call.\n     c) Check if the API endpoint URL path is correct (compare with the working `/api/chzzk-videos` endpoint).\n\n2. Fix Empty SSE Error in Client:\n   - File: `src/hooks/useSyncProgress.ts` & `src/app/api/chzzk-sync/route.ts`\n   - Context: Client logs `Error: SSE error: {}`.\n   - Action: Ensure the server sends a proper JSON string in the `sendEvent('error', ...)` payload, and the client properly parses the `event.data`.\n\nReference Logs:\n- Stack: `at fetchChzzkVideos (.../route.ts:137:19)`\n- Error: `Chzzk API error: 400`\n- Client Error: `Error: SSE error: {}`",
+      "priority": "critical",
+      "title": "Fix Chzzk comment collection - zero comments stored despite successful video sync",
+      "description": "CRITICAL BUG: Channel sync successfully stores video metadata but all videos show totalComments=0 and timelineComments=0 in database. Root cause analysis reveals three specific issues in src/app/api/chzzk-sync/route.ts:\n\n## Issue 1: Silent Error Handling (Lines 250-256)\n`fetchChzzkComments()` catches ALL errors and returns empty array without propagating failure:\n```javascript\ncatch (error) {\n  console.error(`Error fetching comments for video ${videoNo}:`, error);\n  hasMore = false;  // Just stops loop\n}\nreturn allComments;  // Returns [] on error\n```\n\nProblem: If comment API fails (wrong endpoint, auth, rate limit), sync completes 'successfully' with 0 comments.\n\nFix Required:\n- Add detailed error logging with response status/body (like video API at lines 170-175)\n- Log response structure to verify `data.comments` path (line 239)\n- Consider throwing error instead of silent fail, OR track error count in return value\n- Test actual comment API response structure\n\n## Issue 2: Existing Videos Skip Comment Collection (Lines 373-383, 789-794)\nBoth SSE stream and POST handlers skip existing videos:\n```javascript\nconst existingVideo = await ChzzkVideo.findOne({ videoNo: videoData.videoNo });\nif (existingVideo && !force) {\n  continue;  // SKIPS comment fetch entirely!\n}\n```\n\nScenario:\n1. First sync: Videos saved, but comment API fails silently → totalComments=0\n2. Second sync: existingVideo=true, force=false → continue → comments NEVER collected\n3. User has videos with 0 comments forever unless they use force=true\n\nFix Options:\nA. Always fetch comments even for existing videos (update lastCommentSync)\nB. Check if totalComments=0 and re-fetch comments\nC. Force user to use force=true flag for comment re-collection\nD. Add separate 'sync comments only' action\n\n## Issue 3: Unverified Comment API Response Structure (Line 239)\nCode assumes: `data.comments` contains array\nPossible issues:\n- API might return different structure (e.g., `data.content.data`)\n- API might require different parameters\n- API endpoint might be outdated/changed\n\nFix Required:\n- Manually test comment API with curl to verify response structure\n- Log full response body when comments.length=0 to see actual structure\n- Compare with actual Chzzk website's comment fetch network request\n\n## Debug Steps:\n\n1. Add comprehensive logging to fetchChzzkComments:\n   ```javascript\n   console.log(`[fetchChzzkComments] Fetching for video ${videoNo}`);\n   console.log(`[fetchChzzkComments] Response status:`, response.status);\n   const data = await response.json();\n   console.log(`[fetchChzzkComments] Response keys:`, Object.keys(data));\n   console.log(`[fetchChzzkComments] Comments count:`, data.comments?.length || 0);\n   ```\n\n2. Test comment API manually:\n   ```bash\n   curl 'https://apis.naver.com/nng_main/nng_comment_api/v1/type/STREAMING_VIDEO/id/11162022/comments?limit=30&offset=0&orderType=POPULAR&pagingType=PAGE' \\\n   -H 'front-client-platform-type: PC' \\\n     -H 'front-client-product-type: web'\n   ```\n\n3. Check database state:\n   - Count videos: `db.chzzkvideos.count()`\n   - Count comments: `db.chzzkcomments.count()`\n   - Find videos with 0 comments: `db.chzzkvideos.find({totalComments: 0})`\n\n4. Fix skip logic (choose option A, B, C, or D above)\n\n5. Re-run sync and verify comments are collected\n\nReference Files:\n- Main logic: src/app/api/chzzk-sync/route.ts\n- SSE stream: lines 358-460\n- POST handler: lines 770-850\n- Comment fetch: lines 208-257",
       "acceptanceCriteria": [
-        "fetchChzzkVideos executes without returning 400 Bad Request",
-        "Sync operation successfully retrieves video list from Chzzk",
-        "If an error occurs, the server logs the full URL and response body",
-        "Client-side useSyncProgress correctly displays the actual error message instead of '{}'",
-        "Verify if reducing 'size' parameter resolves the 400 error"
+        "fetchChzzkComments logs detailed info on every call (video number, response status, comment count)",
+        "Comment API errors are properly logged with response body (not silently ignored)",
+        "Actual comment API response structure is verified and logged",
+        "Manual curl test of comment API succeeds and returns data",
+        "Comment collection logic handles existing videos correctly (doesn't skip forever)",
+        "After sync, ChzzkComment collection contains actual comments (count > 0)",
+        "ChzzkVideo records show accurate totalComments and timelineComments (not all 0)",
+        "UI displays collected comments when video is selected",
+        "Error messages are actionable if comment API fails (shows exact failure reason)"
       ],
       "status": "in_progress",
-      "createdAt": "2026-01-10T09:30:00.000Z",
-      "updatedAt": "2026-01-10T09:30:00.000Z"
+      "createdAt": "2026-01-10T14:00:00.000Z",
+      "updatedAt": "2026-01-11T02:36:15.682Z"
     }
   ],
   "completed": [
@@ -382,6 +367,25 @@
       "status": "completed",
       "createdAt": "2026-01-10T00:17:00.000Z",
       "updatedAt": "2026-01-10T10:04:09.514Z"
+    },
+    {
+      "id": "task-021",
+      "type": "feature_implementation",
+      "priority": "low",
+      "title": "Add empty state message for videos with no timeline comments",
+      "description": "Improve UX by showing a helpful message when a video has zero timeline comments instead of displaying an empty comments area.\n\nImplementation requirements:\n1. Add conditional rendering in comments display section\n2. Show message: \"이 영상에는 타임라인 댓글이 없습니다.\"\n3. Add helpful icon (ChatBubbleLeftIcon with slash)\n4. Style consistently with other empty states\n5. Ensure message appears in both light and dark modes\n6. Consider adding tip: \"타임라인 댓글은 '0:00' 같은 시간 표시가 포함된 댓글입니다.\"\n\nReference:\n- BUGS_FOUND.md BUG-004 (lines 608-634)\n- Current empty behavior: ChzzkYoutubeConverterTab.tsx comments section",
+      "acceptanceCriteria": [
+        "Empty state message displays when timelineComments = 0",
+        "Message is clear and helpful",
+        "Styling matches app design system",
+        "Works in both light and dark modes",
+        "Checkbox to toggle conversion is disabled (already implemented)",
+        "No layout shift when switching between videos",
+        "Message is center-aligned and properly padded"
+      ],
+      "status": "completed",
+      "createdAt": "2026-01-10T00:20:00.000Z",
+      "updatedAt": "2026-01-10T10:15:34.852Z"
     }
   ],
   "rejected": [
@@ -447,6 +451,6 @@
       "rejectionReason": "Review failed"
     }
   ],
-  "current": "task-023",
-  "lastUpdated": "2026-01-10T10:04:09.531Z"
+  "current": "task-024",
+  "lastUpdated": "2026-01-11T02:36:15.682Z"
 }

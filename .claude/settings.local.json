@@ -32,7 +32,9 @@
       "Bash(sed:*)",
       "Bash(cat:*)",
       "mcp__playwright__playwright_evaluate",
-      "mcp__playwright__playwright_get_visible_text"
+      "mcp__playwright__playwright_get_visible_text",
+      "Bash(jq:*)",
+      "Bash(echo:*)"
     ],
     "deny": []
   }

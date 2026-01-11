@@ -148,29 +148,43 @@ interface ChzzkCommentData {
   createTime: number;
 }
 
-async function fetchChzzkVideos(channelId: string, size: number = 100): Promise<ChzzkVideoData[]> {
+async function fetchChzzkVideos(channelId: string, size: number = 50): Promise<ChzzkVideoData[]> {
   try {
-    // Use correct pagination parameters: pagingType and sortType are REQUIRED
+    // IMPORTANT: Chzzk API has a maximum size limit of 50 videos per request
+    // Parameter order and empty values matter for Chzzk API
+    // Must match exact format: sortType=LATEST&pagingType=PAGE&page=0&size=N&publishDateAt=&videoType=
+    const maxSize = Math.min(size, 50); // Enforce API limit
     const response = await fetchWithTimeout(
-      `https://api.chzzk.naver.com/service/v1/channels/${channelId}/videos?pagingType=PAGE&page=0&size=${size}&sortType=LATEST`,
+      `https://api.chzzk.naver.com/service/v1/channels/${channelId}/videos?sortType=LATEST&pagingType=PAGE&page=0&size=${maxSize}&publishDateAt=&videoType=`,
       {
         headers: {
-          // Complete User-Agent with Chrome version and Safari compatibility
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-          "Accept": "application/json, text/plain, */*",
-          "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
-          "Referer": `https://chzzk.naver.com/${channelId}`,
-          "Origin": "https://chzzk.naver.com",
+          "accept": "application/json, text/plain, */*",
+          "referer": `https://chzzk.naver.com/${channelId}`,
+          "front-client-platform-type": "PC",
+          "front-client-product-type": "web",
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         },
       },
       30000 // 30 second timeout
     );
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[fetchChzzkVideos] API response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
       throw new Error(`Chzzk API error: ${response.status}`);
     }
 
     const data = await response.json();
+
+    // Chzzk API returns: {code: 200, message: null, content: {data: [...], page, size, totalCount, totalPages}}
+    if (data.code !== 200) {
+      throw new Error(`Chzzk API returned error code: ${data.code}, message: ${data.message}`);
+    }
+
     return data.content?.data || [];
   } catch (error: any) {
     console.error("[fetchChzzkVideos] Error fetching Chzzk videos:", {
@@ -199,42 +213,183 @@ async function fetchChzzkComments(videoNo: number): Promise<ChzzkCommentData[]> 
 
   while (hasMore) {
     try {
+      const url = `https://apis.naver.com/nng_main/nng_comment_api/v1/type/STREAMING_VIDEO/id/${videoNo}/comments?limit=${limit}&offset=${offset}&orderType=POPULAR&pagingType=PAGE`;
+
       const response = await fetchWithTimeout(
-        `https://apis.naver.com/nng_main/nng_comment_api/v1/type/STREAMING_VIDEO/id/${videoNo}/comments?limit=${limit}&offset=${offset}&orderType=POPULAR&pagingType=PAGE`,
+        url,
         {
           headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Referer": `https://chzzk.naver.com/video/${videoNo}`,
+            "front-client-platform-type": "PC",
+            "front-client-product-type": "web",
           },
         },
         30000 // 30 second timeout
       );
 
+      console.log(`[fetchChzzkComments] Response status: ${response.status}`);
+
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[fetchChzzkComments] API Error for video ${videoNo}:`, {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+          offset,
+        });
+
         if (response.status === 404) {
           // Video deleted or no comments
+          console.log(`[fetchChzzkComments] Video ${videoNo} not found (404), stopping`);
           break;
         }
-        throw new Error(`Chzzk Comment API error: ${response.status}`);
+        throw new Error(`Chzzk Comment API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      const comments = data.comments || [];
+
+      // Log response structure for debugging
+      console.log(`[fetchChzzkComments] Response structure:`, {
+        topLevelKeys: Object.keys(data),
+        code: data.code,
+        message: data.message,
+        hasComments: 'comments' in data,
+        hasContent: 'content' in data,
+        contentType: typeof data.content,
+        contentKeys: data.content ? Object.keys(data.content) : 'no content',
+      });
+
+      // Chzzk API returns { code, message, content } structure like video API
+      if (data.code && data.code !== 200) {
+        console.error(`[fetchChzzkComments] API returned error code ${data.code}: ${data.message}`);
+        throw new Error(`Chzzk Comment API error code: ${data.code} - ${data.message}`);
+      }
+
+      // Check if comments are in data.content or data.comments
+      let comments: any[] = [];
+
+      if (data.content) {
+        // Log content structure to find where comments actually are
+        console.log(`[fetchChzzkComments] Content structure:`, {
+          keys: Object.keys(data.content),
+          commentCount: data.content.commentCount,
+          hasComments: 'comments' in data.content,
+          hasData: 'data' in data.content,
+          totalCount: data.content.totalCount,
+          commentsType: typeof data.content.comments,
+          commentsIsArray: Array.isArray(data.content.comments),
+        });
+
+        // Check what type comments is
+        if (data.content.comments) {
+          console.log(`[fetchChzzkComments] data.content.comments type:`, typeof data.content.comments);
+          console.log(`[fetchChzzkComments] data.content.comments is array:`, Array.isArray(data.content.comments));
+
+          if (typeof data.content.comments === 'object' && !Array.isArray(data.content.comments)) {
+            console.log(`[fetchChzzkComments] data.content.comments object keys:`, Object.keys(data.content.comments));
+
+            // Try to find array inside comments object
+            if (data.content.comments.data) {
+              comments = data.content.comments.data;
+              console.log(`[fetchChzzkComments] Found comments at data.content.comments.data, length:`, comments.length);
+            } else if (data.content.comments.list) {
+              comments = data.content.comments.list;
+              console.log(`[fetchChzzkComments] Found comments at data.content.comments.list, length:`, comments.length);
+            } else {
+              console.error(`[fetchChzzkComments] data.content.comments is object but has no array field!`);
+              console.log(`[fetchChzzkComments] Full comments object:`, JSON.stringify(data.content.comments, null, 2));
+            }
+          } else if (Array.isArray(data.content.comments)) {
+            comments = data.content.comments;
+            console.log(`[fetchChzzkComments] Found comments array at data.content.comments, length:`, comments.length);
+          }
+        } else if (data.content.data) {
+          comments = data.content.data;
+        } else if (Array.isArray(data.content)) {
+          comments = data.content;
+        }
+      } else if (data.comments) {
+        comments = data.comments;
+      }
+
+      if (comments.length > 0) {
+        console.log(`[fetchChzzkComments] Sample comment structure:`, Object.keys(comments[0]));
+        console.log(`[fetchChzzkComments] First comment full object:`, JSON.stringify(comments[0], null, 2));
+
+        // Check nested structure
+        if (comments[0].comment) {
+          console.log(`[fetchChzzkComments] Nested comment object keys:`, Object.keys(comments[0].comment));
+        }
+        if (comments[0].user) {
+          console.log(`[fetchChzzkComments] Nested user object keys:`, Object.keys(comments[0].user));
+        }
+      }
+
+      console.log(`[fetchChzzkComments] Fetched ${comments.length} comments at offset ${offset}`);
 
       if (comments.length === 0) {
         hasMore = false;
+        if (offset === 0) {
+          console.log(`[fetchChzzkComments] Video ${videoNo} has no comments`);
+        }
       } else {
-        allComments.push(...comments);
+        // Transform nested comment structure to flat structure
+        const transformedComments = comments.map(item => {
+          // Chzzk API returns nested structure: { comment: {...}, user: {...} }
+          // We need to flatten it to match ChzzkCommentData interface
+          const comment = item.comment || item; // Fallback to item if not nested
+          const user = item.user || {};
+
+          // Parse createdDate from "20260110012218" format to timestamp
+          let createTime = 0;
+          if (comment.createdDate) {
+            // Format: YYYYMMDDHHMMSS
+            const dateStr = comment.createdDate;
+            const year = parseInt(dateStr.substring(0, 4));
+            const month = parseInt(dateStr.substring(4, 6)) - 1; // JS months are 0-indexed
+            const day = parseInt(dateStr.substring(6, 8));
+            const hour = parseInt(dateStr.substring(8, 10));
+            const minute = parseInt(dateStr.substring(10, 12));
+            const second = parseInt(dateStr.substring(12, 14));
+            createTime = new Date(year, month, day, hour, minute, second).getTime();
+          }
+
+          return {
+            commentId: comment.commentId,
+            videoNo: parseInt(comment.objectId) || videoNo,
+            commentType: comment.commentType || 'COMMENT',
+            parentCommentId: comment.parentCommentId || undefined,
+            content: comment.content,
+            userIdHash: user.userIdHash || 'unknown',
+            createTime: createTime,
+          };
+        });
+
+        allComments.push(...transformedComments);
         offset += limit;
 
         // Add delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 100));
       }
-    } catch (error) {
-      console.error(`Error fetching comments for video ${videoNo}:`, error);
+    } catch (error: any) {
+      console.error(`[fetchChzzkComments] CRITICAL ERROR for video ${videoNo}:`, {
+        error: error.message,
+        stack: error.stack,
+        offset,
+        totalCollected: allComments.length,
+      });
       hasMore = false;
+
+      // If we haven't collected any comments yet and got an error, this is a real failure
+      if (allComments.length === 0) {
+        console.error(`[fetchChzzkComments] ZERO COMMENTS COLLECTED - This will result in empty comment list!`);
+      }
     }
   }
 
+  console.log(`[fetchChzzkComments] Completed for video ${videoNo}: collected ${allComments.length} total comments`);
   return allComments;
 }
 
@@ -244,7 +399,11 @@ async function checkVideoExists(videoNo: number): Promise<boolean> {
       `https://api.chzzk.naver.com/service/v1/videos/${videoNo}`,
       {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*",
+          "Referer": `https://chzzk.naver.com/video/${videoNo}`,
+          "front-client-platform-type": "PC",
+          "front-client-product-type": "web",
         },
       },
       15000 // 15 second timeout for quick check
@@ -349,7 +508,10 @@ export async function GET(request: NextRequest) {
 
                 // Check if exists
                 const existingVideo = await ChzzkVideo.findOne({ videoNo: videoData.videoNo });
-                if (existingVideo && !force) {
+                const needsCommentSync = existingVideo && (existingVideo.totalComments === 0 || !existingVideo.lastCommentSync);
+
+                if (existingVideo && !force && !needsCommentSync) {
+                  // Skip only if video exists, force is false, AND comments were already collected
                   sendEvent('video_skip', {
                     current: i + 1,
                     total: totalVideos,
@@ -358,6 +520,18 @@ export async function GET(request: NextRequest) {
                   });
                   stats.processedVideos++;
                   continue;
+                }
+
+                if (needsCommentSync) {
+                  console.log(`[Sync] Re-syncing comments for video ${videoData.videoNo} (totalComments=${existingVideo.totalComments})`);
+                  sendEvent('video_start', {
+                    current: i + 1,
+                    total: totalVideos,
+                    videoNo: videoData.videoNo,
+                    videoTitle: videoData.videoTitle,
+                    thumbnailUrl: videoData.thumbnailImageUrl,
+                    reason: 'resync_comments'
+                  });
                 }
 
                 stats.newVideos++;
@@ -765,13 +939,19 @@ export async function POST(request: NextRequest) {
       for (const videoData of videos) {
         // Check if video already exists
         const existingVideo = await ChzzkVideo.findOne({ videoNo: videoData.videoNo });
+        const needsCommentSync = existingVideo && (existingVideo.totalComments === 0 || !existingVideo.lastCommentSync);
 
-        if (existingVideo && !force) {
-          // Skip if already exists and not forcing update
+        if (existingVideo && !force && !needsCommentSync) {
+          // Skip only if video exists, force is false, AND comments were already collected
+          console.log(`[Sync] Skipping video ${videoData.videoNo} (already synced with ${existingVideo.totalComments} comments)`);
           continue;
         }
 
-        stats.newVideos++;
+        if (needsCommentSync) {
+          console.log(`[Sync] Re-syncing comments for video ${videoData.videoNo} (totalComments=${existingVideo.totalComments})`);
+        } else {
+          stats.newVideos++;
+        }
 
         // Fetch comments for this video
         const comments = await fetchChzzkComments(videoData.videoNo);

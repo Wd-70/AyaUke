@@ -861,9 +861,9 @@ export default function ChzzkYoutubeConverterTab() {
                     </div>
                   ) : (
                     <EmptyState
-                      icon={<ChatBubbleLeftIcon className="w-16 h-16" />}
-                      title="타임라인 댓글이 없습니다"
-                      message="이 영상에는 타임스탬프가 포함된 댓글이 없습니다."
+                      icon={<ChatBubbleLeftIcon className="w-16 h-16" aria-hidden="true" />}
+                      title="이 영상에는 타임라인 댓글이 없습니다."
+                      message="타임라인 댓글은 '0:00' 같은 시간 표시가 포함된 댓글입니다."
                     />
                   )}
                 </div>

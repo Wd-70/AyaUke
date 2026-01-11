@@ -11,6 +11,16 @@
       "static/chunks/main-app.js",
       "static/chunks/app/error.js"
     ],
+    "/auth/signin/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/auth/signin/page.js"
+    ],
+    "/api/auth/[...nextauth]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/[...nextauth]/route.js"
+    ],
     "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -20,11 +30,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/chzzk-videos/route.js"
-    ],
-    "/api/auth/[...nextauth]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/[...nextauth]/route.js"
     ],
     "/admin/page": [
       "static/chunks/webpack.js",
@@ -37,25 +42,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/admin/dashboard-stats/route.js"
     ],
-    "/api/admin/clips/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/clips/route.js"
-    ],
     "/api/chzzk-sync/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/chzzk-sync/route.js"
     ],
-    "/auth/signin/page": [
+    "/api/timeline-parser/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/auth/signin/page.js"
+      "static/chunks/app/api/timeline-parser/route.js"
     ],
-    "/_not-found/page": [
+    "/api/youtube-comments/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/api/youtube-comments/route.js"
     ]
   }
 }
