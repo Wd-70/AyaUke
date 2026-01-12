@@ -11,15 +11,31 @@
       "static/chunks/main-app.js",
       "static/chunks/app/error.js"
     ],
-    "/auth/signin/page": [
+    "/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/auth/signin/page.js"
+      "static/css/app/admin/page.css",
+      "static/chunks/app/admin/page.js"
     ],
     "/api/auth/[...nextauth]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/[...nextauth]/route.js"
+    ],
+    "/api/admin/dashboard-stats/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/dashboard-stats/route.js"
+    ],
+    "/api/youtube-comments/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/youtube-comments/route.js"
+    ],
+    "/api/chzzk-sync/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/chzzk-sync/route.js"
     ],
     "/page": [
       "static/chunks/webpack.js",
@@ -31,31 +47,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/chzzk-videos/route.js"
     ],
-    "/admin/page": [
+    "/tools/timeline/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/css/app/admin/page.css",
-      "static/chunks/app/admin/page.js"
+      "static/chunks/app/tools/timeline/page.js"
     ],
-    "/api/admin/dashboard-stats/route": [
+    "/api/songdetails/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/dashboard-stats/route.js"
+      "static/chunks/app/api/songdetails/route.js"
     ],
-    "/api/chzzk-sync/route": [
+    "/tools/timeline-adjuster/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/chzzk-sync/route.js"
-    ],
-    "/api/timeline-parser/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/timeline-parser/route.js"
-    ],
-    "/api/youtube-comments/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/youtube-comments/route.js"
+      "static/chunks/app/tools/timeline-adjuster/page.js"
     ]
   }
 }

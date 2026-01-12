@@ -34,7 +34,8 @@
       "mcp__playwright__playwright_evaluate",
       "mcp__playwright__playwright_get_visible_text",
       "Bash(jq:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(python3:*)"
     ],
     "deny": []
   }

@@ -77,6 +77,23 @@ export default function DualVideoPlayer({
             <p className="text-xs text-light-text/60 dark:text-dark-text/60">
               두 영상의 동일한 지점에서 버튼을 눌러 시간차를 설정하세요.
             </p>
+
+            {/* Current Time Display */}
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg">
+                <span className="text-xs text-light-text/60 dark:text-dark-text/60">치지직:</span>
+                <span className="text-sm font-mono font-semibold text-light-text dark:text-dark-text">
+                  {formatOffset(chzzkCurrentTime)}
+                </span>
+              </div>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-500/5 rounded-lg">
+                <span className="text-xs text-light-text/60 dark:text-dark-text/60">유튜브:</span>
+                <span className="text-sm font-mono font-semibold text-light-text dark:text-dark-text">
+                  {formatOffset(youtubeCurrentTime)}
+                </span>
+              </div>
+            </div>
+
             {currentOffset !== null && (
               <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-light-accent/10 dark:bg-dark-accent/10 rounded-lg">
                 <span className="text-xs text-light-text/60 dark:text-dark-text/60">현재 오프셋:</span>

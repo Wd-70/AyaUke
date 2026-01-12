@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PlayIcon, PauseIcon } from "@heroicons/react/24/solid";
+import Hls from "hls.js";
 import { formatSeconds } from "@/lib/timeUtils";
 
 interface ChzzkPlayerProps {
@@ -19,57 +19,153 @@ export default function ChzzkPlayer({
   onTimeUpdate,
   className = "",
 }: ChzzkPlayerProps) {
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hlsUrl, setHlsUrl] = useState<string | null>(null);
 
-  // Extract video ID from URL or use videoNo
-  const getChzzkEmbedUrl = (url: string): string => {
-    // Chzzk embed URL format: https://chzzk.naver.com/embed/video/{videoNo}
-    return `https://chzzk.naver.com/embed/video/${videoNo}`;
-  };
-
-  const embedUrl = getChzzkEmbedUrl(videoUrl);
-
+  // Fetch HLS URL from Chzzk API
   useEffect(() => {
     if (isDeleted) {
       setError("이 영상은 치지직에서 삭제되었습니다.");
+      setLoading(false);
       return;
     }
 
-    // Check if video is accessible
-    const checkVideo = async () => {
+    const fetchHlsUrl = async () => {
       try {
-        setIsReady(true);
+        setLoading(true);
         setError(null);
-      } catch (err) {
-        setError("영상을 로드할 수 없습니다.");
-        setIsReady(false);
+
+        const response = await fetch(
+          `/api/chzzk-sync?action=get-hls-url&videoNo=${videoNo}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch video info");
+        }
+
+        const result = await response.json();
+
+        if (!result.success || !result.data?.hlsUrl) {
+          throw new Error(result.error || "HLS stream not found");
+        }
+
+        setHlsUrl(result.data.hlsUrl);
+        setDuration(result.data.duration || 0);
+      } catch (err: any) {
+        console.error("Error fetching HLS URL:", err);
+        setError(err.message || "영상을 로드할 수 없습니다.");
+      } finally {
+        setLoading(false);
       }
     };
 
-    checkVideo();
-  }, [videoUrl, videoNo, isDeleted]);
+    fetchHlsUrl();
+  }, [videoNo, isDeleted]);
 
-  // Note: Chzzk iframe may not provide direct time tracking API
-  // This is a limitation - we'll need to rely on manual sync points
+  // Initialize HLS player
   useEffect(() => {
-    if (!isReady) return;
+    if (!hlsUrl || !videoRef.current) return;
 
-    // Simulate time tracking (actual implementation depends on Chzzk API)
-    // For now, this is a placeholder that would need Chzzk's player API
-    const interval = setInterval(() => {
-      // In a real implementation, this would query the Chzzk player's current time
-      // For now, we rely on manual sync point setting
+    const video = videoRef.current;
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+      });
+
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        setIsReady(true);
+        setError(null);
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.error("Network error, trying to recover...");
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.error("Media error, trying to recover...");
+              hls.recoverMediaError();
+              break;
+            default:
+              console.error("Fatal error, cannot recover:", data);
+              setError("재생 중 오류가 발생했습니다.");
+              break;
+          }
+        }
+      });
+
+      hlsRef.current = hls;
+
+      return () => {
+        hls.destroy();
+        hlsRef.current = null;
+      };
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari native HLS support
+      video.src = hlsUrl;
+      video.addEventListener("loadedmetadata", () => {
+        setIsReady(true);
+        setError(null);
+      });
+    } else {
+      setError("이 브라우저는 HLS를 지원하지 않습니다.");
+    }
+  }, [hlsUrl]);
+
+  // Track video time
+  useEffect(() => {
+    if (!videoRef.current || !isReady) return;
+
+    const video = videoRef.current;
+
+    const handleTimeUpdate = () => {
+      const time = video.currentTime;
+      setCurrentTime(time);
       if (onTimeUpdate) {
-        onTimeUpdate(currentTime);
+        onTimeUpdate(time);
       }
-    }, 100);
+    };
 
-    return () => clearInterval(interval);
-  }, [isReady, currentTime, onTimeUpdate]);
+    const handleDurationChange = () => {
+      setDuration(video.duration);
+    };
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    video.addEventListener("durationchange", handleDurationChange);
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handlePause);
+
+    // Initial duration update
+    if (video.duration) {
+      setDuration(video.duration);
+    }
+
+    console.log("[ChzzkPlayer] Time tracking initialized");
+
+    return () => {
+      video.removeEventListener("timeupdate", handleTimeUpdate);
+      video.removeEventListener("durationchange", handleDurationChange);
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("pause", handlePause);
+    };
+  }, [isReady, onTimeUpdate]);
 
   if (isDeleted || error) {
     return (
@@ -117,17 +213,35 @@ export default function ChzzkPlayer({
     );
   }
 
+  if (loading) {
+    return (
+      <div className={`flex flex-col ${className}`}>
+        <div className="relative aspect-video bg-gray-900/50 rounded-lg overflow-hidden flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-light-accent dark:border-dark-accent mx-auto mb-3"></div>
+            <p className="text-sm text-light-text/60 dark:text-dark-text/60">
+              영상 로딩 중...
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 px-2">
+          <div className="text-sm font-mono text-light-text/40 dark:text-dark-text/40">
+            --:-- / --:--
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex flex-col ${className}`}>
       {/* Video Player */}
       <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-        <iframe
-          ref={iframeRef}
-          src={embedUrl}
+        <video
+          ref={videoRef}
           className="w-full h-full"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          title="Chzzk Video Player"
+          controls
+          playsInline
         />
       </div>
 
@@ -136,8 +250,11 @@ export default function ChzzkPlayer({
         <div className="text-sm font-mono text-light-text dark:text-dark-text">
           {formatSeconds(currentTime)} / {formatSeconds(duration)}
         </div>
-        <p className="text-xs text-light-text/40 dark:text-dark-text/40 mt-1">
-          * 치지직 플레이어는 자동 시간 추적을 지원하지 않습니다. 싱크 포인트를 수동으로 설정해주세요.
+        <p className="text-xs text-light-text/60 dark:text-dark-text/60 mt-1 flex items-center gap-1">
+          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+          HLS 스트림으로 재생 중 (자동 시간 추적)
         </p>
       </div>
     </div>

@@ -1,5 +1,7 @@
 {
-  "/auth/signin/page": "app/auth/signin/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/chzzk-sync/route": "app/api/chzzk-sync/route.js",
   "/admin/page": "app/admin/page.js",
+  "/tools/timeline/page": "app/tools/timeline/page.js",
   "/page": "app/page.js"
 }

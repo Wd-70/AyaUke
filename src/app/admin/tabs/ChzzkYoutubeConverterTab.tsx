@@ -91,6 +91,7 @@ export default function ChzzkYoutubeConverterTab() {
 
   // Comment display mode
   const [showConverted, setShowConverted] = useState(false);
+  const [showAllComments, setShowAllComments] = useState(false); // false = timeline only, true = all comments
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -190,11 +191,13 @@ export default function ChzzkYoutubeConverterTab() {
     }
   };
 
-  const handleSyncChannel = async () => {
+  const handleSyncChannel = async (forceSync: boolean = false) => {
     const confirmed = await confirm({
-      title: '채널 수집',
-      message: '채널의 모든 영상과 댓글을 수집합니다. 시간이 오래 걸릴 수 있습니다. 계속하시겠습니까?',
-      confirmText: '수집 시작',
+      title: forceSync ? '강제 재수집' : '채널 수집',
+      message: forceSync
+        ? '⚠️ 모든 영상과 댓글을 강제로 다시 수집합니다. 기존 데이터가 덮어씌워집니다.\n시간이 오래 걸릴 수 있습니다. 계속하시겠습니까?'
+        : '채널의 모든 영상과 댓글을 수집합니다. 시간이 오래 걸릴 수 있습니다. 계속하시겠습니까?',
+      confirmText: forceSync ? '강제 수집 시작' : '수집 시작',
       cancelText: '취소',
       type: 'warning'
     });
@@ -205,7 +208,7 @@ export default function ChzzkYoutubeConverterTab() {
     setSSEStatus('connecting');
 
     try {
-      await startSync(false);
+      await startSync(forceSync);
       setSSEStatus('connected');
     } catch (error) {
       setSSEStatus('error');
@@ -461,29 +464,91 @@ export default function ChzzkYoutubeConverterTab() {
   const convertCommentTimestamps = (comment: ChzzkComment): string => {
     if (!timeOffset) return comment.content;
 
-    let converted = comment.content;
-    comment.extractedTimestamps.forEach(timestamp => {
-      const seconds = parseTimeToSeconds(timestamp);
-      const newSeconds = seconds + timeOffset;
-      const newTimestamp = formatSeconds(newSeconds);
-      converted = converted.replace(timestamp, newTimestamp);
+    // Split by lines and process each line individually
+    const lines = comment.content.split('\n');
+
+    const convertedLines = lines.map(line => {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) return line;
+
+      // Match timestamp at the start of the line: H:MM:SS or MM:SS
+      // Priority: HH:MM:SS first, then MM:SS
+      const timePatternHMS = /^(\d{1,2}:\d{2}:\d{2})/;
+      const timePatternMS = /^(\d{1,2}:\d{2})/;
+
+      let match = trimmedLine.match(timePatternHMS);
+      if (!match) {
+        match = trimmedLine.match(timePatternMS);
+      }
+
+      if (match) {
+        const originalTime = match[1];
+        const seconds = parseTimeToSeconds(originalTime);
+        const newSeconds = seconds + timeOffset;
+        const newTimestamp = formatSeconds(newSeconds);
+
+        return trimmedLine.replace(originalTime, newTimestamp);
+      }
+
+      return trimmedLine;
     });
 
-    return converted;
+    return convertedLines.join('\n');
   };
 
-  const displayedComments = useMemo(() => {
-    const timelineComments = comments.filter(c => c.isTimeline);
+  // Organize comments into hierarchical structure
+  const organizedComments = useMemo(() => {
+    // Filter comments based on toggle
+    const filteredComments = showAllComments
+      ? comments
+      : comments.filter(c => c.isTimeline);
 
-    if (!showConverted || timeOffset === null) {
-      return timelineComments.map(c => c.content);
-    }
+    // Separate parent comments and replies
+    const parentComments = filteredComments.filter(c => !c.parentCommentId || c.parentCommentId === 0);
+    const replies = filteredComments.filter(c => c.parentCommentId && c.parentCommentId !== 0);
 
-    return timelineComments.map(c => convertCommentTimestamps(c));
-  }, [comments, showConverted, timeOffset]);
+    // Build hierarchical structure
+    const result: any[] = [];
+
+    parentComments.forEach(parent => {
+      // Add parent comment
+      const displayContent = (showConverted && timeOffset !== null)
+        ? convertCommentTimestamps(parent)
+        : parent.content;
+
+      result.push({
+        ...parent,
+        displayContent,
+        isReply: false
+      });
+
+      // Add its replies
+      const childReplies = replies.filter(r => r.parentCommentId === parent.commentId);
+      childReplies.forEach(reply => {
+        const replyDisplayContent = (showConverted && timeOffset !== null)
+          ? convertCommentTimestamps(reply)
+          : reply.content;
+
+        result.push({
+          ...reply,
+          displayContent: replyDisplayContent,
+          isReply: true
+        });
+      });
+    });
+
+    return result;
+  }, [comments, showConverted, timeOffset, showAllComments]);
+
+  const displayedComments = organizedComments;
 
   const handleCopyComments = () => {
-    const text = displayedComments.join("\n");
+    const text = displayedComments
+      .map(c => {
+        const indent = c.isReply ? '  ↳ ' : '';
+        return `${indent}${c.authorName}: ${c.displayContent}`;
+      })
+      .join("\n");
     navigator.clipboard.writeText(text);
     showSuccess('복사 완료', '댓글이 클립보드에 복사되었습니다.');
   };
@@ -527,13 +592,23 @@ export default function ChzzkYoutubeConverterTab() {
               {showStatistics ? '통계 숨기기' : '통계 보기'}
             </LoadingButton>
             <LoadingButton
-              onClick={handleSyncChannel}
+              onClick={() => handleSyncChannel(false)}
               isLoading={progress.isActive}
               variant="accent"
               icon={<ArrowPathIcon className="w-5 h-5" />}
               aria-label="치지직 채널 영상 및 댓글 수집"
             >
               {progress.isActive ? "수집 중..." : "채널 수집"}
+            </LoadingButton>
+            <LoadingButton
+              onClick={() => handleSyncChannel(true)}
+              isLoading={progress.isActive}
+              variant="primary"
+              icon={<ArrowPathIcon className="w-5 h-5" />}
+              aria-label="강제 재수집 (기존 데이터 덮어쓰기)"
+              title="모든 영상과 댓글을 다시 수집하여 기존 데이터를 업데이트합니다"
+            >
+              {progress.isActive ? "수집 중..." : "강제 재수집"}
             </LoadingButton>
           </div>
         </div>
@@ -630,7 +705,7 @@ export default function ChzzkYoutubeConverterTab() {
                     aria-current={selectedVideo?.videoNo === video.videoNo ? 'true' : undefined}
                     className={`w-full p-4 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-light-purple dark:focus-visible:outline-dark-accent ${
                       selectedVideo?.videoNo === video.videoNo
-                        ? "bg-light-accent/10 dark:bg-dark-accent/10"
+                        ? "bg-light-accent/20 dark:bg-dark-accent/20 border-l-2 border-light-accent dark:border-dark-accent"
                         : "hover:bg-white/30 dark:hover:bg-gray-800/30"
                     }`}
                   >
@@ -795,7 +870,16 @@ export default function ChzzkYoutubeConverterTab() {
                       const result = await response.json();
 
                       if (result.success) {
-                        setSelectedVideo(result.data.video);
+                        const updatedVideo = result.data.video;
+                        setSelectedVideo(updatedVideo);
+
+                        // Update videos array to persist the change
+                        setVideos(prevVideos =>
+                          prevVideos.map(v =>
+                            v.videoNo === updatedVideo.videoNo ? updatedVideo : v
+                          )
+                        );
+
                         setShowConverted(true);
                         showSuccess('싱크 포인트 설정 완료', `오프셋: ${formatOffset(offset)}`);
                       } else {
@@ -814,9 +898,36 @@ export default function ChzzkYoutubeConverterTab() {
                 <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-light-text dark:text-dark-text">
-                      타임라인 댓글
+                      댓글 ({displayedComments.length}개)
                     </h2>
                     <div className="flex items-center gap-4">
+                      {/* Toggle: Timeline only vs All comments */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setShowAllComments(false)}
+                          className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                            !showAllComments
+                              ? 'bg-light-accent dark:bg-dark-accent text-white'
+                              : 'bg-white/50 dark:bg-gray-800/50 text-light-text/60 dark:text-dark-text/60 hover:bg-white/70 dark:hover:bg-gray-800/70'
+                          }`}
+                          aria-pressed={!showAllComments}
+                        >
+                          타임라인만
+                        </button>
+                        <button
+                          onClick={() => setShowAllComments(true)}
+                          className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                            showAllComments
+                              ? 'bg-light-accent dark:bg-dark-accent text-white'
+                              : 'bg-white/50 dark:bg-gray-800/50 text-light-text/60 dark:text-dark-text/60 hover:bg-white/70 dark:hover:bg-gray-800/70'
+                          }`}
+                          aria-pressed={showAllComments}
+                        >
+                          전체 댓글
+                        </button>
+                      </div>
+
+                      {/* Convert checkbox */}
                       <label className="flex items-center gap-2 text-sm text-light-text/60 dark:text-dark-text/60">
                         <input
                           type="checkbox"
@@ -841,10 +952,12 @@ export default function ChzzkYoutubeConverterTab() {
                             : '체크하면 치지직 타임스탬프를 유튜브 타임스탬프로 변환하여 표시합니다'}
                         </span>
                       </label>
+
+                      {/* Copy button */}
                       {displayedComments.length > 0 && (
                         <button
                           onClick={handleCopyComments}
-                          aria-label="타임라인 댓글 복사하기"
+                          aria-label="댓글 복사하기"
                           className="flex items-center gap-2 px-4 py-2 bg-light-accent/10 dark:bg-dark-accent/10 text-light-accent dark:text-dark-accent rounded-lg hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-light-purple dark:focus-visible:outline-dark-accent"
                         >
                           <ClipboardDocumentIcon className="w-4 h-4" aria-hidden="true" />
@@ -853,17 +966,55 @@ export default function ChzzkYoutubeConverterTab() {
                       )}
                     </div>
                   </div>
+
                   {displayedComments.length > 0 ? (
-                    <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 max-h-96 overflow-y-auto">
-                      <pre className="text-sm text-light-text dark:text-dark-text whitespace-pre-wrap font-mono">
-                        {displayedComments.join("\n")}
-                      </pre>
+                    <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-4 max-h-96 overflow-y-auto space-y-3">
+                      {displayedComments.map((comment) => (
+                        <div
+                          key={comment.commentId}
+                          className={`pb-3 border-b border-light-primary/10 dark:border-dark-primary/10 last:border-b-0 last:pb-0 ${
+                            comment.isReply ? 'ml-3' : ''
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-2">
+                              {comment.isReply && (
+                                <span className="text-xs text-light-text/40 dark:text-dark-text/40">↳</span>
+                              )}
+                              <span className="text-sm font-semibold text-light-text dark:text-dark-text">
+                                {comment.authorName}
+                              </span>
+                              {comment.isReply && (
+                                <span className="text-xs px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
+                                  답글
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-light-text/40 dark:text-dark-text/40">
+                              {new Date(comment.publishedAt).toLocaleString('ko-KR', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-light-text/80 dark:text-dark-text/80 whitespace-pre-wrap break-words">
+                            {comment.displayContent}
+                          </p>
+                          {comment.isTimeline && (
+                            <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent rounded">
+                              타임라인
+                            </span>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   ) : (
                     <EmptyState
                       icon={<ChatBubbleLeftIcon className="w-16 h-16" aria-hidden="true" />}
-                      title="이 영상에는 타임라인 댓글이 없습니다."
-                      message="타임라인 댓글은 '0:00' 같은 시간 표시가 포함된 댓글입니다."
+                      title={showAllComments ? "이 영상에는 댓글이 없습니다." : "이 영상에는 타임라인 댓글이 없습니다."}
+                      message={showAllComments ? "" : "타임라인 댓글은 '0:00' 같은 시간 표시가 포함된 댓글입니다."}
                     />
                   )}
                 </div>
