@@ -90,7 +90,14 @@ export default function ChzzkYoutubeConverterTab() {
   const [videoExists, setVideoExists] = useState(true);
 
   // Comment display mode
-  const [showConverted, setShowConverted] = useState(false);
+  // Initialize from localStorage, default to false
+  const [showConverted, setShowConverted] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('chzzk-converter-show-converted');
+      return saved === 'true';
+    }
+    return false;
+  });
   const [showAllComments, setShowAllComments] = useState(false); // false = timeline only, true = all comments
 
   // UI state
@@ -126,6 +133,13 @@ export default function ChzzkYoutubeConverterTab() {
     const youtubeRegex = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|embed\/)|youtu\.be\/)([^&\s?]+)/;
     return youtubeRegex.test(url);
   };
+
+  // Save showConverted preference to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('chzzk-converter-show-converted', showConverted.toString());
+    }
+  }, [showConverted]);
 
   // Debounce search query to prevent excessive API calls
   useEffect(() => {
@@ -990,14 +1004,27 @@ export default function ChzzkYoutubeConverterTab() {
                                 </span>
                               )}
                             </div>
-                            <span className="text-xs text-light-text/40 dark:text-dark-text/40">
-                              {new Date(comment.publishedAt).toLocaleString('ko-KR', {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-light-text/40 dark:text-dark-text/40">
+                                {new Date(comment.publishedAt).toLocaleString('ko-KR', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(comment.displayContent);
+                                  showSuccess('복사 완료', '댓글이 클립보드에 복사되었습니다.');
+                                }}
+                                className="p-1 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 rounded transition-colors"
+                                title="이 댓글 복사"
+                                aria-label="이 댓글 복사"
+                              >
+                                <ClipboardDocumentIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent" />
+                              </button>
+                            </div>
                           </div>
                           <p className="text-sm text-light-text/80 dark:text-dark-text/80 whitespace-pre-wrap break-words">
                             {comment.displayContent}

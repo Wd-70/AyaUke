@@ -47,7 +47,21 @@ export function useSyncProgress() {
     }
 
     startTimeRef.current = Date.now();
-    setProgress(prev => ({ ...prev, isActive: true, stage: 'connecting' }));
+
+    // Reset all progress state to initial values
+    setProgress({
+      isActive: true,
+      stage: 'connecting',
+      currentVideo: 0,
+      totalVideos: 0,
+      processedVideos: 0,
+      currentVideoTitle: '',
+      currentVideoThumbnail: '',
+      totalComments: 0,
+      timelineComments: 0,
+      errors: [],
+      estimatedTimeRemaining: null,
+    });
     setFinalStats(null);
 
     // Create EventSource for SSE

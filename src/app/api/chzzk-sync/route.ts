@@ -206,6 +206,50 @@ async function fetchChzzkVideos(channelId: string, size: number = 50): Promise<C
   }
 }
 
+// Quick check for total comment count without fetching all comments
+async function getChzzkCommentCount(videoNo: number): Promise<number> {
+  try {
+    // Use same URL format and headers as fetchChzzkComments for consistency
+    const url = `https://apis.naver.com/nng_main/nng_comment_api/v1/type/STREAMING_VIDEO/id/${videoNo}/comments?limit=30&offset=0&orderType=POPULAR&pagingType=PAGE`;
+
+    const response = await fetchWithTimeout(
+      url,
+      {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          "Accept": "application/json, text/plain, */*",
+          "Referer": `https://chzzk.naver.com/video/${videoNo}`,
+          "front-client-platform-type": "PC",
+          "front-client-product-type": "web",
+        },
+      },
+      10000 // 10 second timeout
+    );
+
+    if (!response.ok) {
+      // 404 or other errors mean video/comments don't exist
+      if (response.status === 404) {
+        return 0;
+      }
+      console.error(`[getChzzkCommentCount] API Error for video ${videoNo}: ${response.status}`);
+      return 0;
+    }
+
+    const data = await response.json();
+
+    if (data.code && data.code !== 200) {
+      console.error(`[getChzzkCommentCount] Error code ${data.code}: ${data.message}`);
+      return 0;
+    }
+
+    // Return totalCount from comments object
+    return data.content?.comments?.totalCount || 0;
+  } catch (error: any) {
+    // Silently handle errors for deleted videos
+    return 0;
+  }
+}
+
 async function fetchChzzkComments(videoNo: number): Promise<ChzzkCommentData[]> {
   const allComments: ChzzkCommentData[] = [];
   let offset = 0;
@@ -590,21 +634,42 @@ export async function GET(request: NextRequest) {
 
                 // Check if exists
                 const existingVideo = await ChzzkVideo.findOne({ videoNo: videoData.videoNo });
-                const needsCommentSync = existingVideo && (existingVideo.totalComments === 0 || !existingVideo.lastCommentSync);
+                let needsCommentSync = existingVideo && (existingVideo.totalComments === 0 || !existingVideo.lastCommentSync);
 
+                // Check for new comments on existing videos
                 if (existingVideo && !force && !needsCommentSync) {
-                  // Skip only if video exists, force is false, AND comments were already collected
-                  sendEvent('video_skip', {
-                    current: i + 1,
-                    total: totalVideos,
-                    videoTitle: videoData.videoTitle,
-                    reason: 'already_exists'
-                  });
-                  stats.processedVideos++;
-                  continue;
+                  // Quick check: compare current comment count with stored count
+                  const currentCommentCount = await getChzzkCommentCount(videoData.videoNo);
+
+                  if (currentCommentCount > existingVideo.totalComments) {
+                    // New comments detected!
+                    console.log(`[Sync] New comments detected for video ${videoData.videoNo}: ${existingVideo.totalComments} → ${currentCommentCount}`);
+                    needsCommentSync = true;
+                    sendEvent('video_start', {
+                      current: i + 1,
+                      total: totalVideos,
+                      videoNo: videoData.videoNo,
+                      videoTitle: videoData.videoTitle,
+                      thumbnailUrl: videoData.thumbnailImageUrl,
+                      reason: 'new_comments_detected',
+                      oldCount: existingVideo.totalComments,
+                      newCount: currentCommentCount
+                    });
+                  } else {
+                    // No new comments, skip
+                    sendEvent('video_skip', {
+                      current: i + 1,
+                      total: totalVideos,
+                      videoTitle: videoData.videoTitle,
+                      reason: 'already_exists',
+                      commentCount: existingVideo.totalComments
+                    });
+                    stats.processedVideos++;
+                    continue;
+                  }
                 }
 
-                if (needsCommentSync) {
+                if (needsCommentSync && existingVideo) {
                   console.log(`[Sync] Re-syncing comments for video ${videoData.videoNo} (totalComments=${existingVideo.totalComments})`);
                   sendEvent('video_start', {
                     current: i + 1,
@@ -1104,15 +1169,25 @@ export async function POST(request: NextRequest) {
       for (const videoData of videos) {
         // Check if video already exists
         const existingVideo = await ChzzkVideo.findOne({ videoNo: videoData.videoNo });
-        const needsCommentSync = existingVideo && (existingVideo.totalComments === 0 || !existingVideo.lastCommentSync);
+        let needsCommentSync = existingVideo && (existingVideo.totalComments === 0 || !existingVideo.lastCommentSync);
 
+        // Check for new comments on existing videos
         if (existingVideo && !force && !needsCommentSync) {
-          // Skip only if video exists, force is false, AND comments were already collected
-          console.log(`[Sync] Skipping video ${videoData.videoNo} (already synced with ${existingVideo.totalComments} comments)`);
-          continue;
+          // Quick check: compare current comment count with stored count
+          const currentCommentCount = await getChzzkCommentCount(videoData.videoNo);
+
+          if (currentCommentCount > existingVideo.totalComments) {
+            // New comments detected!
+            console.log(`[Sync] New comments detected for video ${videoData.videoNo}: ${existingVideo.totalComments} → ${currentCommentCount}`);
+            needsCommentSync = true;
+          } else {
+            // No new comments, skip
+            console.log(`[Sync] Skipping video ${videoData.videoNo} (already synced with ${existingVideo.totalComments} comments)`);
+            continue;
+          }
         }
 
-        if (needsCommentSync) {
+        if (needsCommentSync && existingVideo) {
           console.log(`[Sync] Re-syncing comments for video ${videoData.videoNo} (totalComments=${existingVideo.totalComments})`);
         } else {
           stats.newVideos++;

@@ -27,40 +27,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/admin/dashboard-stats/route.js"
     ],
-    "/api/youtube-comments/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/youtube-comments/route.js"
-    ],
     "/api/chzzk-sync/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/chzzk-sync/route.js"
-    ],
-    "/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
-    ],
-    "/api/chzzk-videos/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/chzzk-videos/route.js"
-    ],
-    "/tools/timeline/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/tools/timeline/page.js"
-    ],
-    "/api/songdetails/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/songdetails/route.js"
-    ],
-    "/tools/timeline-adjuster/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/tools/timeline-adjuster/page.js"
     ]
   }
 }
