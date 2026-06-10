@@ -1,5 +1,0 @@
-{
-  "/api/chzzk-sync/route": "app/api/chzzk-sync/route.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
-  "/admin/page": "app/admin/page.js"
-}
