@@ -13,6 +13,7 @@ import {
   ChevronRightIcon,
   ChatBubbleLeftIcon,
   XMarkIcon,
+  VideoCameraIcon,
 } from "@heroicons/react/24/outline";
 import Image from "next/image";
 import DualVideoPlayer from "@/components/video/DualVideoPlayer";
@@ -724,13 +725,19 @@ export default function ChzzkYoutubeConverterTab() {
                     }`}
                   >
                     <div className="flex gap-3">
-                      <div className="relative w-32 h-18 flex-shrink-0 rounded-lg overflow-hidden">
-                        <Image
-                          src={video.thumbnailImageUrl}
-                          alt=""
-                          fill
-                          className="object-cover"
-                        />
+                      <div className="relative w-32 h-18 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700">
+                        {video.thumbnailImageUrl ? (
+                          <Image
+                            src={video.thumbnailImageUrl}
+                            alt=""
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500">
+                            <VideoCameraIcon className="w-8 h-8" />
+                          </div>
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="text-sm font-medium text-light-text dark:text-dark-text mb-1 line-clamp-2">
