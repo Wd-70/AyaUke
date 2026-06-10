@@ -2179,8 +2179,9 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
             <button
               onClick={() => openMatchingDialog(selectedTimeline)}
               className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition-colors"
+              title="이 항목의 아티스트·곡명으로 노래 DB를 검색해 매칭할 곡을 직접 고릅니다."
             >
-              매칭 검색
+              곡 검색해서 매칭
             </button>
           </div>
           {selectedTimeline.matchedSong ? (
@@ -2202,8 +2203,9 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
               </div>
               <button
                 onClick={() => handleDirectSongMatch(selectedTimeline, null, 0)}
-                className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
+                className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50
                            text-red-700 dark:text-red-300 rounded text-xs transition-colors"
+                title="이 항목에 연결된 곡을 해제합니다 (잘못 매칭됐을 때)."
               >
                 매칭 해제
               </button>
@@ -2708,15 +2710,16 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
                 className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm
                            bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                            focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                title="작업 상태별 필터 — '노래 중 곡 미매칭'은 매칭 작업 대상, '노래 중 시간 미검증'은 검증 작업 대상입니다"
               >
                 <option value="all">전체</option>
-                <option value="relevant">관련성 있음</option>
-                <option value="irrelevant">관련성 없음</option>
+                <option value="relevant">노래</option>
+                <option value="irrelevant">노래 아님</option>
                 <option value="excluded">제외됨</option>
-                <option value="matched">매칭 완료</option>
-                <option value="unmatched">미매칭</option>
-                <option value="relevantUnmatched">관련성 있음 (매칭완료 제외)</option>
-                <option value="relevantUnverified">관련성 있음 (검증완료 제외)</option>
+                <option value="matched">곡 매칭 완료</option>
+                <option value="unmatched">곡 미매칭</option>
+                <option value="relevantUnmatched">노래 중 곡 미매칭 (② 매칭 대상)</option>
+                <option value="relevantUnverified">노래 중 시간 미검증 (③ 검증 대상)</option>
               </select>
 
               <select
@@ -2768,49 +2771,60 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
             {selectedTimelineIds.size > 0 && (
               <div className="flex items-center gap-1 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <span className="text-xs text-blue-700 dark:text-blue-300 mr-1">
-                  일괄:
+                  선택 항목({selectedTimelineIds.size}개):
                 </span>
                 <button
                   onClick={() => bulkUpdateRelevance(true)}
                   className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs transition-colors"
+                  title="선택한 항목들을 '노래'로 표시합니다. 관련성 있는 항목만 곡 매칭·업로드 대상이 됩니다."
                 >
-                  관련성 있음
+                  노래로 표시
                 </button>
                 <button
                   onClick={() => bulkUpdateRelevance(false)}
                   className="px-2 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded text-xs transition-colors"
+                  title="선택한 항목들을 '노래 아님'(토크, 게임 등)으로 표시해 매칭·업로드 대상에서 제외합니다."
                 >
-                  관련성 없음
+                  노래 아님
+                </button>
+                <button
+                  onClick={() => bulkUpdateExclusion(true)}
+                  className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs transition-colors"
+                  title="선택한 항목들을 목록에서 제외 처리합니다 (중복·오파싱 정리용). '제외됨' 필터로 다시 볼 수 있습니다."
+                >
+                  제외
                 </button>
               </div>
             )}
-            
-            {/* 일괄 검색 */}
+
+            {/* ② 곡 자동 매칭 */}
             <button
               onClick={performBatchSearch}
               disabled={batchSearchLoading}
               className="px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 disabled:cursor-not-allowed text-white rounded-lg text-sm transition-colors flex items-center gap-2"
+              title="미매칭 항목 전체에 대해 노래 DB에서 비슷한 곡을 검색합니다. 신뢰도가 높으면 자동 매칭하고, 애매하면 후보만 저장해 수동 확인을 돕습니다."
             >
               {batchSearchLoading ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  일괄검색 중...
+                  곡 매칭 중...
                 </>
               ) : (
                 <>
                   <Square3Stack3DIcon className="w-4 h-4" />
-                  일괄검색
+                  곡 자동 매칭
                 </>
               )}
             </button>
-            
+
             {/* 페이지 전체 선택/해제 */}
             <button
               onClick={toggleSelectAll}
               className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm transition-colors flex items-center gap-2"
+              title="현재 페이지에 보이는 항목들을 모두 선택하거나 선택 해제합니다. (Shift+클릭: 범위 선택, Ctrl+클릭: 개별 선택)"
             >
               <CheckIcon className="w-4 h-4" />
-              {paginationInfo.currentPageItems.every(timeline => selectedTimelineIds.has(timeline.id)) ? '페이지해제' : '페이지선택'}
+              {paginationInfo.currentPageItems.every(timeline => selectedTimelineIds.has(timeline.id)) ? '페이지 선택 해제' : '페이지 전체 선택'}
             </button>
           </div>
           

@@ -561,33 +561,36 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                     onClick={() => loadChannelData(pagination.currentPage, searchQuery)}
                     disabled={loading}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                    title="화면의 영상 목록과 통계를 다시 불러옵니다. (새 댓글 수집은 하지 않음)"
                   >
                     <ArrowPathIcon className="w-4 h-4" />
-                    새로고침
+                    목록 새로고침
                   </button>
                   <button
                     onClick={syncChannelData}
                     disabled={syncing}
                     className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                    title="아야 다시보기 유튜브 채널의 모든 영상에서 새 댓글을 수집하고 타임라인 댓글을 감지합니다. (수 분 소요될 수 있음)"
                   >
                     {syncing ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        동기화 중...
+                        수집 중...
                       </>
                     ) : (
                       <>
                         <ChatBubbleBottomCenterTextIcon className="w-4 h-4" />
-                        전체 동기화
+                        유튜브 댓글 수집
                       </>
                     )}
                   </button>
                   <button
                     onClick={() => setShowManualAdd(!showManualAdd)}
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-2 transition-colors"
+                    title="채널 목록에 없는 유튜브 영상의 URL을 직접 등록해 그 영상의 댓글을 수집합니다."
                   >
                     <LinkIcon className="w-4 h-4" />
-                    영상 추가
+                    영상 수동 추가
                   </button>
                 </>
               )}
@@ -686,84 +689,96 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
               
               {viewMode === 'timeline' && (
                 <div className="flex flex-col gap-2">
-                  {/* 파싱 옵션 */}
-                  <div className="flex items-center gap-3 text-sm">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={skipProcessed}
-                        onChange={(e) => setSkipProcessed(e.target.checked)}
-                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-gray-600 dark:text-gray-400">
-                        처리완료된 댓글 스킵
-                      </span>
-                    </label>
-                    <span className="text-xs text-gray-500 dark:text-gray-500">
-                      ({skipProcessed ? '빠른 파싱' : '전체 재파싱'})
-                    </span>
+                  {/* 워크플로우 안내 */}
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    작업 순서: ① 댓글 파싱 → ② 곡 매칭 (목록의 &apos;곡 자동 매칭&apos; 또는 항목별 수동 매칭) → ③ 시간 검증 → ④ 클립 업로드
                   </div>
-                  
-                  {/* 버튼들 */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={parseTimelineComments}
-                      disabled={timelineParsing}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors"
-                    >
-                      {timelineParsing ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          처리 중...
-                        </>
-                      ) : (
-                        <>
-                          <LinkIcon className="w-4 h-4" />
-                          타임라인 파싱 (유튜브)
-                        </>
-                      )}
-                    </button>
 
-                    <button
-                      onClick={parseChzzkTimelineComments}
-                      disabled={timelineParsing}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg flex items-center gap-2 transition-colors"
-                      title="이미 동기화된 치지직 다시보기 댓글에서 타임라인을 파싱합니다"
-                    >
-                      {timelineParsing && chzzkParseProgress !== null ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          {chzzkParseProgress}
-                        </>
-                      ) : timelineParsing ? (
-                        <>
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          처리 중...
-                        </>
-                      ) : (
-                        <>
-                          <LinkIcon className="w-4 h-4" />
-                          타임라인 파싱 (치지직)
-                        </>
-                      )}
-                    </button>
+                  {/* 버튼들 — 단계별 그룹 */}
+                  <div className="flex flex-wrap items-stretch gap-3">
+                    {/* 그룹 1: 댓글 파싱 */}
+                    <div className="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-700/40 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">① 파싱</span>
 
-                    <button
-                      onClick={triggerUpload}
-                      disabled={(timelineStats?.matchedSongs || 0) === 0 && (timelineStats?.verifiedItems || 0) === 0}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 transition-colors"
-                    >
-                      <ArrowPathIcon className="w-4 h-4" />
-                      라이브 클립 업로드
-                    </button>
-                    
+                      <button
+                        onClick={parseChzzkTimelineComments}
+                        disabled={timelineParsing}
+                        className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg flex items-center gap-2 transition-colors text-sm"
+                        title="동기화된 치지직 다시보기 댓글에서 타임스탬프·곡 정보를 추출해 타임라인 항목을 만듭니다. 이미 만들어진 항목(±10초)은 자동으로 건너뜁니다."
+                      >
+                        {timelineParsing && chzzkParseProgress !== null ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            {chzzkParseProgress}
+                          </>
+                        ) : (
+                          <>
+                            <LinkIcon className="w-4 h-4" />
+                            치지직 댓글 파싱
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={parseTimelineComments}
+                        disabled={timelineParsing}
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg flex items-center gap-2 transition-colors text-sm"
+                        title="수집된 유튜브 타임라인 댓글에서 곡 항목을 추출합니다. 옆의 '처리완료 건너뛰기' 옵션을 따릅니다. (과거 영상용 — 신규 영상은 치지직 파싱 사용)"
+                      >
+                        {timelineParsing && chzzkParseProgress === null ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            처리 중...
+                          </>
+                        ) : (
+                          <>
+                            <LinkIcon className="w-4 h-4" />
+                            유튜브 댓글 파싱
+                          </>
+                        )}
+                      </button>
+
+                      <label
+                        className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap"
+                        title="켜짐: 이미 파싱된 유튜브 댓글은 건너뛰고 새 댓글만 처리 (빠름) / 꺼짐: 모든 타임라인 댓글을 다시 확인 (느림)"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={skipProcessed}
+                          onChange={(e) => setSkipProcessed(e.target.checked)}
+                          className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                        />
+                        처리완료 건너뛰기
+                      </label>
+                    </div>
+
+                    {/* 그룹 2: 업로드 (최종 단계) */}
+                    <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <span className="text-xs font-medium text-green-700 dark:text-green-400 whitespace-nowrap">④ 업로드</span>
+                      <button
+                        onClick={triggerUpload}
+                        disabled={(timelineStats?.matchedSongs || 0) === 0 && (timelineStats?.verifiedItems || 0) === 0}
+                        className="px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-lg flex items-center gap-2 transition-colors text-sm"
+                        title={
+                          (timelineStats?.matchedSongs || 0) === 0 && (timelineStats?.verifiedItems || 0) === 0
+                            ? '업로드할 항목이 없습니다 — 먼저 곡 매칭과 시간 검증을 완료하세요.'
+                            : '곡 매칭·시간 검증이 끝난 항목들을 노래책 라이브 클립으로 등록합니다. 실행 전 확인 화면이 표시됩니다.'
+                        }
+                      >
+                        <ArrowPathIcon className="w-4 h-4" />
+                        라이브 클립 업로드
+                      </button>
+                    </div>
+
+                    {/* 유지보수 (드물게 사용) */}
                     <button
                       onClick={reprocessAllTimelines}
                       disabled={timelineParsing}
-                      className="px-4 py-2 bg-orange-600 hover:bg-orange-700 disabled:bg-orange-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                      className="px-3 py-2 border border-orange-400 dark:border-orange-600 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 disabled:opacity-50 rounded-lg flex items-center gap-2 transition-colors text-sm"
+                      title="유지보수용: 새 항목을 추가하지 않고, 기존에 파싱된 유튜브 타임라인을 최신 파싱 로직으로 다시 계산해 갱신합니다. (파싱 로직이 개선됐을 때만 사용)"
                     >
                       <ChatBubbleBottomCenterTextIcon className="w-4 h-4" />
-                      데이터 업데이트
+                      기존 항목 재파싱
                     </button>
                   </div>
                 </div>
