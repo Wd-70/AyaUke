@@ -194,7 +194,7 @@ export default function ChzzkYoutubeConverterTab() {
           `영상 ${result.data.pagination.totalCount}개를 불러왔습니다. 현재 페이지 ${result.data.pagination.currentPage}`
         );
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error?.message || result.error);
       }
     } catch (err: any) {
       const friendlyError = transformError(err);
@@ -290,7 +290,7 @@ export default function ChzzkYoutubeConverterTab() {
       if (result.success) {
         setComments(result.data.comments);
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error?.message || result.error);
       }
     } catch (err: any) {
       if (err.name === 'AbortError') {
@@ -418,7 +418,7 @@ export default function ChzzkYoutubeConverterTab() {
           showSuccess('저장 완료', '유튜브 URL이 저장되었습니다.');
         }
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error?.message || result.error);
       }
     } catch (err: any) {
       // Rollback on error
@@ -466,7 +466,7 @@ export default function ChzzkYoutubeConverterTab() {
         setShowConverted(false);
         showSuccess('초기화 완료', '오프셋이 초기화되었습니다.');
       } else {
-        throw new Error(result.error);
+        throw new Error(result.error?.message || result.error);
       }
     } catch (err: any) {
       const friendlyError = transformError(err);
@@ -904,7 +904,7 @@ export default function ChzzkYoutubeConverterTab() {
                         setShowConverted(true);
                         showSuccess('싱크 포인트 설정 완료', `오프셋: ${formatOffset(offset)}`);
                       } else {
-                        throw new Error(result.error);
+                        throw new Error(result.error?.message || result.error);
                       }
                     } catch (err: any) {
                       const friendlyError = transformError(err);

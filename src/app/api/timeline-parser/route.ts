@@ -7,54 +7,7 @@ import { YouTubeComment, YouTubeVideo } from '@/models/YouTubeComment';
 import SongDetail from '@/models/SongDetail';
 import mongoose from 'mongoose';
 
-// 파싱된 타임라인 데이터를 위한 MongoDB 스키마
-const ParsedTimelineSchema = new mongoose.Schema({
-  id: { type: String, required: true, unique: true },
-  videoId: { type: String, required: true },
-  videoTitle: { type: String, required: true },
-  uploadedDate: { type: Date, required: true }, // 파싱된 날짜
-  videoPublishedAt: { type: Date }, // 실제 YouTube 영상 업로드 날짜
-  originalDateString: { type: String }, // 원본 날짜 문자열
-  artist: { type: String, required: true }, // songData1
-  songTitle: { type: String, required: true }, // songData2
-  videoUrl: { type: String, required: true }, // 기본 비디오 URL (t 파라미터 제외)
-  startTimeSeconds: { type: Number, required: true }, // 시작 시간 (초)
-  endTimeSeconds: { type: Number }, // 종료 시간 (초, 마지막 곡은 null)
-  duration: { type: Number }, // 곡 길이 (초)
-  isRelevant: { type: Boolean, default: true },
-  isExcluded: { type: Boolean, default: false },
-  matchedSong: {
-    songId: { type: String },
-    title: { type: String },
-    artist: { type: String },
-    confidence: { type: Number }
-  },
-  originalComment: { type: String, required: true }, // 원본 댓글
-  commentAuthor: { type: String, required: true }, // 댓글 작성자
-  commentId: { type: String, required: true }, // 원본 댓글 ID
-  commentPublishedAt: { type: Date }, // 댓글 작성 시간
-  // 수동 검증 관련 필드
-  isTimeVerified: { type: Boolean, default: false }, // 시간 검증 완료 여부
-  verifiedBy: { type: String }, // 검증한 사용자 ID/이름
-  verifiedAt: { type: Date }, // 검증 완료 시간
-  verificationNotes: { type: String }, // 검증 관련 메모
-  customDescription: { type: String }, // 커스텀 설명 (라이브 클립 업로드용)
-  specialTags: [{ type: String }], // 특별 태그 (모르는 곡, 곡 없음 등)
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-}, {
-  // 스키마 옵션
-  strict: true, // 스키마에 정의되지 않은 필드 허용하지 않음
-  timestamps: false, // createdAt, updatedAt을 수동으로 관리
-  versionKey: false // __v 필드 제거
-});
-
-// 기존 모델이 있다면 삭제 후 재생성 (개발 환경에서만)
-if (mongoose.models.ParsedTimeline) {
-  delete mongoose.models.ParsedTimeline;
-}
-
-const ParsedTimeline = mongoose.model('ParsedTimeline', ParsedTimelineSchema);
+import ParsedTimeline from '@/domains/archive/schemas/parsed-timeline.schema';
 
 // 텍스트 정규화 함수 (공백/특수문자 제거, 소문자 변환)
 function normalizeText(text: string): string {

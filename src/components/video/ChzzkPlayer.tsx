@@ -53,7 +53,7 @@ export default function ChzzkPlayer({
         const result = await response.json();
 
         if (!result.success || !result.data?.hlsUrl) {
-          throw new Error(result.error || "HLS stream not found");
+          throw new Error(result.error?.message || "HLS stream not found");
         }
 
         setHlsUrl(result.data.hlsUrl);
