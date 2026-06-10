@@ -25,6 +25,7 @@ import SongCard from './SongCard'
 import ShareManagement from './ShareManagement'
 import { Song } from '@/types'
 import { useToast } from './Toast'
+import { useBulkLikes } from '@/hooks/useLikes'
 
 interface PlaylistData {
   playlist: {
@@ -73,6 +74,7 @@ interface PlaylistDetailViewProps {
 export default function PlaylistDetailView({ data, shareId }: PlaylistDetailViewProps) {
   const { playlist, isOwner, permissions } = data
   const { showSuccess, showError } = useToast()
+  const { loadLikes } = useBulkLikes()
   const [showShareManagement, setShowShareManagement] = useState(false)
   const [isLiked, setIsLiked] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -86,38 +88,12 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
   const [editedCoverImage, setEditedCoverImage] = useState(playlist.coverImage || '')
   const [showNumbers, setShowNumbers] = useState(false)
 
-  // 플레이리스트 곡들의 좋아요 정보 미리 로드
+  // 플레이리스트 곡들의 좋아요 정보 미리 로드 (react-query 캐시에 병합)
   useEffect(() => {
-    const loadPlaylistLikes = async () => {
-      if (playlist.songs.length === 0) return
-
-      try {
-        const songIds = playlist.songs.map(item => item.songId.id || item.songId._id)
-        console.log('🔄 플레이리스트 좋아요 정보 로딩:', songIds)
-        
-        const response = await fetch('/api/likes/bulk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ songIds })
-        })
-
-        if (response.ok) {
-          const { data } = await response.json()
-          console.log('✅ 플레이리스트 좋아요 정보 로딩 완료:', data.likes)
-
-          // 전역 likes store에 데이터 설정 (useLike 훅에서 사용)
-          // 각 SongCard의 useLike 훅이 이 데이터를 사용하도록 강제 새로고침
-          window.dispatchEvent(new CustomEvent('likesLoaded', {
-            detail: { likes: data.likes }
-          }))
-        }
-      } catch (error) {
-        console.error('❌ 플레이리스트 좋아요 정보 로딩 실패:', error)
-      }
-    }
-
-    loadPlaylistLikes()
-  }, [playlist.songs])
+    if (playlist.songs.length === 0) return
+    const songIds = playlist.songs.map(item => item.songId.id || item.songId._id)
+    loadLikes(songIds)
+  }, [playlist.songs, loadLikes])
 
   const showToastMessage = (message: string, type: 'success' | 'error' = 'success') => {
     setToastMessage(message)

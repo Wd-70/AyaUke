@@ -1,166 +1,55 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 
-// 전역 상태 관리를 위한 간단한 store
-class LikesStore {
-  private likes: Map<string, boolean> = new Map()
-  private loading: Set<string> = new Set()
-  private subscribers: Map<string, Set<() => void>> = new Map()
-  private bulkLoadPromise: Promise<void> | null = null
+/**
+ * 좋아요 상태 관리 — TanStack Query 캐시 기반.
+ * 캐시 형태: Record<songId, boolean>, 키는 사용자(channelId)별로 분리되어
+ * 로그인 전환 시 자동으로 격리된다.
+ *
+ * 데이터는 항상 대량 로딩(useBulkLikes)으로 주입되고,
+ * useLike는 캐시를 구독해 개별 곡 상태를 읽는다.
+ */
 
-  setLike(songId: string, liked: boolean) {
-    this.likes.set(songId, liked)
-    this.notifySubscribers(songId)
-    // 전역 이벤트 발생
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('likesUpdated'))
-    }
-  }
+type LikesMap = Record<string, boolean>
 
-  getLike(songId: string): boolean | undefined {
-    return this.likes.get(songId)
-  }
+const likesKey = (channelId: string | null) => ['likes', channelId ?? 'anonymous'] as const
 
-  setLoading(songId: string, loading: boolean) {
-    if (loading) {
-      this.loading.add(songId)
-    } else {
-      this.loading.delete(songId)
-    }
-    this.notifySubscribers(songId)
-  }
-
-  isLoading(songId: string): boolean {
-    return this.loading.has(songId)
-  }
-
-  subscribe(songId: string, callback: () => void) {
-    if (!this.subscribers.has(songId)) {
-      this.subscribers.set(songId, new Set())
-    }
-    this.subscribers.get(songId)!.add(callback)
-
-    return () => {
-      const songSubscribers = this.subscribers.get(songId)
-      if (songSubscribers) {
-        songSubscribers.delete(callback)
-        if (songSubscribers.size === 0) {
-          this.subscribers.delete(songId)
-        }
-      }
-    }
-  }
-
-  private notifySubscribers(songId: string) {
-    const songSubscribers = this.subscribers.get(songId)
-    if (songSubscribers) {
-      songSubscribers.forEach(callback => callback())
-    }
-  }
-
-  // bulk 데이터를 직접 설정
-  setBulkLikes(likesData: Record<string, boolean>) {
-    Object.entries(likesData).forEach(([songId, liked]) => {
-      this.likes.set(songId, liked)
-      this.notifySubscribers(songId)
-    })
-    // 전역 이벤트 발생
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('likesUpdated'))
-    }
-  }
-
-  // 좋아요한 곡 ID들 반환
-  getLikedSongIds(): string[] {
-    const likedIds: string[] = []
-    this.likes.forEach((liked, songId) => {
-      if (liked) {
-        likedIds.push(songId)
-      }
-    })
-    return likedIds
-  }
-
-  // 대량 로딩 (중복 방지)
-  async bulkLoadLikes(songIds: string[], priority: 'high' | 'low' = 'low'): Promise<void> {
-    if (this.bulkLoadPromise && priority === 'low') {
-      // 낮은 우선순위 요청이고 이미 진행 중인 요청이 있으면 기다림
-      await this.bulkLoadPromise
-    }
-
-    // 아직 로딩되지 않은 곡들만 필터링
-    const unloadedSongIds = songIds.filter(id => !this.likes.has(id))
-    
-    if (unloadedSongIds.length === 0) {
-      console.log(`⏭️ 모든 곡이 이미 로딩됨: ${songIds.length}곡`)
-      return
-    }
-
-    // 동일한 요청이 진행 중인지 확인 (songIds 배열을 문자열로 변환하여 비교)
-    const requestKey = unloadedSongIds.sort().join(',')
-    if (this.bulkLoadPromise) {
-      console.log(`⌛ 동일한 대량 로딩 요청 대기 중: ${unloadedSongIds.length}곡`)
-      await this.bulkLoadPromise
-      return
-    }
-
-    console.log(`🔄 대량 좋아요 로딩 시작 (${priority}): ${unloadedSongIds.length}곡`)
-
-    this.bulkLoadPromise = this.performBulkLoad(unloadedSongIds)
-    await this.bulkLoadPromise
-    this.bulkLoadPromise = null
-  }
-
-  private async performBulkLoad(songIds: string[]): Promise<void> {
-    try {
-      const response = await fetch('/api/likes/bulk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ songIds })
-      })
-
-      if (response.ok) {
-        const { data } = await response.json()
-
-        // 결과를 store에 저장하고 모든 관련 구독자에게 알림
-        Object.entries(data.likes).forEach(([songId, liked]) => {
-          this.likes.set(songId, liked as boolean)
-          this.notifySubscribers(songId)
-        })
-
-        // 전역 이벤트 발생
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('likesUpdated'))
-        }
-
-        console.log(`✅ 대량 좋아요 로딩 완료: ${Object.keys(data.likes).length}곡`)
-      } else {
-        console.error('대량 좋아요 로딩 실패:', response.status)
-      }
-    } catch (error) {
-      console.error('대량 좋아요 로딩 오류:', error)
-    }
-  }
-
-  reset() {
-    this.likes.clear()
-    this.loading.clear()
-    this.subscribers.clear()
-    this.bulkLoadPromise = null
+/** SongSearch 등 외부 구독자를 위한 레거시 호환 이벤트 */
+function emitLikesUpdated() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('likesUpdated'))
   }
 }
 
-const likesStore = new LikesStore()
+function useLikesCache() {
+  const { data: session } = useSession()
+  const channelId = session?.user?.channelId ?? null
+  const queryClient = useQueryClient()
 
-// 전역 이벤트 리스너 설정 (플레이리스트에서 bulk 데이터 수신)
-if (typeof window !== 'undefined') {
-  window.addEventListener('likesLoaded', (event: CustomEvent) => {
-    const { likes } = event.detail
-    console.log('📨 좋아요 bulk 데이터 수신:', likes)
-    likesStore.setBulkLikes(likes)
+  const { data: likesMap = {} } = useQuery<LikesMap>({
+    queryKey: likesKey(channelId),
+    // 실제 데이터는 loadLikes가 setQueryData로 병합 주입한다
+    queryFn: () => ({}),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    enabled: !!channelId,
   })
+
+  const mergeLikes = useCallback(
+    (incoming: LikesMap) => {
+      queryClient.setQueryData<LikesMap>(likesKey(channelId), (prev) => ({
+        ...(prev ?? {}),
+        ...incoming,
+      }))
+      emitLikesUpdated()
+    },
+    [queryClient, channelId],
+  )
+
+  return { channelId, likesMap, mergeLikes, queryClient }
 }
 
 interface UseLikeReturn {
@@ -171,137 +60,101 @@ interface UseLikeReturn {
 }
 
 export function useLike(songId: string): UseLikeReturn {
-  const { data: session } = useSession()
-  const [updateCounter, setUpdateCounter] = useState(0)
+  const { channelId, likesMap, mergeLikes } = useLikesCache()
   const [error, setError] = useState<string | null>(null)
-  const mounted = useRef(true)
 
-  // 강제 업데이트 함수
-  const forceUpdate = useCallback(() => {
-    if (mounted.current) {
-      setUpdateCounter(prev => prev + 1)
-    }
-  }, [])
+  const liked = likesMap[songId] ?? false
 
-  // 컴포넌트 언마운트 시 cleanup
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  const mutation = useMutation({
+    mutationFn: async (currentLiked: boolean) => {
+      const response = currentLiked
+        ? await fetch(`/api/likes?songId=${songId}`, { method: 'DELETE' })
+        : await fetch('/api/likes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ songId }),
+          })
 
-  // 세션 변경 시 store 리셋 (다른 사용자로 변경된 경우에만)
-  const prevChannelIdRef = useRef<string | null>(null)
-  useEffect(() => {
-    const currentChannelId = session?.user?.channelId || null
-    
-    // 이전 channelId가 있었는데 다른 사용자로 변경된 경우에만 리셋
-    if (prevChannelIdRef.current && prevChannelIdRef.current !== currentChannelId) {
-      console.log('🔄 사용자 변경 감지, store 리셋:', prevChannelIdRef.current, '->', currentChannelId)
-      likesStore.reset()
-    }
-    
-    prevChannelIdRef.current = currentChannelId
-  }, [session?.user?.channelId])
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        throw new Error(
+          data?.error?.message || (currentLiked ? '좋아요 취소에 실패했습니다' : '좋아요 추가에 실패했습니다'),
+        )
+      }
+    },
+    onMutate: async (currentLiked) => {
+      // 낙관적 업데이트
+      setError(null)
+      mergeLikes({ [songId]: !currentLiked })
+      return { previous: currentLiked }
+    },
+    onError: (err, _vars, context) => {
+      // 실패 시 원래 상태로 롤백
+      if (context) mergeLikes({ [songId]: context.previous })
+      setError(err instanceof Error ? err.message : '네트워크 오류가 발생했습니다')
+    },
+  })
 
-  // store 구독 - UI 업데이트를 위해 필요
-  useEffect(() => {
-    if (!songId) return
-
-    const unsubscribe = likesStore.subscribe(songId, forceUpdate)
-
-    return unsubscribe
-  }, [songId, forceUpdate])
-
-  // 개별 API 호출 제거 - 오직 대량 로딩에만 의존
-
-  const toggleLike = async () => {
-    if (!session?.user?.channelId) {
+  const toggleLike = useCallback(async () => {
+    if (!channelId) {
       setError('로그인이 필요합니다')
       return
     }
-
-    const currentLiked = likesStore.getLike(songId) || false
-    const newLikedState = !currentLiked
-    
-    // 즉시 UI 반영 (낙관적 업데이트)
-    likesStore.setLike(songId, newLikedState)
-    likesStore.setLoading(songId, true)
-    setError(null)
-
-    try {
-      if (currentLiked) {
-        // 좋아요 취소
-        const response = await fetch(`/api/likes?songId=${songId}`, {
-          method: 'DELETE'
-        })
-
-        if (!response.ok) {
-          // 실패 시 원래 상태로 되돌림
-          likesStore.setLike(songId, currentLiked)
-          const data = await response.json().catch(() => null)
-          setError(data?.error?.message || '좋아요 취소에 실패했습니다')
-        }
-      } else {
-        // 좋아요 추가
-        const response = await fetch('/api/likes', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ songId })
-        })
-
-        if (!response.ok) {
-          // 실패 시 원래 상태로 되돌림
-          likesStore.setLike(songId, currentLiked)
-          const data = await response.json().catch(() => null)
-          setError(data?.error?.message || '좋아요 추가에 실패했습니다')
-        }
-      }
-    } catch (err) {
-      // 오류 시 원래 상태로 되돌림
-      likesStore.setLike(songId, currentLiked)
-      setError('네트워크 오류가 발생했습니다')
-      console.error('좋아요 토글 오류:', err)
-    } finally {
-      likesStore.setLoading(songId, false)
-    }
-  }
+    await mutation.mutateAsync(liked).catch(() => {
+      // 에러는 onError에서 처리됨
+    })
+  }, [channelId, liked, mutation])
 
   return {
-    liked: likesStore.getLike(songId) || false,
-    isLoading: likesStore.isLoading(songId),
+    liked,
+    isLoading: mutation.isPending,
     error,
-    toggleLike
+    toggleLike,
   }
 }
 
-// 대량 좋아요 로딩을 위한 훅
+/** 여러 곡의 좋아요 상태를 한 번에 로딩해 캐시에 병합 */
 export function useBulkLikes() {
-  const { data: session } = useSession()
+  const { channelId, likesMap, mergeLikes } = useLikesCache()
 
-  const loadLikes = useCallback(async (songIds: string[], priority: 'high' | 'low' = 'low') => {
-    if (!session?.user?.channelId || !songIds.length) {
-      console.log('🚫 좋아요 로딩 건너뜀:', { 
-        hasSession: !!session?.user?.channelId, 
-        songCount: songIds.length 
-      })
-      return
-    }
+  const loadLikes = useCallback(
+    async (songIds: string[], _priority: 'high' | 'low' = 'low') => {
+      if (!channelId || !songIds.length) return
 
-    await likesStore.bulkLoadLikes(songIds, priority)
-  }, [session?.user?.channelId])
+      // 이미 캐시에 있는 곡은 제외
+      const unloaded = songIds.filter((id) => !(id in likesMap))
+      if (unloaded.length === 0) return
+
+      try {
+        const response = await fetch('/api/likes/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ songIds: unloaded }),
+        })
+
+        if (response.ok) {
+          const { data } = await response.json()
+          mergeLikes(data.likes)
+        } else {
+          console.error('대량 좋아요 로딩 실패:', response.status)
+        }
+      } catch (error) {
+        console.error('대량 좋아요 로딩 오류:', error)
+      }
+    },
+    [channelId, likesMap, mergeLikes],
+  )
 
   return { loadLikes }
 }
 
-// 좋아요 관련 정보를 가져오는 훅
+/** 캐시에서 좋아요한 곡 ID 목록을 읽는다 (SongSearch의 필터링용) */
 export function useLikes() {
-  const getLikedSongIds = useCallback(() => {
-    return likesStore.getLikedSongIds()
-  }, [])
+  const { likesMap } = useLikesCache()
+
+  const getLikedSongIds = useCallback((): string[] => {
+    return Object.keys(likesMap).filter((id) => likesMap[id])
+  }, [likesMap])
 
   return { getLikedSongIds }
 }
@@ -319,14 +172,15 @@ interface UserLikesReturn {
   } | null
 }
 
+/** 프로필 화면의 좋아요 목록 (페이지네이션) */
 export function useUserLikes(page: number = 1, limit: number = 20): UserLikesReturn {
   const { data: session } = useSession()
   const [likes, setLikes] = useState<unknown[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [pagination, setPagination] = useState<unknown>(null)
+  const [pagination, setPagination] = useState<UserLikesReturn['pagination']>(null)
 
-  const fetchLikes = async () => {
+  const fetchLikes = useCallback(async () => {
     if (!session?.user?.channelId) return
 
     setIsLoading(true)
@@ -334,14 +188,13 @@ export function useUserLikes(page: number = 1, limit: number = 20): UserLikesRet
 
     try {
       const response = await fetch(`/api/user/likes?page=${page}&limit=${limit}`)
-      
+      const data = await response.json()
+
       if (response.ok) {
-        const data = await response.json()
         setLikes(data.likes)
         setPagination(data.pagination)
       } else {
-        const data = await response.json()
-        setError(data.error || '좋아요 목록을 불러오는데 실패했습니다')
+        setError(data.error?.message || data.error || '좋아요 목록을 불러오는데 실패했습니다')
       }
     } catch (err) {
       setError('네트워크 오류가 발생했습니다')
@@ -349,17 +202,17 @@ export function useUserLikes(page: number = 1, limit: number = 20): UserLikesRet
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [session?.user?.channelId, page, limit])
 
   useEffect(() => {
     fetchLikes()
-  }, [session, page, limit])
+  }, [fetchLikes])
 
   return {
     likes,
     isLoading,
     error,
     refresh: fetchLikes,
-    pagination
+    pagination,
   }
 }

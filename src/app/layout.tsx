@@ -4,6 +4,7 @@ import "./globals.css";
 import ThemeScript from "@/components/ThemeScript";
 import { Analytics } from "@vercel/analytics/next";
 import AuthProvider from "@/contexts/AuthProvider";
+import QueryProvider from "@/contexts/QueryProvider";
 import { ToastProvider } from "@/components/Toast";
 
 const inter = Inter({
@@ -69,9 +70,11 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AuthProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
+          <QueryProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </QueryProvider>
         </AuthProvider>
         <Analytics />
       </body>
