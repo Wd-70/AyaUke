@@ -25,6 +25,7 @@ import {
 } from '@heroicons/react/24/outline'
 import Navigation from '@/components/Navigation'
 import SongEditModal from '@/components/admin/SongEditModal'
+import { useToast } from '@/components/Toast'
 
 interface AdminSong {
   id: string
@@ -66,6 +67,7 @@ export default function SongManagement() {
   // 노래관리 페이지 활동 추적
   useActivity()
   const { data: session, status } = useSession()
+  const { showSuccess, showError } = useToast()
   const router = useRouter()
   const initializedRef = useRef(false)
   const [songs, setSongs] = useState<AdminSong[]>([])
@@ -85,6 +87,8 @@ export default function SongManagement() {
   const [showTagAddModal, setShowTagAddModal] = useState(false)
   const [showSongEditModal, setShowSongEditModal] = useState(false)
   const [editingSong, setEditingSong] = useState<AdminSong | null>(null)
+  const [bulkMRLoading, setBulkMRLoading] = useState(false)
+  const [bulkMRProgress, setBulkMRProgress] = useState({ current: 0, total: 0 })
   const [stats, setStats] = useState<AdminStats>({
     total: 0,
     complete: 0,
@@ -131,7 +135,7 @@ export default function SongManagement() {
     } catch (error) {
       console.error('❌ 노래 목록 로딩 오류:', error)
       // 에러 시 사용자에게 알림
-      alert('노래 목록을 불러오는 중 오류가 발생했습니다.')
+      showError('로드 실패', '노래 목록을 불러오는 중 오류가 발생했습니다.')
     } finally {
       if (showFullLoading) {
         setLoading(false)
@@ -233,7 +237,7 @@ export default function SongManagement() {
   // 일괄 작업 실행
   const executeBulkAction = useCallback(async (action: string, data?: unknown) => {
     if (selectedSongs.size === 0) {
-      alert('곡을 선택해주세요.')
+      showError('선택 필요', '곡을 선택해주세요.')
       return
     }
 
@@ -255,7 +259,7 @@ export default function SongManagement() {
       const result = await response.json()
       
       if (result.success) {
-        alert(`${result.message} (${result.affectedCount}곡 처리됨)`)
+        showSuccess('작업 완료', `${result.message} (${result.affectedCount}곡 처리됨)`)
         setSelectedSongs(new Set()) // 선택 해제
         // 데이터 다시 로드 (백그라운드에서 조용히)
         await loadSongs()
@@ -264,7 +268,7 @@ export default function SongManagement() {
       }
     } catch (error) {
       console.error('❌ 일괄 작업 오류:', error)
-      alert('작업 중 오류가 발생했습니다.')
+      showError('작업 실패', '작업 중 오류가 발생했습니다.')
     } finally {
       setBulkActionLoading(false)
     }
@@ -340,7 +344,7 @@ export default function SongManagement() {
       const result = await response.json()
       
       if (result.success) {
-        alert(`${songData.title} 곡이 성공적으로 추가되었습니다!`)
+        showSuccess('추가 완료', `${songData.title} 곡이 추가되었습니다.`)
         setShowAddModal(false)
         // 데이터 다시 로드 (백그라운드에서 조용히)
         await loadSongs()
@@ -349,11 +353,98 @@ export default function SongManagement() {
       }
     } catch (error) {
       console.error('❌ 새 곡 추가 오류:', error)
-      alert('곡 추가 중 오류가 발생했습니다.')
+      showError('추가 실패', '곡 추가 중 오류가 발생했습니다.')
     } finally {
       setAddLoading(false)
     }
   }, [loadSongs])
+
+  // YouTube에서 MR 링크 검색 (구 SongManagementTab에서 이식)
+  const searchMRFromYouTube = useCallback(async (title: string, artist: string) => {
+    try {
+      const response = await fetch('/api/youtube-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, artist })
+      })
+      const result = await response.json()
+
+      if (result.success) return result.selectedResult
+      if (result.error && (String(result.error).includes('quota') || String(result.error).includes('할당량'))) {
+        return 'QUOTA_EXCEEDED'
+      }
+      return null
+    } catch (error) {
+      console.error('YouTube 검색 오류:', error)
+      return null
+    }
+  }, [])
+
+  // MR 링크가 없는 모든 곡에 YouTube 자동 검색으로 MR 일괄 추가
+  const bulkAddMRLinks = useCallback(async () => {
+    const songsWithoutMR = filteredSongs.filter(song => !song.mrLinks || song.mrLinks.length === 0)
+
+    if (songsWithoutMR.length === 0) {
+      showError('대상 없음', 'MR 링크가 없는 곡이 없습니다.')
+      return
+    }
+
+    const confirmMessage = `MR 링크가 없는 ${songsWithoutMR.length}곡에 대해 자동으로 YouTube에서 MR 링크를 검색하여 추가하시겠습니까?\n\n⚠️ 주의사항:\n• YouTube API 할당량 제한이 있습니다\n• 잘못된 MR이 연결될 수 있습니다`
+    if (!confirm(confirmMessage)) return
+
+    setBulkMRLoading(true)
+    setBulkMRProgress({ current: 0, total: songsWithoutMR.length })
+
+    let successCount = 0
+    let errorCount = 0
+    let quotaExceeded = false
+
+    for (let i = 0; i < songsWithoutMR.length; i++) {
+      const song = songsWithoutMR[i]
+      setBulkMRProgress({ current: i + 1, total: songsWithoutMR.length })
+
+      try {
+        const mrResult = await searchMRFromYouTube(song.title, song.artist)
+
+        if (mrResult === 'QUOTA_EXCEEDED') {
+          quotaExceeded = true
+          break
+        }
+
+        if (mrResult) {
+          const newMRLink = {
+            url: mrResult.url,
+            skipSeconds: 0,
+            label: `Auto-added: ${mrResult.title.substring(0, 30)}...`,
+            duration: ''
+          }
+          const response = await fetch(`/api/songdetails/${song.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mrLinks: [newMRLink] })
+          })
+          if (response.ok) successCount++
+          else errorCount++
+        } else {
+          errorCount++
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 200))
+      } catch (error) {
+        errorCount++
+        console.error('MR 일괄 추가 처리 중 오류:', error)
+      }
+    }
+
+    setBulkMRLoading(false)
+    setBulkMRProgress({ current: 0, total: 0 })
+
+    const message = `성공: ${successCount}곡, 실패: ${errorCount}곡${quotaExceeded ? ' (API 할당량 초과로 중단)' : ''}`
+    if (quotaExceeded || errorCount > successCount) showError('MR 일괄 추가 중단', message)
+    else showSuccess('MR 일괄 추가 완료', message)
+
+    await loadSongs()
+  }, [filteredSongs, searchMRFromYouTube, loadSongs, showSuccess, showError])
 
   // 개별 곡 편집 함수
   const handleEditSong = useCallback((song: AdminSong) => {
@@ -385,7 +476,7 @@ export default function SongManagement() {
       const result = await response.json()
       
       if (result.success) {
-        alert(`"${song.title}" 곡이 성공적으로 삭제되었습니다.`)
+        showSuccess('삭제 완료', `"${song.title}" 곡이 삭제되었습니다.`)
         // 데이터 다시 로드 (백그라운드에서 조용히)
         await loadSongs()
       } else {
@@ -393,7 +484,7 @@ export default function SongManagement() {
       }
     } catch (error) {
       console.error('❌ 곡 삭제 오류:', error)
-      alert('곡 삭제 중 오류가 발생했습니다.')
+      showError('삭제 실패', '곡 삭제 중 오류가 발생했습니다.')
     } finally {
       setBulkActionLoading(false)
     }
@@ -429,7 +520,7 @@ export default function SongManagement() {
       const result = await response.json()
       
       if (result.success) {
-        alert(`${editingSong.title} 곡이 성공적으로 수정되었습니다!`)
+        showSuccess('수정 완료', `${editingSong.title} 곡이 수정되었습니다.`)
         setShowSongEditModal(false)
         setEditingSong(null)
         // 데이터 다시 로드 (백그라운드에서 조용히)
@@ -439,7 +530,7 @@ export default function SongManagement() {
       }
     } catch (error) {
       console.error('❌ 개별 곡 수정 오류:', error)
-      alert('곡 수정 중 오류가 발생했습니다.')
+      showError('수정 실패', '곡 수정 중 오류가 발생했습니다.')
     } finally {
       setBulkActionLoading(false)
     }
@@ -667,12 +758,39 @@ export default function SongManagement() {
                 )}
               </button>
 
+              {/* MR 일괄 추가 - 편집 권한이 있을 때만 표시 */}
+              {userPermissions.canEdit && (
+                <button
+                  onClick={bulkAddMRLinks}
+                  disabled={bulkMRLoading}
+                  className="px-4 py-3 bg-gradient-to-r from-rose-500 to-pink-600
+                             text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300
+                             flex items-center gap-2 font-medium
+                             disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  title="MR 링크가 없는 곡에 YouTube 자동 검색으로 MR 일괄 추가"
+                >
+                  {bulkMRLoading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span className="hidden sm:inline">
+                        {bulkMRProgress.current}/{bulkMRProgress.total}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <LinkIcon className="w-5 h-5" />
+                      <span className="hidden sm:inline">MR 일괄 추가</span>
+                    </>
+                  )}
+                </button>
+              )}
+
               {/* 새 곡 추가 버튼 - 생성 권한이 있을 때만 표시 */}
               {userPermissions.canCreate && (
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="px-4 py-3 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple 
-                             text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 
+                  className="px-4 py-3 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple
+                             text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300
                              flex items-center gap-2 font-medium"
                   title="새 곡 추가"
                 >

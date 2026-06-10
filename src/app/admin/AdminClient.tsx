@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { isSuperAdmin, UserRole } from "@/lib/permissions";
+import { isSuperAdmin, canAccessAdminPanel, canManageSongs, UserRole } from "@/lib/permissions";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChartBarIcon,
@@ -29,8 +29,8 @@ import {
 
 // Import tabs from test-db
 import CommentAnalysisTab from "../test-db/tabs/CommentAnalysisTab";
-import SongManagementTab from "./tabs/SongManagementTab";
 import UserManagementTab from "./tabs/UserManagementTab";
+import MaintenanceTab from "./tabs/MaintenanceTab";
 import DashboardTab from "./tabs/DashboardTab";
 import LiveClipManagementTab from "./tabs/LiveClipManagementTab";
 import ChzzkYoutubeConverterTab from "./tabs/ChzzkYoutubeConverterTab";
@@ -43,7 +43,17 @@ type TabType =
   | "comments"
   | "converter"
   | "users"
+  | "maintenance"
   | "system";
+
+/** 탭 접근 레벨: admin=모든 관리자, songs=노래 관리 권한, super=최고관리자 */
+type TabAccess = "admin" | "songs" | "super";
+
+const TAB_ACCESS_CHECKS: Record<TabAccess, (role: UserRole) => boolean> = {
+  admin: canAccessAdminPanel,
+  songs: canManageSongs,
+  super: isSuperAdmin,
+};
 
 const tabs = [
   {
@@ -51,48 +61,65 @@ const tabs = [
     name: "대시보드",
     icon: ChartBarIcon,
     description: "시스템 개요 및 통계",
+    access: "admin" as TabAccess,
   },
   {
     id: "clips" as const,
     name: "라이브 클립",
     icon: PlayIcon,
     description: "라이브 클립 조회, 재생, 관리",
+    access: "super" as TabAccess,
   },
   {
     id: "songs" as const,
     name: "노래 관리",
     icon: MusicalNoteIcon,
     description: "노래 데이터 조회, 편집, 삭제",
+    access: "songs" as TabAccess,
+    external: true,
+    externalLink: "/admin/songs",
   },
   {
     id: "timeline" as const,
     name: "타임라인 파싱",
     icon: AdjustmentsHorizontalIcon,
     description: "YouTube 댓글 수집 및 타임라인 분석",
+    access: "super" as TabAccess,
   },
   {
     id: "comments" as const,
     name: "댓글 분석",
     icon: ChatBubbleBottomCenterTextIcon,
     description: "댓글 분석 도구",
+    access: "super" as TabAccess,
   },
   {
     id: "converter" as const,
     name: "치지직→유튜브",
     icon: AdjustmentsHorizontalIcon,
     description: "타임라인 댓글 변환",
+    access: "super" as TabAccess,
   },
   {
     id: "users" as const,
     name: "사용자 관리",
     icon: UsersIcon,
     description: "사용자 권한 및 활동 관리",
+    access: "super" as TabAccess,
+  },
+  {
+    id: "maintenance" as const,
+    name: "데이터 유지보수",
+    icon: ServerIcon,
+    description: "백업 내보내기, 재계산, 컬렉션 현황",
+    access: "super" as TabAccess,
   },
   {
     id: "system" as const,
     name: "시스템 설정",
     icon: ServerIcon,
     description: "시스템 설정 및 모니터링",
+    access: "super" as TabAccess,
   },
 ];
 
@@ -120,7 +147,7 @@ export default function AdminClient() {
       return;
     }
 
-    if (!isSuperAdmin(session.user.role as UserRole)) {
+    if (!canAccessAdminPanel(session.user.role as UserRole)) {
       router.push("/");
       return;
     }
@@ -134,20 +161,25 @@ export default function AdminClient() {
     );
   }
 
-  if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+  if (!session || !canAccessAdminPanel(session.user.role as UserRole)) {
     return null;
   }
 
+  // 보유 권한에 따라 노출할 탭 필터링
+  const role = session.user.role as UserRole;
+  const visibleTabs = tabs.filter((tab) => TAB_ACCESS_CHECKS[tab.access](role));
+
+  // 현재 활성 탭이 권한 밖이면 첫 번째 가시 탭으로 이동
+  const activeIsVisible = visibleTabs.some((tab) => tab.id === activeTab);
+  const effectiveActiveTab = activeIsVisible ? activeTab : (visibleTabs[0]?.id ?? "dashboard");
+
   const renderTabContent = () => {
-    switch (activeTab) {
+    switch (effectiveActiveTab) {
       case "dashboard":
         return <DashboardTab />;
 
       case "clips":
         return <LiveClipManagementTab />;
-
-      case "songs":
-        return <SongManagementTab />;
 
       case "timeline":
         return <CommentAnalysisTab viewMode="timeline" />;
@@ -160,6 +192,9 @@ export default function AdminClient() {
 
       case "users":
         return <UserManagementTab />;
+
+      case "maintenance":
+        return <MaintenanceTab />;
 
       case "system":
         return (
@@ -249,9 +284,9 @@ export default function AdminClient() {
                 </button>
               </div>
               <nav className="p-3 xl:p-4 space-y-1 xl:space-y-2">
-                {tabs.map((tab) => {
+                {visibleTabs.map((tab) => {
                   const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
+                  const isActive = effectiveActiveTab === tab.id;
                   const TabElement = (tab as any).external ? 'a' : 'button';
                   const tabProps = (tab as any).external 
                     ? { href: (tab as any).externalLink, target: '_blank', rel: 'noopener noreferrer' }
@@ -300,9 +335,9 @@ export default function AdminClient() {
           <div className="hidden lg:block xl:hidden lg:w-16 flex-shrink-0">
             <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 overflow-hidden">
               <nav className="p-2 space-y-1">
-                {tabs.map((tab) => {
+                {visibleTabs.map((tab) => {
                   const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
+                  const isActive = effectiveActiveTab === tab.id;
                   const TabElement = (tab as any).external ? 'a' : 'button';
                   const tabProps = (tab as any).external 
                     ? { href: (tab as any).externalLink, target: '_blank', rel: 'noopener noreferrer' }
@@ -330,9 +365,9 @@ export default function AdminClient() {
           {/* Mobile Tab Navigation */}
           <div className="lg:hidden">
             <nav className="flex overflow-x-auto space-x-1 pb-4">
-              {tabs.map((tab) => {
+              {visibleTabs.map((tab) => {
                 const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
+                const isActive = effectiveActiveTab === tab.id;
                 const TabElement = (tab as any).external ? 'a' : 'button';
                 const tabProps = (tab as any).external 
                   ? { href: (tab as any).externalLink, target: '_blank', rel: 'noopener noreferrer' }
@@ -362,7 +397,7 @@ export default function AdminClient() {
           <div className="flex-1">
             <AnimatePresence mode="wait">
               <motion.div
-                key={activeTab}
+                key={effectiveActiveTab}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
-import { isSuperAdmin, UserRole } from '@/lib/permissions'
+import { canAccessAdminPanel, UserRole } from '@/lib/permissions'
 import dbConnect from '@/lib/mongodb'
 import SongVideo from '@/models/SongVideo'
 import User from '@/models/User'
@@ -10,9 +10,9 @@ import SongDetail from '@/models/SongDetail'
 
 export async function GET() {
   try {
-    // 권한 체크
+    // 권한 체크: 대시보드는 모든 관리자 역할에게 공개 (통계 요약만 제공)
     const session = await getServerSession(authOptions)
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+    if (!session || !canAccessAdminPanel(session.user.role as UserRole)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

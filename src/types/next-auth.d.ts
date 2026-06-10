@@ -12,6 +12,9 @@ declare module "next-auth" {
       followerCount: number
       isAdmin: boolean
       adminRole: string
+      /** UserRole enum 값 (super_admin | song_admin | ayauke_admin | song_editor | user) */
+      role: string
+      displayName?: string
       selectedTitle: {
         id: string
         name: string
@@ -31,6 +34,7 @@ declare module "next-auth" {
     followerCount: number
     isAdmin: boolean
     adminRole: string
+    role?: string
   }
 }
 
@@ -44,5 +48,6 @@ declare module "next-auth/jwt" {
     followerCount: number
     isAdmin: boolean
     adminRole: string
+    role?: string
   }
 }

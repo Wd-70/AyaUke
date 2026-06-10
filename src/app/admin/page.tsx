@@ -1,19 +1,19 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
-import { isSuperAdmin, UserRole } from '@/lib/permissions'
+import { canAccessAdminPanel, UserRole } from '@/lib/permissions'
 import Navigation from '@/components/Navigation'
 import AdminClient from './AdminClient'
 
 export default async function AdminDashboard() {
-  // 서버사이드에서 권한 체크
+  // 서버사이드에서 권한 체크: 관리자 역할이면 진입 가능, 탭은 권한별로 노출
   const session = await getServerSession(authOptions)
-  
+
   if (!session) {
     redirect('/auth/signin')
   }
-  
-  if (!isSuperAdmin(session.user.role as UserRole)) {
+
+  if (!canAccessAdminPanel(session.user.role as UserRole)) {
     redirect('/')
   }
 
