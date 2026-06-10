@@ -3,6 +3,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import Hls from "hls.js";
 import { formatSeconds } from "@/lib/timeUtils";
+import { loadStoredVolume, saveStoredVolume } from "@/components/clip/volume-storage";
 
 interface ChzzkPlayerProps {
   videoUrl: string;
@@ -194,11 +195,21 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
 
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
+    // 네이티브 컨트롤로 음량 조절 시 저장 (ClipPlayer와 공유)
+    const handleVolumeChange = () => {
+      saveStoredVolume({ volume: video.volume, muted: video.muted });
+    };
+
+    // 저장된 음량 설정 적용 (영상/화면 전환 시에도 유지)
+    const stored = loadStoredVolume();
+    video.volume = stored.volume;
+    video.muted = stored.muted;
 
     video.addEventListener("timeupdate", handleTimeUpdate);
     video.addEventListener("durationchange", handleDurationChange);
     video.addEventListener("play", handlePlay);
     video.addEventListener("pause", handlePause);
+    video.addEventListener("volumechange", handleVolumeChange);
 
     // Initial duration update
     if (video.duration) {
@@ -213,6 +224,7 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
       video.removeEventListener("durationchange", handleDurationChange);
       video.removeEventListener("play", handlePlay);
       video.removeEventListener("pause", handlePause);
+      video.removeEventListener("volumechange", handleVolumeChange);
     };
   }, [isReady, onTimeUpdate, onDurationChange]);
 

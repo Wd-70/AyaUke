@@ -16,8 +16,10 @@ import {
   SpeakerWaveIcon,
   SpeakerXMarkIcon,
   ArrowsPointingOutIcon,
+  ArrowsPointingInIcon,
 } from "@heroicons/react/24/solid";
 import type { VideoPlatform } from "@/shared/utils/video-url";
+import { loadStoredVolume, saveStoredVolume } from "./volume-storage";
 
 interface ClipPlayerProps {
   platform: VideoPlatform;
@@ -102,8 +104,9 @@ export default function ClipPlayer({
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(() => loadStoredVolume().muted);
+  const [volume, setVolume] = useState(() => loadStoredVolume().volume);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [clipPosition, setClipPosition] = useState(0); // 구간 상대 시간
   const [clipDuration, setClipDuration] = useState(
     endTime != null ? Math.max(0, endTime - startTime) : 0,
@@ -116,6 +119,9 @@ export default function ClipPlayer({
   const onEndedRef = useRef(onEnded);
   playingRef.current = playing;
   onEndedRef.current = onEnded;
+  // 플레이어 초기화 시 저장된 음량을 적용하기 위한 최신 값 참조
+  const volumeRef = useRef({ volume, muted });
+  volumeRef.current = { volume, muted };
 
   const clipEnd = useCallback(
     () => (endTime != null ? endTime : startTime + clipDuration || Infinity),
@@ -163,6 +169,9 @@ export default function ClipPlayer({
                 const total = e.target.getDuration?.() ?? 0;
                 if (total > 0) setClipDuration(Math.max(0, total - startTime));
               }
+              // 저장된 음량 설정 적용 (영상 전환 시에도 유지)
+              adapterRef.current.setVolume(volumeRef.current.volume);
+              adapterRef.current.setMuted(volumeRef.current.muted);
               setReady(true);
             },
             onStateChange: (e: any) => {
@@ -230,6 +239,9 @@ export default function ClipPlayer({
       if (endTime == null && video.duration) {
         setClipDuration(Math.max(0, video.duration - startTime));
       }
+      // 저장된 음량 설정 적용 (영상 전환 시에도 유지)
+      video.volume = volumeRef.current.volume;
+      video.muted = volumeRef.current.muted;
       setReady(true);
       if (autoplay) void video.play();
     };
@@ -344,6 +356,15 @@ export default function ClipPlayer({
     return () => cancelAnimationFrame(rafRef.current);
   }, [ready, startTime, clipEnd]);
 
+  // ── 전체화면 상태 추적 ──────────────────────────────────────────
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === containerRef.current);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
   // ── 컨트롤 자동 숨김 ────────────────────────────────────────────
   const showControls = useCallback(() => {
     setControlsVisible(true);
@@ -388,16 +409,20 @@ export default function ClipPlayer({
     const next = !muted;
     setMuted(next);
     adapterRef.current?.setMuted(next);
+    saveStoredVolume({ volume, muted: next });
   };
 
   const handleVolume = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = Number(e.target.value);
     setVolume(v);
     adapterRef.current?.setVolume(v);
+    let nextMuted = muted;
     if (v > 0 && muted) {
+      nextMuted = false;
       setMuted(false);
       adapterRef.current?.setMuted(false);
     }
+    saveStoredVolume({ volume: v, muted: nextMuted });
   };
 
   const toggleFullscreen = () => {
@@ -532,8 +557,17 @@ export default function ClipPlayer({
             />
           </div>
 
-          <button type="button" onClick={toggleFullscreen} aria-label="전체화면" className="hover:text-light-accent dark:hover:text-dark-accent transition-colors">
-            <ArrowsPointingOutIcon className="w-5 h-5" />
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? "전체화면 종료" : "전체화면"}
+            className="hover:text-light-accent dark:hover:text-dark-accent transition-colors"
+          >
+            {isFullscreen ? (
+              <ArrowsPointingInIcon className="w-5 h-5" />
+            ) : (
+              <ArrowsPointingOutIcon className="w-5 h-5" />
+            )}
           </button>
         </div>
       </div>
