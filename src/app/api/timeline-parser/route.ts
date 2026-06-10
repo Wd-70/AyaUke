@@ -1074,7 +1074,10 @@ export async function POST(request: NextRequest) {
         // 통계 계산
         const totalVideos = await YouTubeVideo.countDocuments();
         const totalTimelineComments = await YouTubeComment.countDocuments({ isTimeline: true });
-        const allParsedTimelines = await ParsedTimeline.find().sort({ uploadedDate: -1, startTimeSeconds: 1 });
+        const allParsedTimelines = await ParsedTimeline.find()
+          .sort({ uploadedDate: -1, startTimeSeconds: 1 })
+          .allowDiskUse(true)
+          .lean();
         const relevantClips = allParsedTimelines.filter(clip => clip.isRelevant && !clip.isExcluded).length;
         const matchedClips = allParsedTimelines.filter(clip => clip.matchedSong).length;
         
@@ -1556,9 +1559,47 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get('action');
 
     switch (action) {
+      case 'parse-chzzk-timeline-stream': {
+        // 치지직 타임라인 파싱 — SSE로 진행 상황 스트리밍
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          async start(controller) {
+            const sendEvent = (event: string, data: unknown) => {
+              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+            };
+
+            try {
+              const parseResult = await parseChzzkTimelineComments({
+                onProgress: (progress) => sendEvent('progress', progress),
+              });
+              sendEvent('complete', {
+                ...parseResult,
+                message: `치지직 타임라인 파싱 완료: ${parseResult.createdItems}개 생성 (중복 ${parseResult.skippedExisting}개 스킵)`,
+              });
+            } catch (error) {
+              sendEvent('error', { error: error instanceof Error ? error.message : String(error) });
+            } finally {
+              controller.close();
+            }
+          },
+        });
+
+        return new Response(stream, {
+          headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+          },
+        });
+      }
+
       case 'get-parsed-items':
-        const items = await ParsedTimeline.find().sort({ uploadedDate: -1, startTimeSeconds: 1 });
-        
+        // allowDiskUse: 인덱스 생성 전/예외 상황에서도 32MB 정렬 제한에 걸리지 않도록
+        const items = await ParsedTimeline.find()
+          .sort({ uploadedDate: -1, startTimeSeconds: 1 })
+          .allowDiskUse(true)
+          .lean();
+
         return NextResponse.json({
           success: true,
           data: items

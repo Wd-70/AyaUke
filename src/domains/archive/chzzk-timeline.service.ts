@@ -10,6 +10,14 @@ import { buildChzzkVideoUrl } from '@/shared/utils/video-url';
  * 이후 곡 매칭 → 시간 검증 → 클립 업로드는 기존 유튜브 플로우와 동일하게 합류한다.
  */
 
+export interface ChzzkParseProgress {
+  stage: 'loading' | 'parsing' | 'saving';
+  current: number;
+  total: number;
+  createdItems: number;
+  message: string;
+}
+
 export interface ChzzkParseResult {
   processedComments: number;
   createdItems: number;
@@ -30,7 +38,13 @@ function toOriginalDateString(publishDate: string | Date): string | undefined {
 export async function parseChzzkTimelineComments(options?: {
   /** 특정 영상만 파싱 */
   videoNo?: number;
+  /** 진행 상황 보고 (SSE 라우트가 전달) */
+  onProgress?: (progress: ChzzkParseProgress) => void;
 }): Promise<ChzzkParseResult> {
+  const onProgress = options?.onProgress ?? (() => {});
+
+  onProgress({ stage: 'loading', current: 0, total: 0, createdItems: 0, message: '치지직 댓글 로딩 중...' });
+
   const commentFilter: Record<string, unknown> = { isTimeline: true };
   if (options?.videoNo) commentFilter.videoNo = options.videoNo;
 
@@ -41,6 +55,19 @@ export async function parseChzzkTimelineComments(options?: {
   const videos = await ChzzkVideo.find({ videoNo: { $in: videoNos } }).lean();
   const videoMap = new Map(videos.map((v) => [v.videoNo, v]));
 
+  // 기존 치지직 타임라인의 (videoId → 시작시간들)을 한 번에 로드해 메모리에서 중복 검사
+  // (항목별 findOne은 댓글 수백 개 × 항목 수십 개에서 수 분이 걸린다)
+  const existing = await ParsedTimeline.find(
+    { platform: 'chzzk' },
+    { videoId: 1, startTimeSeconds: 1 },
+  ).lean();
+  const existingStartTimes = new Map<string, number[]>();
+  for (const item of existing) {
+    const list = existingStartTimes.get(item.videoId) ?? [];
+    list.push(item.startTimeSeconds);
+    existingStartTimes.set(item.videoId, list);
+  }
+
   const result: ChzzkParseResult = {
     processedComments: 0,
     createdItems: 0,
@@ -48,7 +75,21 @@ export async function parseChzzkTimelineComments(options?: {
     videosWithoutInfo: 0,
   };
 
-  for (const comment of comments) {
+  const docsToInsert: Record<string, unknown>[] = [];
+
+  for (let i = 0; i < comments.length; i++) {
+    const comment = comments[i];
+
+    if (i % 20 === 0) {
+      onProgress({
+        stage: 'parsing',
+        current: i,
+        total: comments.length,
+        createdItems: docsToInsert.length,
+        message: `댓글 파싱 중... (${i}/${comments.length})`,
+      });
+    }
+
     const video = videoMap.get(comment.videoNo);
     if (!video) {
       result.videosWithoutInfo++;
@@ -62,24 +103,18 @@ export async function parseChzzkTimelineComments(options?: {
     const videoUrl = buildChzzkVideoUrl(comment.videoNo);
     const uploadedDate = new Date(video.publishDate);
     const originalDateString = toOriginalDateString(video.publishDate);
+    const knownTimes = existingStartTimes.get(videoIdStr) ?? [];
 
     for (const entry of entries) {
       // 같은 영상의 ±10초 이내 기존 항목은 스킵 (여러 댓글의 동일 타임라인 중복 방지)
-      const existing = await ParsedTimeline.findOne({
-        platform: 'chzzk',
-        videoId: videoIdStr,
-        startTimeSeconds: {
-          $gte: entry.startTimeSeconds - 10,
-          $lte: entry.startTimeSeconds + 10,
-        },
-      });
-
-      if (existing) {
+      const isDuplicate = knownTimes.some((t) => Math.abs(t - entry.startTimeSeconds) <= 10);
+      if (isDuplicate) {
         result.skippedExisting++;
         continue;
       }
 
-      await new ParsedTimeline({
+      knownTimes.push(entry.startTimeSeconds);
+      docsToInsert.push({
         id: `chzzk_${comment.commentId}_${entry.startTimeSeconds}`,
         platform: 'chzzk',
         videoId: videoIdStr,
@@ -100,12 +135,29 @@ export async function parseChzzkTimelineComments(options?: {
         commentPublishedAt: comment.publishedAt,
         isRelevant: entry.isRelevant,
         isExcluded: false,
-      }).save();
-
-      result.createdItems++;
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
     }
 
+    existingStartTimes.set(videoIdStr, knownTimes);
     result.processedComments++;
+  }
+
+  if (docsToInsert.length > 0) {
+    onProgress({
+      stage: 'saving',
+      current: comments.length,
+      total: comments.length,
+      createdItems: docsToInsert.length,
+      message: `${docsToInsert.length}개 항목 저장 중...`,
+    });
+
+    // ordered: false — 동시 실행 등으로 id가 중복돼도 나머지는 저장
+    const inserted = await ParsedTimeline.insertMany(docsToInsert, { ordered: false }).catch(
+      (error: { insertedDocs?: unknown[] }) => error.insertedDocs ?? [],
+    );
+    result.createdItems = Array.isArray(inserted) ? inserted.length : docsToInsert.length;
   }
 
   return result;

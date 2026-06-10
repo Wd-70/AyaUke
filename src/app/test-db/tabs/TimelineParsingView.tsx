@@ -128,6 +128,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
   const [selectedTimelineIds, setSelectedTimelineIds] = useState<Set<string>>(new Set());
   const [lastSelectedIndex, setLastSelectedIndex] = useState<number>(-1);
   const [filterType, setFilterType] = useState<'all' | 'relevant' | 'irrelevant' | 'excluded' | 'matched' | 'unmatched' | 'relevantUnmatched' | 'relevantUnverified'>('relevant');
+  const [platformFilter, setPlatformFilter] = useState<'all' | 'youtube' | 'chzzk'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [autoPlay, setAutoPlay] = useState(true); // 자동 재생 옵션
   const [showMatchModal, setShowMatchModal] = useState(false);
@@ -1408,6 +1409,11 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
   // 필터링된 타임라인들 (메모이제이션으로 성능 최적화)
   const filteredTimelines = useMemo(() => {
     return parsedTimelines.filter(timeline => {
+      // 플랫폼 필터 (기존 데이터는 platform 미설정 = 유튜브)
+      if (platformFilter !== 'all' && (timeline.platform || 'youtube') !== platformFilter) {
+        return false;
+      }
+
       // 필터 타입 체크
       let matchesFilter = false;
       switch (filterType) {
@@ -1440,7 +1446,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
       
       return matchesFilter;
     });
-  }, [parsedTimelines, filterType, searchQuery]);
+  }, [parsedTimelines, filterType, platformFilter, searchQuery]);
 
   // 페이지네이션 계산 (메모이제이션으로 성능 최적화)
   const paginationInfo = useMemo(() => {
@@ -1469,7 +1475,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
       setLastSelectedIndex(-1);
       setSelectedTimeline(null);
     }
-  }, [currentPage, filterType, isMobile, showMobileDetail]);
+  }, [currentPage, filterType, platformFilter, isMobile, showMobileDetail]);
 
   // 현재 페이지 전체 선택/해제
   const toggleSelectAll = () => {
@@ -2699,7 +2705,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm 
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm
                            bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                            focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               >
@@ -2711,6 +2717,19 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
                 <option value="unmatched">미매칭</option>
                 <option value="relevantUnmatched">관련성 있음 (매칭완료 제외)</option>
                 <option value="relevantUnverified">관련성 있음 (검증완료 제외)</option>
+              </select>
+
+              <select
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value as 'all' | 'youtube' | 'chzzk')}
+                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm
+                           bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                           focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                title="영상 플랫폼 필터"
+              >
+                <option value="all">모든 플랫폼</option>
+                <option value="youtube">유튜브</option>
+                <option value="chzzk">치지직</option>
               </select>
             </div>
           </div>
@@ -2893,6 +2912,11 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
                           {timeline.artist} - {timeline.songTitle}
                         </h4>
                         <div className="flex gap-1">
+                          {(timeline.platform || 'youtube') === 'chzzk' && (
+                            <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded text-xs">
+                              치지직
+                            </span>
+                          )}
                           {!timeline.isRelevant && (
                             <span className="px-2 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded text-xs">
                               관련성 없음

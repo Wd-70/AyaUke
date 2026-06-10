@@ -88,6 +88,11 @@ const ParsedTimelineSchema = new Schema<IParsedTimeline>(
   },
 );
 
+// 목록 조회 정렬용 — 인덱스 없이는 컬렉션이 커지면 32MB 정렬 메모리 제한 초과
+ParsedTimelineSchema.index({ uploadedDate: -1, startTimeSeconds: 1 });
+// 파싱 시 중복 검사용 (platform+videoId+시작시간 ±10초 범위 조회)
+ParsedTimelineSchema.index({ platform: 1, videoId: 1, startTimeSeconds: 1 });
+
 export const ParsedTimeline =
   mongoose.models.ParsedTimeline ||
   mongoose.model<IParsedTimeline>('ParsedTimeline', ParsedTimelineSchema);

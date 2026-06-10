@@ -100,6 +100,7 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
   };
   const [syncing, setSyncing] = useState(false);
   const [timelineParsing, setTimelineParsing] = useState(false);
+  const [chzzkParseProgress, setChzzkParseProgress] = useState<string | null>(null);
   const [videos, setVideos] = useState<VideoData[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<VideoData | null>(null);
   const [comments, setComments] = useState<CommentData[]>([]);
@@ -437,31 +438,42 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
   };
 
 
-  // 치지직 타임라인 댓글 파싱 (이미 수집된 chzzkcomments → parsedtimelines)
-  const parseChzzkTimelineComments = async () => {
+  // 치지직 타임라인 댓글 파싱 — SSE로 실시간 진행 표시
+  const parseChzzkTimelineComments = () => {
     setTimelineParsing(true);
-    try {
-      const response = await fetch('/api/timeline-parser', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'parse-chzzk-timeline-comments'
-        })
-      });
+    setChzzkParseProgress('연결 중...');
 
-      const result = await response.json();
+    const eventSource = new EventSource('/api/timeline-parser?action=parse-chzzk-timeline-stream');
 
-      if (result.success) {
-        showDialog('치지직 타임라인 파싱 완료', result.message || '치지직 타임라인 파싱이 완료되었습니다.', result.data);
-      } else {
-        showDialog('치지직 타임라인 파싱 실패', result.error || '치지직 타임라인 파싱 중 오류가 발생했습니다.', null, true);
-      }
-    } catch (error) {
-      console.error('치지직 타임라인 파싱 오류:', error);
-      showDialog('치지직 타임라인 파싱 오류', '네트워크 오류가 발생했습니다.', null, true);
-    } finally {
+    const finish = () => {
+      eventSource.close();
       setTimelineParsing(false);
-    }
+      setChzzkParseProgress(null);
+    };
+
+    eventSource.addEventListener('progress', (e) => {
+      const data = JSON.parse((e as MessageEvent).data);
+      setChzzkParseProgress(data.message || `${data.current}/${data.total}`);
+    });
+
+    eventSource.addEventListener('complete', (e) => {
+      const data = JSON.parse((e as MessageEvent).data);
+      finish();
+      showDialog('치지직 타임라인 파싱 완료', data.message || '치지직 타임라인 파싱이 완료되었습니다.', data);
+    });
+
+    eventSource.addEventListener('error', (e) => {
+      // 서버가 보낸 error 이벤트 (data 있음) 또는 연결 오류
+      const message = (e as MessageEvent).data
+        ? JSON.parse((e as MessageEvent).data).error
+        : '연결이 끊어졌습니다.';
+      finish();
+      showDialog('치지직 타임라인 파싱 실패', message, null, true);
+    });
+
+    eventSource.onerror = () => {
+      finish();
+    };
   };
 
   // 기존 데이터를 개선된 파싱 방식으로 업데이트
@@ -718,7 +730,12 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg flex items-center gap-2 transition-colors"
                       title="이미 동기화된 치지직 다시보기 댓글에서 타임라인을 파싱합니다"
                     >
-                      {timelineParsing ? (
+                      {timelineParsing && chzzkParseProgress !== null ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          {chzzkParseProgress}
+                        </>
+                      ) : timelineParsing ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                           처리 중...
