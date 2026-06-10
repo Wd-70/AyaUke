@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
 import { isSuperAdmin, UserRole } from '@/lib/permissions'
-import { connectToDatabase } from '@/lib/mongodb'
+import { connectDB as connectToDatabase } from '@/shared/db/mongodb'
 import User, { IUser } from '@/models/User'
 // Simple UUID v4 generator
 function generateUUID() {

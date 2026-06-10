@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import { hasPermission, Permission, UserRole } from '@/lib/permissions';
-import dbConnect from '@/lib/mongodb';
+import dbConnect from '@/shared/db/mongodb';
 import { YouTubeChannel, YouTubeVideo, YouTubeComment } from '@/models/YouTubeComment';
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
 

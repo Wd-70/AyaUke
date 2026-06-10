@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
 import { canAccessAdminPanel, UserRole } from '@/lib/permissions'
-import dbConnect from '@/lib/mongodb'
-import SongVideo from '@/models/SongVideo'
+import dbConnect from '@/shared/db/mongodb'
+import SongVideo from '@/domains/archive/schemas/song-video.schema'
 import User from '@/models/User'
-import Playlist from '@/models/Playlist'
-import SongDetail from '@/models/SongDetail'
+import Playlist from '@/domains/engagement/playlist.schema'
+import SongDetail from '@/domains/catalog/song.schema'
 
 export async function GET() {
   try {

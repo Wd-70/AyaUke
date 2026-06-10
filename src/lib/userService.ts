@@ -197,11 +197,11 @@ export async function getUserStats() {
 async function getUserStatsForTitles(user: IUser): Promise<UserStats> {
   try {
     // Like 모델에서 해당 사용자의 좋아요 수 조회
-    const Like = (await import("@/models/Like")).default;
+    const Like = (await import("@/domains/engagement/like.schema")).default;
     const likeCount = await Like.countDocuments({ userId: user._id });
 
     // Playlist 모델에서 해당 사용자의 플레이리스트 수 조회
-    const Playlist = (await import("@/models/Playlist")).default;
+    const Playlist = (await import("@/domains/engagement/playlist.schema")).default;
     const playlistCount = await Playlist.countDocuments({ userId: user._id });
 
     // 실제 활동 통계 사용 (activityStats가 없으면 기본값)

@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
 import { isSuperAdmin, UserRole } from '@/lib/permissions'
-import dbConnect from '@/lib/mongodb'
+import dbConnect from '@/shared/db/mongodb'
 import User, { IUser } from '@/models/User'
-import Like from '@/models/Like'
-import Playlist from '@/models/Playlist'
+import Like from '@/domains/engagement/like.schema'
+import Playlist from '@/domains/engagement/playlist.schema'
 
 export async function GET(request: NextRequest) {
   try {

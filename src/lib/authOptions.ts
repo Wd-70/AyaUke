@@ -3,7 +3,7 @@ import { createManualChzzkClient } from "@/lib/chzzkCookieManual"
 import { isAdminChannel, getAdminInfo, getStaticUserRole } from "@/lib/adminChannels"
 import { roleToIsAdmin } from '@/lib/permissions'
 import { createOrUpdateUser } from '@/lib/userService'
-import dbConnect from '@/lib/mongodb'
+import dbConnect from '@/shared/db/mongodb'
 import User from '@/models/User'
 import UserActivity from '@/models/UserActivity'
 import ChzzkProvider from '@/lib/chzzkOAuthProvider'

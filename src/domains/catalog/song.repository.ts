@@ -1,6 +1,6 @@
 import { SongDetail } from '@/types';
 import { connectDB } from '@/shared/db/mongodb';
-import SongDetailModel from '@/models/SongDetail';
+import SongDetailModel from '@/domains/catalog/song.schema';
 import { createSongKey } from './merge';
 
 /** 카탈로그용 MongoDB 조회. 활성 곡 목록과 삭제된 곡 키 집합을 가져온다. */

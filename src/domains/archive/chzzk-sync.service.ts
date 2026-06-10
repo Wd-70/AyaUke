@@ -1,5 +1,5 @@
-import ChzzkVideo from '@/models/ChzzkVideo';
-import ChzzkComment from '@/models/ChzzkComment';
+import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
+import ChzzkComment from '@/domains/archive/schemas/chzzk-comment.schema';
 import { escapeRegex } from '@/lib/regexUtils';
 import { config } from '@/shared/config';
 import { NotFoundError, ValidationError } from '@/shared/api/errors';

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import Playlist from './playlist.schema';
 import User from '@/models/User';
-import SongDetail from '@/models/SongDetail';
+import SongDetail from '@/domains/catalog/song.schema';
 import { AppError, NotFoundError, ConflictError } from '@/shared/api/errors';
 
 const SONG_POPULATE = ['songs.songId', 'title artist language'] as const;

@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
 import { isSuperAdmin, UserRole } from '@/lib/permissions'
-import dbConnect from '@/lib/mongodb'
+import dbConnect from '@/shared/db/mongodb'
 import User, { IUser } from '@/models/User'
-import Like from '@/models/Like'
-import Playlist from '@/models/Playlist'
-import SongDetail from '@/models/SongDetail'
+import Like from '@/domains/engagement/like.schema'
+import Playlist from '@/domains/engagement/playlist.schema'
+import SongDetail from '@/domains/catalog/song.schema'
 
 interface RouteParams {
   params: {

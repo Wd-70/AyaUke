@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withApi } from '@/shared/api/handler';
 import { getSharedPlaylist } from '@/domains/engagement/playlist.service';
-import '@/models/SongDetail'; // populate를 위한 모델 등록
+import '@/domains/catalog/song.schema'; // populate를 위한 모델 등록
 
 /**
  * 공유 링크로 플레이리스트 조회 (공개 라우트).

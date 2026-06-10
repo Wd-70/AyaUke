@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
-import { connectToDatabase } from '@/lib/mongodb';
-import SongVideo from '@/models/SongVideo';
-import SongDetail from '@/models/SongDetail';
+import { connectDB as connectToDatabase } from '@/shared/db/mongodb';
+import SongVideo from '@/domains/archive/schemas/song-video.schema';
+import SongDetail from '@/domains/catalog/song.schema';
 import { SongVideo as SongVideoType } from '@/types';
 import { updateVideoData, validateYouTubeUrl } from '@/lib/youtube';
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import SongDetailModel from '@/models/SongDetail';
+import SongDetailModel from '@/domains/catalog/song.schema';
 import { withApi, ok } from '@/shared/api/handler';
 import { Permission } from '@/lib/permissions';
 import { ConflictError } from '@/shared/api/errors';

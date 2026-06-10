@@ -2,7 +2,9 @@ import SongbookClient from './SongbookClient';
 import { Song } from '@/types';
 import { unstable_cache } from 'next/cache';
 import { Metadata } from 'next';
-import { fetchRawSongsFromSheet, fetchSongDetailsFromMongo, mergeSongsData, getErrorMessage } from '@/lib/googleSheets';
+import { fetchRawSongsFromSheet, getErrorMessage } from '@/domains/catalog/sheets.client';
+import { fetchSongDetailsFromMongo } from '@/domains/catalog/song.repository';
+import { mergeSongsData } from '@/domains/catalog/merge';
 
 export const metadata: Metadata = {
   title: "아야 AyaUke - 노래책",

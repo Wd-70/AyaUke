@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import dbConnect from '@/lib/mongodb'
-import Playlist from '@/models/Playlist'
+import dbConnect from '@/shared/db/mongodb'
+import Playlist from '@/domains/engagement/playlist.schema'
 import { authOptions } from '@/lib/authOptions'
 import mongoose from 'mongoose'
 
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
         console.log('🔍 SongDetail 모델 등록 상태:', !!mongoose.models.SongDetail)
         if (!mongoose.models.SongDetail) {
           console.log('🔧 SongDetail 모델 강제 등록 중...')
-          await import('@/models/SongDetail')
+          await import('@/domains/catalog/song.schema')
           console.log('✅ SongDetail 모델 등록 완료')
         }
         

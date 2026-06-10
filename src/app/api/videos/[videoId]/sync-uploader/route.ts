@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
-import SongVideo from '@/models/SongVideo';
+import { connectDB as connectToDatabase } from '@/shared/db/mongodb';
+import SongVideo from '@/domains/archive/schemas/song-video.schema';
 import User from '@/models/User';
 
 /**

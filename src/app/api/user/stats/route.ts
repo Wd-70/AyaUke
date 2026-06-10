@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
-import dbConnect from '@/lib/mongodb'
-import Like from '@/models/Like'
-import Playlist from '@/models/Playlist'
+import dbConnect from '@/shared/db/mongodb'
+import Like from '@/domains/engagement/like.schema'
+import Playlist from '@/domains/engagement/playlist.schema'
 import User from '@/models/User'
-import SongDetail from '@/models/SongDetail'
+import SongDetail from '@/domains/catalog/song.schema'
 
 export async function GET(request: NextRequest) {
   try {

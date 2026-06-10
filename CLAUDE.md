@@ -17,11 +17,20 @@ npm start
 # Lint check
 npm run lint
 
+# Unit tests (vitest — pure logic only)
+npm test
+
+# DB inspection (read-only) / local backup
+npm run db:inspect collections
+npm run db:backup
+
 # Install dependencies
 npm install
 ```
 
 ## Architecture Overview
+
+**See ARCHITECTURE.md for the authoritative structure guide** (domains, withApi pattern, conventions).
 
 This is a Next.js 15.3.4 application using the App Router for a K-pop VTuber fansite (**아야 AyaUke**). The application has two main sections:
 
@@ -30,12 +39,12 @@ This is a Next.js 15.3.4 application using the App Router for a K-pop VTuber fan
 
 ### Key Architecture Patterns
 
-- **Hybrid Data Integration**: Combines Google Sheets API (primary song data) with MongoDB (detailed metadata and user data)
+- **Domain modules** (`/src/domains/`): catalog (songs), engagement (likes/playlists), archive (clips/videos/timelines), operations (backup/recalc). Services hold business logic; routes stay thin.
+- **Standard API pattern** (`/src/shared/api/`): every new route uses `withApi({ schema, auth }, handler)` — zod validation, permission check, AppError mapping, `{ success, data | error }` envelope.
+- **Hybrid Data Integration**: Combines Google Sheets API (primary song data) with MongoDB (detailed metadata and user data) — merge logic in `domains/catalog/merge.ts` (pure, tested).
 - **Authentication System**: NextAuth with custom Chzzk (Korean streaming platform) cookie-based authentication
-- **Client-Side Theme Management**: Theme switching with localStorage persistence and system preference detection
-- **API Route Handlers**: Server-side data fetching and user management in `/src/app/api/`
+- **Client state**: TanStack Query (`useLikes`, `useGlobalPlaylists`) — no hand-rolled stores; notifications via `useToast`, never `alert()`.
 - **Component-Based UI**: Modular components in `/src/components/`
-- **Custom Hooks**: Reusable logic in `/src/hooks/`
 
 ### Data Flow
 

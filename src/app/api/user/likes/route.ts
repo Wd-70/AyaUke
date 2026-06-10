@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
-import dbConnect from '@/lib/mongodb'
-import Like from '@/models/Like'
+import dbConnect from '@/shared/db/mongodb'
+import Like from '@/domains/engagement/like.schema'
 
 export async function GET(request: NextRequest) {
   try {

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import Like from './like.schema';
 import User from '@/models/User';
-import SongDetail from '@/models/SongDetail';
+import SongDetail from '@/domains/catalog/song.schema';
 import { NotFoundError, ConflictError } from '@/shared/api/errors';
 
 const toObjectId = (id: string) => new mongoose.Types.ObjectId(id);

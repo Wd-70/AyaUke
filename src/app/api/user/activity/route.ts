@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
-import { connectToDatabase } from '@/lib/mongodb'
+import { connectDB as connectToDatabase } from '@/shared/db/mongodb'
 import { UserActivity } from '@/models/UserActivity'
 
 // 메모리 캐시 - 중복 요청 방지
