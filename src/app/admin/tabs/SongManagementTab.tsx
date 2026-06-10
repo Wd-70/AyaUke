@@ -123,10 +123,10 @@ export default function SongManagementTab() {
     try {
       const response = await fetch('/api/songdetails?limit=1000'); // 대량 데이터 로드
       if (response.ok) {
-        const data = await response.json();
-        setSongs(data.songs || []);
-        setFilteredSongs(data.songs || []);
-        console.log(`총 ${data.songs?.length || 0}곡을 로드했습니다.`);
+        const { data } = await response.json();
+        setSongs(data?.songs || []);
+        setFilteredSongs(data?.songs || []);
+        console.log(`총 ${data?.songs?.length || 0}곡을 로드했습니다.`);
       } else {
         console.error('API 응답 오류:', response.status);
       }
@@ -299,9 +299,9 @@ export default function SongManagementTab() {
           
           if (songResponse.ok) {
             const responseData = await songResponse.json();
-            // API 응답 구조가 {success: true, song: {...}} 형태
-            const songData = responseData.song || responseData;
-            existingTags = songData.searchTags || [];
+            // API 응답 구조가 {success: true, data: {song: {...}}} 형태
+            const songData = responseData.data?.song;
+            existingTags = songData?.searchTags || [];
           }
         }
 
@@ -977,8 +977,8 @@ export default function SongManagementTab() {
             setIsModalOpen(false);
             showToast(modalMode === 'create' ? '곡이 추가되었습니다.' : '곡이 수정되었습니다.', 'success');
           } else {
-            const error = await response?.json();
-            showToast(`오류: ${error?.error || '알 수 없는 오류가 발생했습니다.'}`, 'error');
+            const error = await response?.json().catch(() => null);
+            showToast(`오류: ${error?.error?.message || '알 수 없는 오류가 발생했습니다.'}`, 'error');
           }
         }, [modalMode, selectedSong])}
         showToast={showToast}

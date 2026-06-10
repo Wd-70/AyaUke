@@ -101,9 +101,9 @@ export default function TimestampParserTab() {
       
       // MongoDB의 searchTags만 사용
       const response = await fetch('/api/songdetails?limit=1000');
-      const data = await response.json();
-      
-      if (data.success && data.songs) {
+      const { success, data } = await response.json();
+
+      if (success && data?.songs) {
         setAllSongs(data.songs);
         console.log(`📊 ${data.songs.length}곡 로드 완료 (MongoDB)`);
         console.log('📝 첫 번째 곡 searchTags 확인:', data.songs[0]?.searchTags || 'No searchTags');

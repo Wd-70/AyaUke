@@ -1,206 +1,43 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import dbConnect from '@/lib/mongodb'
-import Playlist from '@/models/Playlist'
-import User from '@/models/User'
-import SongDetail from '@/models/SongDetail'
-import mongoose from 'mongoose'
-import { authOptions } from '@/lib/authOptions'
+import { z } from 'zod';
+import { NextResponse } from 'next/server';
+import mongoose from 'mongoose';
+import { withApi } from '@/shared/api/handler';
+import { ValidationError } from '@/shared/api/errors';
+import * as playlistService from '@/domains/engagement/playlist.service';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.channelId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+const UpdateBody = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  coverImage: z.string().nullable().optional(),
+  tags: z.array(z.string()).optional(),
+  isPublic: z.boolean().optional(),
+});
 
-    const { id } = await params
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid playlist ID' }, { status: 400 })
-    }
-
-    await dbConnect()
-
-    // 플레이리스트 조회 (본인 소유인지 확인)
-    const playlist = await Playlist.findOne({
-      _id: id,
-      channelId: session.user.channelId
-    }).populate('songs.songId', 'title artist language')
-
-    if (!playlist) {
-      return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ playlist })
-  } catch (error) {
-    console.error('플레이리스트 조회 오류:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+function assertValidId(id: string) {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ValidationError('유효하지 않은 플레이리스트 ID입니다.');
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.channelId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+// NOTE: 성공 응답은 기존 훅 호환을 위해 레거시 형태 유지 (Phase 5에서 envelope로 전환)
+export const GET = withApi({ auth: 'user' }, async ({ session, params }) => {
+  assertValidId(params.id);
+  const playlist = await playlistService.getPlaylist(session!.user.channelId, params.id);
+  return NextResponse.json({ playlist });
+});
 
-    const { id } = await params
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid playlist ID' }, { status: 400 })
-    }
+// PUT/PATCH 모두 부분 업데이트로 동작한다 (기존 PUT도 name 외 필드는 선택이었음)
+const update = withApi({ schema: UpdateBody, auth: 'user' }, async ({ input, session, params }) => {
+  assertValidId(params.id);
+  const playlist = await playlistService.updatePlaylist(session!.user.channelId, params.id, input);
+  return NextResponse.json({ success: true, playlist });
+});
 
-    const { name, description, coverImage, tags, isPublic } = await request.json()
-    
-    if (!name?.trim()) {
-      return NextResponse.json({ error: 'Playlist name is required' }, { status: 400 })
-    }
+export const PUT = update;
+export const PATCH = update;
 
-    await dbConnect()
-
-    // 플레이리스트 조회 및 소유권 확인
-    const playlist = await Playlist.findOne({
-      _id: id,
-      channelId: session.user.channelId
-    })
-
-    if (!playlist) {
-      return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })
-    }
-
-    // 같은 이름의 다른 플레이리스트가 있는지 확인 (현재 플레이리스트 제외)
-    const existingPlaylist = await Playlist.findOne({
-      _id: { $ne: id },
-      channelId: session.user.channelId,
-      name: name.trim()
-    })
-
-    if (existingPlaylist) {
-      return NextResponse.json({ error: 'Playlist with this name already exists' }, { status: 409 })
-    }
-
-    // 플레이리스트 업데이트
-    playlist.name = name.trim()
-    playlist.description = description?.trim() || ''
-    playlist.coverImage = coverImage || null
-    playlist.tags = Array.isArray(tags) ? tags.filter(tag => tag?.trim()).map(tag => tag.trim()) : []
-    if (typeof isPublic === 'boolean') {
-      playlist.isPublic = isPublic
-    }
-
-    await playlist.save()
-
-    return NextResponse.json({ success: true, playlist })
-  } catch (error) {
-    console.error('플레이리스트 수정 오류:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
-}
-
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.channelId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid playlist ID' }, { status: 400 })
-    }
-
-    const updates = await request.json()
-    
-    await dbConnect()
-
-    // 플레이리스트 조회 및 소유권 확인
-    const playlist = await Playlist.findOne({
-      _id: id,
-      channelId: session.user.channelId
-    })
-
-    if (!playlist) {
-      return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })
-    }
-
-    // 이름 변경시 중복 확인
-    if (updates.name && updates.name.trim() !== playlist.name) {
-      const existingPlaylist = await Playlist.findOne({
-        _id: { $ne: id },
-        channelId: session.user.channelId,
-        name: updates.name.trim()
-      })
-
-      if (existingPlaylist) {
-        return NextResponse.json({ error: 'Playlist with this name already exists' }, { status: 409 })
-      }
-    }
-
-    // 업데이트할 필드들
-    if (updates.name?.trim()) {
-      playlist.name = updates.name.trim()
-    }
-    if (typeof updates.description === 'string') {
-      playlist.description = updates.description.trim()
-    }
-    if (typeof updates.coverImage === 'string') {
-      playlist.coverImage = updates.coverImage || null
-    }
-    if (Array.isArray(updates.tags)) {
-      playlist.tags = updates.tags.filter(tag => tag?.trim()).map(tag => tag.trim())
-    }
-    if (typeof updates.isPublic === 'boolean') {
-      playlist.isPublic = updates.isPublic
-    }
-
-    await playlist.save()
-
-    return NextResponse.json({ success: true, playlist })
-  } catch (error) {
-    console.error('플레이리스트 업데이트 오류:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
-}
-
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.channelId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { id } = await params
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return NextResponse.json({ error: 'Invalid playlist ID' }, { status: 400 })
-    }
-
-    await dbConnect()
-
-    // 플레이리스트 삭제 (본인 소유인지 확인)
-    const result = await Playlist.findOneAndDelete({
-      _id: id,
-      channelId: session.user.channelId
-    })
-
-    if (!result) {
-      return NextResponse.json({ error: 'Playlist not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('플레이리스트 삭제 오류:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
-}
+export const DELETE = withApi({ auth: 'user' }, async ({ session, params }) => {
+  assertValidId(params.id);
+  await playlistService.deletePlaylist(session!.user.channelId, params.id);
+  return NextResponse.json({ success: true });
+});

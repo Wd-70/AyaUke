@@ -239,11 +239,11 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
       const result = await response.json();
 
       if (result.success) {
-        console.log('✅ 저장 성공, 반환된 데이터:', result.song);
-        onSave(result.song);
+        console.log('✅ 저장 성공, 반환된 데이터:', result.data.song);
+        onSave(result.data.song);
         showSuccess('수정 완료', '곡 정보가 성공적으로 수정되었습니다.');
       } else {
-        showError('저장 실패', result.error || '저장에 실패했습니다.');
+        showError('저장 실패', result.error?.message || '저장에 실패했습니다.');
       }
     } catch (error) {
       console.error('저장 오류:', error);

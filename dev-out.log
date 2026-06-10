@@ -1,0 +1,19 @@
+
+> ayauke-page@0.1.0 dev
+> cross-env NODE_OPTIONS=--max-old-space-size=4096 next dev
+
+   ▲ Next.js 15.3.4
+   - Local:        http://localhost:3000
+   - Network:      http://220.81.38.26:3000
+   - Environments: .env.local, .env.development
+
+ ✓ Starting...
+ ✓ Ready in 3s
+ ○ Compiling /api/songs/all ...
+ ✓ Compiled /api/songs/all in 3.2s (734 modules)
+✅ 노래 데이터 병합: 531곡
+ GET /api/songs/all 200 in 7031ms
+ ○ Compiling /api/songs/search ...
+ ✓ Compiled /api/songs/search in 609ms (736 modules)
+✅ 노래 데이터 병합: 531곡
+ GET /api/songs/search?q=%EC%82%AC%EA%B1%B4 200 in 2130ms

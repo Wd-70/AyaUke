@@ -182,7 +182,7 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
         window.location.reload()
       } else {
         const result = await response.json()
-        showError('변경 실패', result.error || '플레이리스트 이름 변경에 실패했습니다')
+        showError('변경 실패', result.error?.message || '플레이리스트 이름 변경에 실패했습니다')
         setEditedName(playlist.name)
       }
     } catch (error) {
@@ -216,7 +216,7 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
         }, 1500)
       } else {
         const result = await response.json()
-        showError('삭제 실패', result.error || '플레이리스트 삭제에 실패했습니다')
+        showError('삭제 실패', result.error?.message || '플레이리스트 삭제에 실패했습니다')
       }
     } catch (error) {
       console.error('플레이리스트 삭제 오류:', error)
@@ -264,7 +264,7 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
         window.location.reload()
       } else {
         const result = await response.json()
-        showToastMessage(result.error || '커버 이미지 변경에 실패했습니다', 'error')
+        showToastMessage(result.error?.message || '커버 이미지 변경에 실패했습니다', 'error')
         setEditedCoverImage(playlist.coverImage || '')
       }
     } catch (error) {

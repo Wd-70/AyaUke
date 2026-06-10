@@ -1,39 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { fetchRawSongsFromSheet, fetchSongDetailsFromMongo, mergeSongsData } from '@/lib/googleSheets';
+import { NextResponse } from 'next/server';
+import { withApi } from '@/shared/api/handler';
+import { getAllSongs } from '@/domains/catalog/song.service';
 
-export async function GET(request: NextRequest) {
-  try {
-    console.log('🎵 전체 곡 목록 조회 중...');
-    
-    // 기존 songbook 페이지와 동일한 방식으로 데이터 가져오기
-    const rawSongs = await fetchRawSongsFromSheet();
-    const songDetails = await fetchSongDetailsFromMongo();
-    const songs = mergeSongsData(rawSongs, songDetails);
-    
-    console.log(`📊 전체 곡 수: ${songs.length}곡`);
-    
-    return NextResponse.json({ 
-      success: true, 
-      songs: songs.map(song => ({
-        id: song.id,
-        title: song.title,
-        artist: song.artist,
-        titleAlias: song.titleAlias,
-        artistAlias: song.artistAlias,
-        titleAliasKor: song.titleAliasKor,
-        artistAliasKor: song.artistAliasKor,
-        titleAliasEng: song.titleAliasEng,
-        artistAliasEng: song.artistAliasEng,
-        tags: song.tags || []
-      })),
-      count: songs.length
-    });
-    
-  } catch (error) {
-    console.error('전체 곡 목록 조회 오류:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
-  }
-}
+// NOTE: 성공 응답은 기존 소비자 호환을 위해 레거시 형태 유지
+export const GET = withApi({}, async () => {
+  const songs = await getAllSongs();
+
+  return NextResponse.json({
+    success: true,
+    songs: songs.map((song) => ({
+      id: song.id,
+      title: song.title,
+      artist: song.artist,
+      titleAlias: song.titleAlias,
+      artistAlias: song.artistAlias,
+      tags: song.searchTags || [],
+    })),
+    count: songs.length,
+  });
+});

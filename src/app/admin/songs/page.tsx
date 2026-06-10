@@ -126,7 +126,7 @@ export default function SongManagement() {
         setFilteredSongs(data.songs)
         setStats(data.stats)
       } else {
-        throw new Error(data.error || '데이터 로드 실패')
+        throw new Error(data.error?.message || '데이터 로드 실패')
       }
     } catch (error) {
       console.error('❌ 노래 목록 로딩 오류:', error)
@@ -260,7 +260,7 @@ export default function SongManagement() {
         // 데이터 다시 로드 (백그라운드에서 조용히)
         await loadSongs()
       } else {
-        throw new Error(result.error || '작업 실패')
+        throw new Error(result.error?.message || '작업 실패')
       }
     } catch (error) {
       console.error('❌ 일괄 작업 오류:', error)
@@ -345,7 +345,7 @@ export default function SongManagement() {
         // 데이터 다시 로드 (백그라운드에서 조용히)
         await loadSongs()
       } else {
-        throw new Error(result.error || '곡 추가 실패')
+        throw new Error(result.error?.message || '곡 추가 실패')
       }
     } catch (error) {
       console.error('❌ 새 곡 추가 오류:', error)
@@ -389,7 +389,7 @@ export default function SongManagement() {
         // 데이터 다시 로드 (백그라운드에서 조용히)
         await loadSongs()
       } else {
-        throw new Error(result.error || '곡 삭제 실패')
+        throw new Error(result.error?.message || '곡 삭제 실패')
       }
     } catch (error) {
       console.error('❌ 곡 삭제 오류:', error)
@@ -435,7 +435,7 @@ export default function SongManagement() {
         // 데이터 다시 로드 (백그라운드에서 조용히)
         await loadSongs()
       } else {
-        throw new Error(result.error || '곡 수정 실패')
+        throw new Error(result.error?.message || '곡 수정 실패')
       }
     } catch (error) {
       console.error('❌ 개별 곡 수정 오류:', error)

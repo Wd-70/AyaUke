@@ -290,7 +290,7 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
         return newPlaylist
       } else {
         const result = await response.json()
-        globalPlaylistsStore.setError(result.error || '플레이리스트 생성에 실패했습니다')
+        globalPlaylistsStore.setError(result.error?.message || '플레이리스트 생성에 실패했습니다')
         return null
       }
     } catch (err) {
@@ -316,7 +316,7 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
         return true
       } else {
         const result = await response.json()
-        globalPlaylistsStore.setError(result.error || '플레이리스트 삭제에 실패했습니다')
+        globalPlaylistsStore.setError(result.error?.message || '플레이리스트 삭제에 실패했습니다')
         return false
       }
     } catch (err) {
@@ -379,7 +379,7 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
         globalPlaylistsStore.removeSongFromPlaylist(playlistId, songId)
         const result = await response.json()
         console.error('플레이리스트 추가 실패:', result.error)
-        globalPlaylistsStore.setError(result.error || '플레이리스트에 추가하는데 실패했습니다')
+        globalPlaylistsStore.setError(result.error?.message || '플레이리스트에 추가하는데 실패했습니다')
         return false
       }
     } catch (err) {
@@ -424,7 +424,7 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
           globalPlaylistsStore.notify()
         }
         const result = await response.json()
-        globalPlaylistsStore.setError(result.error || '플레이리스트에서 제거하는데 실패했습니다')
+        globalPlaylistsStore.setError(result.error?.message || '플레이리스트에서 제거하는데 실패했습니다')
         return false
       }
     } catch (err) {

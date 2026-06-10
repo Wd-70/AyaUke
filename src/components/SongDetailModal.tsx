@@ -18,7 +18,6 @@ import {
   PlusIcon,
   TrashIcon,
   CheckIcon,
-  ExternalLinkIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/solid";
 import YouTube from "react-youtube";
@@ -510,7 +509,7 @@ export default function SongDetailModal({
                           rel="noopener noreferrer"
                           className="flex-1 flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded border text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                         >
-                          <ExternalLinkIcon className="w-3 h-3" />
+                          <ArrowTopRightOnSquareIcon className="w-3 h-3" />
                           {link.title}
                           {link.verified && (
                             <CheckIcon className="w-3 h-3 text-green-500" />

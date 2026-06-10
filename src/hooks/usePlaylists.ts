@@ -68,7 +68,7 @@ export function usePlaylists(page: number = 1, limit: number = 10, includeSongs:
         setPagination(data.pagination)
       } else {
         const data = await response.json()
-        setError(data.error || '플레이리스트 목록을 불러오는데 실패했습니다')
+        setError(data.error?.message || '플레이리스트 목록을 불러오는데 실패했습니다')
       }
     } catch (err) {
       setError('네트워크 오류가 발생했습니다')
@@ -101,7 +101,7 @@ export function usePlaylists(page: number = 1, limit: number = 10, includeSongs:
         return result.playlist
       } else {
         const result = await response.json()
-        setError(result.error || '플레이리스트 생성에 실패했습니다')
+        setError(result.error?.message || '플레이리스트 생성에 실패했습니다')
         return null
       }
     } catch (err) {
@@ -134,7 +134,7 @@ export function usePlaylists(page: number = 1, limit: number = 10, includeSongs:
         return result.playlist
       } else {
         const result = await response.json()
-        setError(result.error || '플레이리스트 수정에 실패했습니다')
+        setError(result.error?.message || '플레이리스트 수정에 실패했습니다')
         return null
       }
     } catch (err) {
@@ -162,7 +162,7 @@ export function usePlaylists(page: number = 1, limit: number = 10, includeSongs:
         return true
       } else {
         const result = await response.json()
-        setError(result.error || '플레이리스트 삭제에 실패했습니다')
+        setError(result.error?.message || '플레이리스트 삭제에 실패했습니다')
         return false
       }
     } catch (err) {
@@ -218,7 +218,7 @@ export function usePlaylist(playlistId: string): UsePlaylistReturn {
         setPlaylist(data.playlist)
       } else {
         const data = await response.json()
-        setError(data.error || '플레이리스트를 불러오는데 실패했습니다')
+        setError(data.error?.message || '플레이리스트를 불러오는데 실패했습니다')
       }
     } catch (err) {
       setError('네트워크 오류가 발생했습니다')
@@ -251,7 +251,7 @@ export function usePlaylist(playlistId: string): UsePlaylistReturn {
         return true
       } else {
         const result = await response.json()
-        setError(result.error || '곡 추가에 실패했습니다')
+        setError(result.error?.message || '곡 추가에 실패했습니다')
         return false
       }
     } catch (err) {
@@ -280,7 +280,7 @@ export function usePlaylist(playlistId: string): UsePlaylistReturn {
         return true
       } else {
         const result = await response.json()
-        setError(result.error || '곡 삭제에 실패했습니다')
+        setError(result.error?.message || '곡 삭제에 실패했습니다')
         return false
       }
     } catch (err) {
@@ -313,7 +313,7 @@ export function usePlaylist(playlistId: string): UsePlaylistReturn {
         return true
       } else {
         const result = await response.json()
-        setError(result.error || '곡 순서 변경에 실패했습니다')
+        setError(result.error?.message || '곡 순서 변경에 실패했습니다')
         return false
       }
     } catch (err) {
