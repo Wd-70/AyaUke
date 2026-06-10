@@ -19,7 +19,6 @@ import {
   ServerIcon,
   ArrowTrendingUpIcon,
   EyeIcon,
-  DocumentDuplicateIcon,
   MagnifyingGlassIcon,
   AdjustmentsHorizontalIcon,
   ChatBubbleBottomCenterTextIcon,
@@ -29,10 +28,8 @@ import {
 } from "@heroicons/react/24/outline";
 
 // Import tabs from test-db
-import TimelineParsingView from "../test-db/tabs/TimelineParsingView";
 import CommentAnalysisTab from "../test-db/tabs/CommentAnalysisTab";
 import SongManagementTab from "./tabs/SongManagementTab";
-import BackupManagementTab from "./tabs/BackupManagementTab";
 import UserManagementTab from "./tabs/UserManagementTab";
 import DashboardTab from "./tabs/DashboardTab";
 import LiveClipManagementTab from "./tabs/LiveClipManagementTab";
@@ -42,7 +39,6 @@ type TabType =
   | "dashboard"
   | "clips"
   | "songs"
-  | "backup"
   | "timeline"
   | "comments"
   | "converter"
@@ -67,12 +63,6 @@ const tabs = [
     name: "노래 관리",
     icon: MusicalNoteIcon,
     description: "노래 데이터 조회, 편집, 삭제",
-  },
-  {
-    id: "backup" as const,
-    name: "백업 관리",
-    icon: DocumentDuplicateIcon,
-    description: "DB 백업, 복원, 통계",
   },
   {
     id: "timeline" as const,
@@ -158,9 +148,6 @@ export default function AdminClient() {
 
       case "songs":
         return <SongManagementTab />;
-
-      case "backup":
-        return <BackupManagementTab />;
 
       case "timeline":
         return <CommentAnalysisTab viewMode="timeline" />;
