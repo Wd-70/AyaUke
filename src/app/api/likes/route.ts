@@ -1,147 +1,63 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import dbConnect from '@/lib/mongodb'
-import Like from '@/models/Like'
-import User from '@/models/User'
-import SongDetail from '@/models/SongDetail'
-import mongoose from 'mongoose'
-import { authOptions } from '@/lib/authOptions'
+import { z } from 'zod';
+import mongoose from 'mongoose';
+import Like from '@/models/Like';
+import User from '@/models/User';
+import SongDetail from '@/models/SongDetail';
+import { withApi, ok } from '@/shared/api/handler';
+import { NotFoundError, ConflictError } from '@/shared/api/errors';
 
-export async function GET(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.channelId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+const SongIdQuery = z.object({ songId: z.string().min(1).optional() });
+const SongIdBody = z.object({ songId: z.string().min(1) });
 
-    await dbConnect()
-
-    const { searchParams } = new URL(request.url)
-    const songId = searchParams.get('songId')
-
-    if (songId) {
-      // 특정 곡의 좋아요 상태 확인
-      const like = await Like.findOne({
-        channelId: session.user.channelId,
-        songId: new mongoose.Types.ObjectId(songId)
-      })
-      
-      return NextResponse.json({ liked: !!like })
-    } else {
-      // 사용자의 모든 좋아요 목록 조회
-      const likes = await Like.find({ channelId: session.user.channelId })
-        .populate('songId', 'title artist language')
-        .sort({ createdAt: -1 })
-      
-      return NextResponse.json({ likes })
-    }
-  } catch (error) {
-    console.error('좋아요 조회 오류:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
+async function findSessionUser(channelId: string) {
+  const user = await User.findOne({ channelId });
+  if (!user) throw new NotFoundError('사용자를 찾을 수 없습니다.');
+  return user;
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.channelId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const GET = withApi({ schema: SongIdQuery, auth: 'user' }, async ({ input, session }) => {
+  const channelId = session!.user.channelId;
 
-    const { songId } = await request.json()
-    if (!songId) {
-      return NextResponse.json({ error: 'songId is required' }, { status: 400 })
-    }
-
-    await dbConnect()
-
-    // 사용자 정보 조회
-    const user = await User.findOne({ channelId: session.user.channelId })
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // 곡 정보 확인
-    const song = await SongDetail.findById(songId)
-    if (!song) {
-      return NextResponse.json({ error: 'Song not found' }, { status: 404 })
-    }
-
-    // 이미 좋아요가 있는지 확인
-    const existingLike = await Like.findOne({
-      userId: user._id,
-      songId: new mongoose.Types.ObjectId(songId)
-    })
-
-    if (existingLike) {
-      return NextResponse.json({ error: 'Already liked' }, { status: 409 })
-    }
-
-    // 새 좋아요 생성
-    const like = new Like({
-      userId: user._id,
-      channelId: session.user.channelId,
-      songId: new mongoose.Types.ObjectId(songId)
-    })
-
-    await like.save()
-
-    // SongDetail의 likeCount 증가
-    await SongDetail.findByIdAndUpdate(
-      songId,
-      { $inc: { likeCount: 1 } },
-      { new: true }
-    )
-
-    return NextResponse.json({ success: true, like }, { status: 201 })
-  } catch (error) {
-    console.error('좋아요 추가 오류:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  if (input.songId) {
+    const like = await Like.findOne({
+      channelId,
+      songId: new mongoose.Types.ObjectId(input.songId),
+    });
+    return ok({ liked: !!like });
   }
-}
 
-export async function DELETE(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.channelId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+  const likes = await Like.find({ channelId })
+    .populate('songId', 'title artist language')
+    .sort({ createdAt: -1 });
+  return ok({ likes });
+});
 
-    const { searchParams } = new URL(request.url)
-    const songId = searchParams.get('songId')
-    
-    if (!songId) {
-      return NextResponse.json({ error: 'songId is required' }, { status: 400 })
-    }
+export const POST = withApi({ schema: SongIdBody, auth: 'user' }, async ({ input, session }) => {
+  const user = await findSessionUser(session!.user.channelId);
 
-    await dbConnect()
+  const song = await SongDetail.findById(input.songId);
+  if (!song) throw new NotFoundError('곡을 찾을 수 없습니다.');
 
-    // 사용자 정보 조회
-    const user = await User.findOne({ channelId: session.user.channelId })
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
+  const songId = new mongoose.Types.ObjectId(input.songId);
+  const existing = await Like.findOne({ userId: user._id, songId });
+  if (existing) throw new ConflictError('이미 좋아요한 곡입니다.');
 
-    // 좋아요 삭제
-    const result = await Like.findOneAndDelete({
-      userId: user._id,
-      songId: new mongoose.Types.ObjectId(songId)
-    })
+  const like = await new Like({ userId: user._id, channelId: session!.user.channelId, songId }).save();
+  await SongDetail.findByIdAndUpdate(input.songId, { $inc: { likeCount: 1 } });
 
-    if (!result) {
-      return NextResponse.json({ error: 'Like not found' }, { status: 404 })
-    }
+  return ok({ like }, { status: 201 });
+});
 
-    // SongDetail의 likeCount 감소
-    await SongDetail.findByIdAndUpdate(
-      songId,
-      { $inc: { likeCount: -1 } },
-      { new: true }
-    )
+export const DELETE = withApi({ schema: SongIdBody, auth: 'user' }, async ({ input, session }) => {
+  const user = await findSessionUser(session!.user.channelId);
 
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('좋아요 삭제 오류:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
-}
+  const result = await Like.findOneAndDelete({
+    userId: user._id,
+    songId: new mongoose.Types.ObjectId(input.songId),
+  });
+  if (!result) throw new NotFoundError('좋아요를 찾을 수 없습니다.');
+
+  await SongDetail.findByIdAndUpdate(input.songId, { $inc: { likeCount: -1 } });
+
+  return ok({ deleted: true });
+});

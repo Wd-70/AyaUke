@@ -1,6 +1,7 @@
 import { Song, SongDetail } from '@/types';
+import { config } from '@/shared/config';
 
-const SHEET_ID = '1g-hVYnHn20XkS2HLAzOI9UcOnNHNtz1H-1g1MgVXTAc';
+const SHEET_ID = config.googleSheetId;
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_SHEETS_API_KEY;
 
 interface SheetData {

@@ -1,4 +1,5 @@
 import { IUser } from "@/models/User";
+import { config } from "@/shared/config";
 
 export interface TitleDefinition {
   id: string;
@@ -44,18 +45,7 @@ export const TITLE_DEFINITIONS: TitleDefinition[] = [
     description: "허니즈에게 부여되는 칭호입니다",
     condition: "허니즈 소속 스트리머",
     rarity: "epic",
-    checkCondition: (user) => {
-      const honeyzChannelIds = [
-        "abe8aa82baf3d3ef54ad8468ee73e7fc", // 아야
-        "798e100206987b59805cfb75f927e965", // 디디디용
-        "b82e8bc2505e37156b2d1140ba1fc05c", // 담유이
-        "c0d9723cbb75dc223c6aa8a9d4f56002", // 허니츄러스
-        "bd07973b6021d72512240c01a386d5c9", // 망내
-        "65a53076fe1a39636082dd6dba8b8a4b", // 오화요
-        "d6017f757614569add71b0bc83a81382", // 테스트
-      ];
-      return honeyzChannelIds.includes(user.channelId);
-    },
+    checkCondition: (user) => config.honeyzChannelIds.includes(user.channelId),
     autoGrant: true,
   },
   {

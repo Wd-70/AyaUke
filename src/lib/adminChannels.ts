@@ -1,14 +1,11 @@
 import { UserRole } from './permissions'
+import { config } from '@/shared/config'
 
-// 최고 관리자 권한을 가진 치지직 채널 ID 목록 (하드코딩)
-export const SUPER_ADMIN_CHANNEL_IDS = [
-  'd6017f757614569add71b0bc83a81382', // 사용자 (개발자)
-] as const
+// 최고 관리자 권한을 가진 치지직 채널 ID 목록 (env: SUPER_ADMIN_CHANNEL_IDS)
+export const SUPER_ADMIN_CHANNEL_IDS = config.superAdminChannelIds
 
-// 아야우케 관리자 권한을 가진 치지직 채널 ID 목록 (하드코딩)
-export const AYAUKE_ADMIN_CHANNEL_IDS = [
-  'abe8aa82baf3d3ef54ad8468ee73e7fc', // 아야우케 (노래책 관리자)
-] as const
+// 아야우케 관리자 권한을 가진 치지직 채널 ID 목록 (env: AYAUKE_ADMIN_CHANNEL_IDS)
+export const AYAUKE_ADMIN_CHANNEL_IDS = config.ayaukeAdminChannelIds
 
 // 최고 관리자 채널 정보
 export const SUPER_ADMIN_CHANNELS = {
@@ -28,12 +25,12 @@ export const AYAUKE_ADMIN_CHANNELS = {
 
 export function isSuperAdminChannel(channelId: string | null | undefined): boolean {
   if (!channelId) return false
-  return SUPER_ADMIN_CHANNEL_IDS.includes(channelId as any)
+  return SUPER_ADMIN_CHANNEL_IDS.includes(channelId)
 }
 
 export function isAyaukeAdminChannel(channelId: string | null | undefined): boolean {
   if (!channelId) return false
-  return AYAUKE_ADMIN_CHANNEL_IDS.includes(channelId as any)
+  return AYAUKE_ADMIN_CHANNEL_IDS.includes(channelId)
 }
 
 export function getSuperAdminInfo(channelId: string | null | undefined) {

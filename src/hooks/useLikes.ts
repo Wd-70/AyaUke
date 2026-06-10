@@ -113,7 +113,7 @@ class LikesStore {
 
   private async performBulkLoad(songIds: string[]): Promise<void> {
     try {
-      const response = await fetch('/api/likes-bulk', {
+      const response = await fetch('/api/likes/bulk', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -122,8 +122,8 @@ class LikesStore {
       })
 
       if (response.ok) {
-        const data = await response.json()
-        
+        const { data } = await response.json()
+
         // 결과를 store에 저장하고 모든 관련 구독자에게 알림
         Object.entries(data.likes).forEach(([songId, liked]) => {
           this.likes.set(songId, liked as boolean)
@@ -240,8 +240,8 @@ export function useLike(songId: string): UseLikeReturn {
         if (!response.ok) {
           // 실패 시 원래 상태로 되돌림
           likesStore.setLike(songId, currentLiked)
-          const data = await response.json()
-          setError(data.error || '좋아요 취소에 실패했습니다')
+          const data = await response.json().catch(() => null)
+          setError(data?.error?.message || '좋아요 취소에 실패했습니다')
         }
       } else {
         // 좋아요 추가
@@ -256,8 +256,8 @@ export function useLike(songId: string): UseLikeReturn {
         if (!response.ok) {
           // 실패 시 원래 상태로 되돌림
           likesStore.setLike(songId, currentLiked)
-          const data = await response.json()
-          setError(data.error || '좋아요 추가에 실패했습니다')
+          const data = await response.json().catch(() => null)
+          setError(data?.error?.message || '좋아요 추가에 실패했습니다')
         }
       }
     } catch (err) {

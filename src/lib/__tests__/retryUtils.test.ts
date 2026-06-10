@@ -1,21 +1,20 @@
 /**
  * Unit tests for retry utility functions
- * @jest-environment node
  */
-
+import { describe, test, expect, beforeEach, vi, type Mock } from 'vitest';
 import { fetchWithRetry, createRetryStatisticsTracker } from '../retryUtils';
 
 // Mock fetch globally
-global.fetch = jest.fn();
+global.fetch = vi.fn();
 
 describe('fetchWithRetry', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    (global.fetch as jest.Mock).mockReset();
+    vi.clearAllMocks();
+    (global.fetch as Mock).mockReset();
   });
 
   test('should succeed on first attempt', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
+    (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => ({ data: 'success' })
@@ -27,7 +26,7 @@ describe('fetchWithRetry', () => {
   });
 
   test('should retry on 429 status', async () => {
-    (global.fetch as jest.Mock)
+    (global.fetch as Mock)
       .mockResolvedValueOnce({ ok: false, status: 429, statusText: 'Too Many Requests' })
       .mockResolvedValueOnce({ ok: true, status: 200 });
 
@@ -37,7 +36,7 @@ describe('fetchWithRetry', () => {
   });
 
   test('should retry on 500 status', async () => {
-    (global.fetch as jest.Mock)
+    (global.fetch as Mock)
       .mockResolvedValueOnce({ ok: false, status: 500, statusText: 'Internal Server Error' })
       .mockResolvedValueOnce({ ok: true, status: 200 });
 
@@ -47,7 +46,7 @@ describe('fetchWithRetry', () => {
   });
 
   test('should NOT retry on 404 status', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' });
+    (global.fetch as Mock).mockResolvedValueOnce({ ok: false, status: 404, statusText: 'Not Found' });
 
     const response = await fetchWithRetry('https://api.test.com/data', {}, { maxRetries: 2 });
     expect(response.status).toBe(404);
@@ -55,7 +54,7 @@ describe('fetchWithRetry', () => {
   });
 
   test('should exhaust retries and throw error', async () => {
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 500, statusText: 'Server Error' });
+    (global.fetch as Mock).mockResolvedValue({ ok: false, status: 500, statusText: 'Server Error' });
 
     await expect(
       fetchWithRetry('https://api.test.com/data', {}, { maxRetries: 2 })
@@ -65,7 +64,7 @@ describe('fetchWithRetry', () => {
   });
 
   test('should retry on network error', async () => {
-    (global.fetch as jest.Mock)
+    (global.fetch as Mock)
       .mockRejectedValueOnce(new TypeError('Network request failed'))
       .mockResolvedValueOnce({ ok: true, status: 200 });
 
@@ -75,8 +74,8 @@ describe('fetchWithRetry', () => {
   });
 
   test('should call onRetry callback', async () => {
-    const onRetry = jest.fn();
-    (global.fetch as jest.Mock)
+    const onRetry = vi.fn();
+    (global.fetch as Mock)
       .mockResolvedValueOnce({ ok: false, status: 429 })
       .mockResolvedValueOnce({ ok: true, status: 200 });
 
@@ -86,11 +85,12 @@ describe('fetchWithRetry', () => {
     expect(onRetry).toHaveBeenCalledWith(1, 1000, expect.any(Object));
   });
 
-  test('should use exponential backoff delays', async () => {
+  // 실제 백오프 대기(1+2+4초)가 발생하므로 타임아웃 여유 필요
+  test('should use exponential backoff delays', { timeout: 15000 }, async () => {
     const delays: number[] = [];
     const onRetry = (attempt: number, delay: number) => delays.push(delay);
 
-    (global.fetch as jest.Mock).mockResolvedValue({ ok: false, status: 500 });
+    (global.fetch as Mock).mockResolvedValue({ ok: false, status: 500 });
 
     await fetchWithRetry('https://api.test.com/data', {}, { maxRetries: 3, onRetry }).catch(() => {});
 

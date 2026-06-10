@@ -95,20 +95,20 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
         const songIds = playlist.songs.map(item => item.songId.id || item.songId._id)
         console.log('🔄 플레이리스트 좋아요 정보 로딩:', songIds)
         
-        const response = await fetch('/api/likes-bulk', {
+        const response = await fetch('/api/likes/bulk', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ songIds })
         })
 
         if (response.ok) {
-          const data = await response.json()
+          const { data } = await response.json()
           console.log('✅ 플레이리스트 좋아요 정보 로딩 완료:', data.likes)
-          
+
           // 전역 likes store에 데이터 설정 (useLike 훅에서 사용)
           // 각 SongCard의 useLike 훅이 이 데이터를 사용하도록 강제 새로고침
-          window.dispatchEvent(new CustomEvent('likesLoaded', { 
-            detail: { likes: data.likes } 
+          window.dispatchEvent(new CustomEvent('likesLoaded', {
+            detail: { likes: data.likes }
           }))
         }
       } catch (error) {
