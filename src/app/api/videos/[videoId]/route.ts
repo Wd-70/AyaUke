@@ -5,7 +5,8 @@ import { connectDB as connectToDatabase } from '@/shared/db/mongodb';
 import SongVideo from '@/domains/archive/schemas/song-video.schema';
 import SongDetail from '@/domains/catalog/song.schema';
 import { canManageSongs, UserRole } from '@/lib/permissions';
-import { updateVideoData, validateYouTubeUrl } from '@/lib/youtube';
+import { parseVideoUrl } from '@/shared/utils/video-url';
+import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
 
 // GET: 특정 영상 정보 조회
 export async function GET(
@@ -88,25 +89,27 @@ export async function PUT(
     const updateData: any = {};
     
     if (videoUrl !== undefined) {
-      // 유튜브 URL 검증
-      if (!validateYouTubeUrl(videoUrl)) {
+      // 영상 URL 검증 (유튜브 / 치지직 다시보기)
+      const videoData = parseVideoUrl(videoUrl);
+      if (!videoData) {
         return NextResponse.json(
-          { error: '올바른 유튜브 URL을 입력해주세요.' },
+          { error: '올바른 유튜브 또는 치지직 다시보기 URL을 입력해주세요.' },
           { status: 400 }
         );
       }
-      
-      // videoUrl이 변경되면 videoId와 thumbnailUrl도 함께 업데이트
-      const videoData = updateVideoData(videoUrl);
-      if (videoData) {
-        updateData.videoUrl = videoUrl;
-        updateData.videoId = videoData.videoId;
+
+      // videoUrl이 변경되면 platform/videoId/thumbnailUrl도 함께 업데이트
+      updateData.videoUrl = videoUrl;
+      updateData.platform = videoData.platform;
+      updateData.videoId = videoData.videoId;
+      if (videoData.thumbnailUrl) {
         updateData.thumbnailUrl = videoData.thumbnailUrl;
-      } else {
-        return NextResponse.json(
-          { error: '올바른 유튜브 URL을 입력해주세요.' },
-          { status: 400 }
-        );
+      } else if (videoData.platform === 'chzzk' && videoData.videoNo) {
+        const chzzkVideo = await ChzzkVideo.findOne({ videoNo: videoData.videoNo })
+          .select('thumbnailImageUrl')
+          .lean();
+        const thumb = (chzzkVideo as { thumbnailImageUrl?: string } | null)?.thumbnailImageUrl;
+        if (thumb) updateData.thumbnailUrl = thumb;
       }
     }
     

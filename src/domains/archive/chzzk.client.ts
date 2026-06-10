@@ -1,4 +1,5 @@
 import { fetchWithTimeout } from '@/lib/fetchWithTimeout';
+import { NotFoundError } from '@/shared/api/errors';
 
 /** 치지직 비공식 API 클라이언트. HTTP 호출과 응답 정규화만 담당한다. */
 
@@ -218,14 +219,41 @@ export async function checkVideoExists(videoNo: number): Promise<boolean> {
   }
 }
 
-export interface HlsInfo {
-  hlsUrl: string;
+export interface StreamInfo {
+  streamUrl: string;
+  /** 'hls' = 임시 다시보기(리와인드), 'mp4' = 영구 보존 VOD (progressive, Range 시킹 가능) */
+  streamType: 'hls' | 'mp4';
   duration: number;
   videoTitle: string;
 }
 
-/** 다시보기 HLS 스트림 정보 */
-export async function fetchVideoHlsInfo(videoNo: number | string): Promise<HlsInfo> {
+/** 네이버 VOD 재생 JSON에서 최고 화질 MP4 URL 추출 */
+function pickBestMp4Url(playback: Record<string, any>): string | null {
+  let best: { width: number; url: string } | null = null;
+
+  for (const period of playback.period ?? []) {
+    for (const adaptationSet of period.adaptationSet ?? []) {
+      if (adaptationSet.mimeType !== 'video/mp4') continue;
+      for (const rep of adaptationSet.representation ?? []) {
+        const width = rep.width ?? 0;
+        const url = rep.baseURL?.[0]?.value;
+        if (url && (!best || width > best.width)) {
+          best = { width, url };
+        }
+      }
+    }
+  }
+
+  return best?.url ?? null;
+}
+
+/**
+ * 다시보기 스트림 정보.
+ * - 구 임시 다시보기: liveRewindPlaybackJson → HLS
+ * - 영구 보존 VOD(파트너): videoId + inKey → 네이버 VOD API → progressive MP4
+ * URL은 만료될 수 있으므로 저장하지 말고 재생 시마다 조회한다.
+ */
+export async function fetchVideoStreamInfo(videoNo: number | string): Promise<StreamInfo> {
   const dt = Date.now().toString(36).substring(0, 5);
   const response = await fetchWithTimeout(
     `https://api.chzzk.naver.com/service/v3/videos/${videoNo}?dt=${dt}`,
@@ -233,20 +261,60 @@ export async function fetchVideoHlsInfo(videoNo: number | string): Promise<HlsIn
     15000,
   );
 
+  if (response.status === 404) {
+    throw new NotFoundError('치지직에서 삭제되었거나 존재하지 않는 영상입니다.');
+  }
   if (!response.ok) throw new Error('Failed to fetch video info');
 
   const data = await response.json();
-  if (data.code !== 200 || !data.content?.liveRewindPlaybackJson) {
-    throw new Error('Video not available');
+  if (data.code === 404 || !data.content) {
+    throw new NotFoundError('치지직에서 삭제되었거나 존재하지 않는 영상입니다.');
+  }
+  if (data.code !== 200) throw new Error('Video not available');
+
+  const content = data.content;
+
+  // 1) 구 방식: 라이브 리와인드 HLS
+  if (content.liveRewindPlaybackJson) {
+    const playbackData = JSON.parse(content.liveRewindPlaybackJson);
+    const hlsMedia = playbackData.media?.find((m: { mediaId: string }) => m.mediaId === 'HLS');
+    if (hlsMedia?.path) {
+      return {
+        streamUrl: hlsMedia.path,
+        streamType: 'hls',
+        duration: playbackData.meta?.duration || content.duration || 0,
+        videoTitle: content.videoTitle,
+      };
+    }
   }
 
-  const playbackData = JSON.parse(data.content.liveRewindPlaybackJson);
-  const hlsMedia = playbackData.media?.find((m: { mediaId: string }) => m.mediaId === 'HLS');
-  if (!hlsMedia?.path) throw new Error('HLS stream not found');
+  // 2) 영구 보존 VOD: videoId + inKey → 네이버 VOD 재생 정보
+  if (content.videoId && content.inKey) {
+    const playbackResponse = await fetchWithTimeout(
+      `https://apis.naver.com/neonplayer/vodplay/v2/playback/${content.videoId}?key=${content.inKey}`,
+      { headers: { ...CHZZK_HEADERS, Accept: 'application/json' } },
+      15000,
+    );
 
-  return {
-    hlsUrl: hlsMedia.path,
-    duration: playbackData.meta?.duration || 0,
-    videoTitle: data.content.videoTitle,
-  };
+    if (playbackResponse.ok) {
+      const playback = await playbackResponse.json();
+      const mp4Url = pickBestMp4Url(playback);
+      if (mp4Url) {
+        return {
+          streamUrl: mp4Url,
+          streamType: 'mp4',
+          duration: content.duration || 0,
+          videoTitle: content.videoTitle,
+        };
+      }
+    }
+  }
+
+  throw new Error('재생 가능한 스트림을 찾을 수 없습니다.');
+}
+
+/** @deprecated fetchVideoStreamInfo를 사용하세요. (hlsUrl 필드 호환용) */
+export async function fetchVideoHlsInfo(videoNo: number | string) {
+  const info = await fetchVideoStreamInfo(videoNo);
+  return { hlsUrl: info.streamUrl, duration: info.duration, videoTitle: info.videoTitle };
 }

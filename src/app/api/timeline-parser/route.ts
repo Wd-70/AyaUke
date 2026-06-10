@@ -8,6 +8,7 @@ import SongDetail from '@/domains/catalog/song.schema';
 import mongoose from 'mongoose';
 
 import ParsedTimeline from '@/domains/archive/schemas/parsed-timeline.schema';
+import { parseChzzkTimelineComments } from '@/domains/archive/chzzk-timeline.service';
 
 // 텍스트 정규화 함수 (공백/특수문자 제거, 소문자 변환)
 function normalizeText(text: string): string {
@@ -799,6 +800,26 @@ export async function POST(request: NextRequest) {
     const { action, itemId, isRelevant, isExcluded, skipProcessed = true } = body;
 
     switch (action) {
+      case 'parse-chzzk-timeline-comments': {
+        // 치지직 타임라인 댓글 → ParsedTimeline (이미 수집된 chzzkcomments 사용)
+        console.log('🔄 치지직 타임라인 댓글 파싱 시작...');
+
+        const chzzkResult = await parseChzzkTimelineComments({
+          videoNo: body.videoNo ? Number(body.videoNo) : undefined,
+        });
+
+        console.log(
+          `✅ 치지직 파싱 완료: 댓글 ${chzzkResult.processedComments}개 → ${chzzkResult.createdItems}개 생성, ` +
+          `중복 스킵 ${chzzkResult.skippedExisting}개`,
+        );
+
+        return NextResponse.json({
+          success: true,
+          data: chzzkResult,
+          message: `치지직 타임라인 파싱 완료: ${chzzkResult.createdItems}개 생성 (중복 ${chzzkResult.skippedExisting}개 스킵)`,
+        });
+      }
+
       case 'reprocess-timeline-comments':
         // 기존 데이터를 개선된 멀티라인 파싱 방식으로 업데이트
         console.log('🔄 기존 파싱된 타임라인 데이터를 개선된 방식으로 업데이트 시작...');

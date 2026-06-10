@@ -6,7 +6,11 @@ import mongoose, { Schema } from 'mongoose';
  */
 export interface IParsedTimeline {
   id: string;
+  /** 'youtube' | 'chzzk' — 기존 데이터는 default youtube */
+  platform: 'youtube' | 'chzzk';
   videoId: string;
+  /** 치지직 전용 영상 번호 */
+  videoNo?: number;
   videoTitle: string;
   uploadedDate: Date; // 파싱된 날짜
   videoPublishedAt?: Date; // 실제 YouTube 영상 업로드 날짜
@@ -43,7 +47,9 @@ export interface IParsedTimeline {
 const ParsedTimelineSchema = new Schema<IParsedTimeline>(
   {
     id: { type: String, required: true, unique: true },
+    platform: { type: String, enum: ['youtube', 'chzzk'], default: 'youtube', index: true },
     videoId: { type: String, required: true },
+    videoNo: { type: Number },
     videoTitle: { type: String, required: true },
     uploadedDate: { type: Date, required: true },
     videoPublishedAt: { type: Date },

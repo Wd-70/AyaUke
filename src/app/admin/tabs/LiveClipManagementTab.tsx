@@ -32,6 +32,7 @@ import {
   CheckCircleIcon as CheckCircleIconSolid,
   PlayIcon as PlayIconSolid,
 } from "@heroicons/react/24/solid";
+import ChzzkPlayer, { type ChzzkPlayerHandle } from "@/components/video/ChzzkPlayer";
 
 // YouTube API 타입 정의
 declare global {
@@ -46,6 +47,7 @@ interface ClipData {
   songId: string;
   title: string;
   artist: string;
+  platform?: 'youtube' | 'chzzk';
   videoUrl: string;
   videoId: string;
   sungDate: string;
@@ -140,7 +142,8 @@ export default function LiveClipManagementTab() {
 
   // 시간 중복 검사 함수들
   const checkTimeOverlap = (clip1: ClipData, clip2: ClipData): boolean => {
-    // 같은 영상이 아니면 중복 아님
+    // 같은 플랫폼의 같은 영상이 아니면 중복 아님
+    if ((clip1.platform || 'youtube') !== (clip2.platform || 'youtube')) return false;
     if (clip1.videoId !== clip2.videoId) return false;
     
     // 같은 클립이면 중복 아님
@@ -183,7 +186,7 @@ export default function LiveClipManagementTab() {
     const videoSongGroups: { [key: string]: ClipData[] } = {};
     
     clips.forEach(clip => {
-      const key = `${clip.videoId}-${clip.songId}`; // videoId와 songId 조합으로 키 생성
+      const key = `${clip.platform || 'youtube'}-${clip.videoId}-${clip.songId}`; // 플랫폼+videoId+songId 조합 키
       if (!videoSongGroups[key]) {
         videoSongGroups[key] = [];
       }
@@ -240,9 +243,10 @@ export default function LiveClipManagementTab() {
   // 특정 클립의 중복 정보 가져오기
   const getClipOverlapInfo = (clip: ClipData) => {
     // 같은 영상의 같은 곡 클립들만 찾기
-    const sameVideoSongClips = allClips.filter(c => 
-      c.videoId === clip.videoId && 
-      c.songId === clip.songId && 
+    const sameVideoSongClips = allClips.filter(c =>
+      (c.platform || 'youtube') === (clip.platform || 'youtube') &&
+      c.videoId === clip.videoId &&
+      c.songId === clip.songId &&
       c._id !== clip._id
     );
     const overlappingClips: ClipData[] = [];
@@ -502,8 +506,29 @@ export default function LiveClipManagementTab() {
     setSelectedClip(clip);
     setPlayerReady(false);
     setCurrentTime(clip.startTime || 0);
-    initializePlayer(clip);
+    // 치지직 클립은 ChzzkPlayer 컴포넌트가 마운트되면서 자체 초기화됨
+    if ((clip.platform || 'youtube') !== 'chzzk') {
+      initializePlayer(clip);
+    }
   };
+
+  // 치지직 플레이어를 기존 player 인터페이스에 맞추는 어댑터
+  const chzzkPlayerAdapterRef = useCallback((handle: ChzzkPlayerHandle | null) => {
+    if (handle) {
+      setPlayer({
+        playVideo: handle.play,
+        pauseVideo: handle.pause,
+        getCurrentTime: handle.getCurrentTime,
+        getDuration: handle.getDuration,
+        seekTo: (seconds: number) => handle.seekTo(seconds),
+        destroy: () => {},
+      });
+      setPlayerReady(true);
+    } else {
+      setPlayer(null);
+      setPlayerReady(false);
+    }
+  }, []);
 
   const togglePlay = () => {
     if (player && playerReady) {
@@ -864,10 +889,23 @@ export default function LiveClipManagementTab() {
               {/* 비디오 플레이어 */}
               <div className="lg:col-span-2">
                 <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                  <div
-                    ref={playerRef}
-                    className="w-full h-full"
-                  />
+                  {(selectedClip.platform || 'youtube') === 'chzzk' ? (
+                    <ChzzkPlayer
+                      key={`admin-chzzk-${selectedClip._id}`}
+                      ref={chzzkPlayerAdapterRef}
+                      videoUrl={selectedClip.videoUrl}
+                      videoNo={parseInt(selectedClip.videoId, 10)}
+                      startTime={selectedClip.startTime || 0}
+                      onTimeUpdate={setCurrentTime}
+                      onDurationChange={setDuration}
+                      className="w-full h-full"
+                    />
+                  ) : (
+                    <div
+                      ref={playerRef}
+                      className="w-full h-full"
+                    />
+                  )}
                 </div>
                 
                 {/* 플레이어 컨트롤 */}
@@ -1397,7 +1435,7 @@ export default function LiveClipManagementTab() {
                     {/* 썸네일 */}
                     <div className="relative flex-shrink-0">
                       <img
-                        src={clip.thumbnailUrl || `https://img.youtube.com/vi/${clip.videoId}/mqdefault.jpg`}
+                        src={clip.thumbnailUrl || ((clip.platform || 'youtube') === 'youtube' ? `https://img.youtube.com/vi/${clip.videoId}/mqdefault.jpg` : '/honeyz_pink.png')}
                         alt=""
                         className="w-20 h-12 object-cover rounded"
                       />

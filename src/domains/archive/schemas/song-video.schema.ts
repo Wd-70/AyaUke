@@ -1,12 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { updateVideoData } from '@/lib/youtube';
+import { parseVideoUrl, validateVideoUrl, type VideoPlatform } from '@/shared/utils/video-url';
 
 export interface ISongVideo extends Document {
   songId: string; // SongDetail의 _id와 연결
   title: string; // 곡 제목 (검색용)
   artist: string; // 아티스트 (검색용)
-  videoUrl: string; // 유튜브 URL
-  videoId: string; // 유튜브 비디오 ID (추출)
+  platform: VideoPlatform; // 'youtube' | 'chzzk' (기존 데이터는 default youtube)
+  videoUrl: string; // 유튜브 URL 또는 치지직 다시보기 URL
+  videoId: string; // 플랫폼별 영상 ID (치지직은 String(videoNo))
   sungDate: Date; // 부른 날짜
   description?: string; // 영상에 대한 설명 (옵션)
   startTime?: number; // 시작 시간 (초) - 노래 시작 부분으로 바로 이동
@@ -41,17 +42,19 @@ const SongVideoSchema: Schema = new Schema({
     trim: true,
     index: true,
   },
+  platform: {
+    type: String,
+    enum: ['youtube', 'chzzk'],
+    default: 'youtube',
+    index: true,
+  },
   videoUrl: {
     type: String,
     required: true,
     trim: true,
     validate: {
-      validator: function(v: string) {
-        // 유튜브 URL 검증
-        const youtubeRegex = /^https?:\/\/(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/;
-        return youtubeRegex.test(v);
-      },
-      message: '올바른 유튜브 URL을 입력해주세요.'
+      validator: (v: string) => validateVideoUrl(v),
+      message: '올바른 유튜브 또는 치지직 다시보기 URL을 입력해주세요.'
     }
   },
   videoId: {
@@ -120,13 +123,17 @@ SongVideoSchema.index({ addedBy: 1, createdAt: -1 }); // 사용자별 추가한 
 SongVideoSchema.index({ isVerified: 1, sungDate: -1 }); // 검증된 영상 조회
 SongVideoSchema.index({ title: 1, artist: 1 }); // 곡 정보로 검색
 
-// 유튜브 비디오 ID 추출 미들웨어
+// 영상 URL에서 플랫폼/ID/썸네일 추출 미들웨어
+// 치지직 썸네일은 URL만으로 만들 수 없어 생성 측(서비스)에서 chzzkvideos 데이터로 채운다
 SongVideoSchema.pre('save', function(next) {
   if (this.isModified('videoUrl')) {
-    const videoData = updateVideoData(this.videoUrl);
-    if (videoData) {
-      this.videoId = videoData.videoId;
-      this.thumbnailUrl = videoData.thumbnailUrl;
+    const parsed = parseVideoUrl(this.videoUrl as string);
+    if (parsed) {
+      this.platform = parsed.platform;
+      this.videoId = parsed.videoId;
+      if (parsed.thumbnailUrl) {
+        this.thumbnailUrl = parsed.thumbnailUrl;
+      }
     }
   }
   next();

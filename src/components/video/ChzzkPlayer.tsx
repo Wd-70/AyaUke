@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import Hls from "hls.js";
 import { formatSeconds } from "@/lib/timeUtils";
 
@@ -8,17 +8,30 @@ interface ChzzkPlayerProps {
   videoUrl: string;
   videoNo: number;
   isDeleted?: boolean;
+  /** 로드 완료 후 이 시간(초)으로 시킹 */
+  startTime?: number;
   onTimeUpdate?: (currentTime: number) => void;
+  onDurationChange?: (duration: number) => void;
   className?: string;
 }
 
-export default function ChzzkPlayer({
+export interface ChzzkPlayerHandle {
+  seekTo: (seconds: number) => void;
+  getCurrentTime: () => number;
+  getDuration: () => number;
+  play: () => void;
+  pause: () => void;
+}
+
+const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function ChzzkPlayer({
   videoUrl,
   videoNo,
   isDeleted = false,
+  startTime,
   onTimeUpdate,
+  onDurationChange,
   className = "",
-}: ChzzkPlayerProps) {
+}, ref) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -28,6 +41,7 @@ export default function ChzzkPlayer({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [hlsUrl, setHlsUrl] = useState<string | null>(null);
+  const [streamType, setStreamType] = useState<'hls' | 'mp4'>('hls');
 
   // Fetch HLS URL from Chzzk API
   useEffect(() => {
@@ -42,9 +56,7 @@ export default function ChzzkPlayer({
         setLoading(true);
         setError(null);
 
-        const response = await fetch(
-          `/api/chzzk-sync?action=get-hls-url&videoNo=${videoNo}`
-        );
+        const response = await fetch(`/api/clips/chzzk-hls?videoNo=${videoNo}`);
 
         if (!response.ok) {
           throw new Error("Failed to fetch video info");
@@ -52,11 +64,12 @@ export default function ChzzkPlayer({
 
         const result = await response.json();
 
-        if (!result.success || !result.data?.hlsUrl) {
-          throw new Error(result.error?.message || "HLS stream not found");
+        if (!result.success || !result.data?.streamUrl) {
+          throw new Error(result.error?.message || "재생 가능한 스트림이 없습니다.");
         }
 
-        setHlsUrl(result.data.hlsUrl);
+        setHlsUrl(result.data.streamUrl);
+        setStreamType(result.data.streamType || 'hls');
         setDuration(result.data.duration || 0);
       } catch (err: any) {
         console.error("Error fetching HLS URL:", err);
@@ -69,11 +82,28 @@ export default function ChzzkPlayer({
     fetchHlsUrl();
   }, [videoNo, isDeleted]);
 
-  // Initialize HLS player
+  // Initialize player (HLS 또는 progressive MP4)
   useEffect(() => {
     if (!hlsUrl || !videoRef.current) return;
 
     const video = videoRef.current;
+
+    // 영구 보존 VOD: progressive MP4 — 네이티브 재생 (Range 시킹 지원)
+    if (streamType === 'mp4') {
+      video.src = hlsUrl;
+      const onLoadedMeta = () => {
+        setIsReady(true);
+        setError(null);
+        if (startTime && startTime > 0) {
+          video.currentTime = startTime;
+        }
+      };
+      video.addEventListener("loadedmetadata", onLoadedMeta);
+      return () => {
+        video.removeEventListener("loadedmetadata", onLoadedMeta);
+        video.removeAttribute("src");
+      };
+    }
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -87,6 +117,9 @@ export default function ChzzkPlayer({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsReady(true);
         setError(null);
+        if (startTime && startTime > 0) {
+          video.currentTime = startTime;
+        }
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
@@ -120,11 +153,25 @@ export default function ChzzkPlayer({
       video.addEventListener("loadedmetadata", () => {
         setIsReady(true);
         setError(null);
+        if (startTime && startTime > 0) {
+          video.currentTime = startTime;
+        }
       });
     } else {
       setError("이 브라우저는 HLS를 지원하지 않습니다.");
     }
-  }, [hlsUrl]);
+  }, [hlsUrl, streamType, startTime]);
+
+  // 외부 제어 핸들 (시간 편집 화면의 '현재 시간 가져오기', 시킹 등)
+  useImperativeHandle(ref, () => ({
+    seekTo: (seconds: number) => {
+      if (videoRef.current) videoRef.current.currentTime = seconds;
+    },
+    getCurrentTime: () => videoRef.current?.currentTime ?? 0,
+    getDuration: () => videoRef.current?.duration ?? 0,
+    play: () => videoRef.current?.play(),
+    pause: () => videoRef.current?.pause(),
+  }), []);
 
   // Track video time
   useEffect(() => {
@@ -142,6 +189,7 @@ export default function ChzzkPlayer({
 
     const handleDurationChange = () => {
       setDuration(video.duration);
+      onDurationChange?.(video.duration);
     };
 
     const handlePlay = () => setIsPlaying(true);
@@ -155,6 +203,7 @@ export default function ChzzkPlayer({
     // Initial duration update
     if (video.duration) {
       setDuration(video.duration);
+      onDurationChange?.(video.duration);
     }
 
     console.log("[ChzzkPlayer] Time tracking initialized");
@@ -165,7 +214,7 @@ export default function ChzzkPlayer({
       video.removeEventListener("play", handlePlay);
       video.removeEventListener("pause", handlePause);
     };
-  }, [isReady, onTimeUpdate]);
+  }, [isReady, onTimeUpdate, onDurationChange]);
 
   if (isDeleted || error) {
     return (
@@ -259,4 +308,6 @@ export default function ChzzkPlayer({
       </div>
     </div>
   );
-}
+});
+
+export default ChzzkPlayer;

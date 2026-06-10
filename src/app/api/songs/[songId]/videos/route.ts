@@ -5,7 +5,8 @@ import { connectDB as connectToDatabase } from '@/shared/db/mongodb';
 import SongVideo from '@/domains/archive/schemas/song-video.schema';
 import SongDetail from '@/domains/catalog/song.schema';
 import { SongVideo as SongVideoType } from '@/types';
-import { updateVideoData, validateYouTubeUrl } from '@/lib/youtube';
+import { parseVideoUrl } from '@/shared/utils/video-url';
+import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
 
 // GET: 특정 곡의 영상 목록 조회
 export async function GET(
@@ -145,27 +146,29 @@ export async function POST(
       );
     }
 
-    // 유튜브 URL 검증
-    if (!validateYouTubeUrl(videoUrl)) {
+    // 영상 URL 검증 (유튜브 / 치지직 다시보기)
+    const videoData = parseVideoUrl(videoUrl);
+    if (!videoData) {
       return NextResponse.json(
-        { error: '올바른 유튜브 URL을 입력해주세요.' },
+        { error: '올바른 유튜브 또는 치지직 다시보기 URL을 입력해주세요.' },
         { status: 400 }
       );
     }
 
-    // 비디오 ID와 썸네일 URL 추출
-    const videoData = updateVideoData(videoUrl);
-    if (!videoData) {
-      return NextResponse.json(
-        { error: '올바른 유튜브 URL을 입력해주세요.' },
-        { status: 400 }
-      );
+    // 치지직 클립 썸네일: chzzkvideos에 저장된 썸네일 사용
+    let thumbnailUrl = videoData.thumbnailUrl;
+    if (videoData.platform === 'chzzk' && videoData.videoNo) {
+      const chzzkVideo = await ChzzkVideo.findOne({ videoNo: videoData.videoNo })
+        .select('thumbnailImageUrl')
+        .lean();
+      thumbnailUrl = (chzzkVideo as { thumbnailImageUrl?: string } | null)?.thumbnailImageUrl;
     }
 
     // 중복 검사 (동일한 영상+시작시간±30초 중복 방지)
     const currentStartTime = startTime || 0;
     const existingVideo = await SongVideo.findOne({
       songId,
+      platform: videoData.platform === 'youtube' ? { $in: ['youtube', null] } : videoData.platform,
       videoId: videoData.videoId,
       startTime: {
         $gte: currentStartTime - 30,
@@ -190,6 +193,7 @@ export async function POST(
       songId,
       title: song.title,
       artist: song.artist,
+      platform: videoData.platform,
       videoUrl,
       videoId: videoData.videoId,
       sungDate: validSungDate, // 검증된 날짜 사용
@@ -199,7 +203,7 @@ export async function POST(
       addedBy: session.user.userId,
       addedByName: session.user.displayName || session.user.name || session.user.channelName,
       isVerified: false,
-      thumbnailUrl: videoData.thumbnailUrl,
+      thumbnailUrl,
     });
 
     await newVideo.save();

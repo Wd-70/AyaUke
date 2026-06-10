@@ -16,6 +16,8 @@ import {
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import YouTube from 'react-youtube';
+import ClipPlayer from './clip/ClipPlayer';
+import ChzzkPlayer, { type ChzzkPlayerHandle } from './video/ChzzkPlayer';
 import { useSession } from 'next-auth/react';
 import { UserRole, roleToIsAdmin } from '@/lib/permissions';
 import { updateVideoData } from '@/lib/youtube';
@@ -663,6 +665,22 @@ export default function LiveClipManager({
     }
   }, [videoPlayer, isVideoPlaying]);
 
+  // 치지직 편집 플레이어를 기존 videoPlayer 인터페이스에 맞추는 어댑터
+  // (useCallback으로 ref 콜백 identity를 고정해 setState 루프 방지)
+  const chzzkEditPlayerRef = useCallback((handle: ChzzkPlayerHandle | null) => {
+    if (handle) {
+      setVideoPlayer({
+        playVideo: handle.play,
+        pauseVideo: handle.pause,
+        getCurrentTime: handle.getCurrentTime,
+        seekTo: handle.seekTo,
+        getPlayerState: () => 1,
+      });
+    } else {
+      setVideoPlayer(null);
+    }
+  }, []);
+
   // 현재 재생 시간을 시작 시간으로 설정
   const setCurrentTimeAsStart = useCallback(() => {
     try {
@@ -1042,7 +1060,44 @@ export default function LiveClipManager({
                   ? 'aspect-video max-h-[20vh] min-h-[120px]' 
                   : 'aspect-video max-h-[40vh] sm:max-h-[45vh] min-h-[200px] sm:min-h-[250px]'
               }`}>
-                {selectedVideo && (
+                {/* 시청 모드: 구간 전용 플레이어 (유튜브/치지직 공통) */}
+                {selectedVideo && !editingVideoId && (
+                  <ClipPlayer
+                    key={`clip-player-${selectedVideo._id}`}
+                    platform={selectedVideo.platform || 'youtube'}
+                    videoId={selectedVideo.videoId}
+                    startTime={selectedVideo.startTime || 0}
+                    endTime={selectedVideo.endTime}
+                    autoplay={shouldAutoPlay}
+                    onEnded={() => {
+                      setIsVideoPlaying(false);
+                      // 다음 클립 연속 재생
+                      if (selectedVideoIndex < songVideos.length - 1) {
+                        setTimeout(() => {
+                          setShouldAutoPlay(true);
+                          setSelectedVideoIndex(selectedVideoIndex + 1);
+                        }, 100);
+                      }
+                    }}
+                    className="w-full h-full"
+                  />
+                )}
+
+                {/* 편집 모드 (치지직): HLS 플레이어 + 시간 캡처 어댑터 */}
+                {selectedVideo && editingVideoId && (selectedVideo.platform === 'chzzk') && (
+                  <ChzzkPlayer
+                    key={`edit-chzzk-${selectedVideo._id}`}
+                    ref={chzzkEditPlayerRef}
+                    videoUrl={selectedVideo.videoUrl}
+                    videoNo={parseInt(selectedVideo.videoId, 10)}
+                    startTime={selectedVideo.startTime || 0}
+                    onTimeUpdate={setCurrentTime}
+                    className="w-full h-full"
+                  />
+                )}
+
+                {/* 편집 모드 (유튜브): 전체 영상 접근 가능한 기존 플레이어 */}
+                {selectedVideo && editingVideoId && selectedVideo.platform !== 'chzzk' && (
                   <YouTube
                     key={`liveclip-player-${selectedVideo._id}`}
                     videoId={selectedVideo.videoId}

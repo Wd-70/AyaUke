@@ -119,8 +119,9 @@ export interface SongVideo {
   songId: string; // SongDetail의 _id와 연결
   title: string; // 곡 제목 (검색용)
   artist: string; // 아티스트 (검색용)
-  videoUrl: string; // 유튜브 URL
-  videoId: string; // 유튜브 비디오 ID (추출)
+  platform?: 'youtube' | 'chzzk'; // 영상 플랫폼 (기존 데이터는 미설정=youtube)
+  videoUrl: string; // 유튜브 URL 또는 치지직 다시보기 URL
+  videoId: string; // 플랫폼별 영상 ID (치지직은 String(videoNo))
   sungDate: Date; // 부른 날짜
   description?: string; // 영상에 대한 설명 (옵션)
   startTime?: number; // 시작 시간 (초) - 노래 시작 부분으로 바로 이동

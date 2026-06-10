@@ -32,10 +32,14 @@ import {
 import SongMatchingDialog from '@/components/SongMatchingDialog';
 import TimeVerificationSection from '@/components/TimeVerificationSection';
 import { updateTimeVerification } from '@/utils/timeVerification';
+import ChzzkPlayer, { type ChzzkPlayerHandle } from '@/components/video/ChzzkPlayer';
+import { parseVideoUrl } from '@/shared/utils/video-url';
 
 interface ParsedTimelineItem {
   id: string;
+  platform?: 'youtube' | 'chzzk';
   videoId: string;
+  videoNo?: number;
   videoTitle: string;
   uploadedDate: string;
   originalDateString?: string;
@@ -1058,6 +1062,23 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
     }
   }, [youtubePlayer, isPlaying]);
 
+  // 치지직 검증 플레이어를 기존 youtubePlayer 인터페이스에 맞추는 어댑터
+  // (시간 캡처/시킹 함수들을 플랫폼 무관하게 재사용하기 위함)
+  const chzzkVerifyPlayerRef = useCallback((handle: ChzzkPlayerHandle | null) => {
+    if (handle) {
+      setYoutubePlayer({
+        playVideo: handle.play,
+        pauseVideo: handle.pause,
+        getCurrentTime: handle.getCurrentTime,
+        seekTo: (seconds: number) => handle.seekTo(seconds),
+        loadVideoById: () => {}, // 치지직은 URL 고정 — 해당 없음
+        destroy: () => {},
+      } as unknown as YouTubePlayer);
+    } else {
+      setYoutubePlayer(null);
+    }
+  }, []);
+
   // 현재 재생 시간을 시작 시간으로 설정
   const setCurrentTimeAsStart = useCallback(() => {
     if (youtubePlayer && editingData) {
@@ -1144,19 +1165,19 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
       console.log('🔍 클라이언트 중복검사 시작...');
       
       const duplicateCheckResults = timelines.map((timeline, index) => {
-        // YouTube URL에서 videoId 추출
-        const videoIdMatch = timeline.videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
-        const videoId = videoIdMatch ? videoIdMatch[1] : '';
-        
-        if (!videoId) {
-          return { ...timeline, isDuplicate: false, error: 'YouTube URL에서 비디오 ID를 추출할 수 없습니다.' };
+        // 영상 URL에서 플랫폼/videoId 추출 (유튜브 / 치지직)
+        const parsed = parseVideoUrl(timeline.videoUrl);
+
+        if (!parsed) {
+          return { ...timeline, isDuplicate: false, error: '영상 URL에서 비디오 ID를 추출할 수 없습니다.' };
         }
 
-        const isDuplicate = existingClips.some((existing: any) => 
-          existing.videoId === videoId &&
+        const isDuplicate = existingClips.some((existing: any) =>
+          (existing.platform || 'youtube') === parsed.platform &&
+          existing.videoId === parsed.videoId &&
           Math.abs(existing.startTime - timeline.startTimeSeconds) <= 30
         );
-        
+
         return {
           ...timeline,
           isDuplicate,
@@ -2259,7 +2280,23 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
           onVerificationUpdate={handleTimeVerificationUpdate}
         />
 
-        {/* YouTube 재생 */}
+        {/* 치지직 재생 (치지직 다시보기에서 파싱된 타임라인) */}
+        {selectedTimeline.platform === 'chzzk' ? (
+          <div className="bg-emerald-50 dark:bg-emerald-900/30 rounded-lg p-4">
+            <h4 className="font-medium text-emerald-800 dark:text-emerald-200 mb-3">치지직 다시보기 재생</h4>
+            <ChzzkPlayer
+              key={`verify-chzzk-${selectedTimeline.id}`}
+              ref={chzzkVerifyPlayerRef}
+              videoUrl={selectedTimeline.videoUrl}
+              videoNo={selectedTimeline.videoNo || parseInt(selectedTimeline.videoId, 10)}
+              startTime={editingData?.startTimeSeconds ?? selectedTimeline.startTimeSeconds}
+              className="w-full"
+            />
+            <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
+              아래 시간 조정/캡처 버튼은 치지직 플레이어와 연동됩니다.
+            </p>
+          </div>
+        ) : (
         <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
           <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-3">YouTube 재생</h4>
           <div className="space-y-3">
@@ -2267,7 +2304,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
               const videoId = extractVideoId(selectedTimeline.videoUrl);
               const startTime = editingData?.startTimeSeconds || selectedTimeline.startTimeSeconds;
               const endTime = editingData?.endTimeSeconds || selectedTimeline.endTimeSeconds;
-              
+
               if (!videoId) {
                 return (
                   <p className="text-sm text-blue-700 dark:text-blue-300">
@@ -2511,6 +2548,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
             })()}
           </div>
         </div>
+        )}
 
         {/* 비디오 정보 */}
         <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">

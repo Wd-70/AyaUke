@@ -437,6 +437,33 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
   };
 
 
+  // 치지직 타임라인 댓글 파싱 (이미 수집된 chzzkcomments → parsedtimelines)
+  const parseChzzkTimelineComments = async () => {
+    setTimelineParsing(true);
+    try {
+      const response = await fetch('/api/timeline-parser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'parse-chzzk-timeline-comments'
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        showDialog('치지직 타임라인 파싱 완료', result.message || '치지직 타임라인 파싱이 완료되었습니다.', result.data);
+      } else {
+        showDialog('치지직 타임라인 파싱 실패', result.error || '치지직 타임라인 파싱 중 오류가 발생했습니다.', null, true);
+      }
+    } catch (error) {
+      console.error('치지직 타임라인 파싱 오류:', error);
+      showDialog('치지직 타임라인 파싱 오류', '네트워크 오류가 발생했습니다.', null, true);
+    } finally {
+      setTimelineParsing(false);
+    }
+  };
+
   // 기존 데이터를 개선된 파싱 방식으로 업데이트
   const reprocessAllTimelines = async () => {
     if (!confirm('기존 파싱된 타임라인 데이터를 개선된 멀티라인 파싱 방식으로 업데이트하시겠습니까?\n새로운 요소는 추가되지 않고 기존 데이터만 업데이트됩니다.')) return;
@@ -680,11 +707,30 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
                       ) : (
                         <>
                           <LinkIcon className="w-4 h-4" />
-                          타임라인 파싱
+                          타임라인 파싱 (유튜브)
                         </>
                       )}
                     </button>
-                    
+
+                    <button
+                      onClick={parseChzzkTimelineComments}
+                      disabled={timelineParsing}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-lg flex items-center gap-2 transition-colors"
+                      title="이미 동기화된 치지직 다시보기 댓글에서 타임라인을 파싱합니다"
+                    >
+                      {timelineParsing ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          처리 중...
+                        </>
+                      ) : (
+                        <>
+                          <LinkIcon className="w-4 h-4" />
+                          타임라인 파싱 (치지직)
+                        </>
+                      )}
+                    </button>
+
                     <button
                       onClick={triggerUpload}
                       disabled={(timelineStats?.matchedSongs || 0) === 0 && (timelineStats?.verifiedItems || 0) === 0}

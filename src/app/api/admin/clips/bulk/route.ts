@@ -4,7 +4,8 @@ import { authOptions } from '@/lib/authOptions';
 import { connectDB as connectToDatabase } from '@/shared/db/mongodb';
 import SongVideo from '@/domains/archive/schemas/song-video.schema';
 import SongDetail from '@/domains/catalog/song.schema';
-import { updateVideoData, validateYouTubeUrl } from '@/lib/youtube';
+import { parseVideoUrl } from '@/shared/utils/video-url';
+import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
 import { roleToIsAdmin } from '@/lib/permissions';
 
 interface BulkClipData {
@@ -59,7 +60,8 @@ export async function POST(request: NextRequest) {
     // 전체 기존 클립 데이터를 메모리에 로드 (서버 2차 검증용)
     const existingClips = await SongVideo.find({}, {
       songId: 1,
-      videoId: 1, 
+      platform: 1,
+      videoId: 1,
       startTime: 1,
       description: 1,
       sungDate: 1
@@ -68,7 +70,7 @@ export async function POST(request: NextRequest) {
     // 기존 클립을 빠른 검색을 위한 Map으로 변환
     const existingClipsMap = new Map();
     existingClips.forEach(clip => {
-      const key = `${clip.songId}-${clip.videoId}`;
+      const key = `${clip.songId}-${clip.platform || 'youtube'}-${clip.videoId}`;
       if (!existingClipsMap.has(key)) {
         existingClipsMap.set(key, []);
       }
@@ -153,24 +155,26 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // 유튜브 URL 검증
-        if (!validateYouTubeUrl(videoUrl)) {
-          results.errors.push(`클립 ${index + 1}: 올바른 유튜브 URL을 입력해주세요.`);
+        // 영상 URL 검증 (유튜브 / 치지직)
+        const videoData = parseVideoUrl(videoUrl);
+        if (!videoData) {
+          results.errors.push(`클립 ${index + 1}: 올바른 유튜브 또는 치지직 다시보기 URL을 입력해주세요.`);
           results.failed++;
           continue;
         }
 
-        // 비디오 ID와 썸네일 URL 추출
-        const videoData = updateVideoData(videoUrl);
-        if (!videoData) {
-          results.errors.push(`클립 ${index + 1}: 유튜브 URL에서 비디오 정보를 추출할 수 없습니다.`);
-          results.failed++;
-          continue;
+        // 치지직 클립 썸네일: chzzkvideos에 저장된 썸네일 사용
+        let thumbnailUrl = videoData.thumbnailUrl;
+        if (videoData.platform === 'chzzk' && videoData.videoNo) {
+          const chzzkVideo = await ChzzkVideo.findOne({ videoNo: videoData.videoNo })
+            .select('thumbnailImageUrl')
+            .lean();
+          thumbnailUrl = (chzzkVideo as { thumbnailImageUrl?: string } | null)?.thumbnailImageUrl;
         }
 
         // 서버 사이드 중복 검사 (2차 안전장치)
         const currentStartTime = startTime || 0;
-        const clipKey = `${songId}-${videoData.videoId}`;
+        const clipKey = `${songId}-${videoData.platform}-${videoData.videoId}`;
         const existingClipsForVideo = existingClipsMap.get(clipKey) || [];
         
         const isDuplicate = existingClipsForVideo.some((existing: any) => 
@@ -188,6 +192,7 @@ export async function POST(request: NextRequest) {
           songId,
           title: song.title,
           artist: song.artist,
+          platform: videoData.platform,
           videoUrl,
           videoId: videoData.videoId,
           sungDate: validSungDate,
@@ -197,7 +202,7 @@ export async function POST(request: NextRequest) {
           addedBy: session.user.userId,
           addedByName: session.user.displayName || session.user.name || session.user.channelName,
           isVerified: false,
-          thumbnailUrl: videoData.thumbnailUrl,
+          thumbnailUrl,
         });
 
         await newVideo.save();

@@ -26,7 +26,8 @@ export async function GET(request: Request) {
       // 중복검사용 전체 클립 데이터 (최소한의 필드만)
       const clips = await SongVideo.find({}, {
         songId: 1,
-        videoId: 1, 
+        platform: 1,
+        videoId: 1,
         startTime: 1,
         endTime: 1,
         sungDate: 1,
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
         success: true,
         clips: clips.map(clip => ({
           songId: clip.songId,
+          platform: clip.platform || 'youtube',
           videoId: clip.videoId,
           startTime: clip.startTime || 0,
           endTime: clip.endTime,
