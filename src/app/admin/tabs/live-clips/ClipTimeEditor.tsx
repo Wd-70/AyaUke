@@ -144,6 +144,16 @@ export default function ClipTimeEditor({
               종료 시간 {endTime != null && <span className="font-mono">({formatTime(endTime)})</span>}
             </label>
             <div className="flex gap-1">
+              {songClipDuration != null && songClipDuration > 0 && (
+                <button
+                  type="button"
+                  onClick={() => onChange({ endTime: Math.round((startTime + songClipDuration) * 10) / 10 })}
+                  className="px-2 py-0.5 text-xs rounded bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700 hover:bg-violet-200 dark:hover:bg-violet-900/60 transition-colors"
+                  title={`종료 시간을 '시작 + 곡 기본 길이(${formatTime(songClipDuration)})'로 설정합니다`}
+                >
+                  기본길이 적용
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => adapter && onChange({ endTime: captureTime(adapter.getCurrentTime()) })}
