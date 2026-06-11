@@ -64,10 +64,25 @@ export default function SongDetailModal({
   const [activeTab, setActiveTab] = useState<'mr' | 'clips'>('mr');
   const [selectedMRIndex, setSelectedMRIndex] = useState(song.selectedMRIndex || 0);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
+  const [playlistMenuPos, setPlaylistMenuPos] = useState({ x: 0, y: 0 });
   const [showLyricsMenu, setShowLyricsMenu] = useState(false);
   const [obsActive, setObsActive] = useState(false);
   const [obsLoading, setObsLoading] = useState(false);
   const playerRef = useRef<YouTubePlayer | null>(null);
+
+  // 플레이리스트 메뉴를 버튼 위치 기준으로 연다 (fixed 좌표 계산)
+  const openPlaylistMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (showPlaylistMenu) {
+      setShowPlaylistMenu(false);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    const menuWidth = 280;
+    // 버튼 왼쪽에 메뉴를 띄우되, 화면 밖으로 나가면 보정 (PlaylistContextMenu가 추가 보정)
+    setPlaylistMenuPos({ x: rect.left - menuWidth - 8, y: rect.top });
+    setShowLyricsMenu(false);
+    setShowPlaylistMenu(true);
+  };
 
   // 관리자 권한 체크
   const isAdmin = session?.user?.isAdmin || false;
@@ -264,15 +279,6 @@ export default function SongDetailModal({
 
     return (
       <>
-        {/* 닫기 (최상단/최좌측) */}
-        <button
-          onClick={handleClose}
-          className="relative p-2.5 rounded-full bg-red-500/15 hover:bg-red-500/25 text-red-500 transition-colors duration-200"
-          title="닫기"
-        >
-          <XMarkIcon className="w-5 h-5" />
-        </button>
-
         {/* 좋아요 */}
         <button
           onClick={toggleLike}
@@ -289,28 +295,18 @@ export default function SongDetailModal({
         </button>
 
         {/* 플레이리스트 */}
-        <div className="relative">
-          <button
-            onClick={() => { setShowPlaylistMenu((v) => !v); setShowLyricsMenu(false); }}
-            className={`${iconBtn} ${showPlaylistMenu ? '!text-light-accent dark:!text-dark-accent' : ''}`}
-            title="플레이리스트에 추가"
-          >
-            <ListBulletIcon className="w-5 h-5" />
-            {songPlaylists.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 flex items-center justify-center text-[10px] font-medium rounded-full bg-light-accent dark:bg-dark-accent text-white">
-                {songPlaylists.length}
-              </span>
-            )}
-          </button>
-          {showPlaylistMenu && (
-            <PlaylistContextMenu
-              songId={song.id}
-              isOpen={showPlaylistMenu}
-              onClose={() => setShowPlaylistMenu(false)}
-              position={{ x: 0, y: 0 }}
-            />
+        <button
+          onClick={openPlaylistMenu}
+          className={`${iconBtn} ${showPlaylistMenu ? '!text-light-accent dark:!text-dark-accent' : ''}`}
+          title="플레이리스트에 추가"
+        >
+          <ListBulletIcon className="w-5 h-5" />
+          {songPlaylists.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 flex items-center justify-center text-[10px] font-medium rounded-full bg-light-accent dark:bg-dark-accent text-white">
+              {songPlaylists.length}
+            </span>
           )}
-        </div>
+        </button>
 
         {/* 가사 검색 (팝오버) */}
         <div className="relative">
@@ -367,17 +363,6 @@ export default function SongDetailModal({
             )}
           </button>
         )}
-
-        {/* 편집 (관리자) */}
-        {isAdmin && (
-          <button
-            onClick={toggleEditMode}
-            className={`${iconBtn} ${isEditMode ? '!text-light-accent dark:!text-dark-accent' : ''}`}
-            title={isEditMode ? '편집 중' : '편집'}
-          >
-            <PencilIcon className="w-5 h-5" />
-          </button>
-        )}
       </>
     );
   };
@@ -415,12 +400,36 @@ export default function SongDetailModal({
         }}
       >
         {/* Background gradient overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-light-accent/5 to-light-purple/5 
+        <div className="absolute inset-0 bg-gradient-to-br from-light-accent/5 to-light-purple/5
                         dark:from-dark-accent/5 dark:to-dark-purple/5 rounded-xl"></div>
+
+        {/* 우상단 고정: 편집(관리자) + 닫기 */}
+        <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={toggleEditMode}
+              className={`p-2 rounded-full transition-colors duration-200 ${
+                isEditMode
+                  ? "bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent"
+                  : "bg-light-primary/10 dark:bg-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/20 dark:hover:bg-dark-primary/30"
+              }`}
+              title={isEditMode ? "편집 중" : "편집"}
+            >
+              <PencilIcon className="w-5 h-5" />
+            </button>
+          )}
+          <button
+            onClick={handleClose}
+            className="p-2 rounded-full bg-red-500/15 hover:bg-red-500/25 text-red-500 transition-colors duration-200"
+            title="닫기"
+          >
+            <XMarkIcon className="w-5 h-5" />
+          </button>
+        </div>
 
         <div className="relative p-4 md:p-5 lg:p-6 flex flex-col h-full gap-3">
           {/* 메타데이터 헤더 (제목/아티스트/태그) */}
-          <div className="flex flex-col gap-2 pr-12 md:pr-0">
+          <div className="flex flex-col gap-2 pr-24 md:pr-24">
             <div className="flex items-center gap-3 min-w-0">
               <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-light-text dark:text-dark-text truncate">
                 {displayTitle}
@@ -603,6 +612,14 @@ export default function SongDetailModal({
             {renderActionButtons('horizontal')}
           </div>
         </div>
+
+        {/* 플레이리스트 메뉴 (버튼 위치 기준 fixed) */}
+        <PlaylistContextMenu
+          songId={song.id}
+          isOpen={showPlaylistMenu}
+          onClose={() => setShowPlaylistMenu(false)}
+          position={playlistMenuPos}
+        />
       </motion.div>
     </>
   );

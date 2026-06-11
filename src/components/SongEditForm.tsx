@@ -279,9 +279,9 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
   if (!isVisible) return null;
 
   return (
-    <div className="flex flex-col h-full min-h-0 xl:pb-0 pb-6">
+    <div className="flex flex-col h-full min-h-0 p-4 md:p-5">
       {/* 헤더 */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <h3 className="text-xl font-semibold text-light-text dark:text-dark-text">
           곡 정보 편집
         </h3>
@@ -303,7 +303,7 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
       </div>
 
       {/* 편집 폼 */}
-      <div className="flex-1 xl:overflow-visible xl:h-auto overflow-y-auto space-y-6">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-6 pr-2 -mr-2">
         {/* 기본 정보 */}
         <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-xl p-4 space-y-4">
           
