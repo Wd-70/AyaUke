@@ -1966,6 +1966,150 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
   }, [selectedTimeline, extractVideoId, initializePlayer]);
 
   // 상세 화면 내용 렌더링 함수 (데스크톱과 모바일에서 공통 사용)
+  // 플레이어 시간 제어 패널 — 유튜브/치지직 공용 (youtubePlayer 어댑터 인터페이스 기반)
+  const renderTimeControlPanel = () => {
+    if (!youtubePlayer) return null;
+
+    const softButton = (tone: 'emerald' | 'purple') =>
+      tone === 'emerald'
+        ? 'bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:border-emerald-800 dark:text-emerald-300'
+        : 'bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 dark:border-purple-800 dark:text-purple-300';
+
+    const neutralButton =
+      'px-2 py-1 bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 ' +
+      'dark:bg-gray-700/50 dark:hover:bg-gray-700 dark:border-gray-600 dark:text-gray-300 ' +
+      'rounded text-xs transition-colors flex items-center justify-center gap-1';
+
+    return (
+      <div className="bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-lg p-3 mt-3 shadow-sm">
+        {/* 현재 시간 표시 */}
+        <div className="text-center mb-3 pb-2 border-b border-gray-200 dark:border-gray-700">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            현재 시간{' '}
+            <span className="font-mono text-base font-semibold text-gray-900 dark:text-white">
+              {formatSeconds(Math.floor(currentTime))}
+            </span>
+          </p>
+        </div>
+
+        {/* 메인 제어 버튼들 */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <button
+            type="button"
+            onClick={setCurrentTimeAsStart}
+            className={`px-2 py-2 rounded-lg text-xs transition-colors flex flex-col items-center gap-1 ${softButton('emerald')}`}
+            title="플레이어의 현재 재생 위치를 클립 시작시간으로 설정합니다"
+          >
+            <ClockIcon className="w-4 h-4" />
+            <span>시작시간 설정</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={togglePlayback}
+            className={`px-2 py-2 rounded-lg text-xs transition-colors flex flex-col items-center gap-1 border ${
+              isPlaying
+                ? 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-700 dark:bg-rose-900/30 dark:hover:bg-rose-900/50 dark:border-rose-800 dark:text-rose-300'
+                : 'bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 dark:border-blue-800 dark:text-blue-300'
+            }`}
+            title={isPlaying ? '일시정지' : '재생'}
+          >
+            {isPlaying ? (
+              <>
+                <PauseIcon className="w-4 h-4" />
+                <span>일시정지</span>
+              </>
+            ) : (
+              <>
+                <PlayIcon className="w-4 h-4" />
+                <span>재생</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={setCurrentTimeAsEnd}
+            className={`px-2 py-2 rounded-lg text-xs transition-colors flex flex-col items-center gap-1 ${softButton('purple')}`}
+            title="플레이어의 현재 재생 위치를 클립 종료시간으로 설정합니다"
+          >
+            <ClockIcon className="w-4 h-4" />
+            <span>종료시간 설정</span>
+          </button>
+        </div>
+
+        {/* 세부 이동 */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="space-y-1">
+            <p className="text-[11px] text-center text-gray-400 dark:text-gray-500">◀ 뒤로</p>
+            <div className="flex flex-col gap-1">
+              <button type="button" onClick={seekBackward1m} className={neutralButton} title="1분 뒤로">
+                <ChevronDoubleLeftIcon className="w-3 h-3" />
+                1분
+              </button>
+              <button type="button" onClick={seekBackward10s} className={neutralButton} title="10초 뒤로">
+                <ChevronLeftIcon className="w-3 h-3" />
+                10초
+              </button>
+              <button type="button" onClick={seekBackward1s} className={neutralButton} title="1초 뒤로">
+                <BackwardIcon className="w-3 h-3" />
+                1초
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-[11px] text-center text-gray-400 dark:text-gray-500">바로가기</p>
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (youtubePlayer && editingData?.startTimeSeconds !== undefined) {
+                    youtubePlayer.seekTo(editingData.startTimeSeconds, true);
+                  }
+                }}
+                className={`${neutralButton} !text-emerald-600 dark:!text-emerald-400`}
+                title="설정된 시작시간 위치로 이동"
+              >
+                <PlayIcon className="w-3 h-3" />
+                시작 지점
+              </button>
+              {editingData?.endTimeSeconds && (
+                <button
+                  type="button"
+                  onClick={seekToEndMinus3s}
+                  className={`${neutralButton} !text-purple-600 dark:!text-purple-400`}
+                  title="설정된 종료시간 3초 전으로 이동 (끝부분 확인용)"
+                >
+                  <ClockIcon className="w-3 h-3" />
+                  종료 3초 전
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <p className="text-[11px] text-center text-gray-400 dark:text-gray-500">앞으로 ▶</p>
+            <div className="flex flex-col gap-1">
+              <button type="button" onClick={seekForward1m} className={neutralButton} title="1분 앞으로">
+                <ChevronDoubleRightIcon className="w-3 h-3" />
+                1분
+              </button>
+              <button type="button" onClick={seekForward10s} className={neutralButton} title="10초 앞으로">
+                <ChevronRightIcon className="w-3 h-3" />
+                10초
+              </button>
+              <button type="button" onClick={seekForward1s} className={neutralButton} title="1초 앞으로">
+                <ForwardIcon className="w-3 h-3" />
+                1초
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderDetailContent = () => {
     if (!selectedTimeline) {
       return (
@@ -2298,11 +2442,30 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
               videoUrl={selectedTimeline.videoUrl}
               videoNo={selectedTimeline.videoNo || parseInt(selectedTimeline.videoId, 10)}
               startTime={editingData?.startTimeSeconds ?? selectedTimeline.startTimeSeconds}
+              onTimeUpdate={(time) => setCurrentTime(Math.floor(time))}
+              onPlayStateChange={setIsPlaying}
               className="w-full"
             />
-            <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
-              아래 시간 조정/캡처 버튼은 치지직 플레이어와 연동됩니다.
-            </p>
+
+            {/* 시간 제어 패널 (유튜브와 동일한 편집 도구) */}
+            {renderTimeControlPanel()}
+
+            {/* 구간 정보 표시 */}
+            <div className="text-sm text-emerald-700 dark:text-emerald-300 mt-3">
+              <p>
+                구간: {formatSeconds(editingData?.startTimeSeconds ?? selectedTimeline.startTimeSeconds)}
+                {(editingData?.endTimeSeconds ?? selectedTimeline.endTimeSeconds) &&
+                  ` ~ ${formatSeconds(editingData?.endTimeSeconds ?? selectedTimeline.endTimeSeconds!)}`}
+              </p>
+              {(editingData?.endTimeSeconds ?? selectedTimeline.endTimeSeconds) && (
+                <p>
+                  지속시간: {formatDuration(
+                    (editingData?.endTimeSeconds ?? selectedTimeline.endTimeSeconds!) -
+                    (editingData?.startTimeSeconds ?? selectedTimeline.startTimeSeconds)
+                  )}
+                </p>
+              )}
+            </div>
           </div>
         ) : (
         <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-4">
@@ -2373,175 +2536,8 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
                       </div>
                     )}
                     
-                    {/* 플레이어 시간 제어 */}
-                    {youtubePlayer && (
-                        <div className="bg-white/50 dark:bg-gray-800/50 rounded-lg p-3 mt-3">
-                          {/* 현재 시간 표시 */}
-                          <div className="text-center mb-3 pb-2 border-b border-blue-200 dark:border-blue-700">
-                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                              현재 시간: <span className="font-mono">{formatSeconds(Math.floor(currentTime))}</span>
-                            </p>
-                          </div>
-                          
-                          {/* 메인 제어 버튼들 */}
-                          <div className="grid grid-cols-3 gap-2 mb-3">
-                            <button
-                              type="button"
-                              onClick={setCurrentTimeAsStart}
-                              className="px-2 py-2 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 
-                                         text-green-700 dark:text-green-300 rounded text-xs transition-colors flex flex-col items-center gap-1"
-                              title="현재 시간을 시작시간으로 설정"
-                            >
-                              <ClockIcon className="w-4 h-4" />
-                              <span>시작시간 설정</span>
-                            </button>
-                            
-                            <button
-                              type="button"
-                              onClick={togglePlayback}
-                              className={`px-2 py-2 rounded text-xs transition-colors flex flex-col items-center gap-1 ${
-                                isPlaying 
-                                  ? 'bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300'
-                                  : 'bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-                              }`}
-                              title={isPlaying ? '일시정지' : '재생'}
-                            >
-                              {isPlaying ? (
-                                <>
-                                  <PauseIcon className="w-4 h-4" />
-                                  <span>일시정지</span>
-                                </>
-                              ) : (
-                                <>
-                                  <PlayIcon className="w-4 h-4" />
-                                  <span>재생</span>
-                                </>
-                              )}
-                            </button>
-                            
-                            <button
-                              type="button"
-                              onClick={setCurrentTimeAsEnd}
-                              className="px-2 py-2 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 
-                                         text-purple-700 dark:text-purple-300 rounded text-xs transition-colors flex flex-col items-center gap-1"
-                              title="현재 시간을 종료시간으로 설정"
-                            >
-                              <ClockIcon className="w-4 h-4" />
-                              <span>종료시간 설정</span>
-                            </button>
-                          </div>
-                          
-                          <h5 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-3 text-center">세부 제어</h5>
-                          <div className="grid grid-cols-3 gap-2">
-                            {/* 뒤로 이동 */}
-                            <div className="space-y-1">
-                              <p className="text-xs text-center text-blue-600 dark:text-blue-400">뒤로</p>
-                              <div className="flex flex-col gap-1">
-                                <button
-                                  type="button"
-                                  onClick={seekBackward1m}
-                                  className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
-                                             text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                  title="1분 뒤로"
-                                >
-                                  <ChevronDoubleLeftIcon className="w-3 h-3" />
-                                  1분
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={seekBackward10s}
-                                  className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
-                                             text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                  title="10초 뒤로"
-                                >
-                                  <ChevronLeftIcon className="w-3 h-3" />
-                                  10초
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={seekBackward1s}
-                                  className="px-2 py-1 bg-red-100 hover:bg-red-200 dark:bg-red-900/30 dark:hover:bg-red-900/50 
-                                             text-red-700 dark:text-red-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                  title="1초 뒤로"
-                                >
-                                  <BackwardIcon className="w-3 h-3" />
-                                  1초
-                                </button>
-                              </div>
-                            </div>
-                            
-                            {/* 특수 이동 */}
-                            <div className="space-y-1">
-                              <p className="text-xs text-center text-blue-600 dark:text-blue-400">특수</p>
-                              <div className="flex flex-col gap-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (youtubePlayer && editingData?.startTimeSeconds !== undefined) {
-                                      youtubePlayer.seekTo(editingData.startTimeSeconds, true);
-                                    }
-                                  }}
-                                  className="px-2 py-1 bg-green-100 hover:bg-green-200 dark:bg-green-900/30 dark:hover:bg-green-900/50 
-                                             text-green-700 dark:text-green-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                  title="시작시간으로 이동"
-                                >
-                                  <PlayIcon className="w-3 h-3" />
-                                  시작
-                                </button>
-                                {editingData?.endTimeSeconds && (
-                                  <button
-                                    type="button"
-                                    onClick={seekToEndMinus3s}
-                                    className="px-2 py-1 bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 
-                                               text-purple-700 dark:text-purple-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                    title="종료시간 3초 전으로 이동"
-                                  >
-                                    <ClockIcon className="w-3 h-3" />
-                                    종료-3초
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                            
-                            {/* 앞으로 이동 */}
-                            <div className="space-y-1">
-                              <p className="text-xs text-center text-blue-600 dark:text-blue-400">앞으로</p>
-                              <div className="flex flex-col gap-1">
-                                <button
-                                  type="button"
-                                  onClick={seekForward1m}
-                                  className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
-                                             text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                  title="1분 앞으로"
-                                >
-                                  <ChevronDoubleRightIcon className="w-3 h-3" />
-                                  1분
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={seekForward10s}
-                                  className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
-                                             text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                  title="10초 앞으로"
-                                >
-                                  <ChevronRightIcon className="w-3 h-3" />
-                                  10초
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={seekForward1s}
-                                  className="px-2 py-1 bg-blue-100 hover:bg-blue-200 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 
-                                             text-blue-700 dark:text-blue-300 rounded text-xs transition-colors flex items-center justify-center gap-1"
-                                  title="1초 앞으로"
-                                >
-                                  <ForwardIcon className="w-3 h-3" />
-                                  1초
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                    {/* 플레이어 시간 제어 (유튜브/치지직 공용 패널) */}
+                    {renderTimeControlPanel()}
                     </div>
                   
                   {/* 구간 정보 표시 */}

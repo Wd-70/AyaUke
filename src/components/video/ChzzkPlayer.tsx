@@ -13,6 +13,7 @@ interface ChzzkPlayerProps {
   startTime?: number;
   onTimeUpdate?: (currentTime: number) => void;
   onDurationChange?: (duration: number) => void;
+  onPlayStateChange?: (playing: boolean) => void;
   className?: string;
 }
 
@@ -31,6 +32,7 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
   startTime,
   onTimeUpdate,
   onDurationChange,
+  onPlayStateChange,
   className = "",
 }, ref) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -193,8 +195,14 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
       onDurationChange?.(video.duration);
     };
 
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      onPlayStateChange?.(true);
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+      onPlayStateChange?.(false);
+    };
     // 네이티브 컨트롤로 음량 조절 시 저장 (ClipPlayer와 공유)
     const handleVolumeChange = () => {
       saveStoredVolume({ volume: video.volume, muted: video.muted });
@@ -226,7 +234,7 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
       video.removeEventListener("pause", handlePause);
       video.removeEventListener("volumechange", handleVolumeChange);
     };
-  }, [isReady, onTimeUpdate, onDurationChange]);
+  }, [isReady, onTimeUpdate, onDurationChange, onPlayStateChange]);
 
   if (isDeleted || error) {
     return (
