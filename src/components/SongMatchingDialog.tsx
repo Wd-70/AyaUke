@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { XMarkIcon, MagnifyingGlassIcon, MusicalNoteIcon } from '@heroicons/react/24/outline';
 
 interface SongCandidate {
@@ -48,6 +48,9 @@ export default function SongMatchingDialog({
   const [customArtist, setCustomArtist] = useState(timelineItem.artist);
   const [customTitle, setCustomTitle] = useState(timelineItem.songTitle);
   const [isCustomSearch, setIsCustomSearch] = useState(false);
+  // 바깥 클릭 닫기: mousedown이 backdrop에서 시작했을 때만 닫는다.
+  // (다이얼로그 안에서 누르고 바깥에서 떼는 드래그로는 닫히지 않도록)
+  const mouseDownOnBackdrop = useRef(false);
 
   // 초기 검색
   useEffect(() => {
@@ -138,11 +141,14 @@ export default function SongMatchingDialog({
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
+      onMouseDown={(e) => { mouseDownOnBackdrop.current = e.target === e.currentTarget; }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && mouseDownOnBackdrop.current) onClose();
+        mouseDownOnBackdrop.current = false;
+      }}
     >
       <div
         className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* 헤더 */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
