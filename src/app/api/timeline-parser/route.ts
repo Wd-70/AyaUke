@@ -1652,16 +1652,42 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      case 'get-parsed-items':
-        // 목록에는 originalComment(댓글 HTML 전문, 항목당 수 KB)를 제외한다.
-        // 같은 댓글에서 나온 수십 개 항목이 같은 블롭을 중복 보유해 페이로드가
-        // 수십 MB까지 불어나 응답이 수십 초 걸렸다. 상세 보기에서 단건으로 lazy-load.
+      case 'get-parsed-items': {
+        // 목록에는 originalComment(댓글 HTML 전문, 상세에서 lazy-load) + 목록/전역작업
+        // 미사용 필드를 제외해 페이로드를 줄인다.
         // allowDiskUse: 인덱스 생성 전/예외 상황에서도 32MB 정렬 제한에 걸리지 않도록
+        const listSelect =
+          '-originalComment -createdAt -updatedAt -videoPublishedAt -verifiedBy -verifiedAt -verificationNotes -__v';
+
+        // offset/limit가 오면 청크 단위로 반환(클라이언트 점진 로딩용). 없으면 전체 반환(레거시).
+        const limitParam = searchParams.get('limit');
+        if (limitParam) {
+          const limit = Math.min(Math.max(parseInt(limitParam, 10) || 0, 1), 3000);
+          const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10) || 0, 0);
+
+          const [chunk, total] = await Promise.all([
+            ParsedTimeline.find()
+              .select(listSelect)
+              .sort({ uploadedDate: -1, startTimeSeconds: 1 })
+              .skip(offset)
+              .limit(limit)
+              .allowDiskUse(true)
+              .lean(),
+            // 총 개수는 첫 청크에서만 (이후 중복 카운트 방지)
+            offset === 0 ? ParsedTimeline.estimatedDocumentCount() : Promise.resolve(undefined),
+          ]);
+
+          return NextResponse.json({
+            success: true,
+            data: chunk,
+            offset,
+            limit,
+            ...(total !== undefined ? { total } : {}),
+          });
+        }
+
         const items = await ParsedTimeline.find()
-          // originalComment(상세에서 lazy-load) + 목록/전역작업에서 안 읽는 필드 제외
-          .select(
-            '-originalComment -createdAt -updatedAt -videoPublishedAt -verifiedBy -verifiedAt -verificationNotes -__v'
-          )
+          .select(listSelect)
           .sort({ uploadedDate: -1, startTimeSeconds: 1 })
           .allowDiskUse(true)
           .lean();
@@ -1670,6 +1696,7 @@ export async function GET(request: NextRequest) {
           success: true,
           data: items
         });
+      }
 
       case 'get-item-comment': {
         // 상세 보기에서 선택된 단일 항목의 댓글 원문만 조회 (목록 경량화 보완)

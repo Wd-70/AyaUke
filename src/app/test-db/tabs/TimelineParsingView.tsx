@@ -116,6 +116,10 @@ declare global {
 export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: TimelineParsingViewProps) {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  // 점진 로딩: 첫 청크로 UI를 즉시 띄우고 나머지를 백그라운드로 채운다.
+  // 전체 데이터셋이 필요한 기능(업로드 등)은 isFullyLoaded 이후에만 활성화.
+  const [isFullyLoaded, setIsFullyLoaded] = useState(false);
+  const [loadProgress, setLoadProgress] = useState<{ loaded: number; total: number }>({ loaded: 0, total: 0 });
   const [parsedTimelines, setParsedTimelines] = useState<ParsedTimelineItem[]>([]);
   const [stats, setStats] = useState<TimelineStats>({
     parsedItems: 0,
@@ -178,8 +182,13 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
     if (onUploadRequest) {
       // 외부에서 업로드를 요청할 때 호출할 함수를 등록
       (window as any).triggerTimelineUpload = () => {
+        // 전체 데이터 로딩이 끝나기 전에는 일부 매칭 항목이 누락될 수 있어 차단
+        if (!isFullyLoaded) {
+          alert('전체 데이터를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');
+          return;
+        }
         // 직접 상태를 확인하여 업로드 가능한지 체크
-        const hasMatchedTimelines = parsedTimelines.some(timeline => 
+        const hasMatchedTimelines = parsedTimelines.some(timeline =>
           timeline.matchedSong && 
           !timeline.isExcluded && 
           timeline.isRelevant &&
@@ -198,8 +207,8 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
         }
       };
     }
-  }, [onUploadRequest, parsedTimelines]);
-  
+  }, [onUploadRequest, parsedTimelines, isFullyLoaded]);
+
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(100);
@@ -234,6 +243,8 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
         setParsedTimelines(result.data.items);
         setStats(result.data.stats);
         onStatsUpdate?.(result.data.stats);
+        setIsFullyLoaded(true);
+        setLoadProgress({ loaded: result.data.items.length, total: result.data.items.length });
       } else {
         alert(result.error || '타임라인 파싱 실패');
       }
@@ -1738,43 +1749,65 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
     }
   };
 
-  // 기존 파싱된 데이터 로드
+  // 누적 데이터로부터 통계 계산 (점진 로딩 중에도 계속 갱신)
+  const computeStats = useCallback((data: ParsedTimelineItem[]): TimelineStats => ({
+    parsedItems: data.length,
+    relevantItems: data.filter((t) => t.isRelevant && !t.isExcluded).length,
+    matchedSongs: data.filter((t) => t.matchedSong).length,
+    uniqueMatchedSongs: new Set(
+      data.filter((t) => t.matchedSong?.songId).map((t) => t.matchedSong!.songId)
+    ).size,
+    verifiedItems: data.filter((t) => t.isTimeVerified).length,
+  }), []);
+
+  // 점진(progressive) 로딩: 첫 청크로 즉시 렌더하고 나머지를 백그라운드로 이어 받는다.
+  // 전체 데이터셋이 필요한 기능(업로드)은 isFullyLoaded 이후 활성화.
   const loadExistingDataOnMount = async () => {
+    setInitialLoading(true);
+    setIsFullyLoaded(false);
+    const seenIds = new Set<string>();
+    const accumulated: ParsedTimelineItem[] = [];
     try {
-      const response = await fetch('/api/timeline-parser?action=get-parsed-items');
-      const result = await response.json();
-      
-      if (result.success) {
-        setParsedTimelines(result.data);
-        // 통계 계산
-        const totalItems = result.data.length;
-        const relevantItems = result.data.filter((timeline: ParsedTimelineItem) => timeline.isRelevant && !timeline.isExcluded).length;
-        const matchedItems = result.data.filter((timeline: ParsedTimelineItem) => timeline.matchedSong).length;
-        
-        // 매칭완료된 곡들 중 곡DB 기준으로 고유한 곡 개수 계산
-        const uniqueMatchedSongs = new Set(
-          result.data
-            .filter((timeline: ParsedTimelineItem) => timeline.matchedSong?.songId)
-            .map((timeline: ParsedTimelineItem) => timeline.matchedSong!.songId)
-        ).size;
-        
-        // 검증완료된 항목 개수 계산
-        const verifiedItems = result.data.filter((timeline: ParsedTimelineItem) => timeline.isTimeVerified).length;
-        
-        const newStats = {
-          parsedItems: totalItems,
-          relevantItems: relevantItems,
-          matchedSongs: matchedItems,
-          uniqueMatchedSongs: uniqueMatchedSongs,
-          verifiedItems: verifiedItems
-        };
-        
-        setStats(newStats);
+      let offset = 0;
+      let total = Infinity;
+      let first = true;
+      while (offset < total) {
+        // 첫 청크는 작게(빠른 첫 렌더), 이후는 크게(요청 수 절감)
+        const limit = first ? 500 : 2500;
+        const response = await fetch(
+          `/api/timeline-parser?action=get-parsed-items&offset=${offset}&limit=${limit}`
+        );
+        const result = await response.json();
+        if (!result.success) break;
+
+        const chunk: ParsedTimelineItem[] = result.data || [];
+        // 정렬 경계의 동률로 인한 중복은 id로 방어
+        for (const item of chunk) {
+          if (!seenIds.has(item.id)) {
+            seenIds.add(item.id);
+            accumulated.push(item);
+          }
+        }
+        if (typeof result.total === 'number') total = result.total;
+
+        setParsedTimelines([...accumulated]);
+        setStats(computeStats(accumulated));
+        setLoadProgress({ loaded: accumulated.length, total: total === Infinity ? accumulated.length : total });
+
+        // 첫 청크 도착 → 즉시 목록 표시
+        if (first) {
+          setInitialLoading(false);
+          first = false;
+        }
+
+        if (chunk.length < limit) break; // 마지막 청크
+        offset = accumulated.length;
       }
     } catch (error) {
       console.error('기존 데이터 로드 오류:', error);
     } finally {
       setInitialLoading(false);
+      setIsFullyLoaded(true);
     }
   };
 
@@ -2872,6 +2905,29 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
             </div>
           )}
           
+          {/* 전체 데이터 백그라운드 로딩 진행 상황 (첫 청크 표시 후 나머지 수신 중) */}
+          {!initialLoading && !isFullyLoaded && (
+            <div className={`${isMobile ? 'px-2 py-2' : 'px-4 py-3'} bg-amber-50 dark:bg-amber-900/20 border-b border-gray-200 dark:border-gray-700`}>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-amber-700 dark:text-amber-300 flex items-center gap-2">
+                  <div className="w-3.5 h-3.5 border-2 border-amber-500/40 border-t-amber-500 rounded-full animate-spin" />
+                  전체 데이터 불러오는 중… (업로드는 완료 후 활성화)
+                </span>
+                <span className="text-amber-600 dark:text-amber-400">
+                  {loadProgress.loaded}{loadProgress.total ? ` / ${loadProgress.total}` : ''}
+                </span>
+              </div>
+              {loadProgress.total > 0 && (
+                <div className="mt-2 w-full bg-amber-200 dark:bg-amber-800 rounded-full h-1.5">
+                  <div
+                    className="bg-amber-500 dark:bg-amber-400 h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, (loadProgress.loaded / loadProgress.total) * 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 업로드 진행 상황 */}
           {uploadProgress && (
             <div className={`${isMobile ? 'px-2 py-2' : 'px-4 py-3'} bg-blue-50 dark:bg-blue-900/20 border-b border-gray-200 dark:border-gray-700`}>
@@ -3330,7 +3386,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
                         await uploadToLiveClips(timelinesToUpload);
                       }
                     }}
-                    disabled={uploadLoading || (!uploadSelection.matched && !uploadSelection.verified)}
+                    disabled={uploadLoading || !isFullyLoaded || (!uploadSelection.matched && !uploadSelection.verified)}
                     className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white rounded transition-colors flex items-center justify-center gap-2"
                   >
                     {uploadLoading ? (
