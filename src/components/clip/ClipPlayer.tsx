@@ -31,6 +31,8 @@ interface ClipPlayerProps {
   autoplay?: boolean;
   /** 구간 재생이 끝났을 때 (연속 재생 등에 사용) */
   onEnded?: () => void;
+  /** 검수용 확장 컨트롤: ±1s/±10s 이동, 끝-3s/끝-6s 바로가기 (관리자 화면용) */
+  extendedControls?: boolean;
   className?: string;
 }
 
@@ -91,6 +93,7 @@ export default function ClipPlayer({
   endTime,
   autoplay = false,
   onEnded,
+  extendedControls = false,
   className = "",
 }: ClipPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -395,14 +398,27 @@ export default function ClipPlayer({
     }
   };
 
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /** 구간 내 상대 위치로 시킹 (클램프 + ended 해제 공통 처리) */
+  const seekToClipPosition = (rel: number) => {
     const adapter = adapterRef.current;
     if (!adapter) return;
-    const rel = Math.min(Math.max(0, Number(e.target.value)), clipDuration);
-    adapter.seekTo(startTime + rel);
-    setClipPosition(rel);
+    const clamped = Math.min(Math.max(0, rel), clipDuration || 0);
+    adapter.seekTo(startTime + clamped);
+    setClipPosition(clamped);
     setEnded(false);
     endedRef.current = false;
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    seekToClipPosition(Number(e.target.value));
+  };
+
+  /** 현재 위치에서 delta초 이동 */
+  const seekRelative = (delta: number) => seekToClipPosition(clipPosition + delta);
+
+  /** 구간 끝에서 offset초 앞 지점으로 이동 (마지막 부분 확인용) */
+  const seekFromEnd = (offset: number) => {
+    if (clipDuration > 0) seekToClipPosition(clipDuration - offset);
   };
 
   const toggleMute = () => {
@@ -447,6 +463,10 @@ export default function ClipPlayer({
   }
 
   const progressPercent = clipDuration > 0 ? (clipPosition / clipDuration) * 100 : 0;
+
+  const seekChipClass =
+    "px-1.5 py-0.5 rounded text-[11px] font-mono bg-white/15 hover:bg-white/30 " +
+    "disabled:opacity-40 disabled:cursor-not-allowed transition-colors";
 
   return (
     <div
@@ -530,12 +550,42 @@ export default function ClipPlayer({
             )}
           </button>
 
+          {/* 검수용 이동 컨트롤 */}
+          {extendedControls && (
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => seekRelative(-10)} disabled={!ready} className={seekChipClass} title="10초 뒤로">
+                -10s
+              </button>
+              <button type="button" onClick={() => seekRelative(-1)} disabled={!ready} className={seekChipClass} title="1초 뒤로">
+                -1s
+              </button>
+              <button type="button" onClick={() => seekRelative(1)} disabled={!ready} className={seekChipClass} title="1초 앞으로">
+                +1s
+              </button>
+              <button type="button" onClick={() => seekRelative(10)} disabled={!ready} className={seekChipClass} title="10초 앞으로">
+                +10s
+              </button>
+            </div>
+          )}
+
           {/* 구간 상대 시간: 클립이 전체 영상인 것처럼 표시 */}
           <span className="text-xs font-mono tabular-nums">
             {formatClipTime(clipPosition)} / {formatClipTime(clipDuration)}
           </span>
 
           <div className="flex-1" />
+
+          {/* 끝부분 확인 바로가기 */}
+          {extendedControls && clipDuration > 0 && (
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => seekFromEnd(6)} disabled={!ready} className={`${seekChipClass} !text-purple-200`} title="구간 끝 6초 전으로 이동 (끝부분 확인)">
+                끝-6s
+              </button>
+              <button type="button" onClick={() => seekFromEnd(3)} disabled={!ready} className={`${seekChipClass} !text-purple-200`} title="구간 끝 3초 전으로 이동 (끝부분 확인)">
+                끝-3s
+              </button>
+            </div>
+          )}
 
           <div className="flex items-center gap-1.5">
             <button type="button" onClick={toggleMute} aria-label={muted ? "음소거 해제" : "음소거"} className="hover:text-light-accent dark:hover:text-dark-accent transition-colors">

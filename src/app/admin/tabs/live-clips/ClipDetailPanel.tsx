@@ -279,6 +279,7 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
             videoId={clip.videoId}
             startTime={clip.startTime || 0}
             endTime={clip.endTime}
+            extendedControls
             className="max-w-2xl mx-auto"
           />
         ) : isChzzk ? (
