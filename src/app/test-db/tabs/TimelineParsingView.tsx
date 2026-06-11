@@ -33,7 +33,7 @@ import SongMatchingDialog from '@/components/SongMatchingDialog';
 import TimeVerificationSection from '@/components/TimeVerificationSection';
 import { updateTimeVerification } from '@/utils/timeVerification';
 import ChzzkPlayer, { type ChzzkPlayerHandle } from '@/components/video/ChzzkPlayer';
-import { parseVideoUrl } from '@/shared/utils/video-url';
+import { parseVideoUrl, buildVideoUrlWithTime } from '@/shared/utils/video-url';
 
 interface ParsedTimelineItem {
   id: string;
@@ -2360,13 +2360,16 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">링크</label>
-              <a 
-                href={`${selectedTimeline.videoUrl}&t=${editingPreview && editingData ? editingData.startTimeSeconds : selectedTimeline.startTimeSeconds}`}
+              <a
+                href={buildVideoUrlWithTime(
+                  selectedTimeline.videoUrl,
+                  editingPreview && editingData ? editingData.startTimeSeconds : selectedTimeline.startTimeSeconds
+                )}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
               >
-                YouTube에서 보기
+                {selectedTimeline.platform === 'chzzk' ? '치지직에서 보기' : 'YouTube에서 보기'}
               </a>
             </div>
             <div>

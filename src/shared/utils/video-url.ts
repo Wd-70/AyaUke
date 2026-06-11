@@ -32,6 +32,21 @@ export function buildChzzkVideoUrl(videoNo: number): string {
   return `https://chzzk.naver.com/video/${videoNo}`;
 }
 
+/**
+ * 영상 URL에 시작 시각(초)을 붙여 반환한다.
+ * - 유튜브(watch?v=…): 이미 쿼리가 있으므로 `&t={초}`
+ * - 치지직(video/{no}): 쿼리가 없으므로 `?t={초}` — 기존의 무조건 `&t=`는
+ *   `.../video/123&t=100` 처럼 깨진 URL을 만들었다.
+ * connector를 URL에 `?` 유무로 판단해 플랫폼과 무관하게 올바른 형식을 만든다.
+ * (치지직 t 파라미터 지원이 불확실해도 형식은 유효하므로 안전)
+ */
+export function buildVideoUrlWithTime(url: string, seconds: number): string {
+  if (!url) return url;
+  const t = Math.max(0, Math.floor(seconds || 0));
+  const connector = url.includes('?') ? '&' : '?';
+  return `${url}${connector}t=${t}`;
+}
+
 /** URL에서 플랫폼과 식별자를 파싱. 지원하지 않는 URL이면 null */
 export function parseVideoUrl(url: string): ParsedVideoUrl | null {
   if (!url || typeof url !== 'string') return null;
