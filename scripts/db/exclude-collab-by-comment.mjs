@@ -18,12 +18,23 @@ import { getDb } from './client.mjs';
 const apply = process.argv.includes('--apply');
 
 // ── 대상 댓글 설정 ──
-// 사향고양이에용 2026-05-24 (KST) 싱크룸 합방. 아야=🪻(U+1FABB), 테리=✝, 나츠키=🎴, 이샤=❄
+// aya: 아야를 나타내는 이모지. others: 다른 참여자 이모지(이것만 있으면 제외).
+// excludeOtherSolo: "(XXX 솔로)" 표기에서 XXX가 '아야'가 아니면 제외(예: 포포 솔로).
 const TARGETS = [
   {
-    commentId: 26472849,            // chzzkcomments.commentId (숫자)
-    aya: '\u{1FABB}',               // 🪻 (아야)
-    others: ['\u{271D}', '\u{1F3B4}', '\u{2744}'], // ✝ 🎴 ❄ (다른 참여자)
+    // 사향고양이에용 2026-05-24 싱크룸 합방. 아야=🪻, 테리=✝, 나츠키=🎴, 이샤=❄
+    commentId: 26472849,
+    aya: '\u{1FABB}',               // 🪻
+    others: ['\u{271D}', '\u{1F3B4}', '\u{2744}'], // ✝ 🎴 ❄
+    excludeOtherSolo: true,
+  },
+  {
+    // 사향고양이에용 2026-03-18 싱크룸 합방 + 앞구간 아야x포포 합방.
+    // 아야=🪻, 나츠키=🎴, 테리눈나=✝, 이샤=❄. "(포포 솔로)" 등 타인 솔로도 제외.
+    commentId: 25378952,
+    aya: '\u{1FABB}',               // 🪻
+    others: ['\u{271D}', '\u{1F3B4}', '\u{2744}'], // ✝ 🎴 ❄
+    excludeOtherSolo: true,
   },
 ];
 
@@ -50,14 +61,17 @@ try {
       continue;
     }
 
-    // 타임스탬프 줄 → 이모지 정보 맵
+    // 타임스탬프 줄 → 이모지/솔로 정보 맵
     const map = new Map();
     for (const line of raw.split('\n')) {
       const m = line.match(/^\s*(\d{1,2}:\d{2}(?::\d{2})?)\s/);
       if (!m) continue;
+      // "(XXX 솔로)" 표기 추출 (XXX에 '아야'가 없으면 타인 솔로)
+      const soloM = line.match(/[(（]\s*([^)）]*?)\s*솔로\s*[)）]/);
       map.set(toSec(m[1]), {
         hasAya: line.includes(target.aya),
         hasOther: target.others.some((e) => line.includes(e)),
+        soloName: soloM ? soloM[1].trim() : null,
         line: line.trim(),
       });
     }
@@ -67,23 +81,33 @@ try {
       .project({ id: 1, songTitle: 1, startTimeSeconds: 1, isRelevant: 1, isExcluded: 1 })
       .toArray();
 
-    let excl = 0, keepAya = 0, keepNone = 0, noMatch = 0;
+    let exclEmoji = 0, exclSolo = 0, keepAya = 0, keepNone = 0, noMatch = 0;
     const samples = [];
+    const markExclude = (it, reason) => {
+      if (it.isExcluded !== true) {
+        allUpdates.push(it.id);
+        if (samples.length < 25) samples.push(`  ${it.startTimeSeconds}s | "${it.songTitle.slice(0, 30)}" ${reason}`);
+      }
+    };
     for (const it of items) {
       const info = map.get(it.startTimeSeconds);
       if (!info) { noMatch++; continue; }
-      if (info.hasOther && !info.hasAya) {
-        if (it.isExcluded !== true) {
-          allUpdates.push(it.id);
-          if (samples.length < 20) samples.push(`  ${it.startTimeSeconds}s | "${it.songTitle.slice(0, 32)}"`);
-        }
-        excl++;
-      } else if (info.hasAya) keepAya++;
+      // 1) 타인 솔로 표기 우선 ("아야 솔로"는 유지)
+      if (target.excludeOtherSolo && info.soloName !== null && !/아야/.test(info.soloName)) {
+        markExclude(it, `(${info.soloName} 솔로)`);
+        exclSolo++;
+      }
+      // 2) 다른 참여자 이모지만 (아야 이모지 없음)
+      else if (info.hasOther && !info.hasAya) {
+        markExclude(it, '[타참여자 이모지]');
+        exclEmoji++;
+      }
+      else if (info.hasAya || (info.soloName !== null && /아야/.test(info.soloName))) keepAya++;
       else keepNone++;
     }
 
     console.log(`\n[댓글 ${target.commentId}] 파싱 ${items.length}개`);
-    console.log(`  제외(다른참여자만): ${excl} | 유지(아야): ${keepAya} | 유지(전원/이모지없음): ${keepNone} | 타임매칭실패: ${noMatch}`);
+    console.log(`  제외: 이모지 ${exclEmoji} + 타인솔로 ${exclSolo} | 유지(아야): ${keepAya} | 유지(전원/이모지없음): ${keepNone} | 타임매칭실패: ${noMatch}`);
     samples.forEach((s) => console.log(s));
   }
 
