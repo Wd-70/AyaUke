@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { SongData } from "@/types";
 import {
@@ -612,15 +613,19 @@ export default function SongDetailModal({
             {renderActionButtons('horizontal')}
           </div>
         </div>
-
-        {/* 플레이리스트 메뉴 (버튼 위치 기준 fixed) */}
-        <PlaylistContextMenu
-          songId={song.id}
-          isOpen={showPlaylistMenu}
-          onClose={() => setShowPlaylistMenu(false)}
-          position={playlistMenuPos}
-        />
       </motion.div>
+
+      {/* 플레이리스트 메뉴: 모달의 transform 영향을 피하려고 body로 포털 (fixed=뷰포트 기준) */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <PlaylistContextMenu
+            songId={song.id}
+            isOpen={showPlaylistMenu}
+            onClose={() => setShowPlaylistMenu(false)}
+            position={playlistMenuPos}
+          />,
+          document.body
+        )}
     </>
   );
 }
