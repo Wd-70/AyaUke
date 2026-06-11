@@ -116,6 +116,11 @@ const SongDetailSchema: Schema = new Schema({
       message: '키 조절은 -12부터 +12 사이의 숫자로 입력해주세요.'
     }
   },
+  // 기본 클립 길이 (초, 소수 허용). 곡 매칭 시 종료시간 = 시작 + clipDuration 자동 설정용
+  clipDuration: {
+    type: Number,
+    min: 0,
+  },
   mrLinks: [MRLinkSchema],
   selectedMRIndex: {
     type: Number,

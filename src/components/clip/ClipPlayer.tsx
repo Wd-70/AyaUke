@@ -47,7 +47,7 @@ interface PlayerAdapter {
 
 // window.YT / onYouTubeIframeAPIReady 전역 선언은 LiveClipEditor.tsx에 이미 존재
 
-function loadYouTubeApi(): Promise<void> {
+export function loadYouTubeApi(): Promise<void> {
   return new Promise((resolve) => {
     if (window.YT?.Player) return resolve();
 

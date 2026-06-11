@@ -784,6 +784,33 @@ function extractDateFromTitle(title: string): { date: Date | null, originalStrin
   return { date: null, originalString: null };
 }
 
+/**
+ * 곡 매칭 업데이트 파이프라인.
+ * 곡에 기본 클립 길이(clipDuration)가 있으면 종료시간을 시작+기본길이로 자동 설정한다.
+ * 단, 시간 검증 완료(isTimeVerified) 항목은 수동 조정으로 간주하고 건드리지 않는다.
+ */
+function buildMatchUpdatePipeline(
+  matchedSong: { songId: string; title: string; artist: string; confidence: number },
+  clipDuration?: number | null,
+) {
+  const setStage: Record<string, unknown> = { matchedSong, updatedAt: new Date() };
+
+  if (clipDuration && clipDuration > 0) {
+    setStage.endTimeSeconds = {
+      $cond: [
+        { $eq: ['$isTimeVerified', true] },
+        '$endTimeSeconds',
+        { $add: ['$startTimeSeconds', clipDuration] },
+      ],
+    };
+    setStage.duration = {
+      $cond: [{ $eq: ['$isTimeVerified', true] }, '$duration', clipDuration],
+    };
+  }
+
+  return [{ $set: setStage }];
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -1200,15 +1227,15 @@ export async function POST(request: NextRequest) {
 
         await ParsedTimeline.updateOne(
           { id: itemId },
-          { 
-            matchedSong: {
+          buildMatchUpdatePipeline(
+            {
               songId: selectedSong._id.toString(),
               title: selectedSong.title,
               artist: selectedSong.artist,
-              confidence: confidence || 1.0 // 수동 매칭은 기본적으로 100% 신뢰도
+              confidence: confidence || 1.0, // 수동 매칭은 기본적으로 100% 신뢰도
             },
-            updatedAt: new Date()
-          }
+            selectedSong.clipDuration,
+          )
         );
 
         return NextResponse.json({
@@ -1309,8 +1336,8 @@ export async function POST(request: NextRequest) {
         }
 
         try {
-          const updateData: any = { updatedAt: new Date() };
-          
+          let matchInfo: { title: string; artist: string } | null = null;
+
           if (matchSongId) {
             // 곡 매칭
             const matchedSong = await SongDetail.findById(matchSongId);
@@ -1320,32 +1347,32 @@ export async function POST(request: NextRequest) {
                 { status: 404 }
               );
             }
-            
-            updateData.matchedSong = {
-              songId: matchedSong._id.toString(),
-              title: matchedSong.title,
-              artist: matchedSong.artist,
-              confidence: matchConfidence || 0.9
-            };
+
+            await ParsedTimeline.updateOne(
+              { id: timelineId },
+              buildMatchUpdatePipeline(
+                {
+                  songId: matchedSong._id.toString(),
+                  title: matchedSong.title,
+                  artist: matchedSong.artist,
+                  confidence: matchConfidence || 0.9,
+                },
+                matchedSong.clipDuration,
+              )
+            );
+            matchInfo = { title: matchedSong.title, artist: matchedSong.artist };
           } else {
             // 매칭 해제
-            updateData.$unset = { matchedSong: "" };
+            await ParsedTimeline.updateOne(
+              { id: timelineId },
+              { $unset: { matchedSong: "" }, $set: { updatedAt: new Date() } }
+            );
           }
-
-          await ParsedTimeline.updateOne(
-            { id: timelineId },
-            updateData
-          );
 
           return NextResponse.json({
             success: true,
             message: matchSongId ? '곡이 매칭되었습니다.' : '곡 매칭이 해제되었습니다.',
-            data: {
-              matchInfo: matchSongId ? {
-                title: updateData.matchedSong?.title,
-                artist: updateData.matchedSong?.artist
-              } : null
-            }
+            data: { matchInfo }
           });
         } catch (error) {
           console.error('곡 매칭 오류:', error);
@@ -1411,18 +1438,18 @@ export async function POST(request: NextRequest) {
             
             let matchResult = null;
             if (exactMatch) {
-              // 자동 매칭 수행
+              // 자동 매칭 수행 (곡에 기본 클립 길이가 있으면 종료시간 자동 설정)
               await ParsedTimeline.updateOne(
                 { _id: timeline._id },
-                { 
-                  matchedSong: {
+                buildMatchUpdatePipeline(
+                  {
                     songId: exactMatch.song._id.toString(),
                     title: exactMatch.song.title,
                     artist: exactMatch.song.artist,
-                    confidence: exactMatch.overallSimilarity
+                    confidence: exactMatch.overallSimilarity,
                   },
-                  updatedAt: new Date()
-                }
+                  exactMatch.song.clipDuration,
+                )
               );
 
               matchResult = {

@@ -716,12 +716,12 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
   }, []);
 
   const handleStartTimeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 0;
+    const value = parseFloat(e.target.value) || 0;
     setEditingData(prev => prev ? {...prev, startTimeSeconds: value} : null);
   }, []);
 
   const handleEndTimeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value ? parseInt(e.target.value) : undefined;
+    const value = e.target.value ? parseFloat(e.target.value) : undefined;
     setEditingData(prev => prev ? {...prev, endTimeSeconds: value} : null);
   }, []);
 
@@ -1083,7 +1083,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
   // 현재 재생 시간을 시작 시간으로 설정
   const setCurrentTimeAsStart = useCallback(() => {
     if (youtubePlayer && editingData) {
-      const currentTime = Math.floor(youtubePlayer.getCurrentTime());
+      const currentTime = Math.round(youtubePlayer.getCurrentTime() * 10) / 10;
       setEditingData(prev => prev ? { ...prev, startTimeSeconds: currentTime } : null);
     }
   }, [youtubePlayer, editingData]);
@@ -1091,7 +1091,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
   // 현재 재생 시간을 종료 시간으로 설정
   const setCurrentTimeAsEnd = useCallback(() => {
     if (youtubePlayer && editingData) {
-      const currentTime = Math.floor(youtubePlayer.getCurrentTime());
+      const currentTime = Math.round(youtubePlayer.getCurrentTime() * 10) / 10;
       setEditingData(prev => prev ? { ...prev, endTimeSeconds: currentTime } : null);
     }
   }, [youtubePlayer, editingData]);
@@ -2229,7 +2229,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
                 <div className="space-y-2">
                   <input
                     type="number"
-                    min="0"
+                    min="0" step="0.1"
                     value={editingData?.startTimeSeconds || 0}
                     onChange={handleStartTimeChange}
                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded
@@ -2245,7 +2245,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
                 <div className="space-y-2">
                   <input
                     type="number"
-                    min="0"
+                    min="0" step="0.1"
                     value={editingData?.endTimeSeconds || ''}
                     onChange={handleEndTimeChange}
                     className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded

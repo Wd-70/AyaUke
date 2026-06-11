@@ -689,7 +689,7 @@ export default function LiveClipManager({
         return;
       }
       
-      const currentTime = Math.floor(videoPlayer.getCurrentTime());
+      const currentTime = Math.round(videoPlayer.getCurrentTime() * 10) / 10;
       setEditingVideoData(prev => ({
         ...prev,
         startTime: currentTime
@@ -708,7 +708,7 @@ export default function LiveClipManager({
         return;
       }
       
-      const currentTime = Math.floor(videoPlayer.getCurrentTime());
+      const currentTime = Math.round(videoPlayer.getCurrentTime() * 10) / 10;
       setEditingVideoData(prev => ({
         ...prev,
         endTime: currentTime
@@ -1519,7 +1519,7 @@ export default function LiveClipManager({
                             <input
                               type="number"
                               value={editingVideoData.startTime}
-                              onChange={(e) => setEditingVideoData(prev => ({...prev, startTime: parseInt(e.target.value) || 0}))}
+                              onChange={(e) => setEditingVideoData(prev => ({...prev, startTime: parseFloat(e.target.value) || 0}))}
                               onPaste={(e) => {
                                 const pastedText = e.clipboardData.getData('text');
                                 // URL인지 확인 (프로토콜 포함)
@@ -1533,6 +1533,7 @@ export default function LiveClipManager({
                               }}
                               className="w-full px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
                               min="0"
+                              step="0.1"
                               placeholder="시간(s) 또는 URL"
                             />
                           </div>
@@ -1548,7 +1549,7 @@ export default function LiveClipManager({
                             <input
                               type="number"
                               value={editingVideoData.endTime || ''}
-                              onChange={(e) => setEditingVideoData(prev => ({...prev, endTime: e.target.value ? parseInt(e.target.value) : undefined}))}
+                              onChange={(e) => setEditingVideoData(prev => ({...prev, endTime: e.target.value ? parseFloat(e.target.value) : undefined}))}
                               onPaste={(e) => {
                                 const pastedText = e.clipboardData.getData('text');
                                 // URL인지 확인 (프로토콜 포함)
@@ -1562,7 +1563,7 @@ export default function LiveClipManager({
                               }}
                               className="w-full px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-600 rounded text-light-text dark:text-dark-text"
                               placeholder="시간(s) 또는 URL"
-                              min="0"
+                              min="0" step="0.1"
                             />
                           </div>
                         </div>
@@ -2046,9 +2047,9 @@ export default function LiveClipManager({
                 <input
                   type="number"
                   value={addVideoData.startTime}
-                  onChange={(e) => setAddVideoData(prev => ({...prev, startTime: parseInt(e.target.value) || 0}))}
+                  onChange={(e) => setAddVideoData(prev => ({...prev, startTime: parseFloat(e.target.value) || 0}))}
                   placeholder="0"
-                  min="0"
+                  min="0" step="0.1"
                   className="w-full px-4 py-3 bg-white/50 dark:bg-gray-800/50 
                            border border-light-accent/30 dark:border-dark-accent/30 
                            rounded-xl outline-none 
@@ -2069,9 +2070,9 @@ export default function LiveClipManager({
                 <input
                   type="number"
                   value={addVideoData.endTime || ''}
-                  onChange={(e) => setAddVideoData(prev => ({...prev, endTime: e.target.value ? parseInt(e.target.value) : undefined}))}
+                  onChange={(e) => setAddVideoData(prev => ({...prev, endTime: e.target.value ? parseFloat(e.target.value) : undefined}))}
                   placeholder="자동 (영상 끝까지)"
-                  min="0"
+                  min="0" step="0.1"
                   className="w-full px-4 py-3 bg-white/50 dark:bg-gray-800/50 
                            border border-light-accent/30 dark:border-dark-accent/30 
                            rounded-xl outline-none 

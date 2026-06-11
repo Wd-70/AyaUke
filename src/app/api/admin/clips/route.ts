@@ -1,317 +1,89 @@
+import { z } from 'zod'
 import { NextResponse } from 'next/server'
+import type { Session } from 'next-auth'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
 import { isSuperAdmin, UserRole } from '@/lib/permissions'
 import { connectDB as connectToDatabase } from '@/shared/db/mongodb'
+import { withApi, ok } from '@/shared/api/handler'
+import { ForbiddenError } from '@/shared/api/errors'
 import SongVideo from '@/domains/archive/schemas/song-video.schema'
-import SongDetail from '@/domains/catalog/song.schema'
-import { updateVideoData, validateYouTubeUrl } from '@/lib/youtube'
+import { parseVideoUrl } from '@/shared/utils/video-url'
+import * as clipService from '@/domains/archive/clip.service'
 
-export async function GET(request: Request) {
-  try {
-    // 권한 체크
-    const session = await getServerSession(authOptions)
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
-
-    await connectToDatabase()
-
-    const { searchParams } = new URL(request.url)
-    
-    // 전체 클립 데이터 조회 요청인지 확인 (중복검사용)
-    const getAllForDuplicateCheck = searchParams.get('getAllForDuplicateCheck') === 'true'
-    
-    if (getAllForDuplicateCheck) {
-      // 중복검사용 전체 클립 데이터 (최소한의 필드만)
-      const clips = await SongVideo.find({}, {
-        songId: 1,
-        platform: 1,
-        videoId: 1,
-        startTime: 1,
-        endTime: 1,
-        sungDate: 1,
-        createdAt: 1
-      }).lean().sort({ createdAt: -1 })
-
-      const totalCount = clips.length
-      const dataSize = JSON.stringify(clips).length
-
-      console.log(`📊 중복검사용 전체 라이브클립 조회: ${totalCount}개, 데이터 크기: ${(dataSize / 1024 / 1024).toFixed(2)}MB`)
-
-      return NextResponse.json({
-        success: true,
-        clips: clips.map(clip => ({
-          songId: clip.songId,
-          platform: clip.platform || 'youtube',
-          videoId: clip.videoId,
-          startTime: clip.startTime || 0,
-          endTime: clip.endTime,
-          sungDate: clip.sungDate
-        })),
-        meta: {
-          totalCount,
-          dataSizeMB: Math.round(dataSize / 1024 / 1024 * 100) / 100
-        }
-      })
-    }
-
-    // 기존 페이지네이션 기반 조회 로직
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const sortBy = searchParams.get('sortBy') || 'recent' // recent, addedBy, songTitle, verified
-    const filterBy = searchParams.get('filterBy') || 'all' // all, verified, unverified
-    const search = searchParams.get('search') || ''
-    const addedBy = searchParams.get('addedBy') || ''
-    const songId = searchParams.get('songId') || ''
-
-    const skip = (page - 1) * limit
-
-    // 디버깅을 위한 로그
-    console.log('🔍 Clips API params:', { page, limit, sortBy, filterBy, search, addedBy, songId })
-
-    // 필터 조건 구성
-    let matchConditions: any = {}
-    
-    if (filterBy === 'verified') {
-      matchConditions.isVerified = true
-    } else if (filterBy === 'unverified') {
-      matchConditions.isVerified = false
-    }
-
-    if (addedBy) {
-      // 정확한 매칭을 위해 escape 처리
-      const escapedAddedBy = addedBy.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      matchConditions.addedByName = new RegExp(`^${escapedAddedBy}$`, 'i')
-    }
-
-    if (songId) {
-      matchConditions.songId = songId
-    }
-
-    console.log('🎯 Match conditions:', matchConditions)
-
-    // 검색의 경우 aggregation을 사용해야 하므로 별도 처리
-
-    // 정렬 조건 구성
-    let sortConditions: any = {}
-    switch (sortBy) {
-      case 'recent':
-        sortConditions = { createdAt: -1 }
-        break
-      case 'addedBy':
-        sortConditions = { addedByName: 1, createdAt: -1 }
-        break
-      case 'songTitle':
-        sortConditions = { title: 1, artist: 1 }
-        break
-      case 'verified':
-        sortConditions = { isVerified: -1, createdAt: -1 }
-        break
-      case 'sungDate':
-        sortConditions = { sungDate: -1 }
-        break
-      default:
-        sortConditions = { createdAt: -1 }
-    }
-
-    // 클립 데이터 조회 (검색이 있는 경우 aggregation 사용)
-    let clips: any[]
-    let totalCount: number
-
-    if (search) {
-      // 공백 제거 및 대소문자 무시 검색
-      const searchPattern = search.replace(/\s+/g, '').toLowerCase()
-      
-      const aggregationPipeline = [
-        {
-          $lookup: {
-            from: 'songdetails',
-            localField: 'songId',
-            foreignField: '_id',
-            as: 'songDetail'
-          }
-        },
-        {
-          $addFields: {
-            songDetail: { $arrayElemAt: ['$songDetail', 0] },
-            // 검색용 필드들 (공백 제거 및 소문자 변환)
-            searchableTitle: { $toLower: { $replaceAll: { input: '$title', find: ' ', replacement: '' } } },
-            searchableArtist: { $toLower: { $replaceAll: { input: '$artist', find: ' ', replacement: '' } } },
-            searchableAddedBy: { $toLower: { $replaceAll: { input: '$addedByName', find: ' ', replacement: '' } } },
-            searchableDescription: { $toLower: { $replaceAll: { input: { $ifNull: ['$description', ''] }, find: ' ', replacement: '' } } }
-          }
-        },
-        {
-          $addFields: {
-            // SongDetail의 alias와 searchTags도 검색 대상에 포함
-            searchableTitleAlias: { $toLower: { $replaceAll: { input: { $ifNull: ['$songDetail.titleAlias', ''] }, find: ' ', replacement: '' } } },
-            searchableArtistAlias: { $toLower: { $replaceAll: { input: { $ifNull: ['$songDetail.artistAlias', ''] }, find: ' ', replacement: '' } } },
-            searchableTags: {
-              $reduce: {
-                input: { $ifNull: ['$songDetail.searchTags', []] },
-                initialValue: '',
-                in: { $concat: ['$$value', { $toLower: { $replaceAll: { input: '$$this', find: ' ', replacement: '' } } }] }
-              }
-            }
-          }
-        },
-        {
-          $match: {
-            // 기본 필터 조건들
-            ...(filterBy === 'verified' && { isVerified: true }),
-            ...(filterBy === 'unverified' && { isVerified: false }),
-            ...(songId && { songId }),
-            ...(addedBy && { addedByName: { $regex: `^${addedBy.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }),
-            // 검색 조건
-            $or: [
-              { searchableTitle: { $regex: searchPattern, $options: 'i' } },
-              { searchableArtist: { $regex: searchPattern, $options: 'i' } },
-              { searchableAddedBy: { $regex: searchPattern, $options: 'i' } },
-              { searchableDescription: { $regex: searchPattern, $options: 'i' } },
-              { searchableTitleAlias: { $regex: searchPattern, $options: 'i' } },
-              { searchableArtistAlias: { $regex: searchPattern, $options: 'i' } },
-              { searchableTags: { $regex: searchPattern, $options: 'i' } }
-            ]
-          }
-        },
-        { $sort: sortConditions },
-        { $skip: skip },
-        { $limit: limit }
-      ]
-
-      clips = await SongVideo.aggregate(aggregationPipeline)
-      
-      // 검색 결과의 총 개수 계산
-      const countPipeline = aggregationPipeline.slice(0, -2) // skip과 limit 제외
-      countPipeline.push({ $count: 'total' })
-      const countResult = await SongVideo.aggregate(countPipeline)
-      totalCount = countResult.length > 0 ? countResult[0].total : 0
-    } else {
-      // 일반 조회
-      const [clipsResult, countResult] = await Promise.all([
-        SongVideo.find(matchConditions)
-          .sort(sortConditions)
-          .skip(skip)
-          .limit(limit)
-          .lean(),
-        SongVideo.countDocuments(matchConditions)
-      ])
-      clips = clipsResult
-      totalCount = countResult
-    }
-
-    // 각 클립의 곡 정보도 함께 조회 (검색이 아닌 경우만)
-    const clipsWithSongInfo = search ? clips.map(clip => ({
-      ...clip,
-      songDetail: clip.songDetail ? {
-        _id: clip.songDetail._id,
-        title: clip.songDetail.title,
-        artist: clip.songDetail.artist,
-        titleAlias: clip.songDetail.titleAlias,
-        artistAlias: clip.songDetail.artistAlias,
-        language: clip.songDetail.language,
-        sungCount: clip.songDetail.sungCount
-      } : null
-    })) : await Promise.all(
-      clips.map(async (clip) => {
-        const songDetail = await SongDetail.findById(clip.songId).lean()
-        return {
-          ...clip,
-          songDetail: songDetail ? {
-            _id: songDetail._id,
-            title: songDetail.title,
-            artist: songDetail.artist,
-            titleAlias: songDetail.titleAlias,
-            artistAlias: songDetail.artistAlias,
-            language: songDetail.language,
-            sungCount: songDetail.sungCount
-          } : null
-        }
-      })
-    )
-
-    // 추가 통계 정보
-    const stats = await Promise.all([
-      SongVideo.countDocuments({ isVerified: true }),
-      SongVideo.countDocuments({ isVerified: false }),
-      SongVideo.aggregate([
-        { $group: { _id: '$addedByName', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 10 }
-      ]),
-      SongVideo.aggregate([
-        {
-          $lookup: {
-            from: 'songdetails',
-            localField: 'songId',
-            foreignField: '_id',
-            as: 'songDetail'
-          }
-        },
-        {
-          $addFields: {
-            songDetail: { $arrayElemAt: ['$songDetail', 0] }
-          }
-        },
-        { 
-          $group: { 
-            _id: { 
-              songId: '$songId', 
-              title: '$title', 
-              artist: '$artist',
-              titleAlias: '$songDetail.titleAlias',
-              artistAlias: '$songDetail.artistAlias'
-            }, 
-            count: { $sum: 1 } 
-          } 
-        },
-        { $sort: { count: -1 } },
-        { $limit: 10 }
-      ])
-    ])
-
-    const [verifiedCount, unverifiedCount, topContributors, topSongs] = stats
-
-    return NextResponse.json({
-      clips: clipsWithSongInfo,
-      pagination: {
-        page,
-        limit,
-        total: totalCount,
-        totalPages: Math.ceil(totalCount / limit)
-      },
-      stats: {
-        total: totalCount,
-        verified: verifiedCount,
-        unverified: unverifiedCount,
-        topContributors: topContributors.map((c: any) => ({
-          name: c._id,
-          count: c.count
-        })),
-        topSongs: topSongs.map((s: any) => ({
-          songId: s._id.songId,
-          title: s._id.title,
-          artist: s._id.artist,
-          titleAlias: s._id.titleAlias,
-          artistAlias: s._id.artistAlias,
-          count: s.count
-        }))
-      }
-    })
-    
-  } catch (error) {
-    console.error('Clips API error:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch clips' },
-      { status: 500 }
-    )
+function assertSuperAdmin(session: Session | null) {
+  const role = (session?.user as { role?: string } | undefined)?.role as UserRole | undefined
+  if (!role || !isSuperAdmin(role)) {
+    throw new ForbiddenError('최고관리자 권한이 필요합니다.')
   }
 }
 
+const GetQuery = z.object({
+  // 중복검사용 전체 데이터 (TimelineParsingView/TimestampParserTab 업로드가 사용)
+  getAllForDuplicateCheck: z.coerce.boolean().default(false),
+  view: z.enum(['stats', 'songs', 'clips', 'song-clips']).default('clips'),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  sortBy: z.enum(['recent', 'addedBy', 'songTitle', 'verified', 'sungDate', 'clipCount', 'title']).default('recent'),
+  filterBy: z.enum(['all', 'verified', 'unverified']).default('all'),
+  platform: z.enum(['all', 'youtube', 'chzzk']).default('all'),
+  search: z.string().default(''),
+  addedBy: z.string().default(''),
+  songId: z.string().default(''),
+})
+
+export const GET = withApi({ schema: GetQuery, auth: 'user' }, async ({ input, session }) => {
+  assertSuperAdmin(session)
+
+  // 레거시 호환: 업로드 중복검사용 전체 클립 (성공 형태 유지)
+  if (input.getAllForDuplicateCheck) {
+    const clips = await clipService.getDuplicateCheckData()
+    return NextResponse.json({
+      success: true,
+      clips,
+      meta: { totalCount: clips.length },
+    })
+  }
+
+  switch (input.view) {
+    case 'stats':
+      return ok(await clipService.getClipStats())
+
+    case 'songs':
+      return ok(
+        await clipService.listSongsWithClips({
+          page: input.page,
+          limit: input.limit,
+          search: input.search || undefined,
+          sortBy: input.sortBy === 'clipCount' || input.sortBy === 'title' ? input.sortBy : 'recent',
+        }),
+      )
+
+    case 'song-clips': {
+      // 특정 곡의 클립 전체 + 곡 정보(기본 길이 포함)
+      return ok(await clipService.listClipsForSong(input.songId))
+    }
+
+    case 'clips':
+    default:
+      return ok(
+        await clipService.listClips({
+          page: input.page,
+          limit: input.limit,
+          sortBy: input.sortBy === 'clipCount' || input.sortBy === 'title' ? 'recent' : input.sortBy,
+          filterBy: input.filterBy,
+          platform: input.platform,
+          search: input.search || undefined,
+          addedBy: input.addedBy || undefined,
+          songId: input.songId || undefined,
+        }),
+      )
+  }
+})
+
+// PATCH: 클립 부분 업데이트 (노래책 LiveClipManager의 bulkUpdateDuration 등이 사용)
 export async function PATCH(request: Request) {
   try {
-    // 권한 체크
     const session = await getServerSession(authOptions)
     if (!session || !isSuperAdmin(session.user.role as UserRole)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -325,7 +97,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    let updateData: any = {}
+    let updateData: Record<string, unknown> = {}
 
     switch (action) {
       case 'verify':
@@ -350,117 +122,84 @@ export async function PATCH(request: Request) {
         updateData.description = data.description
         break
       case 'updateUrl':
-        if (!data.videoUrl) {
+      case 'updateClip': {
+        if (action === 'updateUrl' && !data.videoUrl) {
           return NextResponse.json({ error: 'videoUrl is required' }, { status: 400 })
         }
-        
-        // 유튜브 URL 검증
-        if (!validateYouTubeUrl(data.videoUrl)) {
-          return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
-        }
-        
-        // videoUrl이 변경되면 videoId와 thumbnailUrl도 함께 업데이트
-        const videoData = updateVideoData(data.videoUrl)
-        if (videoData) {
-          updateData.videoUrl = data.videoUrl
-          updateData.videoId = videoData.videoId
-          updateData.thumbnailUrl = videoData.thumbnailUrl
-        } else {
-          return NextResponse.json({ error: 'Failed to extract video data' }, { status: 400 })
-        }
-        break
-      case 'updateClip':
-        // 전체 클립 정보 업데이트
+
         if (data.videoUrl) {
-          // 유튜브 URL 검증
-          if (!validateYouTubeUrl(data.videoUrl)) {
-            return NextResponse.json({ error: 'Invalid YouTube URL' }, { status: 400 })
+          // 영상 URL 검증 (유튜브/치지직)
+          const videoData = parseVideoUrl(data.videoUrl)
+          if (!videoData) {
+            return NextResponse.json({ error: '올바른 유튜브 또는 치지직 다시보기 URL이 아닙니다.' }, { status: 400 })
           }
-          
-          // videoUrl이 변경되면 videoId와 thumbnailUrl도 함께 업데이트
-          const videoData = updateVideoData(data.videoUrl)
-          if (videoData) {
-            updateData.videoUrl = data.videoUrl
-            updateData.videoId = videoData.videoId
-            updateData.thumbnailUrl = videoData.thumbnailUrl
-          } else {
-            return NextResponse.json({ error: 'Failed to extract video data' }, { status: 400 })
-          }
+          updateData.videoUrl = data.videoUrl
+          updateData.platform = videoData.platform
+          updateData.videoId = videoData.videoId
+          if (videoData.thumbnailUrl) updateData.thumbnailUrl = videoData.thumbnailUrl
         }
-        
-        if (data.startTime !== undefined) updateData.startTime = data.startTime
-        if (data.endTime !== undefined) updateData.endTime = data.endTime
-        if (data.description !== undefined) updateData.description = data.description
+
+        if (action === 'updateClip') {
+          if (data.startTime !== undefined) updateData.startTime = data.startTime
+          if (data.endTime !== undefined) updateData.endTime = data.endTime
+          if (data.description !== undefined) updateData.description = data.description
+        }
         break
-      case 'bulkUpdateDuration':
-        // 같은 곡의 모든 클립들에게 길이 일괄 적용
-        const { songId, duration, excludeVideoId } = data;
-        
+      }
+      case 'bulkUpdateDuration': {
+        // 같은 곡의 모든 클립에 길이 일괄 적용 (노래책 편집 UI에서 사용)
+        const { songId, duration, excludeVideoId } = data
+
         if (!songId || !duration || duration <= 0) {
           return NextResponse.json(
             { error: 'songId와 올바른 duration이 필요합니다.' },
             { status: 400 }
-          );
+          )
         }
 
-        // 같은 곡의 모든 클립들을 찾기 (현재 편집 중인 클립은 제외)
         const clipsToUpdate = await SongVideo.find({
-          songId: songId,
+          songId,
           ...(excludeVideoId && { _id: { $ne: excludeVideoId } })
-        });
+        }).select('startTime').lean()
 
         if (clipsToUpdate.length === 0) {
-          return NextResponse.json({
-            success: true,
-            message: '업데이트할 클립이 없습니다.',
-            updatedCount: 0
-          });
+          return NextResponse.json({ success: true, message: '업데이트할 클립이 없습니다.', updatedCount: 0 })
         }
 
-        // 각 클립의 종료시간을 (시작시간 + 새로운 길이)로 업데이트
-        const updatePromises = clipsToUpdate.map(clip => 
-          SongVideo.findByIdAndUpdate(clip._id, {
-            $set: {
-              endTime: (clip.startTime || 0) + duration
-            }
-          })
-        );
-
-        await Promise.all(updatePromises);
+        await SongVideo.bulkWrite(
+          clipsToUpdate.map((clip) => ({
+            updateOne: {
+              filter: { _id: clip._id },
+              update: { $set: { endTime: (clip.startTime || 0) + duration } },
+            },
+          }))
+        )
 
         return NextResponse.json({
           success: true,
           message: `${clipsToUpdate.length}개의 클립에 길이가 적용되었습니다.`,
           updatedCount: clipsToUpdate.length
-        });
+        })
+      }
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
-    const updatedClip = await SongVideo.findByIdAndUpdate(
-      clipId,
-      updateData,
-      { new: true }
-    ).lean()
+    const updatedClip = await SongVideo.findByIdAndUpdate(clipId, updateData, { new: true }).lean()
 
     if (!updatedClip) {
       return NextResponse.json({ error: 'Clip not found' }, { status: 404 })
     }
 
     return NextResponse.json({ success: true, clip: updatedClip })
-    
   } catch (error) {
     console.error('Clips update error:', error)
-    return NextResponse.json(
-      { error: 'Failed to update clip' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to update clip' }, { status: 500 })
   }
 }
 
 export async function DELETE(request: Request) {
   try {
-    // 권한 체크
     const session = await getServerSession(authOptions)
     if (!session || !isSuperAdmin(session.user.role as UserRole)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -482,12 +221,8 @@ export async function DELETE(request: Request) {
     }
 
     return NextResponse.json({ success: true, message: 'Clip deleted successfully' })
-    
   } catch (error) {
     console.error('Clips delete error:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete clip' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Failed to delete clip' }, { status: 500 })
   }
 }

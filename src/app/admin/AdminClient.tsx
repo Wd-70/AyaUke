@@ -32,7 +32,7 @@ import CommentAnalysisTab from "../test-db/tabs/CommentAnalysisTab";
 import UserManagementTab from "./tabs/UserManagementTab";
 import MaintenanceTab from "./tabs/MaintenanceTab";
 import DashboardTab from "./tabs/DashboardTab";
-import LiveClipManagementTab from "./tabs/LiveClipManagementTab";
+import LiveClipManagementTab from "./tabs/live-clips/LiveClipManagementTab";
 import ChzzkYoutubeConverterTab from "./tabs/ChzzkYoutubeConverterTab";
 
 type TabType =

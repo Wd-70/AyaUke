@@ -59,6 +59,8 @@ export interface SongDetail {
   likeCount?: number;
   lastSungDate?: string;
   keyAdjustment?: number | null;
+  /** 기본 클립 길이 (초, 소수 허용) — 곡 매칭 시 종료시간 자동 설정용 */
+  clipDuration?: number;
   mrLinks?: MRLink[];
   selectedMRIndex?: number;
   personalNotes?: string;
