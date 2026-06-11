@@ -29,7 +29,8 @@ export interface IParsedTimeline {
     artist?: string;
     confidence?: number;
   };
-  originalComment: string;
+  /** @deprecated 댓글 원문은 TimelineComment(commentId 기준)로 정규화. 신규 항목은 미저장. */
+  originalComment?: string;
   commentAuthor: string;
   commentId: string;
   commentPublishedAt?: Date;
@@ -68,7 +69,8 @@ const ParsedTimelineSchema = new Schema<IParsedTimeline>(
       artist: { type: String },
       confidence: { type: Number },
     },
-    originalComment: { type: String, required: true },
+    // 댓글 원문은 TimelineComment로 정규화됨. 기존 데이터 호환 위해 필드는 유지하되 선택값.
+    originalComment: { type: String },
     commentAuthor: { type: String, required: true },
     commentId: { type: String, required: true },
     commentPublishedAt: { type: Date },

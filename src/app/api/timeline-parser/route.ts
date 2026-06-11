@@ -8,6 +8,7 @@ import SongDetail from '@/domains/catalog/song.schema';
 import mongoose from 'mongoose';
 
 import ParsedTimeline from '@/domains/archive/schemas/parsed-timeline.schema';
+import TimelineComment from '@/domains/archive/schemas/timeline-comment.schema';
 import { parseChzzkTimelineComments } from '@/domains/archive/chzzk-timeline.service';
 
 // 텍스트 정규화 함수 (공백/특수문자 제거, 소문자 변환)
@@ -873,9 +874,23 @@ export async function POST(request: NextRequest) {
             const hasHtmlLinks = comment.textContent.includes('<a ');
             
             if (hasHtmlLinks) {
+              // 댓글 원문 정규화 저장 (commentId 기준 한 벌)
+              await TimelineComment.updateOne(
+                { commentId: comment.commentId },
+                {
+                  $set: {
+                    platform: 'youtube',
+                    text: comment.textContent,
+                    author: comment.authorName,
+                    publishedAt: comment.publishedAt,
+                  },
+                },
+                { upsert: true }
+              );
+
               // 개선된 멀티라인 타임라인 댓글 파싱
               const liveClips = parseTimelineComment(comment.textContent, video.title);
-              
+
               if (liveClips.length > 0) {
                 // 이 댓글에서 기존에 파싱된 타임라인들 조회
                 const existingTimelines = await ParsedTimeline.find({
@@ -915,7 +930,7 @@ export async function POST(request: NextRequest) {
                       endTimeSeconds: clipData.endTimeSeconds,
                       duration: clipData.duration,
                       isRelevant: clipData.isRelevant,
-                      originalComment: comment.textContent,
+                      // originalComment는 TimelineComment로 정규화(commentId 참조). 항목엔 미저장.
                       updatedAt: new Date()
                     };
 
@@ -1027,6 +1042,20 @@ export async function POST(request: NextRequest) {
             console.log(`HTML 링크 포함: ${hasHtmlLinks}`);
             
             if (hasHtmlLinks) {
+              // 댓글 원문은 TimelineComment(commentId 기준 한 벌)로 정규화 저장
+              await TimelineComment.updateOne(
+                { commentId: comment.commentId },
+                {
+                  $set: {
+                    platform: 'youtube',
+                    text: comment.textContent,
+                    author: comment.authorName,
+                    publishedAt: comment.publishedAt,
+                  },
+                },
+                { upsert: true }
+              );
+
               // 타임라인 댓글 파싱
               const liveClips = parseTimelineComment(comment.textContent, video.title);
               console.log(`파싱 결과: ${liveClips.length}개 클립`);
@@ -1063,7 +1092,7 @@ export async function POST(request: NextRequest) {
                       startTimeSeconds: clipData.startTimeSeconds,
                       endTimeSeconds: clipData.endTimeSeconds,
                       duration: clipData.duration,
-                      originalComment: comment.textContent,
+                      // originalComment는 TimelineComment로 정규화(commentId 참조). 항목엔 미저장.
                       commentAuthor: comment.authorName,
                       commentId: comment.commentId,
                       commentPublishedAt: comment.publishedAt,
@@ -1102,6 +1131,9 @@ export async function POST(request: NextRequest) {
         const totalVideos = await YouTubeVideo.countDocuments();
         const totalTimelineComments = await YouTubeComment.countDocuments({ isTimeline: true });
         const allParsedTimelines = await ParsedTimeline.find()
+          .select(
+            '-originalComment -createdAt -updatedAt -videoPublishedAt -verifiedBy -verifiedAt -verificationNotes -__v'
+          )
           .sort({ uploadedDate: -1, startTimeSeconds: 1 })
           .allowDiskUse(true)
           .lean();
@@ -1626,7 +1658,10 @@ export async function GET(request: NextRequest) {
         // 수십 MB까지 불어나 응답이 수십 초 걸렸다. 상세 보기에서 단건으로 lazy-load.
         // allowDiskUse: 인덱스 생성 전/예외 상황에서도 32MB 정렬 제한에 걸리지 않도록
         const items = await ParsedTimeline.find()
-          .select('-originalComment')
+          // originalComment(상세에서 lazy-load) + 목록/전역작업에서 안 읽는 필드 제외
+          .select(
+            '-originalComment -createdAt -updatedAt -videoPublishedAt -verifiedBy -verifiedAt -verificationNotes -__v'
+          )
           .sort({ uploadedDate: -1, startTimeSeconds: 1 })
           .allowDiskUse(true)
           .lean();
@@ -1637,7 +1672,9 @@ export async function GET(request: NextRequest) {
         });
 
       case 'get-item-comment': {
-        // 상세 보기에서 선택된 단일 항목의 originalComment만 조회 (목록 경량화 보완)
+        // 상세 보기에서 선택된 단일 항목의 댓글 원문만 조회 (목록 경량화 보완)
+        // 정규화 저장소(TimelineComment, commentId 기준)를 우선 조회하고,
+        // 아직 마이그레이션되지 않은 기존 항목은 originalComment로 폴백한다.
         const id = searchParams.get('id');
         if (!id) {
           return NextResponse.json(
@@ -1647,7 +1684,7 @@ export async function GET(request: NextRequest) {
         }
 
         const item = await ParsedTimeline.findOne({ id })
-          .select('id originalComment')
+          .select('id commentId originalComment')
           .lean();
 
         if (!item) {
@@ -1657,9 +1694,17 @@ export async function GET(request: NextRequest) {
           );
         }
 
+        let text = item.originalComment ?? '';
+        if (item.commentId) {
+          const normalized = await TimelineComment.findOne({ commentId: item.commentId })
+            .select('text')
+            .lean();
+          if (normalized?.text) text = normalized.text;
+        }
+
         return NextResponse.json({
           success: true,
-          data: { id: item.id, originalComment: item.originalComment ?? '' }
+          data: { id: item.id, originalComment: text }
         });
       }
 

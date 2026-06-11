@@ -1,6 +1,7 @@
 import ChzzkComment from './schemas/chzzk-comment.schema';
 import ChzzkVideo from './schemas/chzzk-video.schema';
 import ParsedTimeline from './schemas/parsed-timeline.schema';
+import TimelineComment from './schemas/timeline-comment.schema';
 import { parseChzzkTimelineComment } from './chzzk-timeline';
 import { buildChzzkVideoUrl } from '@/shared/utils/video-url';
 
@@ -76,6 +77,9 @@ export async function parseChzzkTimelineComments(options?: {
   };
 
   const docsToInsert: Record<string, unknown>[] = [];
+  // 댓글 원문은 TimelineComment(commentId 기준 한 벌)로 정규화 저장
+  const commentUpserts: Record<string, unknown>[] = [];
+  const seenCommentIds = new Set<string>();
 
   for (let i = 0; i < comments.length; i++) {
     const comment = comments[i];
@@ -98,6 +102,25 @@ export async function parseChzzkTimelineComments(options?: {
 
     const entries = parseChzzkTimelineComment(comment.content);
     if (entries.length === 0) continue;
+
+    const commentIdStr = String(comment.commentId);
+    if (!seenCommentIds.has(commentIdStr)) {
+      seenCommentIds.add(commentIdStr);
+      commentUpserts.push({
+        updateOne: {
+          filter: { commentId: commentIdStr },
+          update: {
+            $set: {
+              platform: 'chzzk',
+              text: comment.content,
+              author: comment.authorName,
+              publishedAt: comment.publishedAt,
+            },
+          },
+          upsert: true,
+        },
+      });
+    }
 
     const videoIdStr = String(comment.videoNo);
     const videoUrl = buildChzzkVideoUrl(comment.videoNo);
@@ -129,7 +152,7 @@ export async function parseChzzkTimelineComments(options?: {
         startTimeSeconds: entry.startTimeSeconds,
         endTimeSeconds: entry.endTimeSeconds,
         duration: entry.duration,
-        originalComment: comment.content,
+        // originalComment는 TimelineComment로 정규화(commentId 참조). 항목엔 미저장.
         commentAuthor: comment.authorName,
         commentId: String(comment.commentId),
         commentPublishedAt: comment.publishedAt,
@@ -142,6 +165,11 @@ export async function parseChzzkTimelineComments(options?: {
 
     existingStartTimes.set(videoIdStr, knownTimes);
     result.processedComments++;
+  }
+
+  // 댓글 원문 정규화 저장 (항목 저장 전에 선반영)
+  if (commentUpserts.length > 0) {
+    await TimelineComment.bulkWrite(commentUpserts, { ordered: false }).catch(() => undefined);
   }
 
   if (docsToInsert.length > 0) {
