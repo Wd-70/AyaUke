@@ -1778,8 +1778,12 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
     }
   };
 
+  const didLoadOnMountRef = useRef(false);
   useEffect(() => {
     // 초기 로드 시 기존 타임라인 데이터만 로드
+    // (dev StrictMode 이중 마운트로 무거운 조회가 2번 나가는 것을 가드)
+    if (didLoadOnMountRef.current) return;
+    didLoadOnMountRef.current = true;
     loadExistingDataOnMount();
   }, []);
 
