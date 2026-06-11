@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { motion } from "framer-motion";
-import { SongData, LyricsLink, MRLink } from "@/types";
+import { SongData, MRLink } from "@/types";
 import {
   MusicalNoteIcon,
   XMarkIcon,
@@ -15,9 +15,6 @@ import {
   ListBulletIcon,
   ComputerDesktopIcon,
   DocumentDuplicateIcon,
-  PlusIcon,
-  TrashIcon,
-  CheckIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/solid";
 import YouTube from "react-youtube";
@@ -28,8 +25,6 @@ import LiveClipManager from "./LiveClipManager";
 import LiveClipEditor from "./LiveClipEditor";
 import SongEditForm from "./SongEditForm";
 import { useSession } from "next-auth/react";
-import { useToast } from "./Toast";
-import { useConfirm } from "./ConfirmDialog";
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -74,13 +69,7 @@ export default function SongDetailModal({
   const [activeTab, setActiveTab] = useState<'mr' | 'clips'>('mr');
   const [selectedMRIndex, setSelectedMRIndex] = useState(song.selectedMRIndex || 0);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
-  const [editingLyricsLink, setEditingLyricsLink] = useState<number | null>(null);
-  const [newLyricsLink, setNewLyricsLink] = useState({ title: '', url: '' });
-  const [addingNewLink, setAddingNewLink] = useState(false);
-  
   const playerRef = useRef<YouTubePlayer | null>(null);
-  const showToast = useToast();
-  const confirm = useConfirm();
 
   // 관리자 권한 체크
   const isAdmin = session?.user?.isAdmin || false;
@@ -219,34 +208,15 @@ export default function SongDetailModal({
     onClose();
   };
 
-  // 가사 링크 추가 핸들러
-  const handleAddLyricsLink = async () => {
-    if (!newLyricsLink.title.trim() || !newLyricsLink.url.trim()) {
-      showToast('제목과 URL을 모두 입력해주세요.', 'error');
-      return;
-    }
-
-    try {
-      new URL(newLyricsLink.url);
-    } catch {
-      showToast('올바른 URL 형식을 입력해주세요.', 'error');
-      return;
-    }
-
-    // TODO: API 호출로 가사 링크 추가
-    setNewLyricsLink({ title: '', url: '' });
-    setAddingNewLink(false);
-    showToast('가사 링크가 추가되었습니다.', 'success');
-  };
-
-  // 가사 링크 삭제 핸들러
-  const handleDeleteLyricsLink = async (index: number) => {
-    const confirmed = await confirm('이 가사 링크를 삭제하시겠습니까?');
-    if (confirmed) {
-      // TODO: API 호출로 가사 링크 삭제
-      showToast('가사 링크가 삭제되었습니다.', 'success');
-    }
-  };
+  // 가사 검색 링크 (저작권상 가사 원문을 직접 노출하지 않고 검색으로 연결)
+  const lyricsSearchLinks = useMemo(() => {
+    const query = `${displayTitle} ${displayArtist}`;
+    return [
+      { name: 'Google', url: `https://www.google.com/search?q=${encodeURIComponent(`${query} 가사`)}` },
+      { name: '멜론', url: `https://www.melon.com/search/total/index.htm?q=${encodeURIComponent(query)}` },
+      { name: 'Bugs', url: `https://music.bugs.co.kr/search/integrated?q=${encodeURIComponent(query)}` },
+    ];
+  }, [displayTitle, displayArtist]);
 
   // OBS 오버레이 핸들러
   const handleOBSOverlay = () => {
@@ -481,90 +451,30 @@ export default function SongDetailModal({
 
             {/* 오른쪽: 사이드바 (md: 40%, lg: 30% 공간) */}
             <div className="w-full md:flex-none md:w-[40%] lg:flex-none lg:w-[30%] flex flex-col gap-4 min-h-0">
-              {/* 가사 링크 섹션 */}
-              <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-medium flex items-center gap-2">
+              {/* 가사 검색 (저작권상 원문 미노출 — 외부 검색으로 연결) */}
+              <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 px-4 py-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium flex items-center gap-1.5 text-light-text dark:text-dark-text">
                     <MusicalNoteIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-                    가사 링크
-                  </h4>
-                  {isAdmin && !addingNewLink && (
-                    <button
-                      onClick={() => setAddingNewLink(true)}
-                      className="p-1 rounded text-light-accent dark:text-dark-accent hover:bg-light-accent/10 dark:hover:bg-dark-accent/10"
+                    가사 검색
+                  </span>
+                  {lyricsSearchLinks.map((link) => (
+                    <a
+                      key={link.name}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full
+                                 bg-white dark:bg-gray-800 border border-light-primary/20 dark:border-dark-primary/20
+                                 text-light-text/80 dark:text-dark-text/80
+                                 hover:border-light-accent/50 dark:hover:border-dark-accent/50
+                                 hover:text-light-accent dark:hover:text-dark-accent transition-colors"
+                      title={`${link.name}에서 "${displayTitle}" 가사 검색`}
                     >
-                      <PlusIcon className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  {/* 기존 가사 링크들 */}
-                  {song.lyricsLinks && song.lyricsLinks.length > 0 ? (
-                    song.lyricsLinks.map((link, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <a
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded border text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                        >
-                          <ArrowTopRightOnSquareIcon className="w-3 h-3" />
-                          {link.title}
-                          {link.verified && (
-                            <CheckIcon className="w-3 h-3 text-green-500" />
-                          )}
-                        </a>
-                        {isAdmin && (
-                          <button
-                            onClick={() => handleDeleteLyricsLink(index)}
-                            className="p-1 text-red-500 hover:bg-red-500/10 rounded"
-                          >
-                            <TrashIcon className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs text-gray-500">가사 링크가 없습니다</p>
-                  )}
-
-                  {/* 새 링크 추가 폼 */}
-                  {addingNewLink && (
-                    <div className="space-y-2 border-t pt-2">
-                      <input
-                        type="text"
-                        placeholder="사이트명 (예: 멜론)"
-                        value={newLyricsLink.title}
-                        onChange={(e) => setNewLyricsLink(prev => ({ ...prev, title: e.target.value }))}
-                        className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-light-accent dark:focus:ring-dark-accent"
-                      />
-                      <input
-                        type="url"
-                        placeholder="가사 페이지 URL"
-                        value={newLyricsLink.url}
-                        onChange={(e) => setNewLyricsLink(prev => ({ ...prev, url: e.target.value }))}
-                        className="w-full px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-light-accent dark:focus:ring-dark-accent"
-                      />
-                      <div className="flex gap-1">
-                        <button
-                          onClick={handleAddLyricsLink}
-                          className="px-2 py-1 text-xs bg-light-accent dark:bg-dark-accent text-white rounded hover:opacity-80"
-                        >
-                          추가
-                        </button>
-                        <button
-                          onClick={() => {
-                            setAddingNewLink(false);
-                            setNewLyricsLink({ title: '', url: '' });
-                          }}
-                          className="px-2 py-1 text-xs bg-gray-500 text-white rounded hover:opacity-80"
-                        >
-                          취소
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                      {link.name}
+                      <ArrowTopRightOnSquareIcon className="w-3 h-3" />
+                    </a>
+                  ))}
                 </div>
               </div>
 
