@@ -33,8 +33,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     "/tmp/.next-ayauke/types/**/*.ts",
+    "/tmp/.next/types/**/*.ts",
     "next-env.d.ts",
-    "/tmp/.next/types/**/*.ts"
+    ".next-dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
