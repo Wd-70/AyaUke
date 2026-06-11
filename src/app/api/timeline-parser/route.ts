@@ -1621,8 +1621,12 @@ export async function GET(request: NextRequest) {
       }
 
       case 'get-parsed-items':
+        // 목록에는 originalComment(댓글 HTML 전문, 항목당 수 KB)를 제외한다.
+        // 같은 댓글에서 나온 수십 개 항목이 같은 블롭을 중복 보유해 페이로드가
+        // 수십 MB까지 불어나 응답이 수십 초 걸렸다. 상세 보기에서 단건으로 lazy-load.
         // allowDiskUse: 인덱스 생성 전/예외 상황에서도 32MB 정렬 제한에 걸리지 않도록
         const items = await ParsedTimeline.find()
+          .select('-originalComment')
           .sort({ uploadedDate: -1, startTimeSeconds: 1 })
           .allowDiskUse(true)
           .lean();
@@ -1631,6 +1635,33 @@ export async function GET(request: NextRequest) {
           success: true,
           data: items
         });
+
+      case 'get-item-comment': {
+        // 상세 보기에서 선택된 단일 항목의 originalComment만 조회 (목록 경량화 보완)
+        const id = searchParams.get('id');
+        if (!id) {
+          return NextResponse.json(
+            { success: false, error: 'id가 필요합니다.' },
+            { status: 400 }
+          );
+        }
+
+        const item = await ParsedTimeline.findOne({ id })
+          .select('id originalComment')
+          .lean();
+
+        if (!item) {
+          return NextResponse.json(
+            { success: false, error: '항목을 찾을 수 없습니다.' },
+            { status: 404 }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          data: { id: item.id, originalComment: item.originalComment ?? '' }
+        });
+      }
 
       default:
         return NextResponse.json(

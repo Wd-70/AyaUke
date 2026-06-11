@@ -57,7 +57,7 @@ interface ParsedTimelineItem {
     artist: string;
     confidence: number;
   };
-  originalComment: string;
+  originalComment?: string; // 목록에서는 제외, 상세 보기 시 lazy-load
   commentAuthor: string;
   commentId: string;
   commentPublishedAt: string;
@@ -1337,9 +1337,27 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
     }
   }, [youtubePlayer, editingData]);
 
-  // 상세정보 로딩 - 복잡한 비동기 처리 제거하고 즉시 처리
+  // 상세정보 로딩 - 즉시 표시 + originalComment는 필요 시 lazy-load
+  // (목록 API는 페이로드 경량화를 위해 originalComment를 제외하므로 단건으로 보충)
   const loadTimelineDetails = useCallback((timeline: ParsedTimelineItem) => {
     setSelectedTimeline(timeline);
+
+    if (timeline.originalComment === undefined || timeline.originalComment === null) {
+      fetch(`/api/timeline-parser?action=get-item-comment&id=${encodeURIComponent(timeline.id)}`)
+        .then((res) => res.json())
+        .then((result) => {
+          if (!result.success) return;
+          const comment: string = result.data.originalComment ?? '';
+          // 선택 항목과 목록 캐시 양쪽에 채워, 다시 열 때 재요청하지 않도록
+          setSelectedTimeline((prev) =>
+            prev && prev.id === timeline.id ? { ...prev, originalComment: comment } : prev
+          );
+          setParsedTimelines((prev) =>
+            prev.map((t) => (t.id === timeline.id ? { ...t, originalComment: comment } : t))
+          );
+        })
+        .catch((error) => console.error('원본 댓글 로드 오류:', error));
+    }
   }, []);
 
 
@@ -2592,7 +2610,9 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
           )}
           <div className="text-sm text-yellow-700 dark:text-yellow-300 bg-white dark:bg-gray-800 rounded p-3 border border-yellow-200 dark:border-yellow-800">
             <p className="whitespace-pre-wrap leading-relaxed">
-              {stripHtmlTags(selectedTimeline.originalComment)}
+              {selectedTimeline.originalComment === undefined || selectedTimeline.originalComment === null
+                ? '댓글 불러오는 중...'
+                : stripHtmlTags(selectedTimeline.originalComment)}
             </p>
           </div>
         </div>
