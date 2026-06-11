@@ -143,6 +143,29 @@ export default function SongDetailModal({
     }
   }, [activeTab, isExpanded, loadSongVideos, songVideos.length, videosLoading]);
 
+  // Escape 처리: 팝오버/편집 모드가 열려 있으면 그것만 닫고 모달은 유지한다.
+  // (부모 SongCard에도 document Escape 리스너가 있어, capture 단계에서 먼저
+  //  가로채 전파를 막지 않으면 팝오버를 닫으려는 Escape에 모달이 통째로 닫힌다.)
+  useEffect(() => {
+    if (!isExpanded) return;
+    const onKeyDownCapture = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (showPlaylistMenu || showLyricsMenu) {
+        setShowPlaylistMenu(false);
+        setShowLyricsMenu(false);
+        event.stopPropagation();
+        event.preventDefault();
+      } else if (isEditMode) {
+        setIsEditMode(false);
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      // 그 외에는 부모(SongCard)가 모달을 닫도록 그대로 둔다.
+    };
+    document.addEventListener("keydown", onKeyDownCapture, true);
+    return () => document.removeEventListener("keydown", onKeyDownCapture, true);
+  }, [isExpanded, showPlaylistMenu, showLyricsMenu, isEditMode]);
+
   // YouTube 플레이어 이벤트 핸들러
   const onYouTubeReady = useCallback((event: any) => {
     playerRef.current = event.target;
