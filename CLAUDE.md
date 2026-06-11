@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 ```bash
-# Development server (with increased memory allocation)
+# Development server
 npm run dev
 
 # Production build
@@ -147,9 +147,6 @@ For testing songbook subdomain functionality:
 # Add to /etc/hosts
 127.0.0.1 songbook.localhost
 ```
-
-### Memory Configuration
-Development server runs with increased memory allocation due to large dataset processing.
 
 ## Common Development Patterns
 
