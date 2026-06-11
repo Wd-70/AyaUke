@@ -289,7 +289,7 @@ export default function AdminClient() {
                   const isActive = effectiveActiveTab === tab.id;
                   const TabElement = (tab as any).external ? 'a' : 'button';
                   const tabProps = (tab as any).external 
-                    ? { href: (tab as any).externalLink, target: '_blank', rel: 'noopener noreferrer' }
+                    ? { href: (tab as any).externalLink }
                     : { onClick: () => setActiveTab(tab.id) };
                   
                   return (
@@ -340,7 +340,7 @@ export default function AdminClient() {
                   const isActive = effectiveActiveTab === tab.id;
                   const TabElement = (tab as any).external ? 'a' : 'button';
                   const tabProps = (tab as any).external 
-                    ? { href: (tab as any).externalLink, target: '_blank', rel: 'noopener noreferrer' }
+                    ? { href: (tab as any).externalLink }
                     : { onClick: () => setActiveTab(tab.id) };
                     
                   return (
@@ -370,7 +370,7 @@ export default function AdminClient() {
                 const isActive = effectiveActiveTab === tab.id;
                 const TabElement = (tab as any).external ? 'a' : 'button';
                 const tabProps = (tab as any).external 
-                  ? { href: (tab as any).externalLink, target: '_blank', rel: 'noopener noreferrer' }
+                  ? { href: (tab as any).externalLink }
                   : { onClick: () => setActiveTab(tab.id) };
                   
                 return (
