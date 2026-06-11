@@ -147,6 +147,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
     startTimeSeconds: number;
     endTimeSeconds?: number;
     customDescription?: string;
+    specialTags?: string[];
   } | null>(null);
   
   // 곡 매칭 다이얼로그 상태
@@ -344,13 +345,18 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
       const result = await response.json();
       
       if (result.success) {
-        const updatedTimelines = parsedTimelines.map(timeline => 
-          timeline.id === clipId 
+        const updatedTimelines = parsedTimelines.map(timeline =>
+          timeline.id === clipId
             ? { ...timeline, isRelevant: !timeline.isRelevant }
             : timeline
         );
         setParsedTimelines(updatedTimelines);
-        
+
+        // 상세 패널(selectedTimeline)도 같은 항목이면 동기화
+        setSelectedTimeline(prev =>
+          prev && prev.id === clipId ? { ...prev, isRelevant: !prev.isRelevant } : prev
+        );
+
         // 통계 재계산
         const relevantItems = updatedTimelines.filter(timeline => timeline.isRelevant && !timeline.isExcluded).length;
         const matchedItems = updatedTimelines.filter(timeline => timeline.matchedSong).length;
@@ -360,7 +366,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
             .map((timeline: ParsedTimelineItem) => timeline.matchedSong!.songId)
         ).size;
         const verifiedItems = updatedTimelines.filter(timeline => timeline.isTimeVerified).length;
-        
+
         setStats(prev => ({
           ...prev,
           relevantItems: relevantItems,
@@ -598,21 +604,25 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
       const result = await response.json();
       
       if (result.success) {
+        const newMatched = songId ? {
+          songId: songId,
+          title: result.data.matchInfo?.title || matchingTimelineItem.songTitle,
+          artist: result.data.matchInfo?.artist || matchingTimelineItem.artist,
+          confidence: confidence || 0
+        } : undefined;
+
         // 로컬 상태 업데이트
-        setParsedTimelines(prev => prev.map(timeline => 
-          timeline.id === matchingTimelineItem.id 
-            ? { 
-                ...timeline, 
-                matchedSong: songId ? {
-                  songId: songId,
-                  title: result.data.matchInfo?.title || timeline.songTitle,
-                  artist: result.data.matchInfo?.artist || timeline.artist,
-                  confidence: confidence || 0
-                } : undefined
-              }
+        setParsedTimelines(prev => prev.map(timeline =>
+          timeline.id === matchingTimelineItem.id
+            ? { ...timeline, matchedSong: newMatched }
             : timeline
         ));
-        
+
+        // 상세 패널(selectedTimeline)도 같은 항목이면 동기화
+        setSelectedTimeline(prev =>
+          prev && prev.id === matchingTimelineItem.id ? { ...prev, matchedSong: newMatched } : prev
+        );
+
         // 매칭 완료 시 해당 타임라인의 후보 목록을 메모리에서 제거
         if (songId) {
           setBatchSearchResults(prev => {
@@ -757,7 +767,8 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
         songTitle: selectedTimeline.songTitle,
         startTimeSeconds: selectedTimeline.startTimeSeconds,
         endTimeSeconds: selectedTimeline.endTimeSeconds,
-        customDescription: defaultDescription
+        customDescription: defaultDescription,
+        specialTags: selectedTimeline.specialTags || []
       });
     } else {
       setEditingData(null);
@@ -798,7 +809,8 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
           songTitle: songTitle,
           startTimeSeconds: editingData.startTimeSeconds,
           endTimeSeconds: editingData.endTimeSeconds,
-          customDescription: editingData.customDescription
+          customDescription: editingData.customDescription,
+          specialTags: editingData.specialTags || []
         })
       });
 
@@ -806,33 +818,30 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
 
       if (result.success) {
         // 로컬 상태 업데이트
-        setParsedTimelines(prev => prev.map(timeline => 
-          timeline.id === selectedTimeline.id 
-            ? { 
-                ...timeline, 
-                artist: artist,
-                songTitle: songTitle,
-                startTimeSeconds: editingData.startTimeSeconds,
-                endTimeSeconds: editingData.endTimeSeconds,
-                customDescription: editingData.customDescription,
-                duration: editingData.endTimeSeconds && editingData.endTimeSeconds > editingData.startTimeSeconds
-                  ? editingData.endTimeSeconds - editingData.startTimeSeconds
-                  : timeline.duration
-              }
+        const editedFields = {
+          artist: artist,
+          songTitle: songTitle,
+          startTimeSeconds: editingData.startTimeSeconds,
+          endTimeSeconds: editingData.endTimeSeconds,
+          customDescription: editingData.customDescription,
+          specialTags: editingData.specialTags || [],
+        };
+        const editedDuration = (prevDuration?: number | null) =>
+          editingData.endTimeSeconds && editingData.endTimeSeconds > editingData.startTimeSeconds
+            ? editingData.endTimeSeconds - editingData.startTimeSeconds
+            : prevDuration;
+
+        setParsedTimelines(prev => prev.map(timeline =>
+          timeline.id === selectedTimeline.id
+            ? { ...timeline, ...editedFields, duration: editedDuration(timeline.duration) }
             : timeline
         ));
 
         // 선택된 클립도 업데이트
         setSelectedTimeline(prev => prev ? {
           ...prev,
-          artist: artist,
-          songTitle: songTitle,
-          startTimeSeconds: editingData.startTimeSeconds,
-          endTimeSeconds: editingData.endTimeSeconds,
-          customDescription: editingData.customDescription,
-          duration: editingData.endTimeSeconds && editingData.endTimeSeconds > editingData.startTimeSeconds
-            ? editingData.endTimeSeconds - editingData.startTimeSeconds
-            : prev.duration
+          ...editedFields,
+          duration: editedDuration(prev.duration)
         } : null);
 
         // 저장 후에도 편집 상태 유지 (항상 편집 모드)
@@ -1545,13 +1554,18 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
       await Promise.all(updatePromises);
 
       // 로컬 상태 업데이트
-      const updatedTimelines = parsedTimelines.map(timeline => 
-        selectedTimelineIds.has(timeline.id) 
+      const updatedTimelines = parsedTimelines.map(timeline =>
+        selectedTimelineIds.has(timeline.id)
           ? { ...timeline, isRelevant: isRelevant }
           : timeline
       );
       setParsedTimelines(updatedTimelines);
-      
+
+      // 상세 패널(selectedTimeline)이 일괄 대상에 포함되면 동기화
+      setSelectedTimeline(prev =>
+        prev && selectedTimelineIds.has(prev.id) ? { ...prev, isRelevant } : prev
+      );
+
       // 통계 재계산
       const relevantItems = updatedTimelines.filter(timeline => timeline.isRelevant && !timeline.isExcluded).length;
       const matchedItems = updatedTimelines.filter(timeline => timeline.matchedSong).length;
@@ -1561,7 +1575,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
           .map((timeline: ParsedTimelineItem) => timeline.matchedSong!.songId)
       ).size;
       const verifiedItems = updatedTimelines.filter(timeline => timeline.isTimeVerified).length;
-      
+
       setStats(prev => ({
         ...prev,
         relevantItems: relevantItems,
@@ -1597,13 +1611,18 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
       await Promise.all(updatePromises);
 
       // 로컬 상태 업데이트
-      const updatedTimelines = parsedTimelines.map(timeline => 
-        selectedTimelineIds.has(timeline.id) 
+      const updatedTimelines = parsedTimelines.map(timeline =>
+        selectedTimelineIds.has(timeline.id)
           ? { ...timeline, isExcluded: isExcluded }
           : timeline
       );
       setParsedTimelines(updatedTimelines);
-      
+
+      // 상세 패널(selectedTimeline)이 일괄 대상에 포함되면 동기화
+      setSelectedTimeline(prev =>
+        prev && selectedTimelineIds.has(prev.id) ? { ...prev, isExcluded } : prev
+      );
+
       // 통계 재계산
       const relevantItems = updatedTimelines.filter(timeline => timeline.isRelevant && !timeline.isExcluded).length;
       const matchedItems = updatedTimelines.filter(timeline => timeline.matchedSong).length;

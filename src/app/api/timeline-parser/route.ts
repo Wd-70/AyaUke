@@ -1297,8 +1297,8 @@ export async function POST(request: NextRequest) {
         });
 
       case 'update-live-clip':
-        const { artist, songTitle, startTimeSeconds, endTimeSeconds, customDescription } = body;
-        
+        const { artist, songTitle, startTimeSeconds, endTimeSeconds, customDescription, specialTags } = body;
+
         if (!itemId) {
           return NextResponse.json(
             { success: false, error: 'itemId가 필요합니다.' },
@@ -1307,12 +1307,13 @@ export async function POST(request: NextRequest) {
         }
 
         const updateFields: any = { updatedAt: new Date() };
-        
+
         if (artist !== undefined) updateFields.artist = artist.trim();
         if (songTitle !== undefined) updateFields.songTitle = songTitle.trim();
         if (startTimeSeconds !== undefined) updateFields.startTimeSeconds = startTimeSeconds;
         if (endTimeSeconds !== undefined) updateFields.endTimeSeconds = endTimeSeconds;
         if (customDescription !== undefined) updateFields.customDescription = customDescription;
+        if (specialTags !== undefined) updateFields.specialTags = Array.isArray(specialTags) ? specialTags : [];
 
         // 지속 시간 재계산 (종료 시간이 있는 경우)
         if (endTimeSeconds !== undefined && startTimeSeconds !== undefined) {
