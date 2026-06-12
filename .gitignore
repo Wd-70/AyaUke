@@ -55,9 +55,15 @@ next-env.d.ts
 # local db backups (scripts/db/backup.mjs output)
 /backups
 
+# db analysis reports (scripts/db/analyze-*.mjs output)
+/reports
+
 # Claude settings
 .claude/
 
 # dev smoke test logs
 dev-out.log
 dev-err.log
+
+# AI asset generation sources/references (not for distribution)
+asset-src/
