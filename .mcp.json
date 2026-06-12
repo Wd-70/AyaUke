@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "browsermcp": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "@browsermcp/mcp@latest"
+      ],
+      "env": {}
+    }
+  }
+}
