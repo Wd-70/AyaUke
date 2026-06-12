@@ -141,10 +141,21 @@ export default function ClipPlayer({
 
     if (platform === "youtube") {
       let player: any = null;
+      let host: HTMLDivElement | null = null;
       loadYouTubeApi().then(() => {
         if (cancelled || !ytMountRef.current) return;
 
-        player = new window.YT.Player(ytMountRef.current, {
+        // YouTube API는 전달된 노드를 <iframe>으로 "교체"한다. React가 만든 노드를
+        // 직접 넘기면 React의 DOM 추적과 어긋나, 언마운트 시 React가 그 노드를
+        // 제거하려다 'removeChild ... not a child' 에러가 난다.
+        // → React가 소유하는 ytMountRef 컨테이너 안에, React가 모르는 별도 노드를
+        //   직접 만들어 YouTube에 넘긴다. (컨테이너만 React가, 내부는 YouTube가 소유)
+        host = document.createElement("div");
+        host.style.width = "100%";
+        host.style.height = "100%";
+        ytMountRef.current.appendChild(host);
+
+        player = new window.YT.Player(host, {
           videoId,
           playerVars: {
             controls: 0, // 네이티브 컨트롤 숨김 — 커스텀 컨트롤만 사용
@@ -208,6 +219,12 @@ export default function ClipPlayer({
           player?.destroy?.();
         } catch {
           /* iframe 이미 제거된 경우 무시 */
+        }
+        // 혹시 남은 노드는 직접 정리 (React 가상DOM 밖이라 안전)
+        try {
+          host?.remove();
+        } catch {
+          /* 이미 제거됨 */
         }
       };
     }
@@ -475,11 +492,14 @@ export default function ClipPlayer({
       onMouseMove={showControls}
       onTouchStart={showControls}
     >
-      {/* 영상 영역 — 네이티브 UI 없이 렌더 */}
+      {/* 영상 영역 — 네이티브 UI 없이 렌더.
+          ytMountRef는 React가 소유하는 빈 컨테이너. 내부 host 노드(YouTube가 iframe으로
+          교체)는 React 가상DOM 밖이라 자식으로 추적되지 않는다 → 언마운트 충돌 없음. */}
       {platform === "youtube" ? (
-        <div className="absolute inset-0 [&>iframe]:w-full [&>iframe]:h-full">
-          <div ref={ytMountRef} className="w-full h-full" />
-        </div>
+        <div
+          ref={ytMountRef}
+          className="absolute inset-0 [&>div]:w-full [&>div]:h-full [&>iframe]:w-full [&>iframe]:h-full"
+        />
       ) : (
         <video ref={videoRef} className="absolute inset-0 w-full h-full" playsInline />
       )}
