@@ -60,6 +60,14 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
     description: clip.description || "",
   }));
 
+  // 표시/재생용 클립. prop(clip)은 목록 캐시에서 파생되는데, 저장 직후 그 갱신이
+  // 화면에 도달하지 못하는 경우가 있어, 저장 성공 시 이 로컬 상태를 직접 갱신해
+  // 즉시 새 값으로 보이도록 한다. prop이 바뀌면 동기화한다.
+  const [displayClip, setDisplayClip] = useState(clip);
+  useEffect(() => {
+    setDisplayClip(clip);
+  }, [clip]);
+
   // 편집용 플레이어 어댑터
   const [adapter, setAdapter] = useState<EditPlayerAdapter | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -201,8 +209,15 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
     onSuccess: () => {
       showSuccess("저장 완료", "클립 정보가 수정되었습니다.");
       setEditing(false);
-      // refetch 타이밍/캐시와 무관하게, 방금 저장한 값으로 목록 캐시를 즉시 갱신한다.
-      // (selectedClip은 이 캐시에서 파생되므로 상세 패널·플레이어가 바로 새 시간으로 반영)
+      // 패널/플레이어가 즉시 새 값으로 보이도록 로컬 표시 상태를 직접 갱신
+      setDisplayClip((prev) => ({
+        ...prev,
+        startTime: editData.startTime,
+        endTime: editData.endTime ?? null,
+        description: editData.description,
+        ...(editData.videoUrl !== clip.videoUrl ? { videoUrl: editData.videoUrl } : {}),
+      }));
+      // 목록 행 표시도 새 값으로 (refetch 없이 캐시 직접 패치)
       queryClient.setQueriesData<{ clips: ClipData[]; pagination: Pagination }>(
         { queryKey: ["admin-clips", "list"] },
         (old) => {
@@ -300,11 +315,11 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
         {!editing ? (
           <ClipPlayer
             // 편집 저장으로 시간이 바뀌면 key가 달라져 새 구간으로 재마운트된다
-            key={`view-${clip._id}-${clip.startTime ?? 0}-${clip.endTime ?? "end"}`}
-            platform={clip.platform || "youtube"}
-            videoId={clip.videoId}
-            startTime={clip.startTime || 0}
-            endTime={clip.endTime}
+            key={`view-${displayClip._id}-${displayClip.startTime ?? 0}-${displayClip.endTime ?? "end"}`}
+            platform={displayClip.platform || "youtube"}
+            videoId={displayClip.videoId}
+            startTime={displayClip.startTime || 0}
+            endTime={displayClip.endTime}
             extendedControls
             className="max-w-2xl mx-auto"
           />
@@ -330,12 +345,12 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="text-sm text-light-text/70 dark:text-dark-text/70 space-y-1">
               <div>
-                구간 <span className="font-mono text-light-text dark:text-dark-text">{formatTime(clip.startTime || 0)}</span>
-                {clip.endTime != null && (
+                구간 <span className="font-mono text-light-text dark:text-dark-text">{formatTime(displayClip.startTime || 0)}</span>
+                {displayClip.endTime != null && (
                   <>
                     {" ~ "}
-                    <span className="font-mono text-light-text dark:text-dark-text">{formatTime(clip.endTime)}</span>
-                    <span className="ml-2 text-xs">(길이 {formatTime(clip.endTime - (clip.startTime || 0))})</span>
+                    <span className="font-mono text-light-text dark:text-dark-text">{formatTime(displayClip.endTime)}</span>
+                    <span className="ml-2 text-xs">(길이 {formatTime(displayClip.endTime - (displayClip.startTime || 0))})</span>
                   </>
                 )}
               </div>
