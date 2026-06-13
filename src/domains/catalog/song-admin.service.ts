@@ -74,16 +74,21 @@ export interface NewSongInput {
   artistAlias?: string;
   language: string;
   lyrics?: string;
-  mrLinks?: string[];
+  /** MR 링크 (URL 문자열 배열 또는 상세 객체 배열 모두 허용) */
+  mrLinks?: Array<string | { url: string; skipSeconds?: number; label?: string; duration?: string }>;
   tags?: string[];
   keyAdjustment?: number | null;
   imageUrl?: string;
   personalNotes?: string;
+  selectedMRIndex?: number;
 }
 
 export async function addSong(songData: NewSongInput) {
   const existing = await SongDetail.findOne({ title: songData.title, artist: songData.artist });
   if (existing) throw new ConflictError('같은 제목과 아티스트의 곡이 이미 존재합니다.');
+
+  // 문자열 URL이면 객체로 정규화
+  const mrLinks = (songData.mrLinks || []).map((m) => (typeof m === 'string' ? { url: m } : m));
 
   const song = await new SongDetail({
     title: songData.title,
@@ -92,7 +97,8 @@ export async function addSong(songData: NewSongInput) {
     artistAlias: songData.artistAlias?.trim() || undefined,
     language: songData.language,
     lyrics: songData.lyrics || '',
-    mrLinks: songData.mrLinks?.map((url) => ({ url })) || [],
+    mrLinks,
+    selectedMRIndex: songData.selectedMRIndex || 0,
     searchTags: songData.tags || [],
     personalNotes: songData.personalNotes || '',
     keyAdjustment: songData.keyAdjustment ?? null,

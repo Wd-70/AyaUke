@@ -33,33 +33,38 @@ interface AdminSong {
 }
 
 interface SongEditModalProps {
-  song: AdminSong
+  /** 없으면 '새 곡 추가' 모드 */
+  song?: AdminSong
   onClose: () => void
-  onSubmit: (songData: {
-    title?: string
-    artist?: string
-    language?: string
-    keyAdjustment?: number | null
-    lyrics?: string
-    mrLinks?: MRLink[]
-    tags?: string[]
-    selectedMRIndex?: number
-    imageUrl?: string
-  }) => void
+  onSubmit: (
+    songData: {
+      title?: string
+      artist?: string
+      language?: string
+      keyAdjustment?: number | null
+      lyrics?: string
+      mrLinks?: MRLink[]
+      tags?: string[]
+      selectedMRIndex?: number
+      imageUrl?: string
+    },
+    isAdd: boolean,
+  ) => void
   loading: boolean
 }
 
 export default function SongEditModal({ song, onClose, onSubmit, loading }: SongEditModalProps) {
+  const isAdd = !song
   const [formData, setFormData] = useState({
-    title: song.title,
-    artist: song.artist,
-    language: song.language,
-    keyAdjustment: song.keyAdjustment !== null ? song.keyAdjustment?.toString() || '0' : '999',
-    lyrics: song.lyrics || '',
-    mrLinks: song.mrLinks?.length ? song.mrLinks : [{ url: '', skipSeconds: 0, label: '', duration: '' }],
-    tags: song.tags || [],
-    selectedMRIndex: song.selectedMRIndex || 0,
-    imageUrl: song.imageUrl || ''
+    title: song?.title || '',
+    artist: song?.artist || '',
+    language: song?.language || 'Korean',
+    keyAdjustment: song?.keyAdjustment != null ? song.keyAdjustment.toString() : '999',
+    lyrics: song?.lyrics || '',
+    mrLinks: song?.mrLinks?.length ? song.mrLinks : [{ url: '', skipSeconds: 0, label: '', duration: '' }],
+    tags: song?.tags || [],
+    selectedMRIndex: song?.selectedMRIndex || 0,
+    imageUrl: song?.imageUrl || ''
   })
   const [currentTag, setCurrentTag] = useState('')
   const [isSearchingMR, setIsSearchingMR] = useState(false)
@@ -197,7 +202,26 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
       return
     }
 
-    // 변경된 데이터만 전송
+    // 추가 모드: 전체 데이터 전송
+    if (!song) {
+      onSubmit(
+        {
+          title: formData.title.trim(),
+          artist: formData.artist.trim(),
+          language: formData.language,
+          keyAdjustment: formData.keyAdjustment === '999' ? null : parseInt(formData.keyAdjustment),
+          lyrics: formData.lyrics.trim() || undefined,
+          mrLinks: formData.mrLinks.filter(link => link.url.trim()),
+          tags: formData.tags,
+          selectedMRIndex: formData.selectedMRIndex,
+          imageUrl: formData.imageUrl.trim() || undefined,
+        },
+        true,
+      )
+      return
+    }
+
+    // 편집 모드: 변경된 데이터만 전송
     const updateData: Record<string, unknown> = {}
     
     if (formData.title.trim() !== song.title) {
@@ -250,16 +274,16 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
       return
     }
 
-    onSubmit(updateData)
+    onSubmit(updateData, false)
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-light-text dark:text-dark-text">곡 편집</h2>
+          <h2 className="text-2xl font-bold text-light-text dark:text-dark-text">{isAdd ? '새 곡 추가' : '곡 편집'}</h2>
           <p className="text-sm text-light-text/60 dark:text-dark-text/60 mt-1">
-            {song.title} - {song.artist}
+            {song ? `${song.title} - ${song.artist}` : '새로운 곡 정보를 입력하세요'}
           </p>
         </div>
         <button
@@ -695,12 +719,12 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
           {loading ? (
             <>
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              수정 중...
+              {isAdd ? '추가 중...' : '수정 중...'}
             </>
           ) : (
             <>
               <PencilIcon className="w-4 h-4" />
-              곡 수정
+              {isAdd ? '곡 추가' : '곡 수정'}
             </>
           )}
         </button>
