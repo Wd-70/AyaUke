@@ -21,6 +21,7 @@ interface EditData {
   artistAlias: string;
   lyrics: string;
   personalNotes: string;
+  imageUrl: string;
   keyAdjustment: number | null;
   language: string;
   searchTags: string[];
@@ -42,6 +43,7 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
     artistAlias: '',
     lyrics: '',
     personalNotes: '',
+    imageUrl: '',
     keyAdjustment: null,
     language: '',
     searchTags: [],
@@ -71,6 +73,7 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
       artistAlias: displayArtist,
       lyrics: lyricsValue,
       personalNotes: song.personalNotes || '',
+      imageUrl: song.imageUrl || '',
       keyAdjustment: song.keyAdjustment ?? null,
       language: song.language || '',
       searchTags: song.searchTags || [],
@@ -620,6 +623,37 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
               </div>
             ))}
           </div>
+        </div>
+
+        {/* 커버 이미지 (노래책 카드 배경) */}
+        <div>
+          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
+            커버 이미지 URL
+          </label>
+          <div className="flex items-start gap-3">
+            <input
+              type="url"
+              value={editData.imageUrl}
+              onChange={(e) => setEditData({ ...editData, imageUrl: e.target.value })}
+              className="flex-1 px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg
+                       bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
+                       focus:border-light-accent dark:focus:border-dark-accent outline-none"
+              placeholder="https://... (비우면 카드 배경 미사용)"
+            />
+            {editData.imageUrl.trim() && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={editData.imageUrl}
+                alt="커버 미리보기"
+                className="w-20 h-12 object-cover rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex-shrink-0"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                onLoad={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }}
+              />
+            )}
+          </div>
+          <p className="text-xs text-light-text/50 dark:text-dark-text/50 mt-1">
+            노래책 곡 카드의 배경 이미지로 사용됩니다.
+          </p>
         </div>
 
         {/* 개인 노트 - 가장 아래쪽으로 이동 */}

@@ -28,6 +28,7 @@ interface AdminSong {
   keyAdjustment?: number | null
   selectedMRIndex?: number
   personalNotes?: string
+  imageUrl?: string
   source?: string
 }
 
@@ -43,6 +44,7 @@ interface SongEditModalProps {
     mrLinks?: MRLink[]
     tags?: string[]
     selectedMRIndex?: number
+    imageUrl?: string
   }) => void
   loading: boolean
 }
@@ -56,7 +58,8 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
     lyrics: song.lyrics || '',
     mrLinks: song.mrLinks?.length ? song.mrLinks : [{ url: '', skipSeconds: 0, label: '', duration: '' }],
     tags: song.tags || [],
-    selectedMRIndex: song.selectedMRIndex || 0
+    selectedMRIndex: song.selectedMRIndex || 0,
+    imageUrl: song.imageUrl || ''
   })
   const [currentTag, setCurrentTag] = useState('')
   const [isSearchingMR, setIsSearchingMR] = useState(false)
@@ -237,7 +240,11 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
     if (JSON.stringify(newTags) !== JSON.stringify(currentTags)) {
       updateData.tags = newTags
     }
-    
+
+    if (formData.imageUrl.trim() !== (song.imageUrl || '')) {
+      updateData.imageUrl = formData.imageUrl.trim()
+    }
+
     if (Object.keys(updateData).length === 0) {
       alert('변경된 내용이 없습니다.')
       return
@@ -635,6 +642,36 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
               placeholder="가사를 입력하세요"
               rows={8}
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+              커버 이미지 URL
+            </label>
+            <div className="flex items-start gap-3">
+              <input
+                type="url"
+                value={formData.imageUrl}
+                onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
+                className="flex-1 px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20
+                           rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent
+                           text-light-text dark:text-dark-text"
+                placeholder="https://... (비우면 카드 배경 미사용)"
+              />
+              {formData.imageUrl.trim() && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={formData.imageUrl}
+                  alt="커버 미리보기"
+                  className="w-20 h-12 object-cover rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex-shrink-0"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                  onLoad={(e) => { (e.currentTarget as HTMLImageElement).style.display = '' }}
+                />
+              )}
+            </div>
+            <p className="text-xs text-light-text/50 dark:text-dark-text/50 mt-1">
+              노래책 곡 카드의 배경 이미지로 사용됩니다.
+            </p>
           </div>
         </div>
       </div>

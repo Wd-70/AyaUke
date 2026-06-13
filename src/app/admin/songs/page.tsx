@@ -45,6 +45,7 @@ interface AdminSong {
   keyAdjustment?: number | null
   selectedMRIndex?: number
   personalNotes?: string
+  imageUrl?: string
   source?: string
 }
 
@@ -499,6 +500,7 @@ export default function SongManagement() {
     lyrics?: string
     mrLinks?: string[]
     tags?: string[]
+    imageUrl?: string
   }) => {
     if (!editingSong) return
 

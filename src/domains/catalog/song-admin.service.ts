@@ -41,6 +41,7 @@ export async function listSongsForAdmin() {
       keyAdjustment: detail.keyAdjustment,
       selectedMRIndex: detail.selectedMRIndex || 0,
       personalNotes: detail.personalNotes || '',
+      imageUrl: detail.imageUrl || '',
       source: 'mongodb' as const,
     };
   });
@@ -157,6 +158,7 @@ export interface EditSongInput {
   mrLinks?: unknown[];
   tags?: string[];
   selectedMRIndex?: number;
+  imageUrl?: string;
 }
 
 export async function editSong(songId: string, editData: EditSongInput): Promise<number> {
@@ -180,6 +182,7 @@ export async function editSong(songId: string, editData: EditSongInput): Promise
   if (editData.mrLinks !== undefined) updateFields.mrLinks = editData.mrLinks;
   if (editData.selectedMRIndex !== undefined) updateFields.selectedMRIndex = editData.selectedMRIndex;
   if (editData.tags !== undefined) updateFields.searchTags = editData.tags;
+  if (editData.imageUrl !== undefined) updateFields.imageUrl = editData.imageUrl.trim();
 
   const result = await SongDetail.updateOne({ _id: songId }, { $set: updateFields });
   return result.modifiedCount;
