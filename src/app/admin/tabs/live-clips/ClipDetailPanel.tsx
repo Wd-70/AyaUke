@@ -23,7 +23,6 @@ import ClipTimeEditor from "./ClipTimeEditor";
 import {
   type ClipData,
   type EditPlayerAdapter,
-  type Pagination,
   formatTime,
   platformBadgeClass,
   platformLabel,
@@ -34,8 +33,10 @@ interface ClipDetailPanelProps {
   /** 곡의 기본 클립 길이 (있으면 편집기에 표시) */
   songClipDuration?: number | null;
   onClose: () => void;
-  /** 데이터 변경 후 목록 갱신용 */
+  /** 데이터 변경 후 목록 갱신용 (검증/삭제 등) */
   onChanged: () => void;
+  /** 시간 편집 저장 시: 기대값을 등록하고 refetch (옛 값 보정용) */
+  onSaved: (id: string, patch: { startTime: number; endTime: number | null }) => void;
 }
 
 interface EditData {
@@ -46,7 +47,7 @@ interface EditData {
   description: string;
 }
 
-export default function ClipDetailPanel({ clip, songClipDuration, onClose, onChanged }: ClipDetailPanelProps) {
+export default function ClipDetailPanel({ clip, songClipDuration, onClose, onChanged, onSaved }: ClipDetailPanelProps) {
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -217,30 +218,9 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
         description: editData.description,
         ...(editData.videoUrl !== clip.videoUrl ? { videoUrl: editData.videoUrl } : {}),
       }));
-      // 목록 행 표시도 새 값으로 (refetch 없이 캐시 직접 패치)
-      queryClient.setQueriesData<{ clips: ClipData[]; pagination: Pagination }>(
-        { queryKey: ["admin-clips", "list"] },
-        (old) => {
-          if (!old?.clips) return old;
-          return {
-            ...old,
-            clips: old.clips.map((c) =>
-              c._id === clip._id
-                ? {
-                    ...c,
-                    startTime: editData.startTime,
-                    endTime: editData.endTime ?? null,
-                    description: editData.description,
-                    ...(editData.videoUrl !== clip.videoUrl ? { videoUrl: editData.videoUrl } : {}),
-                  }
-                : c,
-            ),
-          };
-        },
-      );
-      // 주의: 여기서 invalidate()/refetch(onChanged)를 하지 않는다. 저장 직후 서버
-      // read가 (복제 지연/타이밍으로) 옛 값을 줘 위 낙관적 패치를 덮어쓰는 일이 있었다.
-      // 방금 저장한 값을 신뢰하고, 정합성은 다음 자연 refetch(페이지/필터 변경) 때 맞춘다.
+      // 목록은 부모가 기대값을 등록하고 refetch한다. refetch가 옛 값을 주면 부모의
+      // select 보정이 기대값으로 표시하고, 서버가 반영되면 보정을 해제한다.
+      onSaved(clip._id, { startTime: editData.startTime, endTime: editData.endTime ?? null });
     },
     onError: (e) => showError("저장 실패", e.message),
   });

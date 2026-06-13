@@ -4,7 +4,7 @@
  * 전체 클립 목록 — 서버 페이지네이션 + 필터(검증/플랫폼/검색/등록자/정렬).
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import Image from "next/image";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
@@ -34,6 +34,10 @@ export default function ClipListView() {
   // (객체를 복사해 두면 편집 저장 후 목록만 refetch되어 선택 클립이 옛 값으로 남음)
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
 
+  // 방금 편집 저장한 클립의 기대값. 저장 직후 refetch가 (복제 지연 등으로) 옛 값을
+  // 주면 이 값으로 보정하고, 서버가 기대값과 일치하면 보정을 해제한다.
+  const pendingEdits = useRef<Map<string, { startTime: number; endTime: number | null }>>(new Map());
+
   const debouncedSearch = useDebounce(search, 300);
 
   const { data, isLoading, refetch } = useQuery({
@@ -54,7 +58,26 @@ export default function ClipListView() {
       return result.data as { clips: ClipData[]; pagination: Pagination };
     },
     placeholderData: keepPreviousData,
+    select: (raw) => ({
+      ...raw,
+      clips: raw.clips.map((c) => {
+        const p = pendingEdits.current.get(c._id);
+        if (!p) return c;
+        // 서버가 기대값을 반영했으면 보정 해제, 아직이면 기대값으로 덮어 표시
+        if ((c.startTime ?? 0) === p.startTime && (c.endTime ?? null) === p.endTime) {
+          pendingEdits.current.delete(c._id);
+          return c;
+        }
+        return { ...c, startTime: p.startTime, endTime: p.endTime };
+      }),
+    }),
   });
+
+  // 저장 성공 시: 기대값 등록 후 refetch. 옛 값이 오면 위 select가 보정한다.
+  const handleSaved = (id: string, patch: { startTime: number; endTime: number | null }) => {
+    pendingEdits.current.set(id, patch);
+    refetch();
+  };
 
   const resetPage = () => setPage(1);
 
@@ -103,6 +126,7 @@ export default function ClipListView() {
           songClipDuration={selectedClip.songDetail?.clipDuration}
           onClose={() => setSelectedClipId(null)}
           onChanged={() => refetch()}
+          onSaved={handleSaved}
         />
       )}
 
