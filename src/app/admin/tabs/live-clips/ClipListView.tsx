@@ -48,7 +48,7 @@ export default function ClipListView() {
         platform,
         ...(debouncedSearch && { search: debouncedSearch }),
       });
-      const res = await fetch(`/api/admin/clips?${params}`);
+      const res = await fetch(`/api/admin/clips?${params}`, { cache: "no-store" });
       const result = await res.json();
       if (!result.success) throw new Error(result.error?.message || "클립을 불러오지 못했습니다.");
       return result.data as { clips: ClipData[]; pagination: Pagination };

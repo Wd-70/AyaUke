@@ -23,6 +23,7 @@ import ClipTimeEditor from "./ClipTimeEditor";
 import {
   type ClipData,
   type EditPlayerAdapter,
+  type Pagination,
   formatTime,
   platformBadgeClass,
   platformLabel,
@@ -200,7 +201,29 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
     onSuccess: () => {
       showSuccess("저장 완료", "클립 정보가 수정되었습니다.");
       setEditing(false);
-      invalidate();
+      // refetch 타이밍/캐시와 무관하게, 방금 저장한 값으로 목록 캐시를 즉시 갱신한다.
+      // (selectedClip은 이 캐시에서 파생되므로 상세 패널·플레이어가 바로 새 시간으로 반영)
+      queryClient.setQueriesData<{ clips: ClipData[]; pagination: Pagination }>(
+        { queryKey: ["admin-clips", "list"] },
+        (old) => {
+          if (!old?.clips) return old;
+          return {
+            ...old,
+            clips: old.clips.map((c) =>
+              c._id === clip._id
+                ? {
+                    ...c,
+                    startTime: editData.startTime,
+                    endTime: editData.endTime ?? null,
+                    description: editData.description,
+                    ...(editData.videoUrl !== clip.videoUrl ? { videoUrl: editData.videoUrl } : {}),
+                  }
+                : c,
+            ),
+          };
+        },
+      );
+      invalidate(); // 서버 정합성 확인(백그라운드)
     },
     onError: (e) => showError("저장 실패", e.message),
   });
