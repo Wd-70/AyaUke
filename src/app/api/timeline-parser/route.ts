@@ -1624,8 +1624,17 @@ export async function GET(request: NextRequest) {
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
           async start(controller) {
+            // 클라이언트(EventSource)가 파싱 완료 전에 끊기면 enqueue가 throw하는데,
+            // 그게 onProgress를 통해 파싱 루프로 전파되면 insert 전에 파싱이 중단된다.
+            // → enqueue 실패를 삼켜 진행 보고만 멈추고, 파싱·저장은 끝까지 진행한다.
+            let clientGone = false;
             const sendEvent = (event: string, data: unknown) => {
-              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+              if (clientGone) return;
+              try {
+                controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+              } catch {
+                clientGone = true; // 클라이언트 연결 끊김 — 이후 전송 생략(파싱은 계속)
+              }
             };
 
             try {
@@ -1639,7 +1648,7 @@ export async function GET(request: NextRequest) {
             } catch (error) {
               sendEvent('error', { error: error instanceof Error ? error.message : String(error) });
             } finally {
-              controller.close();
+              try { controller.close(); } catch { /* 이미 닫힘 */ }
             }
           },
         });
