@@ -1063,7 +1063,8 @@ export default function LiveClipManager({
                 {/* 시청 모드: 구간 전용 플레이어 (유튜브/치지직 공통) */}
                 {selectedVideo && !editingVideoId && (
                   <ClipPlayer
-                    key={`clip-player-${selectedVideo._id}`}
+                    // 편집으로 시간이 바뀌면 key가 달라져 플레이어가 새 값으로 재마운트된다
+                    key={`clip-player-${selectedVideo._id}-${selectedVideo.startTime ?? 0}-${selectedVideo.endTime ?? 'end'}`}
                     platform={selectedVideo.platform || 'youtube'}
                     videoId={selectedVideo.videoId}
                     startTime={selectedVideo.startTime || 0}

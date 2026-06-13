@@ -138,6 +138,10 @@ export default function ClipPlayer({
     setError(null);
     setEnded(false);
     setClipPosition(0);
+    // startTime/endTime이 (편집 등으로) 바뀌면 구간 길이도 재계산한다.
+    // endTime이 없으면 0으로 두고 onReady/onLoaded에서 영상 길이 기준으로 채운다.
+    // (이 줄이 없으면 같은 클립을 편집해 시간만 바꿀 때 진행바·시간표시가 옛값으로 남음)
+    setClipDuration(endTime != null ? Math.max(0, endTime - startTime) : 0);
 
     if (platform === "youtube") {
       let player: any = null;
