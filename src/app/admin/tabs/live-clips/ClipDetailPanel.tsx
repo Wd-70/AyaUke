@@ -33,10 +33,8 @@ interface ClipDetailPanelProps {
   /** 곡의 기본 클립 길이 (있으면 편집기에 표시) */
   songClipDuration?: number | null;
   onClose: () => void;
-  /** 데이터 변경 후 목록 갱신용 (검증/삭제 등) */
+  /** 데이터 변경 후 목록 갱신용 */
   onChanged: () => void;
-  /** 시간 편집 저장 시: 기대값을 등록하고 refetch (옛 값 보정용) */
-  onSaved: (id: string, patch: { startTime: number; endTime: number | null }) => void;
 }
 
 interface EditData {
@@ -47,7 +45,7 @@ interface EditData {
   description: string;
 }
 
-export default function ClipDetailPanel({ clip, songClipDuration, onClose, onChanged, onSaved }: ClipDetailPanelProps) {
+export default function ClipDetailPanel({ clip, songClipDuration, onClose, onChanged }: ClipDetailPanelProps) {
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -61,13 +59,13 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
     description: clip.description || "",
   }));
 
-  // 표시/재생용 클립. prop(clip)은 목록 캐시에서 파생되는데, 저장 직후 그 갱신이
-  // 화면에 도달하지 못하는 경우가 있어, 저장 성공 시 이 로컬 상태를 직접 갱신해
-  // 즉시 새 값으로 보이도록 한다. prop이 바뀌면 동기화한다.
+  // 표시/재생용 클립. 저장 성공 시 이 로컬 상태를 직접 갱신해 즉시 새 값으로 보인다.
+  // 동기화는 '다른 클립으로 바뀔 때'(clip._id 변경)만 한다 — 같은 클립의 refetch가
+  // (복제 지연으로) 옛 값을 줘도 방금 저장한 값이 되돌아가지 않도록.
   const [displayClip, setDisplayClip] = useState(clip);
   useEffect(() => {
     setDisplayClip(clip);
-  }, [clip]);
+  }, [clip._id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 편집용 플레이어 어댑터
   const [adapter, setAdapter] = useState<EditPlayerAdapter | null>(null);
@@ -218,9 +216,9 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
         description: editData.description,
         ...(editData.videoUrl !== clip.videoUrl ? { videoUrl: editData.videoUrl } : {}),
       }));
-      // 목록은 부모가 기대값을 등록하고 refetch한다. refetch가 옛 값을 주면 부모의
-      // select 보정이 기대값으로 표시하고, 서버가 반영되면 보정을 해제한다.
-      onSaved(clip._id, { startTime: editData.startTime, endTime: editData.endTime ?? null });
+      // 목록은 기존대로 invalidate→refetch로 갱신(원래 정상 동작했음).
+      // 패널은 위 displayClip이 즉시 새 값을 유지하므로 refetch가 옛 값을 줘도 무방.
+      invalidate();
     },
     onError: (e) => showError("저장 실패", e.message),
   });
