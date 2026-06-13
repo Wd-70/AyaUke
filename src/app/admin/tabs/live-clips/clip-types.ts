@@ -41,6 +41,8 @@ export interface SongWithClips {
   latestSungDate?: string;
   thumbnailUrl?: string;
   clipDuration?: number;
+  /** 같은 영상 내 시간이 겹치는 클립이 있는지 (서버 집계) */
+  hasOverlap?: boolean;
 }
 
 export interface ClipStats {

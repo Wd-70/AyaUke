@@ -68,6 +68,27 @@ export interface SongsWithClipsQuery {
 }
 
 /** 클립을 곡 단위로 묶어 페이지네이션. 곡의 기본 클립 길이(clipDuration) 포함 */
+/** 곡 내 클립들에 시간 겹침이 있는지 (같은 플랫폼·같은 영상 내, sweep line) */
+function hasTimeOverlap(clips: { p?: string; v: string; s?: number; e?: number | null }[]): boolean {
+  const byVideo = new Map<string, { s: number; e: number }[]>();
+  for (const c of clips) {
+    const key = `${c.p || 'youtube'}|${c.v}`;
+    const arr = byVideo.get(key) ?? [];
+    arr.push({ s: c.s ?? 0, e: c.e ?? Number.MAX_SAFE_INTEGER });
+    byVideo.set(key, arr);
+  }
+  for (const arr of byVideo.values()) {
+    if (arr.length < 2) continue;
+    arr.sort((a, b) => a.s - b.s);
+    let maxEnd = -Infinity;
+    for (const { s, e } of arr) {
+      if (s < maxEnd) return true; // 정확히 이어지는(s===maxEnd) 경우는 정상으로 제외
+      maxEnd = Math.max(maxEnd, e);
+    }
+  }
+  return false;
+}
+
 export async function listSongsWithClips({ page, limit, search, sortBy = 'recent' }: SongsWithClipsQuery) {
   const match: Record<string, unknown> = {};
   if (search) {
@@ -94,6 +115,10 @@ export async function listSongsWithClips({ page, limit, search, sortBy = 'recent
         platforms: { $addToSet: { $ifNull: ['$platform', 'youtube'] } },
         latestSungDate: { $max: '$sungDate' },
         thumbnailUrl: { $first: '$thumbnailUrl' },
+        // 곡별 겹침 판정용 시간 정보 (페이지 항목에 대해서만 Node에서 계산)
+        overlapClips: {
+          $push: { p: { $ifNull: ['$platform', 'youtube'] }, v: '$videoId', s: { $ifNull: ['$startTime', 0] }, e: '$endTime' },
+        },
       },
     },
     { $sort: sortStage },
@@ -120,6 +145,7 @@ export async function listSongsWithClips({ page, limit, search, sortBy = 'recent
               platforms: 1,
               latestSungDate: 1,
               thumbnailUrl: 1,
+              overlapClips: 1,
               titleAlias: '$songDetail.titleAlias',
               artistAlias: '$songDetail.artistAlias',
               clipDuration: '$songDetail.clipDuration',
@@ -132,8 +158,12 @@ export async function listSongsWithClips({ page, limit, search, sortBy = 'recent
   ]);
 
   const total: number = result.total[0]?.n ?? 0;
+  // 페이지 항목에 대해서만 겹침 여부 계산 후, 무거운 시간 배열은 응답에서 제거
+  const songs = (result.items as Array<Record<string, unknown> & { overlapClips?: { p?: string; v: string; s?: number; e?: number | null }[] }>).map(
+    ({ overlapClips, ...song }) => ({ ...song, hasOverlap: hasTimeOverlap(overlapClips ?? []) }),
+  );
   return {
-    songs: result.items,
+    songs,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   };
 }

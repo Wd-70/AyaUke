@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import Image from "next/image";
-import { MagnifyingGlassIcon, ClockIcon, MusicalNoteIcon } from "@heroicons/react/24/outline";
+import { MagnifyingGlassIcon, ClockIcon, MusicalNoteIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 import { useDebounce } from "@/hooks/useDebounce";
 import SongClipPanel from "./SongClipPanel";
 import PaginationControl from "./PaginationControl";
@@ -136,6 +136,15 @@ export default function SongClipBrowser() {
                         {formatTime(song.clipDuration)}
                       </span>
                     ) : null}
+                    {song.hasOverlap && (
+                      <span
+                        className="px-1.5 py-0.5 rounded text-[11px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 inline-flex items-center gap-0.5"
+                        title="같은 영상 내 시간이 겹치는 클립이 있습니다 — 곡을 열어 확인하세요"
+                      >
+                        <ExclamationTriangleIcon className="w-3 h-3" />
+                        겹침
+                      </span>
+                    )}
                   </div>
                 </div>
               </button>

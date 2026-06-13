@@ -5,7 +5,7 @@
  * 기본 클립 길이 표시/직접 수정, 기존 클립 일괄 적용(임계초), 클립 목록.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import {
@@ -32,6 +32,15 @@ interface SongClipPanelProps {
   songId: string;
   onClose: () => void;
 }
+
+// 겹침 그룹별 색상 (같은 색 = 서로 겹치는 클립들)
+const OVERLAP_COLORS = [
+  "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300",
+  "bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300",
+  "bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300",
+  "bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300",
+  "bg-lime-100 dark:bg-lime-900/40 text-lime-700 dark:text-lime-300",
+];
 
 interface SongInfo {
   _id: string;
@@ -66,16 +75,51 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
   const song = data?.song;
   const clipDuration = song?.clipDuration;
 
-  // 겹침 감지 (이 곡 클립들만 — 소량이라 클라이언트 연산으로 충분)
-  const overlappingIds = new Set<string>();
-  for (let i = 0; i < clips.length; i++) {
-    for (let j = i + 1; j < clips.length; j++) {
-      if (clipsOverlap(clips[i], clips[j])) {
-        overlappingIds.add(clips[i]._id);
-        overlappingIds.add(clips[j]._id);
+  // 겹침 감지 (이 곡 클립들만 — 소량이라 클라이언트 연산으로 충분).
+  // 서로 겹치는 클립들을 그룹으로 묶어, 어떤 클립끼리 겹치는지 한눈에 보이게 한다.
+  const { groupOf, partnersOf } = useMemo(() => {
+    // union-find로 겹침 연결요소(그룹) 계산
+    const parent = new Map<string, string>();
+    clips.forEach((c) => parent.set(c._id, c._id));
+    const find = (x: string): string => {
+      let r = x;
+      while (parent.get(r) !== r) r = parent.get(r)!;
+      while (parent.get(x) !== r) {
+        const next = parent.get(x)!;
+        parent.set(x, r);
+        x = next;
+      }
+      return r;
+    };
+    const partners = new Map<string, ClipData[]>();
+    const addPartner = (id: string, other: ClipData) => {
+      const list = partners.get(id) ?? [];
+      list.push(other);
+      partners.set(id, list);
+    };
+    for (let i = 0; i < clips.length; i++) {
+      for (let j = i + 1; j < clips.length; j++) {
+        if (clipsOverlap(clips[i], clips[j])) {
+          parent.set(find(clips[i]._id), find(clips[j]._id));
+          addPartner(clips[i]._id, clips[j]);
+          addPartner(clips[j]._id, clips[i]);
+        }
       }
     }
-  }
+    // 겹침이 있는 클립에만 1부터 그룹 번호 부여 (등장 순서대로)
+    const rootToNum = new Map<string, number>();
+    const groupOf = new Map<string, number>();
+    let n = 0;
+    for (const c of clips) {
+      if (!partners.has(c._id)) continue;
+      const root = find(c._id);
+      if (!rootToNum.has(root)) rootToNum.set(root, ++n);
+      groupOf.set(c._id, rootToNum.get(root)!);
+    }
+    return { groupOf, partnersOf: partners };
+  }, [clips]);
+
+  const overlappingIds = groupOf;
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["admin-clips"] });
@@ -308,9 +352,15 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {overlappingIds.has(clip._id) && (
-                        <span title="다른 클립과 시간이 겹칩니다">
-                          <ExclamationTriangleIcon className="w-4 h-4 text-amber-500" />
+                      {groupOf.has(clip._id) && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[11px] font-medium inline-flex items-center gap-0.5 ${OVERLAP_COLORS[(groupOf.get(clip._id)! - 1) % OVERLAP_COLORS.length]}`}
+                          title={`시간 겹침 (그룹 ${groupOf.get(clip._id)}) — 같은 색끼리 겹침\n겹치는 클립: ${(partnersOf.get(clip._id) ?? [])
+                            .map((p) => `${formatTime(p.startTime || 0)}${p.endTime != null ? `~${formatTime(p.endTime)}` : "~?"}`)
+                            .join(", ")}`}
+                        >
+                          <ExclamationTriangleIcon className="w-3 h-3" />
+                          겹침 {groupOf.get(clip._id)}
                         </span>
                       )}
                       <span className={`px-1.5 py-0.5 rounded text-[11px] ${platformBadgeClass(clip.platform)}`}>
