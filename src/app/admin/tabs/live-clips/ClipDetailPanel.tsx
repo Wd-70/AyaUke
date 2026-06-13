@@ -223,7 +223,9 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
           };
         },
       );
-      invalidate(); // 서버 정합성 확인(백그라운드)
+      // 주의: 여기서 invalidate()/refetch(onChanged)를 하지 않는다. 저장 직후 서버
+      // read가 (복제 지연/타이밍으로) 옛 값을 줘 위 낙관적 패치를 덮어쓰는 일이 있었다.
+      // 방금 저장한 값을 신뢰하고, 정합성은 다음 자연 refetch(페이지/필터 변경) 때 맞춘다.
     },
     onError: (e) => showError("저장 실패", e.message),
   });
