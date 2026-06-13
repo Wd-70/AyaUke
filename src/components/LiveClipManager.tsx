@@ -1741,7 +1741,7 @@ export default function LiveClipManager({
                           <div className="text-xs text-light-text/50 dark:text-dark-text/50 mt-1">
                             {video.addedByName}
                             {video.isVerified && (
-                              <span className="ml-2 text-green-600 dark:text-green-400">✓ 검증됨</span>
+                              <span className="ml-2 text-green-600 dark:text-green-400" title="검증됨">✓</span>
                             )}
                             {overlapInfo.hasOverlap && (
                               <button
