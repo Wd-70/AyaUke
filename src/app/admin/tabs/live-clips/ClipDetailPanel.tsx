@@ -274,7 +274,8 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
         {/* 플레이어 */}
         {!editing ? (
           <ClipPlayer
-            key={`view-${clip._id}`}
+            // 편집 저장으로 시간이 바뀌면 key가 달라져 새 구간으로 재마운트된다
+            key={`view-${clip._id}-${clip.startTime ?? 0}-${clip.endTime ?? "end"}`}
             platform={clip.platform || "youtube"}
             videoId={clip.videoId}
             startTime={clip.startTime || 0}

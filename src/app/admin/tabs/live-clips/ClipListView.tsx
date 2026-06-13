@@ -30,7 +30,9 @@ export default function ClipListView() {
   const [filterBy, setFilterBy] = useState<"all" | "verified" | "unverified">("all");
   const [platform, setPlatform] = useState<"all" | "youtube" | "chzzk">("all");
   const [sortBy, setSortBy] = useState<"recent" | "sungDate" | "songTitle" | "addedBy" | "verified">("recent");
-  const [selectedClip, setSelectedClip] = useState<ClipData | null>(null);
+  // 선택 클립은 id만 보관하고 실제 데이터는 쿼리 결과에서 파생한다.
+  // (객체를 복사해 두면 편집 저장 후 목록만 refetch되어 선택 클립이 옛 값으로 남음)
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -55,6 +57,9 @@ export default function ClipListView() {
   });
 
   const resetPage = () => setPage(1);
+
+  // 현재 페이지 데이터에서 선택 클립을 파생 → 저장 후 refetch되면 자동으로 새 값 반영
+  const selectedClip = data?.clips.find((c) => c._id === selectedClipId) ?? null;
 
   return (
     <div className="space-y-4">
@@ -96,7 +101,7 @@ export default function ClipListView() {
         <ClipDetailPanel
           clip={selectedClip}
           songClipDuration={selectedClip.songDetail?.clipDuration}
-          onClose={() => setSelectedClip(null)}
+          onClose={() => setSelectedClipId(null)}
           onChanged={() => refetch()}
         />
       )}
@@ -114,9 +119,9 @@ export default function ClipListView() {
             {data.clips.map((clip) => (
               <li key={clip._id}>
                 <button
-                  onClick={() => setSelectedClip(clip)}
+                  onClick={() => setSelectedClipId(clip._id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-light-primary/5 dark:hover:bg-dark-primary/10 transition-colors ${
-                    selectedClip?._id === clip._id ? "bg-light-accent/10 dark:bg-dark-accent/10" : ""
+                    selectedClipId === clip._id ? "bg-light-accent/10 dark:bg-dark-accent/10" : ""
                   }`}
                 >
                   <div className="relative w-20 h-12 flex-shrink-0 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
