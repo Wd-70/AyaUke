@@ -149,7 +149,7 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
       message:
         `기본 길이(${formatTime(clipDuration)})와 ${t}초보다 크게 차이나는 클립들의 종료시간을\n` +
         `'시작 + ${formatTime(clipDuration)}'로 다시 설정합니다.\n\n` +
-        `${t}초 이내로 맞춰진 클립(수동 조정 포함)은 건드리지 않습니다.`,
+        `${t}초 이내로 맞춰진 클립과 검증 완료된 클립은 건드리지 않습니다.`,
       confirmText: "적용",
       cancelText: "취소",
       type: "warning",

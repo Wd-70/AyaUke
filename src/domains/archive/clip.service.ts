@@ -279,10 +279,12 @@ export async function applyDefaultDurationToClips(
     throw new ValidationError('이 곡에 기본 클립 길이가 설정되어 있지 않습니다.');
   }
 
-  const clips = await SongVideo.find({ songId }).select('startTime endTime').lean();
+  const clips = await SongVideo.find({ songId }).select('startTime endTime isVerified').lean();
 
   const updates = clips
     .filter((clip) =>
+      // 검증 완료 클립은 사람이 구간을 확정한 것이므로 일괄 적용에서 보존(스킵)
+      !(clip as { isVerified?: boolean }).isVerified &&
       shouldApplyDefaultDuration(clip.startTime || 0, clip.endTime, clipDuration, thresholdSeconds),
     )
     .map((clip) => ({
