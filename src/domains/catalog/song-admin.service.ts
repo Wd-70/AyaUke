@@ -70,10 +70,15 @@ export async function listSongsForAdmin() {
 export interface NewSongInput {
   title: string;
   artist: string;
+  titleAlias?: string;
+  artistAlias?: string;
   language: string;
   lyrics?: string;
   mrLinks?: string[];
   tags?: string[];
+  keyAdjustment?: number | null;
+  imageUrl?: string;
+  personalNotes?: string;
 }
 
 export async function addSong(songData: NewSongInput) {
@@ -83,11 +88,15 @@ export async function addSong(songData: NewSongInput) {
   const song = await new SongDetail({
     title: songData.title,
     artist: songData.artist,
+    titleAlias: songData.titleAlias?.trim() || undefined,
+    artistAlias: songData.artistAlias?.trim() || undefined,
     language: songData.language,
     lyrics: songData.lyrics || '',
     mrLinks: songData.mrLinks?.map((url) => ({ url })) || [],
     searchTags: songData.tags || [],
-    personalNotes: '',
+    personalNotes: songData.personalNotes || '',
+    keyAdjustment: songData.keyAdjustment ?? null,
+    imageUrl: songData.imageUrl?.trim() || undefined,
     sungCount: 0,
     status: 'active',
     sourceType: 'admin',

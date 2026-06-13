@@ -323,10 +323,15 @@ export default function SongManagement() {
   const handleAddSong = useCallback(async (songData: {
     title: string
     artist: string
+    titleAlias?: string
+    artistAlias?: string
     language: string
     lyrics?: string
     mrLinks?: string[]
     tags?: string[]
+    keyAdjustment?: number | null
+    imageUrl?: string
+    personalNotes?: string
   }) => {
     try {
       setAddLoading(true)
@@ -447,9 +452,35 @@ export default function SongManagement() {
     await loadSongs()
   }, [filteredSongs, searchMRFromYouTube, loadSongs, showSuccess, showError])
 
-  // 개별 곡 편집 함수
-  const handleEditSong = useCallback((song: AdminSong) => {
-    setEditingSong(song)
+  // 개별 곡 편집 함수 — 목록 캐시가 오래됐을 수 있어, 편집 직전 최신 곡 정보를 조회한다
+  // (노래책 등 다른 곳에서 수정한 내용이 바로 반영되도록)
+  const handleEditSong = useCallback(async (song: AdminSong) => {
+    let latest = song
+    try {
+      const res = await fetch(`/api/songdetails/${song.id}`)
+      const result = await res.json()
+      if (result.success && result.data?.song) {
+        const d = result.data.song
+        latest = {
+          ...song,
+          title: d.titleAlias || d.title,
+          artist: d.artistAlias || d.artist,
+          originalTitle: d.title,
+          originalArtist: d.artist,
+          language: d.language || song.language,
+          tags: d.searchTags || [],
+          mrLinks: d.mrLinks || [],
+          lyrics: d.lyrics || '',
+          keyAdjustment: d.keyAdjustment ?? null,
+          selectedMRIndex: d.selectedMRIndex || 0,
+          personalNotes: d.personalNotes || '',
+          imageUrl: d.imageUrl || '',
+        } as AdminSong
+      }
+    } catch (e) {
+      console.error('최신 곡 정보 조회 실패, 목록 캐시로 진행:', e)
+    }
+    setEditingSong(latest)
     setShowSongEditModal(true)
   }, [])
 
@@ -1803,10 +1834,15 @@ interface AddSongModalProps {
   onSubmit: (songData: {
     title: string
     artist: string
+    titleAlias?: string
+    artistAlias?: string
     language: string
     lyrics?: string
     mrLinks?: string[]
     tags?: string[]
+    keyAdjustment?: number | null
+    imageUrl?: string
+    personalNotes?: string
   }) => void
   loading: boolean
 }
@@ -1815,10 +1851,15 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     artist: '',
+    titleAlias: '',
+    artistAlias: '',
     language: 'Korean',
+    keyAdjustment: '999', // '999' = 원본 키(미설정)
     lyrics: '',
     mrLinks: '',
-    tags: ''
+    tags: '',
+    imageUrl: '',
+    personalNotes: '',
   })
 
   // 배경 스크롤 방지 (노래책과 동일한 방식)
@@ -1848,10 +1889,15 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
     const songData = {
       title: formData.title.trim(),
       artist: formData.artist.trim(),
+      titleAlias: formData.titleAlias.trim() || undefined,
+      artistAlias: formData.artistAlias.trim() || undefined,
       language: formData.language,
+      keyAdjustment: formData.keyAdjustment === '999' ? null : parseInt(formData.keyAdjustment, 10),
       lyrics: formData.lyrics.trim() || undefined,
       mrLinks: formData.mrLinks.trim() ? formData.mrLinks.split('\n').map(link => link.trim()).filter(link => link) : undefined,
-      tags: formData.tags.trim() ? formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : undefined
+      tags: formData.tags.trim() ? formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag) : undefined,
+      imageUrl: formData.imageUrl.trim() || undefined,
+      personalNotes: formData.personalNotes.trim() || undefined,
     }
 
     onSubmit(songData)
@@ -1909,13 +1955,43 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
 
         <div>
           <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            제목 별칭 (선택)
+          </label>
+          <input
+            type="text"
+            value={formData.titleAlias}
+            onChange={(e) => setFormData(prev => ({ ...prev, titleAlias: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent
+                       text-light-text dark:text-dark-text"
+            placeholder="노래책에 표시할 제목 (비우면 원제목)"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            아티스트 별칭 (선택)
+          </label>
+          <input
+            type="text"
+            value={formData.artistAlias}
+            onChange={(e) => setFormData(prev => ({ ...prev, artistAlias: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent
+                       text-light-text dark:text-dark-text"
+            placeholder="노래책에 표시할 아티스트 (비우면 원아티스트)"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
             언어
           </label>
           <select
             value={formData.language}
             onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value }))}
-            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
-                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent
                        text-light-text dark:text-dark-text"
           >
             <option value="Korean">한국어</option>
@@ -1928,14 +2004,34 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
 
         <div>
           <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+            키 조절
+          </label>
+          <select
+            value={formData.keyAdjustment}
+            onChange={(e) => setFormData(prev => ({ ...prev, keyAdjustment: e.target.value }))}
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent
+                       text-light-text dark:text-dark-text"
+          >
+            <option value="999">원본 키</option>
+            {Array.from({ length: 25 }, (_, i) => 12 - i).map((k) => (
+              <option key={k} value={String(k)}>
+                {k > 0 ? `+${k}키` : k === 0 ? '0 (원본 음정)' : `${k}키`}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
             태그 (선택)
           </label>
           <input
             type="text"
             value={formData.tags}
             onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
-            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
-                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+            className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent
                        text-light-text dark:text-dark-text"
             placeholder="태그를 쉼표로 구분하여 입력하세요"
           />
@@ -1964,11 +2060,53 @@ function AddSongModal({ onClose, onSubmit, loading }: AddSongModalProps) {
         <textarea
           value={formData.lyrics}
           onChange={(e) => setFormData(prev => ({ ...prev, lyrics: e.target.value }))}
-          className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 
-                     rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
+          className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20
+                     rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent
                      text-light-text dark:text-dark-text"
           placeholder="가사를 입력하세요"
           rows={4}
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+          커버 이미지 URL (선택)
+        </label>
+        <div className="flex items-start gap-3">
+          <input
+            type="url"
+            value={formData.imageUrl}
+            onChange={(e) => setFormData(prev => ({ ...prev, imageUrl: e.target.value }))}
+            className="flex-1 px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20
+                       rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent
+                       text-light-text dark:text-dark-text"
+            placeholder="https://... (노래책 카드 배경)"
+          />
+          {formData.imageUrl.trim() && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={formData.imageUrl}
+              alt="커버 미리보기"
+              className="w-20 h-12 object-cover rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex-shrink-0"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+              onLoad={(e) => { (e.currentTarget as HTMLImageElement).style.display = '' }}
+            />
+          )}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-2">
+          개인 노트 (선택)
+        </label>
+        <textarea
+          value={formData.personalNotes}
+          onChange={(e) => setFormData(prev => ({ ...prev, personalNotes: e.target.value }))}
+          className="w-full px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20
+                     rounded-lg focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent
+                     text-light-text dark:text-dark-text"
+          placeholder="메모나 참고사항"
+          rows={3}
         />
       </div>
 
