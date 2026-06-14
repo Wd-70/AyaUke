@@ -36,6 +36,14 @@ const TARGETS = [
     others: ['\u{271D}', '\u{1F3B4}', '\u{2744}'], // ✝ 🎴 ❄
     excludeOtherSolo: true,
   },
+  {
+    // 사향고양이에용 2026-06-14 제이팝동아리 제1회 싱크룸. 아야=🪻(🥛 동반).
+    // 다른 참여자=🎴/🎠/🫧/👹 → 🪻 없이 이 이모지만 붙은 곡 제외.
+    commentId: 26837435,
+    aya: '\u{1FABB}',               // 🪻
+    others: ['\u{1F3B4}', '\u{1F3A0}', '\u{1FAE7}', '\u{1F479}'], // 🎴 🎠 🫧 👹
+    excludeOtherSolo: true,
+  },
 ];
 
 const toSec = (t) => {
