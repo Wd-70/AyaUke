@@ -438,42 +438,34 @@ export default function CommentAnalysisTab({ viewMode: propViewMode }: CommentAn
   };
 
 
-  // 치지직 타임라인 댓글 파싱 — SSE로 실시간 진행 표시
-  const parseChzzkTimelineComments = () => {
+  // 치지직 타임라인 댓글 파싱 — 일반 POST (SSE는 dev/연결 끊김에서 불안정해 회피).
+  // 처리량이 적어 수 초면 끝나므로 진행률 대신 단순 로딩 표시.
+  const parseChzzkTimelineComments = async () => {
     setTimelineParsing(true);
-    setChzzkParseProgress('연결 중...');
-
-    const eventSource = new EventSource('/api/timeline-parser?action=parse-chzzk-timeline-stream');
-
-    const finish = () => {
-      eventSource.close();
+    setChzzkParseProgress('파싱 중... (수십 초 걸릴 수 있어요)');
+    try {
+      const res = await fetch('/api/timeline-parser', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'parse-chzzk-timeline-comments' }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        showDialog(
+          '치지직 타임라인 파싱 완료',
+          result.message || '치지직 타임라인 파싱이 완료되었습니다.',
+          result.data,
+        );
+      } else {
+        showDialog('치지직 타임라인 파싱 실패', result.error || '파싱에 실패했습니다.', null, true);
+      }
+    } catch (error) {
+      console.error('치지직 파싱 오류:', error);
+      showDialog('치지직 타임라인 파싱 실패', '파싱 중 오류가 발생했습니다.', null, true);
+    } finally {
       setTimelineParsing(false);
       setChzzkParseProgress(null);
-    };
-
-    eventSource.addEventListener('progress', (e) => {
-      const data = JSON.parse((e as MessageEvent).data);
-      setChzzkParseProgress(data.message || `${data.current}/${data.total}`);
-    });
-
-    eventSource.addEventListener('complete', (e) => {
-      const data = JSON.parse((e as MessageEvent).data);
-      finish();
-      showDialog('치지직 타임라인 파싱 완료', data.message || '치지직 타임라인 파싱이 완료되었습니다.', data);
-    });
-
-    eventSource.addEventListener('error', (e) => {
-      // 서버가 보낸 error 이벤트 (data 있음) 또는 연결 오류
-      const message = (e as MessageEvent).data
-        ? JSON.parse((e as MessageEvent).data).error
-        : '연결이 끊어졌습니다.';
-      finish();
-      showDialog('치지직 타임라인 파싱 실패', message, null, true);
-    });
-
-    eventSource.onerror = () => {
-      finish();
-    };
+    }
   };
 
   // 기존 데이터를 개선된 파싱 방식으로 업데이트
