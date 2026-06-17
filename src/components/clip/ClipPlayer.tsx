@@ -18,6 +18,7 @@ import {
   ArrowsPointingOutIcon,
   ArrowsPointingInIcon,
 } from "@heroicons/react/24/solid";
+import { CalendarDaysIcon, UserIcon } from "@heroicons/react/24/outline";
 import type { VideoPlatform } from "@/shared/utils/video-url";
 import { loadStoredVolume, saveStoredVolume } from "./volume-storage";
 
@@ -34,6 +35,13 @@ interface ClipPlayerProps {
   /** 검수용 확장 컨트롤: ±1s/±10s 이동, 끝-3s/끝-6s 바로가기 (관리자 화면용) */
   extendedControls?: boolean;
   className?: string;
+  /**
+   * 재생 전(포스터) 화면에 표시할 정보. 유튜브는 자체 썸네일·제목이 뜨므로
+   * 검은 화면만 나오는 치지직(HLS) 클립에서만 사용한다.
+   * 제목(다시보기 원본 제목)은 스트림 API 응답에서 자동으로 가져온다.
+   */
+  posterDate?: string;
+  posterAddedBy?: string;
 }
 
 /** 내부 플레이어 추상화: 두 플랫폼을 같은 인터페이스로 다룬다 */
@@ -95,6 +103,8 @@ export default function ClipPlayer({
   onEnded,
   extendedControls = false,
   className = "",
+  posterDate,
+  posterAddedBy,
 }: ClipPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const ytMountRef = useRef<HTMLDivElement>(null);
@@ -107,6 +117,10 @@ export default function ClipPlayer({
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
+  // 한 번이라도 재생되면 포스터(재생 전 화면)를 더 띄우지 않는다
+  const [started, setStarted] = useState(false);
+  // 치지직 다시보기 원본 제목 (스트림 API에서 받아 포스터에 표시)
+  const [vodTitle, setVodTitle] = useState<string | null>(null);
   const [muted, setMuted] = useState(() => loadStoredVolume().muted);
   const [volume, setVolume] = useState(() => loadStoredVolume().volume);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -137,6 +151,8 @@ export default function ClipPlayer({
     setReady(false);
     setError(null);
     setEnded(false);
+    setStarted(false);
+    setVodTitle(null);
     setClipPosition(0);
     // startTime/endTime이 (편집 등으로) 바뀌면 구간 길이도 재계산한다.
     // endTime이 없으면 0으로 두고 onReady/onLoaded에서 영상 길이 기준으로 채운다.
@@ -198,6 +214,7 @@ export default function ClipPlayer({
               if (e.data === YT.PlayerState.PLAYING) {
                 setPlaying(true);
                 setEnded(false);
+                setStarted(true);
               } else if (e.data === YT.PlayerState.PAUSED) {
                 setPlaying(false);
               } else if (e.data === YT.PlayerState.ENDED) {
@@ -276,10 +293,11 @@ export default function ClipPlayer({
         if (!res.ok || !result.success) {
           throw new Error(result.error?.message || "영상 정보를 불러올 수 없습니다.");
         }
-        return result.data as { streamUrl: string; streamType: 'hls' | 'mp4' };
+        return result.data as { streamUrl: string; streamType: 'hls' | 'mp4'; videoTitle?: string };
       })
-      .then(({ streamUrl, streamType }) => {
+      .then(({ streamUrl, streamType, videoTitle }) => {
         if (cancelled) return;
+        if (videoTitle) setVodTitle(videoTitle);
 
         // 영구 보존 VOD: progressive MP4 — 네이티브 재생 (Range 시킹 지원)
         if (streamType === 'mp4') {
@@ -314,6 +332,7 @@ export default function ClipPlayer({
     const onPlay = () => {
       setPlaying(true);
       setEnded(false);
+      setStarted(true);
     };
     const onPause = () => setPlaying(false);
     const onVideoEnded = () => {
@@ -515,6 +534,37 @@ export default function ClipPlayer({
         onClick={togglePlay}
         className="absolute inset-0 w-full h-full cursor-pointer"
       />
+
+      {/* 재생 전 포스터 (치지직 전용 — 유튜브는 자체 썸네일·제목이 표시됨) */}
+      {platform === "chzzk" && !started && (vodTitle || posterDate) && (
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/30 to-black/75" />
+          <div className="absolute top-0 left-0 right-0 px-3 pt-2.5 pb-4 sm:px-4 sm:pt-3">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#00FFA3]/20 border border-[#00FFA3]/40 text-[#00FFA3] text-[11px] font-semibold tracking-wide">
+                치지직 다시보기
+              </span>
+              {posterDate && (
+                <span className="inline-flex items-center gap-1 text-white/75 text-xs">
+                  <CalendarDaysIcon className="w-3.5 h-3.5" />
+                  {posterDate}
+                </span>
+              )}
+              {posterAddedBy && (
+                <span className="inline-flex items-center gap-1 text-white/55 text-xs">
+                  <UserIcon className="w-3.5 h-3.5" />
+                  {posterAddedBy}
+                </span>
+              )}
+            </div>
+            {vodTitle && (
+              <h4 className="text-white font-semibold text-sm sm:text-base md:text-lg leading-snug line-clamp-2 drop-shadow-md">
+                {vodTitle}
+              </h4>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 로딩 오버레이 */}
       {!ready && (
