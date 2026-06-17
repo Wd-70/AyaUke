@@ -212,6 +212,12 @@ export default function SongDetailModal({
     setIsEditMode(false);
   };
 
+  // MR 검색: 유튜브에서 노래방/MR 영상 검색 (MR 링크가 없을 때 대체 수단)
+  const handleMRSearch = () => {
+    const q = encodeURIComponent(`${displayTitle} ${displayArtist} karaoke MR`);
+    window.open(`https://www.youtube.com/results?search_query=${q}`, "_blank");
+  };
+
   // 모달 닫기 핸들러 (OBS가 켜져 있으면 함께 정리)
   const handleClose = () => {
     if (obsActive && session?.user?.userId) {
@@ -550,36 +556,62 @@ export default function SongDetailModal({
                     {activeTab === 'mr' ? (
                       <div className="flex-1 flex flex-col justify-center min-h-0">
                         {youtubeMR ? (
-                          <div className="w-full max-w-4xl mx-auto aspect-video bg-black rounded-lg overflow-hidden">
-                            <YouTube
-                              key={`modal-mr-${song.id}-${youtubeMR.videoId}`}
-                              videoId={youtubeMR.videoId}
-                              opts={{
-                                width: "100%",
-                                height: "100%",
-                                playerVars: {
-                                  autoplay: 0,
-                                  controls: 1,
-                                  rel: 0,
-                                  modestbranding: 1,
-                                  start: youtubeMR.skipSeconds || 0,
-                                  iv_load_policy: 3,
-                                  cc_load_policy: 0,
-                                },
-                              }}
-                              onReady={onYouTubeReady}
-                              onStateChange={onYouTubeStateChange}
-                              onPlay={() => setIsPlaying(true)}
-                              onPause={() => setIsPlaying(false)}
-                              onEnd={() => setIsPlaying(false)}
-                              className="w-full h-full"
-                            />
+                          <div className="flex flex-col min-h-0 gap-3">
+                            <div className="w-full max-w-4xl mx-auto aspect-video bg-black rounded-lg overflow-hidden">
+                              <YouTube
+                                key={`modal-mr-${song.id}-${youtubeMR.videoId}`}
+                                videoId={youtubeMR.videoId}
+                                opts={{
+                                  width: "100%",
+                                  height: "100%",
+                                  playerVars: {
+                                    autoplay: 0,
+                                    controls: 1,
+                                    rel: 0,
+                                    modestbranding: 1,
+                                    start: youtubeMR.skipSeconds || 0,
+                                    iv_load_policy: 3,
+                                    cc_load_policy: 0,
+                                  },
+                                }}
+                                onReady={onYouTubeReady}
+                                onStateChange={onYouTubeStateChange}
+                                onPlay={() => setIsPlaying(true)}
+                                onPause={() => setIsPlaying(false)}
+                                onEnd={() => setIsPlaying(false)}
+                                className="w-full h-full"
+                              />
+                            </div>
+                            {/* MR 검색: 등록된 MR이 마음에 안 들 때 유튜브에서 다른 MR 찾기 */}
+                            <div className="flex justify-center">
+                              <button
+                                onClick={handleMRSearch}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg
+                                           text-light-text/70 dark:text-dark-text/70
+                                           border border-light-primary/20 dark:border-dark-primary/20
+                                           hover:border-light-accent/50 dark:hover:border-dark-accent/50
+                                           hover:text-light-accent dark:hover:text-dark-accent transition-colors"
+                              >
+                                <MagnifyingGlassIcon className="w-4 h-4" />
+                                YouTube에서 다른 MR 검색
+                              </button>
+                            </div>
                           </div>
                         ) : (
                           <div className="flex-1 flex items-center justify-center">
                             <div className="text-center text-light-text/50 dark:text-dark-text/50">
                               <MusicalNoteIcon className="w-16 h-16 mx-auto mb-4" />
-                              <p>MR 영상이 없습니다</p>
+                              <p className="mb-4">등록된 MR 영상이 없습니다</p>
+                              <button
+                                onClick={handleMRSearch}
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white
+                                           bg-gradient-to-r from-light-accent to-light-purple
+                                           dark:from-dark-accent dark:to-dark-purple
+                                           hover:shadow-lg transition-all duration-200"
+                              >
+                                <MagnifyingGlassIcon className="w-4 h-4" />
+                                YouTube에서 MR 검색
+                              </button>
                             </div>
                           </div>
                         )}
@@ -596,30 +628,6 @@ export default function SongDetailModal({
                         />
                       </div>
                     )}
-
-                    {/* 메타 정보 바 (영상 아래) */}
-                    {activeTab === 'mr' && (song.sungCount || song.dateAdded || song.lastSungDate) && (
-                      <div className="mt-3 flex items-center justify-center gap-4 flex-wrap text-xs text-light-text/60 dark:text-dark-text/60">
-                        {song.sungCount ? (
-                          <span className="inline-flex items-center gap-1">
-                            <MicrophoneIcon className="w-3.5 h-3.5" />
-                            {song.sungCount}회
-                          </span>
-                        ) : null}
-                        {song.dateAdded && (
-                          <span className="inline-flex items-center gap-1">
-                            <CalendarDaysIcon className="w-3.5 h-3.5" />
-                            추가 {song.dateAdded}
-                          </span>
-                        )}
-                        {song.lastSungDate && (
-                          <span className="inline-flex items-center gap-1">
-                            <ClockIcon className="w-3.5 h-3.5" />
-                            최근 {song.lastSungDate}
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </motion.div>
               )}
@@ -630,6 +638,30 @@ export default function SongDetailModal({
               {renderActionButtons('vertical')}
             </div>
           </div>
+
+          {/* 하단 메타 정보 바 (부른 횟수 · 추가일 · 마지막 부른날) — 탭 무관 항상 표시 */}
+          {!isEditMode && (song.sungCount || song.dateAdded || song.lastSungDate) && (
+            <div className="flex items-center justify-center gap-4 flex-wrap flex-shrink-0 text-xs text-light-text/60 dark:text-dark-text/60">
+              {song.sungCount ? (
+                <span className="inline-flex items-center gap-1">
+                  <MicrophoneIcon className="w-3.5 h-3.5" />
+                  {song.sungCount}회 불렀어요
+                </span>
+              ) : null}
+              {song.dateAdded && (
+                <span className="inline-flex items-center gap-1">
+                  <CalendarDaysIcon className="w-3.5 h-3.5" />
+                  추가 {song.dateAdded}
+                </span>
+              )}
+              {song.lastSungDate && (
+                <span className="inline-flex items-center gap-1">
+                  <ClockIcon className="w-3.5 h-3.5" />
+                  최근 {song.lastSungDate}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* 모바일 액션바: 하단 고정 수평 바 */}
           <div className="flex md:hidden items-center justify-around flex-shrink-0 pt-2 border-t border-light-primary/15 dark:border-dark-primary/15">
