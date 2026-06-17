@@ -11,6 +11,7 @@ import {
   ServerStackIcon,
   ArrowUturnLeftIcon,
   TrashIcon,
+  PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { useToast } from "@/components/Toast";
 
@@ -26,6 +27,7 @@ interface LocalBackup {
   totalSizeMB: number;
   totalDocuments: number;
   collections: { collection: string; documents: number; sizeMB: number }[];
+  note: string;
 }
 
 /** 백업 이름(2026-06-11T02-30-45)을 읽기 좋은 날짜로 */
@@ -54,6 +56,9 @@ export default function MaintenanceTab() {
   const [backupsLoading, setBackupsLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [busyBackup, setBusyBackup] = useState<string | null>(null); // 복원/삭제 중인 백업
+  const [editingNote, setEditingNote] = useState<string | null>(null); // 메모 편집 중인 백업
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteSaving, setNoteSaving] = useState(false);
 
   const loadCollections = useCallback(async () => {
     setCollectionsLoading(true);
@@ -135,6 +140,42 @@ export default function MaintenanceTab() {
       showError("삭제 실패", "요청 중 오류가 발생했습니다.");
     } finally {
       setBusyBackup(null);
+    }
+  };
+
+  const startEditNote = (b: LocalBackup) => {
+    setEditingNote(b.name);
+    setNoteDraft(b.note || "");
+  };
+
+  const cancelEditNote = () => {
+    setEditingNote(null);
+    setNoteDraft("");
+  };
+
+  const saveNote = async (name: string) => {
+    if (noteSaving) return;
+    setNoteSaving(true);
+    try {
+      const response = await fetch("/api/admin/maintenance/local-backup", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, note: noteDraft }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setBackups((prev) =>
+          prev.map((b) => (b.name === name ? { ...b, note: result.data.note } : b)),
+        );
+        setEditingNote(null);
+        setNoteDraft("");
+      } else {
+        showError("메모 저장 실패", result.error?.message || "메모를 저장하지 못했습니다.");
+      }
+    } catch {
+      showError("메모 저장 실패", "요청 중 오류가 발생했습니다.");
+    } finally {
+      setNoteSaving(false);
     }
   };
 
@@ -293,40 +334,97 @@ export default function MaintenanceTab() {
             {backups.map((b) => (
               <div
                 key={b.name}
-                className="flex items-center justify-between gap-4 p-3 rounded-lg border border-light-primary/15 dark:border-dark-primary/15 bg-white/40 dark:bg-gray-900/40"
+                className="p-3 rounded-lg border border-light-primary/15 dark:border-dark-primary/15 bg-white/40 dark:bg-gray-900/40"
               >
-                <div className="min-w-0">
-                  <div className="font-medium text-light-text dark:text-dark-text">
-                    {formatBackupName(b.name)}
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="font-medium text-light-text dark:text-dark-text">
+                      {formatBackupName(b.name)}
+                    </div>
+                    <div className="text-xs text-light-text/60 dark:text-dark-text/60">
+                      {b.totalDocuments.toLocaleString()}개 문서 · {b.collections.length}개 컬렉션 ·{" "}
+                      {b.totalSizeMB} MB
+                    </div>
                   </div>
-                  <div className="text-xs text-light-text/60 dark:text-dark-text/60">
-                    {b.totalDocuments.toLocaleString()}개 문서 · {b.collections.length}개 컬렉션 ·{" "}
-                    {b.totalSizeMB} MB
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => restoreBackup(b.name)}
+                      disabled={busyBackup !== null}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-50 transition-colors"
+                      title="이 백업 시점으로 DB를 복원합니다 (현재 데이터를 덮어씀)"
+                    >
+                      {busyBackup === b.name ? (
+                        <div className="w-4 h-4 border-2 border-amber-400/40 border-t-amber-500 rounded-full animate-spin" />
+                      ) : (
+                        <ArrowUturnLeftIcon className="w-4 h-4" />
+                      )}
+                      복원
+                    </button>
+                    <button
+                      onClick={() => deleteBackup(b.name)}
+                      disabled={busyBackup !== null}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
+                      title="이 백업을 디스크에서 삭제합니다"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                      삭제
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => restoreBackup(b.name)}
-                    disabled={busyBackup !== null}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-50 transition-colors"
-                    title="이 백업 시점으로 DB를 복원합니다 (현재 데이터를 덮어씀)"
-                  >
-                    {busyBackup === b.name ? (
-                      <div className="w-4 h-4 border-2 border-amber-400/40 border-t-amber-500 rounded-full animate-spin" />
-                    ) : (
-                      <ArrowUturnLeftIcon className="w-4 h-4" />
-                    )}
-                    복원
-                  </button>
-                  <button
-                    onClick={() => deleteBackup(b.name)}
-                    disabled={busyBackup !== null}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
-                    title="이 백업을 디스크에서 삭제합니다"
-                  >
-                    <TrashIcon className="w-4 h-4" />
-                    삭제
-                  </button>
+
+                {/* 메모 */}
+                <div className="mt-3 pt-3 border-t border-light-primary/10 dark:border-dark-primary/10">
+                  {editingNote === b.name ? (
+                    <div className="space-y-2">
+                      <textarea
+                        value={noteDraft}
+                        onChange={(e) => setNoteDraft(e.target.value)}
+                        maxLength={2000}
+                        rows={3}
+                        autoFocus
+                        placeholder="이 백업에 대한 메모를 입력하세요 (예: 곡 일괄 정리 직전 스냅샷)"
+                        className="w-full text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/60 dark:bg-gray-900/60 text-light-text dark:text-dark-text px-3 py-2 resize-y focus:outline-none focus:border-light-accent/50 dark:focus:border-dark-accent/50"
+                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={cancelEditNote}
+                          disabled={noteSaving}
+                          className="px-3 py-1.5 text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 disabled:opacity-50 transition-colors"
+                        >
+                          취소
+                        </button>
+                        <button
+                          onClick={() => saveNote(b.name)}
+                          disabled={noteSaving}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-light-accent dark:bg-dark-accent text-white hover:shadow-lg disabled:opacity-60 transition-all"
+                        >
+                          {noteSaving && (
+                            <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          )}
+                          저장
+                        </button>
+                      </div>
+                    </div>
+                  ) : b.note ? (
+                    <button
+                      onClick={() => startEditNote(b)}
+                      className="group flex items-start gap-2 w-full text-left"
+                      title="메모 수정"
+                    >
+                      <p className="flex-1 text-sm text-light-text/80 dark:text-dark-text/80 whitespace-pre-wrap break-words">
+                        {b.note}
+                      </p>
+                      <PencilSquareIcon className="w-4 h-4 mt-0.5 flex-shrink-0 text-light-text/40 dark:text-dark-text/40 group-hover:text-light-accent dark:group-hover:text-dark-accent transition-colors" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => startEditNote(b)}
+                      className="inline-flex items-center gap-1.5 text-sm text-light-text/50 dark:text-dark-text/50 hover:text-light-accent dark:hover:text-dark-accent transition-colors"
+                    >
+                      <PencilSquareIcon className="w-4 h-4" />
+                      메모 추가
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

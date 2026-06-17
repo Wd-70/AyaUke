@@ -36,7 +36,13 @@ export interface BackupInfo extends BackupManifest {
   name: string;
   totalSizeMB: number;
   totalDocuments: number;
+  note: string;
 }
+
+/** 메모는 manifest와 분리해 별도 파일로 저장 — manifest는 복원 기준이라 불변 유지 */
+const NOTE_FILE = '_note.txt';
+/** 메모 최대 길이 (디스크/UI 보호) */
+const MAX_NOTE_LENGTH = 2000;
 
 /** Vercel 등 서버리스가 아니면 로컬로 간주 */
 export function isLocalEnvironment(): boolean {
@@ -57,13 +63,23 @@ function resolveBackupDir(name: string): string {
   return dir;
 }
 
-function toBackupInfo(name: string, manifest: BackupManifest): BackupInfo {
+function toBackupInfo(name: string, manifest: BackupManifest, note = ''): BackupInfo {
   return {
     name,
     ...manifest,
     totalSizeMB: +manifest.collections.reduce((sum, c) => sum + c.sizeMB, 0).toFixed(2),
     totalDocuments: manifest.collections.reduce((sum, c) => sum + c.documents, 0),
+    note,
   };
+}
+
+/** 백업 디렉터리에 저장된 메모 읽기 (없으면 빈 문자열) */
+async function readNote(dir: string): Promise<string> {
+  try {
+    return (await fsp.readFile(path.join(dir, NOTE_FILE), 'utf8')).trim();
+  } catch {
+    return '';
+  }
 }
 
 /** 전체 컬렉션을 로컬 디스크에 백업 */
@@ -112,13 +128,14 @@ export async function listLocalBackups(): Promise<BackupInfo[]> {
   for (const entry of entries) {
     if (!entry.isDirectory() || !NAME_PATTERN.test(entry.name)) continue;
 
-    const manifestPath = path.join(BACKUP_ROOT, entry.name, '_manifest.json');
+    const dir = path.join(BACKUP_ROOT, entry.name);
+    const note = await readNote(dir);
     try {
-      const manifest = JSON.parse(await fsp.readFile(manifestPath, 'utf8')) as BackupManifest;
-      backups.push(toBackupInfo(entry.name, manifest));
+      const manifest = JSON.parse(await fsp.readFile(path.join(dir, '_manifest.json'), 'utf8')) as BackupManifest;
+      backups.push(toBackupInfo(entry.name, manifest, note));
     } catch {
       // manifest 누락·손상: 이름만으로 최소 표시
-      backups.push({ name: entry.name, createdAt: '', collections: [], totalSizeMB: 0, totalDocuments: 0 });
+      backups.push({ name: entry.name, createdAt: '', collections: [], totalSizeMB: 0, totalDocuments: 0, note });
     }
   }
 
@@ -131,6 +148,26 @@ export async function deleteLocalBackup(name: string): Promise<void> {
   const dir = resolveBackupDir(name);
   if (!fs.existsSync(dir)) throw new NotFoundError('백업을 찾을 수 없습니다.');
   await fsp.rm(dir, { recursive: true, force: true });
+}
+
+/** 백업 메모 추가/수정. 빈 문자열이면 메모 파일을 삭제한다. */
+export async function updateBackupNote(name: string, note: string): Promise<string> {
+  assertLocal();
+  const dir = resolveBackupDir(name);
+  if (!fs.existsSync(dir)) throw new NotFoundError('백업을 찾을 수 없습니다.');
+
+  const trimmed = note.trim();
+  if (trimmed.length > MAX_NOTE_LENGTH) {
+    throw new ValidationError(`메모는 ${MAX_NOTE_LENGTH}자 이내로 입력해주세요.`);
+  }
+
+  const notePath = path.join(dir, NOTE_FILE);
+  if (trimmed) {
+    await fsp.writeFile(notePath, trimmed, 'utf8');
+  } else {
+    await fsp.rm(notePath, { force: true });
+  }
+  return trimmed;
 }
 
 export interface RestoreResult {

@@ -8,6 +8,7 @@ import {
   listLocalBackups,
   saveBackupToDisk,
   deleteLocalBackup,
+  updateBackupNote,
 } from '@/domains/operations/local-backup.service';
 
 function assertSuperAdmin(session: Session | null) {
@@ -28,6 +29,15 @@ export const GET = withApi({ auth: 'user' }, async ({ session }) => {
 export const POST = withApi({ auth: 'user' }, async ({ session }) => {
   assertSuperAdmin(session);
   return ok(await saveBackupToDisk());
+});
+
+const NoteBody = z.object({ name: z.string().min(1), note: z.string().max(2000) });
+
+/** 백업 메모 추가/수정 */
+export const PATCH = withApi({ schema: NoteBody, auth: 'user' }, async ({ input, session }) => {
+  assertSuperAdmin(session);
+  const note = await updateBackupNote(input.name, input.note);
+  return ok({ name: input.name, note });
 });
 
 const DeleteQuery = z.object({ name: z.string().min(1) });
