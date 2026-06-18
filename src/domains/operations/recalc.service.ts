@@ -73,7 +73,8 @@ export async function recalculateSongStats(songId?: string): Promise<RecalcResul
 
   for (const song of songs) {
     try {
-      const videos = await SongVideo.find({ songId: song._id.toString() }).sort({ sungDate: -1 });
+      // 소스 만료/삭제로 숨김 처리된 클립은 부른 횟수·최근 부른날에서 제외
+      const videos = await SongVideo.find({ songId: song._id.toString(), sourceUnavailable: { $ne: true } }).sort({ sungDate: -1 });
 
       await SongDetail.findByIdAndUpdate(song._id, {
         $set:

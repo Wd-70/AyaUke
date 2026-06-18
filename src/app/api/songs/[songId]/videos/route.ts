@@ -27,8 +27,8 @@ export async function GET(
       );
     }
 
-    // 영상 목록 조회 (최신순)
-    const videos = await SongVideo.find({ songId })
+    // 영상 목록 조회 (최신순). 소스 만료/삭제로 재생 불가 표시된 클립은 제외(소프트 숨김)
+    const videos = await SongVideo.find({ songId, sourceUnavailable: { $ne: true } })
       .sort({ sungDate: -1, createdAt: -1 })
       .lean();
 
@@ -36,7 +36,7 @@ export async function GET(
       success: true,
       videos: videos.map(video => ({
         ...video,
-        _id: video._id.toString(),
+        _id: String(video._id),
       })),
     });
   } catch (error) {

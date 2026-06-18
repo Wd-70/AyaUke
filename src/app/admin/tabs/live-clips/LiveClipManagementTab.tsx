@@ -8,22 +8,27 @@
  */
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   MusicalNoteIcon,
   ListBulletIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
   PlayCircleIcon,
+  NoSymbolIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import SongClipBrowser from "./SongClipBrowser";
 import ClipListView from "./ClipListView";
+import SourceCheckDialog from "./SourceCheckDialog";
 import type { ClipStats } from "./clip-types";
 
 type ViewMode = "songs" | "list";
 
 export default function LiveClipManagementTab() {
   const [mode, setMode] = useState<ViewMode>("songs");
+  const queryClient = useQueryClient();
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: stats } = useQuery({
     queryKey: ["admin-clips", "stats"],
@@ -56,8 +61,17 @@ export default function LiveClipManagementTab() {
             </p>
           </div>
 
-          {/* 모드 전환 */}
-          <div className="flex bg-light-primary/10 dark:bg-dark-primary/20 rounded-lg p-1">
+          {/* 소스 점검 + 모드 전환 */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setDialogOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:border-light-accent/40 transition-colors"
+              title="플랫폼별로 원본 영상 가용성을 점검해, 만료/삭제된 소스의 클립을 골라 노래책에서 숨깁니다."
+            >
+              <ArrowPathIcon className="w-4 h-4" />
+              소스 점검
+            </button>
+            <div className="flex bg-light-primary/10 dark:bg-dark-primary/20 rounded-lg p-1">
             <button
               onClick={() => setMode("songs")}
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
@@ -80,8 +94,10 @@ export default function LiveClipManagementTab() {
               <ListBulletIcon className="w-4 h-4" />
               전체 목록
             </button>
+            </div>
           </div>
         </div>
+
 
         {/* 통계 칩 */}
         {stats && (
@@ -116,12 +132,25 @@ export default function LiveClipManagementTab() {
               stats.platforms.chzzk.toLocaleString(),
               "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300",
             )}
+            {stats.unavailable > 0 && statChip(
+              <NoSymbolIcon className="w-4 h-4" />,
+              "재생불가",
+              stats.unavailable.toLocaleString(),
+              "bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300",
+            )}
           </div>
         )}
       </div>
 
       {/* 본문 */}
       {mode === "songs" ? <SongClipBrowser /> : <ClipListView />}
+
+      {dialogOpen && (
+        <SourceCheckDialog
+          onClose={() => setDialogOpen(false)}
+          onApplied={() => queryClient.invalidateQueries({ queryKey: ["admin-clips"] })}
+        />
+      )}
     </div>
   );
 }

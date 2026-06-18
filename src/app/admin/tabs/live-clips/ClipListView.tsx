@@ -27,7 +27,7 @@ const selectClass =
 export default function ClipListView() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [filterBy, setFilterBy] = useState<"all" | "verified" | "unverified">("all");
+  const [filterBy, setFilterBy] = useState<"all" | "verified" | "unverified" | "unavailable">("all");
   const [platform, setPlatform] = useState<"all" | "youtube" | "chzzk">("all");
   const [sortBy, setSortBy] = useState<"recent" | "sungDate" | "songTitle" | "addedBy" | "verified">("recent");
   // 선택 클립은 id만 보관하고 실제 데이터는 쿼리 결과에서 파생한다.
@@ -58,6 +58,16 @@ export default function ClipListView() {
 
   const resetPage = () => setPage(1);
 
+  // 소스 숨김 해제(복구)
+  const restoreSource = async (clipId: string) => {
+    await fetch("/api/admin/clips/check-sources", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clipId }),
+    }).catch(() => {});
+    refetch();
+  };
+
   // 현재 페이지 데이터에서 선택 클립을 파생 → 저장 후 refetch되면 자동으로 새 값 반영
   const selectedClip = data?.clips.find((c) => c._id === selectedClipId) ?? null;
 
@@ -81,6 +91,7 @@ export default function ClipListView() {
           <option value="all">전체 상태</option>
           <option value="verified">검증됨</option>
           <option value="unverified">미검증</option>
+          <option value="unavailable">재생불가(소스없음)</option>
         </select>
         <select value={platform} onChange={(e) => { setPlatform(e.target.value as typeof platform); resetPage(); }} className={selectClass}>
           <option value="all">모든 플랫폼</option>
@@ -143,6 +154,17 @@ export default function ClipListView() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {clip.sourceUnavailable && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); restoreSource(clip._id); }}
+                        className="px-1.5 py-0.5 rounded text-[11px] bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 hover:bg-rose-200 dark:hover:bg-rose-900/60 cursor-pointer"
+                        title="원본 소스 없음(숨김). 클릭하면 숨김 해제(복구)합니다."
+                      >
+                        재생불가 ↺
+                      </span>
+                    )}
                     <span className={`px-1.5 py-0.5 rounded text-[11px] ${platformBadgeClass(clip.platform)}`}>
                       {platformLabel(clip.platform)}
                     </span>

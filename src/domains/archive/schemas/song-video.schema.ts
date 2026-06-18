@@ -19,6 +19,8 @@ export interface ISongVideo extends Document {
   verifiedAt?: Date; // 검증 날짜
   thumbnailUrl?: string; // 썸네일 URL (유튜브에서 자동 추출)
   duration?: string; // 영상 길이 (유튜브에서 자동 추출)
+  sourceUnavailable?: boolean; // 원본 영상 만료/삭제로 재생 불가 (노래책 숨김)
+  sourceCheckedAt?: Date; // 마지막 소스 점검 시각
   createdAt: Date;
   updatedAt: Date;
 }
@@ -112,6 +114,15 @@ const SongVideoSchema: Schema = new Schema({
   duration: {
     type: String,
     trim: true,
+  },
+  // 소스(원본 영상) 가용성: 점검 결과 만료/삭제로 재생 불가면 true → 노래책에서 숨김(소프트)
+  sourceUnavailable: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  sourceCheckedAt: {
+    type: Date,
   },
 }, {
   timestamps: true,

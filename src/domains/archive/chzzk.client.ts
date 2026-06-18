@@ -264,13 +264,23 @@ export async function fetchVideoStreamInfo(videoNo: number | string): Promise<St
   if (response.status === 404) {
     throw new NotFoundError('치지직에서 삭제되었거나 존재하지 않는 영상입니다.');
   }
-  if (!response.ok) throw new Error('Failed to fetch video info');
+  // 치지직은 만료/이용불가 영상에 HTTP 400 + {code:400,"이용할 수 없는 동영상입니다."}를 준다.
+  // 404가 아닌 4xx(400/403 등)는 "영상이 사라짐"으로 보고 NotFound로 매핑(5xx/네트워크는 일시 오류).
+  if (!response.ok) {
+    if (response.status >= 400 && response.status < 500) {
+      throw new NotFoundError('치지직 다시보기가 만료되었거나 이용할 수 없는 영상입니다.');
+    }
+    throw new Error('Failed to fetch video info');
+  }
 
   const data = await response.json();
   if (data.code === 404 || !data.content) {
     throw new NotFoundError('치지직에서 삭제되었거나 존재하지 않는 영상입니다.');
   }
-  if (data.code !== 200) throw new Error('Video not available');
+  // code 400 "이용할 수 없는 동영상입니다." 등: 영상은 있으나 다시보기가 만료/비공개
+  if (data.code !== 200) {
+    throw new NotFoundError('치지직 다시보기가 만료되었거나 더 이상 제공되지 않는 영상입니다.');
+  }
 
   const content = data.content;
 
@@ -310,7 +320,8 @@ export async function fetchVideoStreamInfo(videoNo: number | string): Promise<St
     }
   }
 
-  throw new Error('재생 가능한 스트림을 찾을 수 없습니다.');
+  // 임시 다시보기 만료 + 영구 VOD 미전환 → 재생 가능한 스트림 없음
+  throw new NotFoundError('치지직 다시보기가 만료되어 재생할 수 없습니다 (영구 보존 영상 아님).');
 }
 
 /** @deprecated fetchVideoStreamInfo를 사용하세요. (hlsUrl 필드 호환용) */

@@ -25,11 +25,12 @@ const GetQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   sortBy: z.enum(['recent', 'addedBy', 'songTitle', 'verified', 'sungDate', 'clipCount', 'title']).default('recent'),
-  filterBy: z.enum(['all', 'verified', 'unverified']).default('all'),
+  filterBy: z.enum(['all', 'verified', 'unverified', 'unavailable']).default('all'),
   platform: z.enum(['all', 'youtube', 'chzzk']).default('all'),
   search: z.string().default(''),
   addedBy: z.string().default(''),
   songId: z.string().default(''),
+  videoId: z.string().default(''),
 })
 
 export const GET = withApi({ schema: GetQuery, auth: 'user' }, async ({ input, session }) => {
@@ -76,6 +77,7 @@ export const GET = withApi({ schema: GetQuery, auth: 'user' }, async ({ input, s
           search: input.search || undefined,
           addedBy: input.addedBy || undefined,
           songId: input.songId || undefined,
+          videoId: input.videoId || undefined,
         }),
       )
   }

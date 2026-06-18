@@ -17,6 +17,7 @@ export interface ClipData {
   isVerified: boolean;
   verifiedAt?: string;
   thumbnailUrl?: string;
+  sourceUnavailable?: boolean;
   createdAt: string;
   updatedAt: string;
   songDetail?: {
@@ -45,10 +46,25 @@ export interface SongWithClips {
   hasOverlap?: boolean;
 }
 
+/** 소스 점검 대상(영상 단위) */
+export interface SourceTarget {
+  platform: 'youtube' | 'chzzk';
+  videoId: string;
+  clips: number;
+}
+
+/** 소스 점검 결과 한 줄 */
+export interface SourceCheckRow extends SourceTarget {
+  status: 'available' | 'dead' | 'unknown';
+  reason: string;
+  title?: string;
+}
+
 export interface ClipStats {
   total: number;
   verified: number;
   unverified: number;
+  unavailable: number;
   platforms: { youtube: number; chzzk: number };
   topContributors: { name: string; count: number }[];
   topSongs: { songId: string; title: string; artist: string; count: number }[];

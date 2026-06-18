@@ -60,22 +60,19 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
         setError(null);
 
         const response = await fetch(`/api/clips/chzzk-hls?videoNo=${videoNo}`);
+        // 에러여도 본문을 읽어 실제 메시지(만료/삭제 안내 등)를 사용
+        const result = await response.json().catch(() => null);
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch video info");
-        }
-
-        const result = await response.json();
-
-        if (!result.success || !result.data?.streamUrl) {
-          throw new Error(result.error?.message || "재생 가능한 스트림이 없습니다.");
+        if (!response.ok || !result?.success || !result.data?.streamUrl) {
+          throw new Error(result?.error?.message || "재생 가능한 스트림이 없습니다.");
         }
 
         setHlsUrl(result.data.streamUrl);
         setStreamType(result.data.streamType || 'hls');
         setDuration(result.data.duration || 0);
       } catch (err: any) {
-        console.error("Error fetching HLS URL:", err);
+        // 만료/삭제된 원본은 예상된 상태 — 오버레이 띄우지 않도록 warn으로 처리
+        console.warn("[ChzzkPlayer] 영상 로드 실패:", err?.message || err);
         setError(err.message || "영상을 로드할 수 없습니다.");
       } finally {
         setLoading(false);

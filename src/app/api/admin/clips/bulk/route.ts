@@ -230,8 +230,9 @@ export async function POST(request: NextRequest) {
     const updatedSongs = new Set(clips.map(clip => clip.songId));
     const statsUpdatePromises = Array.from(updatedSongs).map(async (songId) => {
       try {
-        const actualClipCount = await SongVideo.countDocuments({ songId });
-        const latestClip = await SongVideo.findOne({ songId }).sort({ sungDate: -1 }).lean();
+        // 숨김(소스 만료/삭제) 클립은 부른 횟수·최근 부른날에서 제외
+        const actualClipCount = await SongVideo.countDocuments({ songId, sourceUnavailable: { $ne: true } });
+        const latestClip = await SongVideo.findOne({ songId, sourceUnavailable: { $ne: true } }).sort({ sungDate: -1 }).lean() as { sungDate?: Date } | null;
         
         const updateData: any = {
           $set: { sungCount: actualClipCount }

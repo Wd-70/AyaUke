@@ -22,10 +22,11 @@ const SONG_LOOKUP = {
 // ── 통계 ──────────────────────────────────────────────────────────
 
 export async function getClipStats() {
-  const [total, verified, chzzk, topContributors, topSongs] = await Promise.all([
+  const [total, verified, chzzk, unavailable, topContributors, topSongs] = await Promise.all([
     SongVideo.countDocuments({}),
     SongVideo.countDocuments({ isVerified: true }),
     SongVideo.countDocuments({ platform: 'chzzk' }),
+    SongVideo.countDocuments({ sourceUnavailable: true }),
     SongVideo.aggregate([
       { $group: { _id: '$addedByName', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
@@ -47,6 +48,7 @@ export async function getClipStats() {
     total,
     verified,
     unverified: total - verified,
+    unavailable,
     platforms: { youtube: total - chzzk, chzzk },
     topContributors: topContributors.map((c) => ({ name: c._id as string, count: c.count as number })),
     topSongs: topSongs.map((s) => ({
@@ -174,11 +176,12 @@ export interface ClipsQuery {
   page: number;
   limit: number;
   sortBy?: 'recent' | 'addedBy' | 'songTitle' | 'verified' | 'sungDate';
-  filterBy?: 'all' | 'verified' | 'unverified';
+  filterBy?: 'all' | 'verified' | 'unverified' | 'unavailable';
   platform?: 'all' | 'youtube' | 'chzzk';
   search?: string;
   addedBy?: string;
   songId?: string;
+  videoId?: string;
 }
 
 const SORTS: Record<NonNullable<ClipsQuery['sortBy']>, Record<string, 1 | -1>> = {
@@ -190,14 +193,16 @@ const SORTS: Record<NonNullable<ClipsQuery['sortBy']>, Record<string, 1 | -1>> =
 };
 
 export async function listClips(query: ClipsQuery) {
-  const { page, limit, sortBy = 'recent', filterBy = 'all', platform = 'all', search, addedBy, songId } = query;
+  const { page, limit, sortBy = 'recent', filterBy = 'all', platform = 'all', search, addedBy, songId, videoId } = query;
 
   const match: Record<string, unknown> = {};
   if (filterBy === 'verified') match.isVerified = true;
   if (filterBy === 'unverified') match.isVerified = false;
+  if (filterBy === 'unavailable') match.sourceUnavailable = true;
   if (platform === 'chzzk') match.platform = 'chzzk';
   if (platform === 'youtube') match.platform = { $in: ['youtube', null] };
   if (songId) match.songId = songId;
+  if (videoId) match.videoId = videoId;
   if (addedBy) match.addedByName = new RegExp(`^${escapeRegex(addedBy)}$`, 'i');
   if (search) {
     const regex = new RegExp(escapeRegex(search.trim()), 'i');
