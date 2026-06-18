@@ -1342,6 +1342,16 @@ export default function LiveClipManager({
 
                   <button
                     type="button"
+                    onClick={() => seekRelative(-0.1)}
+                    className="p-1.5 sm:p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg min-w-[2rem] min-h-[2rem] sm:min-w-[2.5rem] sm:min-h-[2.5rem] flex flex-col items-center justify-center"
+                    title="0.1초 뒤로"
+                  >
+                    <ArrowLeftIcon className="w-3 h-3" />
+                    0.1s
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={togglePlayPause}
                     className="p-2 sm:p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors min-w-[2.5rem] min-h-[2.5rem] sm:min-w-[3rem] sm:min-h-[3rem] flex items-center justify-center"
                     title={isVideoPlaying ? "일시정지" : "재생"}
@@ -1353,6 +1363,15 @@ export default function LiveClipManager({
                     )}
                   </button>
 
+                  <button
+                    type="button"
+                    onClick={() => seekRelative(0.1)}
+                    className="p-1.5 sm:p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors text-xs bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg min-w-[2rem] min-h-[2rem] sm:min-w-[2.5rem] sm:min-h-[2.5rem] flex flex-col items-center justify-center"
+                    title="0.1초 앞으로"
+                  >
+                    <ArrowRightIcon className="w-3 h-3" />
+                    0.1s
+                  </button>
                   <button
                     type="button"
                     onClick={() => seekRelative(1)}

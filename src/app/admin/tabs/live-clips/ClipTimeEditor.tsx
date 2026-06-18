@@ -78,6 +78,9 @@ export default function ClipTimeEditor({
           <button type="button" onClick={() => seekRelative(-1)} disabled={!adapter} className={seekButton} title="1초 뒤로">
             <BackwardIcon className="w-3.5 h-3.5" />1s
           </button>
+          <button type="button" onClick={() => seekRelative(-0.1)} disabled={!adapter} className={seekButton} title="0.1초 뒤로">
+            <BackwardIcon className="w-3.5 h-3.5" />0.1s
+          </button>
           <button
             type="button"
             onClick={() => (isPlaying ? adapter?.pause() : adapter?.play())}
@@ -86,6 +89,9 @@ export default function ClipTimeEditor({
             title={isPlaying ? "일시정지" : "재생"}
           >
             {isPlaying ? <PauseIcon className="w-4 h-4" /> : <PlayIcon className="w-4 h-4" />}
+          </button>
+          <button type="button" onClick={() => seekRelative(0.1)} disabled={!adapter} className={seekButton} title="0.1초 앞으로">
+            <ForwardIcon className="w-3.5 h-3.5" />0.1s
           </button>
           <button type="button" onClick={() => seekRelative(1)} disabled={!adapter} className={seekButton} title="1초 앞으로">
             <ForwardIcon className="w-3.5 h-3.5" />1s
