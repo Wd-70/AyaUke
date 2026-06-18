@@ -55,6 +55,9 @@ next-env.d.ts
 # local db backups (scripts/db/backup.mjs output)
 /backups
 
+# yt-clip-builder 일회성 작업 데이터 (workset.json / progress.json)
+/yt-clip-work
+
 # db analysis reports (scripts/db/analyze-*.mjs output)
 /reports
 

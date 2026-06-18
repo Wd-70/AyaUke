@@ -34,10 +34,12 @@ import MaintenanceTab from "./tabs/MaintenanceTab";
 import DashboardTab from "./tabs/DashboardTab";
 import LiveClipManagementTab from "./tabs/live-clips/LiveClipManagementTab";
 import ChzzkYoutubeConverterTab from "./tabs/ChzzkYoutubeConverterTab";
+import ClipWorkflowTab from "./tabs/clip-workflow/ClipWorkflowTab";
 
 type TabType =
   | "dashboard"
   | "clips"
+  | "clip-workflow"
   | "songs"
   | "timeline"
   | "comments"
@@ -80,10 +82,17 @@ const tabs = [
     externalLink: "/admin/songs",
   },
   {
+    id: "clip-workflow" as const,
+    name: "클립 만들기",
+    icon: PlayIcon,
+    description: "치지직/유튜브 댓글 → 클립 생성 (통합)",
+    access: "super" as TabAccess,
+  },
+  {
     id: "timeline" as const,
     name: "타임라인 파싱",
     icon: AdjustmentsHorizontalIcon,
-    description: "YouTube 댓글 수집 및 타임라인 분석",
+    description: "YouTube 댓글 수집 및 타임라인 분석 (레거시)",
     access: "super" as TabAccess,
   },
   {
@@ -180,6 +189,8 @@ export default function AdminClient() {
 
       case "clips":
         return <LiveClipManagementTab />;
+      case "clip-workflow":
+        return <ClipWorkflowTab />;
 
       case "timeline":
         return <CommentAnalysisTab viewMode="timeline" />;
