@@ -25,7 +25,7 @@
     "framer-motion": "^12.19.1",
     "hls.js": "^1.6.15",
     "lucide-react": "^0.523.0",
-    "mongoose": "^8.16.1",
+    "mongoose": "^8.24.0",
     "next": "15.5.19",
     "next-auth": "^4.24.11",
     "react": "^18.3.1",
@@ -50,5 +50,8 @@
     "tailwindcss": "^3.4.16",
     "typescript": "^5",
     "vitest": "^4.1.8"
+  },
+  "overrides": {
+    "undici": "^7.28.0"
   }
 }
