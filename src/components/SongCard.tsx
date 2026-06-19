@@ -1229,8 +1229,8 @@ export default function SongCard({
                       {formatKeyAdjustment(song.keyAdjustment) && (
                         <span
                           className="px-2 py-1 text-xs font-medium rounded-md 
-                                       bg-yellow-100 dark:bg-yellow-900 
-                                       text-yellow-800 dark:text-yellow-200 flex-shrink-0"
+                                       bg-light-primary/10 dark:bg-dark-primary/25
+                                       text-light-text/55 dark:text-dark-text/55 flex-shrink-0"
                         >
                           {formatKeyAdjustment(song.keyAdjustment)}
                         </span>
@@ -1278,10 +1278,10 @@ export default function SongCard({
                     {song.sungCount !== undefined && song.sungCount > 0 && (
                       <div
                         className="flex items-center justify-center gap-1 px-2 py-1 rounded-full
-                                    bg-green-100/80 dark:bg-green-900/50 
-                                    border border-green-200/50 dark:border-green-700/50"
+                                    bg-amber-100/70 dark:bg-amber-500/15
+                                    border border-amber-200/50 dark:border-amber-400/20"
                       >
-                        <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
                           🎤 {song.sungCount}
                         </span>
                       </div>
@@ -1328,11 +1328,14 @@ export default function SongCard({
                 <div className="mt-auto pt-1 pb-2">
                   <button
                     onClick={handlePlay}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 
-                             bg-gradient-to-r from-light-accent to-light-purple 
-                             dark:from-dark-accent dark:to-dark-purple text-white 
-                             rounded-lg hover:shadow-lg transform hover:scale-105 
-                             transition-all duration-200 font-medium"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg
+                             text-light-accent dark:text-dark-accent
+                             bg-light-accent/10 dark:bg-dark-accent/15
+                             border border-light-accent/25 dark:border-dark-accent/30
+                             hover:bg-gradient-to-r hover:from-light-accent hover:to-light-purple
+                             dark:hover:from-dark-accent dark:hover:to-dark-purple
+                             hover:text-white hover:border-transparent hover:shadow-md
+                             transition-all duration-200"
                   >
                     {youtubeMR ? (
                       <>
@@ -1386,8 +1389,8 @@ export default function SongCard({
                       {formatKeyAdjustment(song.keyAdjustment) && (
                         <span
                           className="px-2 py-1 text-xs font-medium rounded-md 
-                                       bg-yellow-100 dark:bg-yellow-900 
-                                       text-yellow-800 dark:text-yellow-200 flex-shrink-0"
+                                       bg-light-primary/10 dark:bg-dark-primary/25
+                                       text-light-text/55 dark:text-dark-text/55 flex-shrink-0"
                         >
                           {formatKeyAdjustment(song.keyAdjustment)}
                         </span>
@@ -1435,10 +1438,10 @@ export default function SongCard({
                     {song.sungCount !== undefined && song.sungCount > 0 && (
                       <div
                         className="flex items-center justify-center gap-1 px-2 py-1 rounded-full
-                                    bg-green-100/80 dark:bg-green-900/50 
-                                    border border-green-200/50 dark:border-green-700/50"
+                                    bg-amber-100/70 dark:bg-amber-500/15
+                                    border border-amber-200/50 dark:border-amber-400/20"
                       >
-                        <span className="text-xs font-medium text-green-700 dark:text-green-300">
+                        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
                           🎤 {song.sungCount}
                         </span>
                       </div>
@@ -1485,11 +1488,14 @@ export default function SongCard({
                 <div className="mt-auto pt-1 pb-2">
                   <button
                     onClick={handlePlay}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 
-                             bg-gradient-to-r from-light-accent to-light-purple 
-                             dark:from-dark-accent dark:to-dark-purple text-white 
-                             rounded-lg hover:shadow-lg transform hover:scale-105 
-                             transition-all duration-200 font-medium"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg
+                             text-light-accent dark:text-dark-accent
+                             bg-light-accent/10 dark:bg-dark-accent/15
+                             border border-light-accent/25 dark:border-dark-accent/30
+                             hover:bg-gradient-to-r hover:from-light-accent hover:to-light-purple
+                             dark:hover:from-dark-accent dark:hover:to-dark-purple
+                             hover:text-white hover:border-transparent hover:shadow-md
+                             transition-all duration-200"
                   >
                     {youtubeMR ? (
                       <>
