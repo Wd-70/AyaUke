@@ -399,6 +399,20 @@ export default function SongCard({
   const displayTitle = song.titleAlias || song.title;
   const displayArtist = song.artistAlias || song.artist;
 
+  // 이미지 없는 카드용: 제목 시드 기반 브랜드 계열 그라데이션 (곡마다 고유, 결정적)
+  const noImageGradient = useMemo(() => {
+    const palettes = [
+      "from-light-accent/15 to-light-purple/10 dark:from-dark-accent/20 dark:to-dark-purple/15",
+      "from-light-purple/15 to-light-secondary/10 dark:from-dark-purple/20 dark:to-dark-secondary/15",
+      "from-light-secondary/15 to-light-accent/10 dark:from-dark-secondary/20 dark:to-dark-accent/15",
+      "from-light-primary/15 to-light-accent/10 dark:from-dark-primary/25 dark:to-dark-accent/15",
+    ];
+    const seed = `${song.title}${song.artist}`;
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+    return palettes[h % palettes.length];
+  }, [song.title, song.artist]);
+
   // YouTube URL에서 비디오 ID 추출
   const getYouTubeVideoId = (url: string) => {
     const regex =
@@ -1363,16 +1377,23 @@ export default function SongCard({
               ></div>
             </>
           ) : (
-            /* 이미지가 없을 때 - 기존 디자인 */
+            /* 이미지가 없을 때 - 곡별 고유 그라데이션 + 음표 워터마크 */
             <>
-              {/* Background gradient overlay */}
+              {/* 곡 시드 기반 소프트 그라데이션 배경 (이미지 카드와의 격차 완화) */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${noImageGradient}`}></div>
+              {/* 음표 워터마크 — 우하단에 은은하게 */}
+              <MusicalNoteIcon
+                className="absolute -bottom-4 -right-3 w-28 h-28 text-light-accent/10 dark:text-dark-accent/10
+                           rotate-12 pointer-events-none transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6"
+              />
+              {/* 호버 시 살짝 더 진해지는 오버레이 */}
               <div
-                className="absolute inset-0 bg-gradient-to-br from-light-accent/5 to-light-purple/5 
-                              dark:from-dark-accent/5 dark:to-dark-purple/5 opacity-0 
+                className="absolute inset-0 bg-gradient-to-br from-light-accent/5 to-light-purple/5
+                              dark:from-dark-accent/5 dark:to-dark-purple/5 opacity-0
                               group-hover:opacity-100 transition-opacity duration-300"
               ></div>
 
-              <div className="relative p-6 bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm h-full">
+              <div className="relative p-6 bg-white/45 dark:bg-gray-900/45 backdrop-blur-sm h-full">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1 min-w-0">
