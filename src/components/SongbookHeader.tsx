@@ -25,10 +25,10 @@ export default function SongbookHeader({
   }, []);
 
   return (
-    <div className="text-center mb-8 sm:mb-12">
+    <div className="text-center mb-5 sm:mb-7">
       {/* 제목과 설명은 항상 즉시 표시 */}
-      <div className="mb-4 sm:mb-6">
-        <div className="flex items-center justify-center gap-2 sm:gap-3 mb-3 sm:mb-4">
+      <div className="mb-2.5 sm:mb-3.5">
+        <div className="flex items-center justify-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
           <MusicalNoteIcon className="w-8 h-8 sm:w-12 sm:h-12 text-light-accent dark:text-dark-accent" />
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold font-display gradient-text">
             노래책
@@ -59,14 +59,17 @@ export default function SongbookHeader({
                 <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
                 <span>총 {totalSongs}곡</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
-                <span>검색된 곡: {filteredSongs}곡</span>
-              </div>
+              {/* 필터로 줄었을 때만 표시(필터 없으면 총=검색이라 중복) */}
+              {filteredSongs < totalSongs && (
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
+                  <span>검색됨 {filteredSongs}곡</span>
+                </div>
+              )}
               {(visibleSongs < filteredSongs && filteredSongs > 0) && (
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-light-purple dark:bg-dark-purple rounded-full"></div>
-                  <span>표시 중: {visibleSongs}곡</span>
+                  <span>표시 중 {visibleSongs}곡</span>
                 </div>
               )}
             </>
