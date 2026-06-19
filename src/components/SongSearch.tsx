@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { Song } from "@/types";
 import {
@@ -97,26 +97,11 @@ export default function SongSearch({
     ); // 개수 많은 순서대로
   }, [songs]);
 
-  // 좋아요한 곡 ID들 가져오기 (실시간 업데이트)
-  const [likedSongIds, setLikedSongIds] = useState<string[]>([]);
-
-  // 좋아요 데이터 실시간 업데이트
-  useEffect(() => {
-    // 초기 로드
-    setLikedSongIds(getLikedSongIds());
-
-    // 좋아요 상태 변경 이벤트 리스너
-    const handleLikesChange = () => {
-      setLikedSongIds(getLikedSongIds());
-    };
-
-    // 이벤트 리스너 등록 (likesStore에서 발생시키는 커스텀 이벤트)
-    window.addEventListener('likesUpdated', handleLikesChange);
-
-    return () => {
-      window.removeEventListener('likesUpdated', handleLikesChange);
-    };
-  }, []);
+  // 좋아요한 곡 ID들 — TanStack Query 캐시에서 직접 파생.
+  // getLikedSongIds는 likesMap이 바뀔 때마다 갱신되므로(useCallback dep) 캐시가
+  // 채워지면 자동으로 재계산된다. (state로 미러링하면 마운트 시점의 빈 캐시를 읽는
+  // stale 클로저 문제가 생겨 필터가 항상 0이 됨)
+  const likedSongIds = useMemo(() => getLikedSongIds(), [getLikedSongIds]);
 
   // 플레이리스트별 곡 ID 매핑
   const playlistSongIds = useMemo(() => {
