@@ -2,14 +2,13 @@
 
 /**
  * 생성된 클립 확인·재생·즉시 편집 다이얼로그 (클립 만들기/yt-clip-builder 공용).
- * 좌측 생성 클립 목록, 우측 선택 클립을 ClipPlayer로 재생(구간) + 편집 모드에서
- * EditPlayer+ClipTimeEditor로 시간 미세조정 후 저장(PATCH updateClip).
+ * 좌측 생성 클립 목록, 우측은 선택 클립을 항상 편집 모드로(EditPlayer+ClipTimeEditor)
+ * 시간 미세조정·설명 편집 후 저장(PATCH updateClip). 검증/삭제도 같은 화면에서.
  * react-query/토스트 의존 없이 plain fetch + 로컬 상태로 동작.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import ClipPlayer from "@/components/clip/ClipPlayer";
 import ClipTimeEditor from "@/app/admin/tabs/live-clips/ClipTimeEditor";
 import type { EditPlayerAdapter, ClipData } from "@/app/admin/tabs/live-clips/clip-types";
 import { formatTime } from "@/app/admin/tabs/live-clips/clip-types";
@@ -29,7 +28,6 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
   const [clips, setClips] = useState<ClipData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState<{ startTime: number; endTime: number | null; description: string }>({ startTime: 0, endTime: null, description: "" });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -54,13 +52,33 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
 
   useEffect(() => { load(); }, [load]);
 
+  // 다이얼로그가 열린 동안 뒤 화면의 플레이어(yt-clip-builder CalibrationPlayer 등이
+  // window 전역 keydown으로 Space/←→/숫자키를 처리함)로 키가 새지 않도록 캡처 단계에서
+  // 가로챈다. Space는 이 다이얼로그의 플레이어를 재생/정지.
+  useEffect(() => {
+    const blocked = new Set([" ", "ArrowLeft", "ArrowRight", "Enter", "1", "2", "3", "4", "5", "6"]);
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (!blocked.has(e.key)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === " ") (isPlaying ? adapter?.pause() : adapter?.play());
+    };
+    window.addEventListener("keydown", onKey, true); // 캡처 단계 → 뒤 화면 window 리스너보다 먼저
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [adapter, isPlaying]);
+
   const selected = clips.find((c) => c._id === selectedId) || null;
 
-  const startEdit = () => {
-    if (!selected) return;
-    setEditData({ startTime: selected.startTime ?? 0, endTime: selected.endTime ?? null, description: selected.description ?? "" });
-    setEditing(true);
-  };
+  // 클립 선택이 바뀌면 편집값을 그 클립으로 초기화하고, 플레이어를 그 시작시각으로 이동.
+  // (같은 영상의 클립을 오갈 때 플레이어는 remount되지 않으므로 adapter로 직접 seek)
+  useEffect(() => {
+    const c = clips.find((x) => x._id === selectedId);
+    if (!c) return;
+    setEditData({ startTime: c.startTime ?? 0, endTime: c.endTime ?? null, description: c.description ?? "" });
+    adapter?.seekTo(c.startTime ?? 0);
+  }, [selectedId, adapter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     if (!selected) return;
@@ -74,7 +92,6 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
       if (!res.ok) throw new Error((await res.json()).error || "저장 실패");
       // 로컬 즉시 반영 + 목록 갱신
       setClips((prev) => prev.map((c) => (c._id === selected._id ? { ...c, startTime: editData.startTime, endTime: editData.endTime ?? undefined, description: editData.description } : c)));
-      setEditing(false);
       setMsg("저장됨");
       onChanged?.();
     } catch (e) {
@@ -99,7 +116,6 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
     await fetch(`/api/admin/clips?clipId=${selected._id}`, { method: "DELETE" }).catch(() => {});
     setClips((prev) => prev.filter((c) => c._id !== selected._id));
     setSelectedId(null);
-    setEditing(false);
     onChanged?.();
   };
 
@@ -129,7 +145,7 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
             ) : clips.map((c) => {
               const sel = c._id === selectedId;
               return (
-                <button key={c._id} onClick={() => { setSelectedId(c._id); setEditing(false); }} className={`w-full text-left px-3 py-2 border-b border-light-primary/10 dark:border-dark-primary/10 ${sel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5"}`}>
+                <button key={c._id} onClick={() => setSelectedId(c._id)} className={`w-full text-left px-3 py-2 border-b border-light-primary/10 dark:border-dark-primary/10 ${sel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5"}`}>
                   <div className="truncate text-sm text-light-text dark:text-dark-text">{c.songDetail?.titleAlias || c.title}</div>
                   <div className="flex items-center gap-2 text-[10px] text-light-text/50 dark:text-dark-text/50 mt-0.5">
                     <span className="truncate">{c.songDetail?.artistAlias || c.artist}</span>
@@ -145,38 +161,21 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
           <div className="p-4 overflow-y-auto max-h-[78vh]">
             {!selected ? (
               <p className="text-sm text-light-text/50 p-8 text-center">클립을 선택하세요.</p>
-            ) : !editing ? (
-              <div className="space-y-3">
-                <ClipPlayer
-                  key={`view-${selected._id}-${selected.startTime}-${selected.endTime}`}
-                  platform={platform}
-                  videoId={selected.videoId}
-                  startTime={selected.startTime ?? 0}
-                  endTime={selected.endTime}
-                  className="max-w-2xl mx-auto"
-                />
-                <div className="text-sm text-light-text dark:text-dark-text">
-                  <span className="font-medium">{selected.songDetail?.titleAlias || selected.title}</span> · {selected.songDetail?.artistAlias || selected.artist}
-                </div>
-                <div className="text-xs text-light-text/60 dark:text-dark-text/60">
-                  {selected.sungDate?.slice(0, 10)} · {platform === "chzzk" ? "치지직" : "유튜브"} {selected.videoId} · {formatTime(selected.startTime ?? 0)}~{formatTime(selected.endTime ?? null)}
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button onClick={startEdit} className="px-3 py-1.5 text-sm rounded-lg bg-light-accent dark:bg-dark-accent text-white">시간 편집</button>
-                  <button onClick={() => verify(!selected.isVerified)} className="px-3 py-1.5 text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70">
-                    {selected.isVerified ? "검증 해제" : "검증 완료"}
-                  </button>
-                  <button onClick={remove} className="px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 ml-auto">삭제</button>
-                </div>
-              </div>
             ) : (
               <div className="space-y-3">
+                <div className="text-sm text-light-text dark:text-dark-text">
+                  <span className="font-medium">{selected.songDetail?.titleAlias || selected.title}</span> · {selected.songDetail?.artistAlias || selected.artist}
+                  {selected.isVerified && <span className="ml-2 text-xs text-blue-500">검증됨</span>}
+                </div>
+                <div className="text-xs text-light-text/60 dark:text-dark-text/60">
+                  {selected.sungDate?.slice(0, 10)} · {platform === "chzzk" ? "치지직" : "유튜브"} {selected.videoId}
+                </div>
                 <EditPlayer
-                  key={`edit-${selected._id}`}
+                  key={`${platform}-${selected.videoId}`}
                   platform={platform}
                   videoId={selected.videoId}
                   videoUrl={selected.videoUrl}
-                  startTime={editData.startTime}
+                  startTime={selected.startTime ?? 0}
                   onAdapter={setAdapter}
                   onTimeUpdate={setCurrentTime}
                   onPlayStateChange={setIsPlaying}
@@ -197,9 +196,12 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
                   placeholder="설명"
                   className="w-full text-sm rounded border border-light-primary/20 dark:border-dark-primary/20 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text px-2 py-1"
                 />
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button onClick={save} disabled={saving} className="px-4 py-1.5 text-sm rounded-lg bg-light-accent dark:bg-dark-accent text-white disabled:opacity-50">{saving ? "저장 중..." : "저장"}</button>
-                  <button onClick={() => setEditing(false)} className="px-3 py-1.5 text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70">취소</button>
+                  <button onClick={() => verify(!selected.isVerified)} className="px-3 py-1.5 text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70">
+                    {selected.isVerified ? "검증 해제" : "검증 완료"}
+                  </button>
+                  <button onClick={remove} className="px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 ml-auto">삭제</button>
                 </div>
               </div>
             )}

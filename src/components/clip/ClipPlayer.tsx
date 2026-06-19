@@ -106,6 +106,12 @@ export default function ClipPlayer({
   posterDate,
   posterAddedBy,
 }: ClipPlayerProps) {
+  // endTime이 없거나 startTime 이하(잘못된 구간)면 "끝까지"로 취급한다.
+  // (이 값이 0/음수가 되면 clipDuration이 0이 되어 진행바가 멈추거나, VOD 전체를
+  //  분모로 잡아 게이지가 거의 안 움직이는 문제가 생긴다)
+  const validEndTime =
+    endTime != null && endTime > startTime ? endTime : null;
+
   const containerRef = useRef<HTMLDivElement>(null);
   const ytMountRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -126,13 +132,16 @@ export default function ClipPlayer({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [clipPosition, setClipPosition] = useState(0); // 구간 상대 시간
   const [clipDuration, setClipDuration] = useState(
-    endTime != null ? Math.max(0, endTime - startTime) : 0,
+    validEndTime != null ? Math.max(0, validEndTime - startTime) : 0,
   );
   const [controlsVisible, setControlsVisible] = useState(true);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // rAF 콜백에서 최신 상태를 읽기 위한 ref들
   const playingRef = useRef(false);
   const endedRef = useRef(false);
+  // 진행바 부드럽게: getCurrentTime이 띄엄띄엄(예: 유튜브 IFrame은 ~1Hz로만) 갱신돼도
+  // 마지막 신선한 샘플 시각을 기준으로 벽시계로 보간한다. {media:-1}이면 재동기화 필요.
+  const syncRef = useRef({ media: -1, wall: 0 });
   const onEndedRef = useRef(onEnded);
   playingRef.current = playing;
   onEndedRef.current = onEnded;
@@ -141,8 +150,8 @@ export default function ClipPlayer({
   volumeRef.current = { volume, muted };
 
   const clipEnd = useCallback(
-    () => (endTime != null ? endTime : startTime + clipDuration || Infinity),
-    [endTime, startTime, clipDuration],
+    () => (validEndTime != null ? validEndTime : startTime + clipDuration || Infinity),
+    [validEndTime, startTime, clipDuration],
   );
 
   // ── 플레이어 초기화 ──────────────────────────────────────────────
@@ -157,7 +166,7 @@ export default function ClipPlayer({
     // startTime/endTime이 (편집 등으로) 바뀌면 구간 길이도 재계산한다.
     // endTime이 없으면 0으로 두고 onReady/onLoaded에서 영상 길이 기준으로 채운다.
     // (이 줄이 없으면 같은 클립을 편집해 시간만 바꿀 때 진행바·시간표시가 옛값으로 남음)
-    setClipDuration(endTime != null ? Math.max(0, endTime - startTime) : 0);
+    setClipDuration(validEndTime != null ? Math.max(0, validEndTime - startTime) : 0);
 
     if (platform === "youtube") {
       let player: any = null;
@@ -184,7 +193,7 @@ export default function ClipPlayer({
             modestbranding: 1,
             playsinline: 1,
             start: Math.floor(startTime),
-            ...(endTime != null ? { end: Math.ceil(endTime) } : {}),
+            ...(validEndTime != null ? { end: Math.ceil(validEndTime) } : {}),
             autoplay: autoplay ? 1 : 0,
           },
           events: {
@@ -199,7 +208,7 @@ export default function ClipPlayer({
                 setVolume: (v) => e.target.setVolume(v * 100),
                 setMuted: (m) => (m ? e.target.mute() : e.target.unMute()),
               };
-              if (endTime == null) {
+              if (validEndTime == null) {
                 const total = e.target.getDuration?.() ?? 0;
                 if (total > 0) setClipDuration(Math.max(0, total - startTime));
               }
@@ -277,7 +286,7 @@ export default function ClipPlayer({
       if (cancelled) return;
       setupAdapter();
       video.currentTime = startTime;
-      if (endTime == null && video.duration) {
+      if (validEndTime == null && video.duration) {
         setClipDuration(Math.max(0, video.duration - startTime));
       }
       // 저장된 음량 설정 적용 (영상 전환 시에도 유지)
@@ -359,15 +368,19 @@ export default function ClipPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform, videoId, startTime, endTime]);
 
-  // ── 구간 경계 강제 + 진행 추적 (rAF) ────────────────────────────
+  // ── 구간 경계 강제 + 진행 추적 ──────────────────────────────────
+  // rAF로 포그라운드에선 60fps 부드럽게 그리되, rAF는 탭이 백그라운드면 완전히
+  // 멈추므로(오디오는 계속 재생 → 게이지만 수십 초 얼어붙음) 1Hz setInterval로 보강한다.
   useEffect(() => {
     if (!ready) return;
 
-    const tick = () => {
+    const runTick = () => {
       const adapter = adapterRef.current;
       if (adapter) {
-        const abs = adapter.getCurrentTime();
+        const abs = adapter.getCurrentTime(); // 시간 소스의 실제값(띄엄띄엄일 수 있음)
         const end = clipEnd();
+        const now =
+          typeof performance !== "undefined" ? performance.now() : Date.now();
 
         // 경계 강제는 재생 중에만 — 일시정지/대기(cued) 상태에서 seekTo하면
         // YouTube가 의도치 않게 재생을 시작할 수 있다
@@ -375,28 +388,51 @@ export default function ClipPlayer({
           if (abs < startTime - 1) {
             // 구간 앞으로 벗어남 (외부 시킹 등) → 시작점 복귀
             adapter.seekTo(startTime);
+            syncRef.current = { media: -1, wall: 0 };
           } else if (end !== Infinity && abs >= end) {
             adapter.pause();
             adapter.seekTo(end);
             setClipPosition(Math.max(0, end - startTime));
             setEnded(true);
+            syncRef.current = { media: -1, wall: 0 };
             if (!endedRef.current) {
               endedRef.current = true;
               onEndedRef.current?.();
             }
           } else {
             endedRef.current = false;
-            setClipPosition(Math.max(0, abs - startTime));
+            // 실제값이 바뀌면 재동기화, 안 바뀌면(소스가 아직 같은 값을 줌) 벽시계로 보간.
+            // 보간이 실제를 너무 앞서거나 end를 넘지 않도록 클램프한다.
+            let absDisplay = abs;
+            const sync = syncRef.current;
+            if (abs !== sync.media) {
+              syncRef.current = { media: abs, wall: now };
+            } else {
+              absDisplay = abs + (now - sync.wall) / 1000;
+            }
+            const capped = end !== Infinity ? Math.min(absDisplay, end) : absDisplay;
+            setClipPosition(Math.max(0, capped - startTime));
           }
         } else if (abs >= startTime) {
+          syncRef.current = { media: -1, wall: 0 };
           setClipPosition(Math.max(0, Math.min(abs, end) - startTime));
         }
       }
-      rafRef.current = requestAnimationFrame(tick);
     };
 
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
+    // 포그라운드: rAF로 매 프레임 갱신(부드러움)
+    const raf = () => {
+      runTick();
+      rafRef.current = requestAnimationFrame(raf);
+    };
+    rafRef.current = requestAnimationFrame(raf);
+    // 백그라운드: rAF가 멈춰도 최소 1초마다 갱신(오디오 재생 중인 탭은 ~1Hz로 유지됨)
+    const interval = setInterval(runTick, 1000);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      clearInterval(interval);
+    };
   }, [ready, startTime, clipEnd]);
 
   // ── 전체화면 상태 추적 ──────────────────────────────────────────
@@ -597,7 +633,7 @@ export default function ClipPlayer({
         <div className="relative h-4 flex items-center mb-1 group/bar">
           <div className="absolute inset-x-0 h-1 rounded-full bg-white/25 group-hover/bar:h-1.5 transition-all" />
           <div
-            className="absolute h-1 rounded-full bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple group-hover/bar:h-1.5 transition-all"
+            className="absolute left-0 h-1 rounded-full bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple group-hover/bar:h-1.5"
             style={{ width: `${progressPercent}%` }}
           />
           <input
