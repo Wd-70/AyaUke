@@ -29,9 +29,11 @@ export default function ItemEditor({ item, songs, songsById, originalLine, onPat
 
   // 항목이 바뀌면 검색어 초기화 + 그 시작점으로 시킹
   useEffect(() => { setSongQuery(""); }, [item.id]);
+  // adapter도 의존: 다른 영상으로 바뀌면 EditPlayer가 remount돼 어댑터가 새로 생기는데,
+  // 그때 정확한 시작시각으로 seek한다. (옛 어댑터 호출은 EditPlayer가 안전하게 무시)
   useEffect(() => {
     if (adapter) adapter.seekTo(item.startTimeSeconds);
-  }, [item.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [item.id, adapter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const matchedSong = item.matchedSongId ? songsById.get(item.matchedSongId) : undefined;
 

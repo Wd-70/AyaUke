@@ -48,15 +48,19 @@ export default function EditPlayer({
           onReady: (e: { target: Record<string, (...args: never[]) => unknown> }) => {
             if (cancelled) return;
             ytPlayerRef.current = e.target as { destroy?: () => void };
+            // 플레이어가 교체/파괴되는 순간 상위 effect가 옛 어댑터로 seekTo 등을
+            // 호출하면 YT 내부에서 null src 접근으로 throw → 모두 안전하게 감싼다.
             cbRef.current.onAdapter({
-              getCurrentTime: () => (e.target.getCurrentTime as () => number)?.() ?? 0,
-              seekTo: (s) => (e.target.seekTo as (s: number, b: boolean) => void)(s, true),
-              play: () => (e.target.playVideo as () => void)(),
-              pause: () => (e.target.pauseVideo as () => void)(),
+              getCurrentTime: () => { try { return (e.target.getCurrentTime as () => number)?.() ?? 0; } catch { return 0; } },
+              seekTo: (s) => { try { (e.target.seekTo as (s: number, b: boolean) => void)(s, true); } catch { /* 파괴/미준비 */ } },
+              play: () => { try { (e.target.playVideo as () => void)(); } catch { /* noop */ } },
+              pause: () => { try { (e.target.pauseVideo as () => void)(); } catch { /* noop */ } },
             });
             interval = setInterval(() => {
-              cbRef.current.onTimeUpdate((e.target.getCurrentTime as () => number)?.() ?? 0);
-              cbRef.current.onPlayStateChange((e.target.getPlayerState as () => number)?.() === 1);
+              try {
+                cbRef.current.onTimeUpdate((e.target.getCurrentTime as () => number)?.() ?? 0);
+                cbRef.current.onPlayStateChange((e.target.getPlayerState as () => number)?.() === 1);
+              } catch { /* 파괴 직후 폴링 — 무시 */ }
             }, 200);
           },
         },
