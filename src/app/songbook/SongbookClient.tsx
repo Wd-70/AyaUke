@@ -7,7 +7,7 @@ import SongSearch from '@/components/SongSearch';
 import SongCard from '@/components/SongCard';
 import Footer from '@/components/Footer';
 import SongbookHeader from '@/components/SongbookHeader';
-import { MusicalNoteIcon } from '@heroicons/react/24/outline';
+import { MusicalNoteIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 import { useBulkLikes } from '@/hooks/useLikes';
 import { useGlobalPlaylists } from '@/hooks/useGlobalPlaylists';
@@ -57,6 +57,17 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [songs, setSongs] = useState<Song[]>(initialSongs || []); // 랜덤 섞기를 위한 상태
   const [showNumbers, setShowNumbers] = useState(false); // 번호 표시 상태
+  // 보기 모드: grid(카드) | list(compact). 브라우저에 저장
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('songbookViewMode');
+      if (saved === 'grid' || saved === 'list') return saved;
+    }
+    return 'grid';
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') window.localStorage.setItem('songbookViewMode', viewMode);
+  }, [viewMode]);
   const [isLoading, setIsLoading] = useState(!initialSongs || initialSongs.length === 0); // 로딩 상태
   const [hasOpenDialog, setHasOpenDialog] = useState(false); // 다이얼로그 열림 상태
   const { loadLikes } = useBulkLikes();
@@ -201,7 +212,29 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
           </div>
         ) : songs && songs.length > 0 ? (
           filteredSongs.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <>
+          {/* 보기 모드 토글 (그리드 / 리스트) */}
+          <div className="flex justify-end mb-3">
+            <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/50 dark:bg-gray-800/50">
+              <button
+                onClick={() => setViewMode('grid')}
+                title="카드 보기"
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-light-accent dark:bg-dark-accent text-white' : 'text-light-text/60 dark:text-dark-text/60 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'}`}
+              >
+                <Squares2X2Icon className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                title="리스트 보기"
+                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-light-accent dark:bg-dark-accent text-white' : 'text-light-text/60 dark:text-dark-text/60 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'}`}
+              >
+                <ListBulletIcon className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+          <div className={viewMode === 'list'
+            ? "grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3"
+            : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6"}>
             {visibleSongs.map((song, index) => (
               <motion.div
                 key={song.id}
@@ -209,17 +242,18 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
                 animate={{ opacity: 1, y: 0 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "0px 0px -20% 0px" }}
-                transition={{ 
-                  duration: 0.3, 
+                transition={{
+                  duration: 0.3,
                   delay: Math.min(index % 8, 6) * 0.03,
                   ease: "easeOut"
                 }}
               >
-                <SongCard 
-                  song={song} 
+                <SongCard
+                  song={song}
                   onPlay={handleSongPlay}
                   showNumber={showNumbers}
                   number={index + 1}
+                  compact={viewMode === 'list'}
                   onDialogStateChange={setHasOpenDialog}
                 />
               </motion.div>
@@ -239,6 +273,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
               </div>
             )}
           </div>
+          </>
         ) : (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

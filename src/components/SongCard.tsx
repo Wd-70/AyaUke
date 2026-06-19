@@ -43,6 +43,8 @@ interface SongCardProps {
   onPlay?: (song: SongData) => void;
   showNumber?: boolean;
   number?: number;
+  /** 리스트(compact) 보기: 슬림한 한 줄 행으로 렌더 */
+  compact?: boolean;
   onDialogStateChange?: (isOpen: boolean) => void;
 }
 
@@ -50,6 +52,7 @@ export default function SongCard({
   song,
   showNumber = false,
   number,
+  compact = false,
   onDialogStateChange,
 }: SongCardProps) {
   const { data: session } = useSession();
@@ -922,8 +925,47 @@ export default function SongCard({
   // SongCard 컴포넌트 메인 렌더링
   return (
     <>
+      {/* 리스트(compact) 보기 — 슬림한 한 줄 행 */}
+      {!isExpanded && compact && (
+        <div
+          onClick={handleCardClick}
+          onContextMenu={handleContextMenu}
+          className="group relative flex items-center gap-3 rounded-lg border border-light-primary/20 dark:border-dark-primary/20
+                     bg-white/60 dark:bg-gray-900/50 px-3 py-2.5 cursor-pointer overflow-hidden
+                     hover:border-light-accent/40 dark:hover:border-dark-accent/40 hover:bg-light-primary/5 dark:hover:bg-dark-primary/10
+                     transition-colors duration-200"
+        >
+          {isOfficialSong(song) && <OfficialCornerFold size={16} />}
+          {showNumber && number && (
+            <span className="shrink-0 w-6 text-center text-xs font-bold text-light-accent dark:text-dark-accent">{number}</span>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate font-medium text-sm text-light-text dark:text-dark-text">{displayTitle}</span>
+              {song.language && (
+                <span className={`shrink-0 w-1.5 h-1.5 rounded-full ${languageColors[song.language as keyof typeof languageColors] || "bg-gray-400"}`} />
+              )}
+            </div>
+            <p className="truncate text-xs text-light-text/55 dark:text-dark-text/55">{displayArtist}</p>
+          </div>
+          {song.sungCount !== undefined && song.sungCount > 0 && (
+            <span className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-300">
+              <MicrophoneIcon className="w-3 h-3" />{song.sungCount}
+            </span>
+          )}
+          <button
+            onClick={handleLike}
+            disabled={likeLoading}
+            className="shrink-0 p-1 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/15 disabled:opacity-50"
+            title={liked ? "좋아요 취소" : "좋아요"}
+          >
+            <HeartIcon className={`w-4 h-4 ${liked ? "text-red-500" : "text-light-text/40 dark:text-dark-text/40"}`} />
+          </button>
+        </div>
+      )}
+
       {/* 일반 카드 */}
-      {!isExpanded && (
+      {!isExpanded && !compact && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
