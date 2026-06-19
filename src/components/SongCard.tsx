@@ -16,7 +16,7 @@ import {
   ComputerDesktopIcon,
   DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
-import { HeartIcon } from "@heroicons/react/24/solid";
+import { HeartIcon, MicrophoneIcon } from "@heroicons/react/24/solid";
 import YouTube from "react-youtube";
 import { useLike } from "@/hooks/useLikes";
 import { useSongPlaylists } from "@/hooks/useGlobalPlaylists";
@@ -1182,7 +1182,9 @@ export default function SongCard({
           onClick={handleCardClick}
           onContextMenu={handleContextMenu}
           className="group relative rounded-xl border border-light-primary/20 dark:border-dark-primary/20
-                     hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer h-52"
+                     hover:border-light-accent/40 dark:hover:border-dark-accent/40
+                     hover:shadow-xl hover:shadow-light-accent/5 dark:hover:shadow-dark-accent/10
+                     transition-all duration-300 overflow-hidden cursor-pointer h-52"
         >
           {/* 공식 등록곡 — 좌상단 접힌 코너 (텍스트 없이 절제된 표식) */}
           {isOfficialSong(song) && <OfficialCornerFold size={22} />}
@@ -1281,8 +1283,9 @@ export default function SongCard({
                                     bg-amber-100/70 dark:bg-amber-500/15
                                     border border-amber-200/50 dark:border-amber-400/20"
                       >
+                        <MicrophoneIcon className="w-3 h-3 text-amber-600 dark:text-amber-300" />
                         <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                          🎤 {song.sungCount}
+                          {song.sungCount}
                         </span>
                       </div>
                     )}
@@ -1441,8 +1444,9 @@ export default function SongCard({
                                     bg-amber-100/70 dark:bg-amber-500/15
                                     border border-amber-200/50 dark:border-amber-400/20"
                       >
+                        <MicrophoneIcon className="w-3 h-3 text-amber-600 dark:text-amber-300" />
                         <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-                          🎤 {song.sungCount}
+                          {song.sungCount}
                         </span>
                       </div>
                     )}

@@ -17,6 +17,7 @@ import {
   ArrowsUpDownIcon,
   HashtagIcon,
   MusicalNoteIcon,
+  MicrophoneIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon as HeartSolidIcon } from "@heroicons/react/24/solid";
 import { isTextMatch } from "@/lib/searchUtils";
@@ -545,11 +546,11 @@ export default function SongSearch({
                   onClick={() => toggleLanguage(language)}
                   className={`
                     flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium
-                    transition-all duration-200 hover:scale-105 border-2
+                    transition-all duration-200 hover:scale-105 border
                     ${
                       activeLanguages.has(language)
-                        ? "bg-blue-500 text-white border-blue-500 shadow-lg"
-                        : "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                        ? "bg-light-accent dark:bg-dark-accent text-white border-transparent shadow-md"
+                        : "bg-light-primary/10 dark:bg-dark-primary/15 text-light-text/70 dark:text-dark-text/70 border-light-primary/25 dark:border-dark-primary/30 hover:bg-light-primary/20 dark:hover:bg-dark-primary/25"
                     }
                   `}
                 >
@@ -629,7 +630,8 @@ export default function SongSearch({
                     : "text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 hover:text-light-text dark:hover:text-dark-text"
                 }`}
               >
-                🎤 부른횟수
+                <MicrophoneIcon className="w-3 h-3" />
+                부른횟수
                 {sortBy === "sungCount" && (
                   <span className="text-xs opacity-75">
                     {sortOrder === "desc" ? "↓" : "↑"}

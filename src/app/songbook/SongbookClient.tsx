@@ -179,25 +179,26 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
         />
 
         {isLoading ? (
-          // 데이터 로딩 중 상태
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="text-center py-16"
-          >
-            <div className="w-24 h-24 mx-auto mb-6 bg-light-primary/20 dark:bg-dark-primary/20 
-                           rounded-full flex items-center justify-center">
-              <div className="w-8 h-8 border-3 border-light-primary/30 dark:border-dark-primary/30 
-                              border-t-light-primary dark:border-t-dark-primary rounded-full animate-spin"></div>
-            </div>
-            <h3 className="text-xl font-semibold text-light-text dark:text-dark-text mb-2">
-              노래를 불러오는 중...
-            </h3>
-            <p className="text-light-text/70 dark:text-dark-text/70">
-              잠시만 기다려주세요
-            </p>
-          </motion.div>
+          // 데이터 로딩 중 — 단일 스피너 대신 카드 스켈레톤(체감 속도·완성도↑)
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-52 rounded-xl border border-light-primary/20 dark:border-dark-primary/20
+                           bg-white/50 dark:bg-gray-900/40 p-6 flex flex-col animate-pulse"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="h-5 w-2/3 rounded bg-light-primary/15 dark:bg-dark-primary/20" />
+                    <div className="h-3.5 w-1/3 rounded bg-light-primary/10 dark:bg-dark-primary/15" />
+                  </div>
+                  <div className="h-7 w-10 rounded-full bg-light-primary/10 dark:bg-dark-primary/15" />
+                </div>
+                <div className="h-6 w-16 rounded-full bg-light-primary/10 dark:bg-dark-primary/15" />
+                <div className="mt-auto h-9 w-full rounded-lg bg-light-primary/10 dark:bg-dark-primary/15" />
+              </div>
+            ))}
+          </div>
         ) : songs && songs.length > 0 ? (
           filteredSongs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
