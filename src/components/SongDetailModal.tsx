@@ -15,6 +15,7 @@ import {
   MicrophoneIcon,
   CalendarDaysIcon,
   ClockIcon,
+  UserPlusIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon } from "@heroicons/react/24/solid";
 import YouTube from "react-youtube";
@@ -23,6 +24,8 @@ import { useSongPlaylists } from "@/hooks/useGlobalPlaylists";
 import PlaylistContextMenu from "./PlaylistContextMenu";
 import LiveClipManager from "./LiveClipManager";
 import SongEditForm from "./SongEditForm";
+import OfficialBadge from "./OfficialBadge";
+import { isOfficialSong } from "@/shared/utils/song-source";
 import { useToast } from "./Toast";
 import { useSession } from "next-auth/react";
 
@@ -62,7 +65,17 @@ export default function SongDetailModal({
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [activeTab, setActiveTab] = useState<'mr' | 'clips'>('mr');
+  // 마지막으로 보던 탭을 브라우저에 저장(모든 곡 공용) → 다음에 열 때 그 탭으로
+  const [activeTab, setActiveTab] = useState<'mr' | 'clips'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('songDetailModalTab');
+      if (saved === 'mr' || saved === 'clips') return saved;
+    }
+    return 'mr';
+  });
+  useEffect(() => {
+    if (typeof window !== 'undefined') window.localStorage.setItem('songDetailModalTab', activeTab);
+  }, [activeTab]);
   const [selectedMRIndex, setSelectedMRIndex] = useState(song.selectedMRIndex || 0);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [playlistMenuPos, setPlaylistMenuPos] = useState({ x: 0, y: 0 });
@@ -464,6 +477,18 @@ export default function SongDetailModal({
               <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-light-text dark:text-dark-text truncate">
                 {displayTitle}
               </h3>
+              {isOfficialSong(song) && (
+                <OfficialBadge size={22} className="shrink-0" title="공식 등록곡 (스트리머 노래책)" />
+              )}
+              {!isOfficialSong(song) && (
+                <span
+                  title="팬 추가곡 — 스트리머 공식 노래책에는 없고 팬이 추가한 곡이에요"
+                  className="shrink-0 inline-flex items-center cursor-help text-light-text/35 dark:text-dark-text/35
+                             hover:text-light-text/70 dark:hover:text-dark-text/70 transition-colors"
+                >
+                  <UserPlusIcon className="w-[18px] h-[18px]" />
+                </span>
+              )}
               {song.keyAdjustment !== null && song.keyAdjustment !== undefined && (
                 <span className="px-2 py-1 text-xs bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-full whitespace-nowrap">
                   {formatKeyAdjustment(song.keyAdjustment)}

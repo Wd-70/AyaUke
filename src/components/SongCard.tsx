@@ -25,6 +25,8 @@ import LiveClipManager from "./LiveClipManager";
 import LiveClipEditor from "./LiveClipEditor";
 import SongEditForm from "./SongEditForm";
 import SongDetailModal from "./SongDetailModal";
+import OfficialCornerFold from "./OfficialCornerFold";
+import { isOfficialSong } from "@/shared/utils/song-source";
 import { useSession } from "next-auth/react";
 import { useToast } from "./Toast";
 import { useConfirm } from "./ConfirmDialog";
@@ -1179,9 +1181,11 @@ export default function SongCard({
           transition={{ duration: 0.3 }}
           onClick={handleCardClick}
           onContextMenu={handleContextMenu}
-          className="group relative rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
+          className="group relative rounded-xl border border-light-primary/20 dark:border-dark-primary/20
                      hover:shadow-xl transition-all duration-300 overflow-hidden cursor-pointer h-52"
         >
+          {/* 공식 등록곡 — 좌상단 접힌 코너 (텍스트 없이 절제된 표식) */}
+          {isOfficialSong(song) && <OfficialCornerFold size={22} />}
           {song.imageUrl ? (
             /* 앨범 이미지가 있을 때 */
             <>
