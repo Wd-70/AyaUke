@@ -1057,8 +1057,8 @@ export default function LiveClipManager({
               <div className="relative">
               <div className={`w-full bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden transition-all duration-300 ${
                 isPlayerMinimized 
-                  ? 'aspect-video max-h-[20vh] min-h-[120px]' 
-                  : 'aspect-video max-h-[40vh] sm:max-h-[45vh] min-h-[200px] sm:min-h-[250px]'
+                  ? 'aspect-video max-h-[20vh] min-h-[120px]'
+                  : 'aspect-video max-h-[40vh] sm:max-h-[45vh] min-h-[140px] sm:min-h-[250px]'
               }`}>
                 {/* 시청 모드: 구간 전용 플레이어 (유튜브/치지직 공통) */}
                 {selectedVideo && !editingVideoId && (
@@ -1311,7 +1311,7 @@ export default function LiveClipManager({
                 </div>
 
                 {/* 재생 컨트롤 */}
-                <div className="flex items-center justify-center gap-2 sm:gap-4">
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4">
                   <button
                     type="button"
                     onClick={() => seekRelative(-60)}

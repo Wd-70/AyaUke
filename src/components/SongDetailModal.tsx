@@ -470,11 +470,11 @@ export default function SongDetailModal({
           </button>
         </div>
 
-        <div className="relative p-4 md:p-5 lg:p-6 flex flex-col h-full gap-3">
+        <div className="relative p-3 sm:p-4 md:p-5 lg:p-6 flex flex-col h-full gap-3">
           {/* 메타데이터 헤더 (제목/아티스트/태그) */}
           <div className="flex flex-col gap-2 pr-24 md:pr-24">
             <div className="flex items-center gap-3 min-w-0">
-              <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-light-text dark:text-dark-text truncate">
+              <h3 className="min-w-0 text-lg md:text-xl lg:text-2xl font-bold text-light-text dark:text-dark-text truncate">
                 {displayTitle}
               </h3>
               {isOfficialSong(song) && (
@@ -528,9 +528,10 @@ export default function SongDetailModal({
           </div>
 
           {/* 본문: 영상/콘텐츠 (좌) + 액션 아이콘바 (우, 데스크톱) */}
-          <div className="flex flex-row gap-3 lg:gap-4 flex-1 min-h-0">
-            {/* 콘텐츠 영역 (전폭) */}
-            <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex flex-row gap-3 lg:gap-4 flex-1 min-h-0 min-w-0">
+            {/* 콘텐츠 영역 (전폭) — min-w-0: 플레이어(aspect-video+min-h)의 min-content 너비가
+                flex 아이템을 못 줄이게 해 모바일에서 가로로 삐져나가던 문제 방지 */}
+            <div className="flex-1 flex flex-col min-h-0 min-w-0">
               {isEditMode ? (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -577,7 +578,7 @@ export default function SongDetailModal({
                   </div>
 
                   {/* 탭 콘텐츠 */}
-                  <div className="flex-1 min-h-0 p-4 flex flex-col">
+                  <div className="flex-1 min-h-0 p-2 sm:p-4 flex flex-col">
                     {activeTab === 'mr' ? (
                       <div className="flex-1 flex flex-col justify-center min-h-0">
                         {youtubeMR ? (
