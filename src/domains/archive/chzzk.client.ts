@@ -221,30 +221,18 @@ export async function checkVideoExists(videoNo: number): Promise<boolean> {
 
 export interface StreamInfo {
   streamUrl: string;
-  /** 'hls' = 임시 다시보기(리와인드), 'mp4' = 영구 보존 VOD (progressive, Range 시킹 가능) */
-  streamType: 'hls' | 'mp4';
+  /**
+   * 'hls' = 임시 다시보기(리와인드, 토큰 IP제약 없음)
+   * 'mp4' = progressive MP4 직접 URL(레거시)
+   * 'vod' = 영구 보존 VOD — vodplay 토큰이 호출 IP에 묶이므로 서버는 videoId/inKey만 주고,
+   *         재생용 MP4 URL은 클라이언트가 직접 받는다(resolveVodMp4Url).
+   */
+  streamType: 'hls' | 'mp4' | 'vod';
   duration: number;
   videoTitle: string;
-}
-
-/** 네이버 VOD 재생 JSON에서 최고 화질 MP4 URL 추출 */
-function pickBestMp4Url(playback: Record<string, any>): string | null {
-  let best: { width: number; url: string } | null = null;
-
-  for (const period of playback.period ?? []) {
-    for (const adaptationSet of period.adaptationSet ?? []) {
-      if (adaptationSet.mimeType !== 'video/mp4') continue;
-      for (const rep of adaptationSet.representation ?? []) {
-        const width = rep.width ?? 0;
-        const url = rep.baseURL?.[0]?.value;
-        if (url && (!best || width > best.width)) {
-          best = { width, url };
-        }
-      }
-    }
-  }
-
-  return best?.url ?? null;
+  /** streamType='vod'일 때만: 클라이언트가 vodplay 호출에 사용 */
+  vodVideoId?: string;
+  vodInKey?: string;
 }
 
 /**
@@ -298,26 +286,18 @@ export async function fetchVideoStreamInfo(videoNo: number | string): Promise<St
     }
   }
 
-  // 2) 영구 보존 VOD: videoId + inKey → 네이버 VOD 재생 정보
+  // 2) 영구 보존 VOD: videoId + inKey만 클라이언트에 전달.
+  //    vodplay MP4 URL의 토큰이 "요청 IP"에 묶이므로 서버에서 받아 넘기면 프로덕션
+  //    (서버=Vercel)과 클라이언트 IP가 달라 재생이 막힌다 → 브라우저가 직접 받게 한다.
   if (content.videoId && content.inKey) {
-    const playbackResponse = await fetchWithTimeout(
-      `https://apis.naver.com/neonplayer/vodplay/v2/playback/${content.videoId}?key=${content.inKey}`,
-      { headers: { ...CHZZK_HEADERS, Accept: 'application/json' } },
-      15000,
-    );
-
-    if (playbackResponse.ok) {
-      const playback = await playbackResponse.json();
-      const mp4Url = pickBestMp4Url(playback);
-      if (mp4Url) {
-        return {
-          streamUrl: mp4Url,
-          streamType: 'mp4',
-          duration: content.duration || 0,
-          videoTitle: content.videoTitle,
-        };
-      }
-    }
+    return {
+      streamType: 'vod',
+      streamUrl: '',
+      vodVideoId: content.videoId,
+      vodInKey: content.inKey,
+      duration: content.duration || 0,
+      videoTitle: content.videoTitle,
+    };
   }
 
   // 임시 다시보기 만료 + 영구 VOD 미전환 → 재생 가능한 스트림 없음

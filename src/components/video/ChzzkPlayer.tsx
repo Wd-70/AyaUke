@@ -3,6 +3,7 @@
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import Hls from "hls.js";
 import { formatSeconds } from "@/lib/timeUtils";
+import { resolveVodMp4Url } from "@/shared/utils/chzzk-vod";
 import { loadStoredVolume, saveStoredVolume } from "@/components/clip/volume-storage";
 
 interface ChzzkPlayerProps {
@@ -63,13 +64,26 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
         // 에러여도 본문을 읽어 실제 메시지(만료/삭제 안내 등)를 사용
         const result = await response.json().catch(() => null);
 
-        if (!response.ok || !result?.success || !result.data?.streamUrl) {
+        if (!response.ok || !result?.success || !result.data) {
           throw new Error(result?.error?.message || "재생 가능한 스트림이 없습니다.");
         }
 
-        setHlsUrl(result.data.streamUrl);
-        setStreamType(result.data.streamType || 'hls');
-        setDuration(result.data.duration || 0);
+        const data = result.data;
+        setDuration(data.duration || 0);
+
+        if (data.streamType === 'vod') {
+          // 영구 보존 VOD: vodplay 토큰이 호출 IP에 묶이므로 브라우저가 직접 MP4 URL을 받는다.
+          const mp4Url = await resolveVodMp4Url(data.vodVideoId, data.vodInKey);
+          if (!mp4Url) throw new Error("재생할 수 있는 영상이 아닙니다.");
+          setHlsUrl(mp4Url);
+          setStreamType('mp4');
+        } else {
+          if (!data.streamUrl) {
+            throw new Error(result?.error?.message || "재생 가능한 스트림이 없습니다.");
+          }
+          setHlsUrl(data.streamUrl);
+          setStreamType(data.streamType || 'hls');
+        }
       } catch (err: any) {
         // 만료/삭제된 원본은 예상된 상태 — 오버레이 띄우지 않도록 warn으로 처리
         console.warn("[ChzzkPlayer] 영상 로드 실패:", err?.message || err);

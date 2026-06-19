@@ -20,6 +20,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { CalendarDaysIcon, UserIcon } from "@heroicons/react/24/outline";
 import type { VideoPlatform } from "@/shared/utils/video-url";
+import { resolveVodMp4Url } from "@/shared/utils/chzzk-vod";
 import { loadStoredVolume, saveStoredVolume } from "./volume-storage";
 
 interface ClipPlayerProps {
@@ -302,15 +303,32 @@ export default function ClipPlayer({
         if (!res.ok || !result.success) {
           throw new Error(result.error?.message || "영상 정보를 불러올 수 없습니다.");
         }
-        return result.data as { streamUrl: string; streamType: 'hls' | 'mp4'; videoTitle?: string };
+        return result.data as {
+          streamUrl: string;
+          streamType: 'hls' | 'mp4' | 'vod';
+          videoTitle?: string;
+          vodVideoId?: string;
+          vodInKey?: string;
+        };
       })
-      .then(({ streamUrl, streamType, videoTitle }) => {
+      .then(async ({ streamUrl, streamType, videoTitle, vodVideoId, vodInKey }) => {
         if (cancelled) return;
         if (videoTitle) setVodTitle(videoTitle);
 
-        // 영구 보존 VOD: progressive MP4 — 네이티브 재생 (Range 시킹 지원)
-        if (streamType === 'mp4') {
-          video.src = streamUrl;
+        // 영구 보존 VOD: vodplay 토큰이 호출 IP에 묶이므로 브라우저가 직접 MP4 URL을 받는다.
+        let mp4Url: string | null = streamType === 'mp4' ? streamUrl : null;
+        if (streamType === 'vod' && vodVideoId && vodInKey) {
+          mp4Url = await resolveVodMp4Url(vodVideoId, vodInKey);
+          if (cancelled) return;
+          if (!mp4Url) {
+            setError("재생할 수 있는 영상이 아닙니다.");
+            return;
+          }
+        }
+
+        // progressive MP4 — 네이티브 재생 (Range 시킹 지원)
+        if (mp4Url) {
+          video.src = mp4Url;
           video.addEventListener("loadedmetadata", onLoaded, { once: true });
           return;
         }
