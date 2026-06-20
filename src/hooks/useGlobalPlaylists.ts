@@ -38,7 +38,12 @@ const playlistsKey = (channelId: string | null) => ['playlists', channelId ?? 'a
 const OPS_KEY = ['playlist-ops'] as const
 type OpsMap = Record<string, string[]> // songId -> playlistIds
 
-function songIdOf(entry: PlaylistWithSongs['songs'][number]): string {
+// 안정적인 빈 기본값. useQuery의 data가 없을 때 매 렌더 새 배열/객체를 만들면
+// 참조가 매번 바뀌어, 이를 의존하는 메모/이펙트가 무한 갱신될 수 있다.
+const EMPTY_PLAYLISTS: PlaylistWithSongs[] = []
+const EMPTY_OPS: OpsMap = {}
+
+export function songIdOf(entry: PlaylistWithSongs['songs'][number]): string {
   const id = entry.songId
   return typeof id === 'object' && id?._id ? id._id : String(id)
 }
@@ -74,7 +79,7 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
     enabled: !!channelId,
   })
 
-  const playlists = query.data ?? []
+  const playlists = query.data ?? EMPTY_PLAYLISTS
 
   /** 캐시 직접 갱신 헬퍼 */
   const updateCache = useCallback(
@@ -87,7 +92,7 @@ export function useGlobalPlaylists(): UseGlobalPlaylistsReturn {
   )
 
   // 곡별 진행 중 작업 추적 (스피너 표시용)
-  const { data: ops = {} } = useQuery<OpsMap>({
+  const { data: ops = EMPTY_OPS } = useQuery<OpsMap>({
     queryKey: OPS_KEY,
     queryFn: () => ({}),
     staleTime: Infinity,

@@ -15,6 +15,10 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
 
 type LikesMap = Record<string, boolean>
 
+// 안정적인 빈 기본값. useQuery의 data가 없을 때 `= {}`로 매 렌더 새 객체를 만들면
+// likesMap 참조가 매번 바뀌어, 이를 의존하는 메모/이펙트가 무한 갱신될 수 있다.
+const EMPTY_LIKES: LikesMap = {}
+
 const likesKey = (channelId: string | null) => ['likes', channelId ?? 'anonymous'] as const
 
 /** SongSearch 등 외부 구독자를 위한 레거시 호환 이벤트 */
@@ -29,7 +33,7 @@ function useLikesCache() {
   const channelId = session?.user?.channelId ?? null
   const queryClient = useQueryClient()
 
-  const { data: likesMap = {} } = useQuery<LikesMap>({
+  const { data: likesMap = EMPTY_LIKES } = useQuery<LikesMap>({
     queryKey: likesKey(channelId),
     // 실제 데이터는 loadLikes가 setQueryData로 병합 주입한다
     queryFn: () => ({}),

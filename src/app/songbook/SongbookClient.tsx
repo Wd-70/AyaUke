@@ -10,7 +10,7 @@ import SongbookHeader from '@/components/SongbookHeader';
 import { MusicalNoteIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
 import { useState, useEffect } from 'react';
 import { useBulkLikes } from '@/hooks/useLikes';
-import { useGlobalPlaylists } from '@/hooks/useGlobalPlaylists';
+import { useSongFilters } from '@/hooks/useSongFilters';
 import { useActivity } from '@/hooks/useActivity';
 
 function useChunkedRender(items: Song[], chunkSize: number = 20) {
@@ -53,9 +53,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   // songbook 페이지 활동 추적
   useActivity()
   
-  const [filteredSongs, setFilteredSongs] = useState<Song[]>(initialSongs || []);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [songs, setSongs] = useState<Song[]>(initialSongs || []); // 랜덤 섞기를 위한 상태
   const [showNumbers, setShowNumbers] = useState(false); // 번호 표시 상태
   // 보기 모드: grid(카드) | list(compact). 브라우저에 저장
   const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
@@ -71,15 +69,16 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   const [isLoading, setIsLoading] = useState(!initialSongs || initialSongs.length === 0); // 로딩 상태
   const [hasOpenDialog, setHasOpenDialog] = useState(false); // 다이얼로그 열림 상태
   const { loadLikes } = useBulkLikes();
-  const { refresh: refreshPlaylists } = useGlobalPlaylists();
+  // 필터/정렬 상태와 파생 결과를 부모가 소유(단일 진실원). SongSearch는 이걸 받아 렌더만.
+  // (useSongFilters 내부에서 useGlobalPlaylists를 호출하므로 플레이리스트 프리페치도 포함)
+  const filters = useSongFilters(initialSongs || []);
+  const filteredSongs = filters.filteredSongs;
 
   const visibleSongs = useChunkedRender(filteredSongs, 24);
 
-  // initialSongs가 변경되면 상태 업데이트 (서버에서 데이터가 도착했을 때)
+  // initialSongs가 도착하면 로딩 해제 (filteredSongs는 useSongFilters에서 파생)
   useEffect(() => {
     if (initialSongs && initialSongs.length > 0) {
-      setSongs(initialSongs);
-      setFilteredSongs(initialSongs);
       setIsLoading(false);
     }
   }, [initialSongs]);
@@ -87,19 +86,12 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   // 초기 데이터 로딩 (좋아요만, 플레이리스트는 useGlobalPlaylists에서 자동 처리)
   useEffect(() => {
     if (filteredSongs.length > 0) {
-      // 좋아요 데이터 로딩 (우선순위 높음)
+      // 좋아요 데이터 로딩 (보이는 24곡 우선, 나머지는 낮은 우선순위)
       const initialSongIds = filteredSongs.slice(0, 24).map(song => song.id);
-      console.log('🚀 초기 24곡 좋아요 로딩 시작');
       loadLikes(initialSongIds, 'high').then(() => {
-        console.log('✅ 초기 24곡 좋아요 로딩 완료');
-        
-        // 초기 로딩 완료 후 나머지 곡들 로딩 (우선순위 낮음)
         if (filteredSongs.length > 24) {
           const remainingSongIds = filteredSongs.slice(24).map(song => song.id);
-          console.log('🔄 나머지 곡 좋아요 로딩 시작');
-          loadLikes(remainingSongIds, 'low').then(() => {
-            console.log('✅ 모든 곡 좋아요 로딩 완료');
-          });
+          loadLikes(remainingSongIds, 'low');
         }
       });
     }
@@ -152,15 +144,6 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
     );
   }
 
-  const handleSongPlay = (song: Song) => {
-    if (song.mrLinks && song.mrLinks.length > 0) {
-      window.open(song.mrLinks[0], '_blank');
-    } else {
-      const searchQuery = encodeURIComponent(`${song.title} ${song.artist} karaoke MR`);
-      window.open(`https://www.youtube.com/results?search_query=${searchQuery}`, '_blank');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-light-background dark:bg-dark-background">
       <Navigation currentPath="/songbook" />
@@ -182,9 +165,8 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
           isLoading={isLoading}
         />
 
-        <SongSearch 
-          songs={songs || []} 
-          onFilteredSongs={setFilteredSongs}
+        <SongSearch
+          filters={filters}
           showNumbers={showNumbers}
           onToggleNumbers={handleToggleNumbers}
         />
@@ -210,7 +192,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
               </div>
             ))}
           </div>
-        ) : songs && songs.length > 0 ? (
+        ) : initialSongs && initialSongs.length > 0 ? (
           filteredSongs.length > 0 ? (
           <>
           {/* 보기 모드 토글 (그리드 / 리스트) */}
@@ -250,7 +232,6 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
               >
                 <SongCard
                   song={song}
-                  onPlay={handleSongPlay}
                   showNumber={showNumbers}
                   number={index + 1}
                   compact={viewMode === 'list'}
@@ -292,8 +273,8 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
               다른 검색어나 필터를 시도해보세요
             </p>
             <button
-              onClick={() => setFilteredSongs(initialSongs)}
-              className="px-6 py-3 bg-gradient-to-r from-light-accent to-light-purple 
+              onClick={() => filters.clearFilters()}
+              className="px-6 py-3 bg-gradient-to-r from-light-accent to-light-purple
                        dark:from-dark-accent dark:to-dark-purple text-white 
                        rounded-lg hover:shadow-lg transition-all duration-200"
             >

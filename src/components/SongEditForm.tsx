@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { SongData } from '@/types';
+import { Song } from '@/types';
 import { StarIcon, TrashIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useToast } from './Toast';
 
 interface SongEditFormProps {
-  song: SongData;
+  song: Song;
   isVisible: boolean;
-  onSave: (updatedSong: SongData) => void;
+  onSave: (updatedSong: Song) => void;
   onCancel: () => void;
   onLyricsChange?: (lyrics: string) => void; // 왼쪽 가사 패널과 동기화용
   initialLyrics?: string; // 왼쪽 패널의 현재 가사 텍스트
@@ -217,17 +217,15 @@ export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyri
     
     setIsSaving(true);
     try {
-      // 저장할 데이터 준비 - alias 로직 처리
+      // 저장할 데이터 준비 - alias 로직 처리.
+      // title/artist는 수정 불가(구글시트 기준)이므로 페이로드에서 제외한다.
+      const { title: _omitTitle, artist: _omitArtist, ...rest } = editData;
       const saveData = {
-        ...editData,
+        ...rest,
         titleAlias: (!editData.titleAlias.trim() || editData.titleAlias.trim() === song.title.trim()) ? null : editData.titleAlias.trim(),
         artistAlias: (!editData.artistAlias.trim() || editData.artistAlias.trim() === song.artist.trim()) ? null : editData.artistAlias.trim(),
         mrLinks: editData.mrLinks.filter(link => link.url.trim() !== ''),
       };
-      
-      // 기본값은 제거 (수정 불가능)
-      delete saveData.title;
-      delete saveData.artist;
 
       console.log('🚀 저장할 데이터:', JSON.stringify(saveData, null, 2));
 

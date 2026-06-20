@@ -1,46 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { SongData } from "@/types";
+import { Song, SongVideo } from "@/types";
 import {
   MusicalNoteIcon,
-  PlayIcon,
-  PauseIcon,
-  XMarkIcon,
-  VideoCameraIcon,
   MagnifyingGlassIcon,
   ArrowTopRightOnSquareIcon,
-  ListBulletIcon,
-  PencilIcon,
-  ComputerDesktopIcon,
-  DocumentDuplicateIcon,
+  QueueListIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon, MicrophoneIcon } from "@heroicons/react/24/solid";
-import YouTube from "react-youtube";
 import { useLike } from "@/hooks/useLikes";
 import { useSongPlaylists } from "@/hooks/useGlobalPlaylists";
 import PlaylistContextMenu from "./PlaylistContextMenu";
-import LiveClipManager from "./LiveClipManager";
-import LiveClipEditor from "./LiveClipEditor";
-import SongEditForm from "./SongEditForm";
 import SongDetailModal from "./SongDetailModal";
 import OfficialCornerFold from "./OfficialCornerFold";
 import { isOfficialSong } from "@/shared/utils/song-source";
-import { useSession } from "next-auth/react";
-import { useToast } from "./Toast";
-import { useConfirm } from "./ConfirmDialog";
-
-// YouTube 플레이어 타입 정의
-interface YouTubePlayer {
-  playVideo(): void;
-  pauseVideo(): void;
-  getPlayerState(): number;
-}
 
 interface SongCardProps {
-  song: SongData;
-  onPlay?: (song: SongData) => void;
+  song: Song;
   showNumber?: boolean;
   number?: number;
   /** 리스트(compact) 보기: 슬림한 한 줄 행으로 렌더 */
@@ -55,99 +33,15 @@ export default function SongCard({
   compact = false,
   onDialogStateChange,
 }: SongCardProps) {
-  const { data: session } = useSession();
   const { liked, isLoading: likeLoading, toggleLike } = useLike(song.id);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTab, setCurrentTab] = useState<"lyrics" | "mr" | "videos">(
-    "lyrics"
-  );
-  const [youtubePlayer, setYoutubePlayer] = useState<YouTubePlayer | null>(
-    null
-  );
-  const [isXLScreen, setIsXLScreen] = useState(false);
-  const [playerPosition, setPlayerPosition] = useState({
-    top: 0,
-    left: 0,
-    width: 0,
-    height: 0,
-  });
-  const [liveClipPosition, setLiveClipPosition] = useState({
-    top: 0,
-    left: 0,
-    width: 0,
-    height: 0,
-  });
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
-  const [isMobileScreen, setIsMobileScreen] = useState(false);
 
-  // 편집 모드 상태
-  const [isEditMode, setIsEditMode] = useState(false);
-  // 라이브 클립 데이터 상태 (LiveClipManager와 LiveClipEditor 공유)
-  const [songVideos, setSongVideos] = useState<any[]>([]);
+  // 라이브 클립 데이터 (SongDetailModal과 공유 — 모달이 열릴 때 모달에서 로드 트리거)
+  const [songVideos, setSongVideos] = useState<SongVideo[]>([]);
   const [videosLoading, setVideosLoading] = useState(false);
-
-  // 토스트 훅
-  const { showSuccess, showError, showInfo } = useToast();
-  const confirm = useConfirm();
-  const [videosLoaded, setVideosLoaded] = useState(false); // 한 번이라도 로드 시도했는지 추적
-
-  // 가사 전용 상태 (성능 최적화를 위해 분리)
-  const [lyricsText, setLyricsText] = useState(song.lyrics || "");
-
-  // 관리자 권한 체크
-  const isAdmin = session?.user?.isAdmin || false;
-
-  // OBS 상태 관리
-  const [obsActive, setObsActive] = useState(false);
-  const [obsLoading, setObsLoading] = useState(false);
-
-  // Player position 계산 최적화
-  const optimizedPlayerStyle = useMemo(() => {
-    const shouldShow =
-      (isXLScreen && (currentTab === "mr" || currentTab === "lyrics")) ||
-      (!isXLScreen && currentTab === "mr");
-
-    return {
-      position: "fixed" as const,
-      top: shouldShow ? playerPosition.top : -9999,
-      left: shouldShow ? playerPosition.left : -9999,
-      width: `${playerPosition.width || 0}px`,
-      height: `${playerPosition.height || 0}px`,
-      maxWidth: `${playerPosition.width || 0}px`,
-      maxHeight: `${playerPosition.height || 0}px`,
-      minWidth: 0,
-      minHeight: 0,
-      pointerEvents: "auto" as const,
-      zIndex: 50,
-      overflow: "hidden" as const,
-      boxSizing: "border-box" as const,
-    };
-  }, [isXLScreen, currentTab, playerPosition]);
-
-  // LiveClip position 계산 최적화
-  const optimizedLiveClipStyle = useMemo(() => {
-    const shouldShow = currentTab === "videos";
-
-    return {
-      position: "fixed" as const,
-      top: shouldShow ? liveClipPosition.top : -9999,
-      left: shouldShow ? liveClipPosition.left : -9999,
-      width: `${liveClipPosition.width || 0}px`,
-      height: `${liveClipPosition.height || 0}px`,
-      maxWidth: `${liveClipPosition.width || 0}px`,
-      maxHeight: `${liveClipPosition.height || 0}px`,
-      minWidth: 0,
-      minHeight: 0,
-      pointerEvents: "auto" as const,
-      zIndex: 50,
-      overflow: "hidden" as const,
-      boxSizing: "border-box" as const,
-    };
-  }, [isXLScreen, currentTab, liveClipPosition]);
-
 
   // 라이브 클립 데이터 로드
   const loadSongVideos = useCallback(async () => {
@@ -157,233 +51,39 @@ export default function SongCard({
       if (response.ok) {
         const data = await response.json();
         setSongVideos(data.videos || []);
-        setVideosLoaded(true); // 성공적으로 로드했음을 표시
       } else {
         console.error("라이브 클립 로딩 실패");
-        setVideosLoaded(true); // 실패해도 시도했음을 표시
       }
     } catch (error) {
       console.error("라이브 클립 로딩 오류:", error);
-      setVideosLoaded(true); // 에러가 나도 시도했음을 표시
     } finally {
       setVideosLoading(false);
     }
-  }, [song.id]); // song.id가 변경될 때만 함수 재생성
+  }, [song.id]);
 
-  // 곡이 바뀔 때 라이브 클립 상태 초기화
+  // 곡이 바뀌면 라이브 클립 상태 초기화
   useEffect(() => {
     setSongVideos([]);
-    setVideosLoaded(false);
     setVideosLoading(false);
   }, [song.id]);
 
-  // 라이브 클립 데이터 로드 (videos 탭을 처음 열 때만)
-  useEffect(() => {
-    if (
-      isExpanded &&
-      currentTab === "videos" &&
-      !videosLoaded &&
-      !videosLoading
-    ) {
-      loadSongVideos();
-    }
-  }, [isExpanded, currentTab, videosLoaded, videosLoading, loadSongVideos]);
-
-  // debounced 가사 업데이트 핸들러 (성능 최적화)
-  const handleLyricsChange = useCallback((newLyrics: string) => {
-    // 즉시 UI 업데이트 (사용자 입력 반응성 유지)
-    setLyricsText(newLyrics);
-  }, []);
-
-  // song이 변경될 때 lyricsText 초기화
-  useEffect(() => {
-    setLyricsText(song.lyrics || "");
-  }, [song.lyrics]);
-
-
-  // XL 화면에서는 MR 탭을 기본으로 설정
-  useEffect(() => {
-    const updateDefaultTab = () => {
-      const isXL = window.innerWidth >= 1280;
-      if (isExpanded && isXL && currentTab === "lyrics") {
-        // XL 화면에서 가사 탭이 선택되어 있으면 MR 탭으로 변경
-        setCurrentTab("mr");
-      }
-    };
-
-    // 다이얼로그가 열릴 때 실행
-    if (isExpanded) {
-      updateDefaultTab();
-      // 화면 크기 변경 감지
-      window.addEventListener("resize", updateDefaultTab);
-    }
-
-    return () => {
-      window.removeEventListener("resize", updateDefaultTab);
-    };
-  }, [isExpanded, currentTab]);
-
-  // 편집 모드 토글
-  const toggleEditMode = () => {
-    setIsEditMode(!isEditMode);
-  };
-
-  // 다이얼로그 닫기 공통 함수
+  // 다이얼로그 닫기
   const handleCloseDialog = useCallback(() => {
     setIsExpanded(false);
-    setIsEditMode(false);
-    setCurrentTab("lyrics");
-    
-    // 모든 플레이어 상태 초기화
-    setYoutubePlayer(null);
-    setIsPlaying(false);
-    
-    // OBS가 ON 상태인 경우에만 다이얼로그 닫을 때 OFF
-    if (obsActive && session?.user?.userId) {
-      // 즉시 UI 상태 업데이트
-      setObsActive(false);
-      // API 요청은 백그라운드에서 처리 (응답 대기 안함)
-      fetch("/api/obs/delete", { method: "DELETE" }).catch((error) => {
-        console.error("OBS 상태 정리 오류:", error);
-      });
-      console.log("다이얼로그 닫힘으로 인한 OBS 상태 OFF");
-    }
-  }, [obsActive, session?.user?.userId]);
+  }, []);
 
-  // ESC 키 핸들러
-  const handleEscapeKey = useCallback(async () => {
-    if (isEditMode) {
-      // 수정 모드에서 ESC: 일반 모드로
-      setIsEditMode(false);
-    } else {
-      // 일반 모드에서 ESC: 다이얼로그 닫기
-      handleCloseDialog();
-    }
-  }, [isEditMode, handleCloseDialog]);
-
-  // ESC 키 이벤트 리스너 등록
+  // ESC 키로 닫기
   useEffect(() => {
+    if (!isExpanded) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        handleEscapeKey();
+        handleCloseDialog();
       }
     };
-
-    if (isExpanded) {
-      document.addEventListener("keydown", handleKeyDown);
-    }
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isExpanded, handleEscapeKey]);
-
-  // SongEditForm용 저장 핸들러
-  const handleSaveEdit = (updatedSong: SongData) => {
-    // 곡 데이터 업데이트
-    Object.assign(song, updatedSong);
-    setIsEditMode(false);
-  };
-
-  // 편집 취소
-  const cancelEdit = () => {
-    setIsEditMode(false);
-  };
-
-  // OBS 토글 함수
-  const toggleOBS = async () => {
-    if (!session?.user?.userId) {
-      showError("로그인 필요", "OBS 기능을 사용하려면 로그인이 필요합니다.");
-      return;
-    }
-
-    if (obsLoading) {
-      console.log("OBS 요청 이미 진행 중...");
-      return; // 중복 실행 방지
-    }
-
-    setObsLoading(true);
-    try {
-      if (obsActive) {
-        // OBS OFF - 상태 삭제
-        const response = await fetch("/api/obs/delete", {
-          method: "DELETE",
-        });
-
-        if (response.ok) {
-          setObsActive(false);
-          console.log("OBS 상태 OFF");
-        } else {
-          // 개발 환경에서는 서버 재시작으로 상태가 사라질 수 있음
-          console.log("OBS OFF 응답 (개발환경에서는 정상)");
-          setObsActive(false);
-        }
-      } else {
-        // OBS ON - 상태 생성
-        const currentSong = {
-          title: song.titleAlias || song.title,
-          artist: song.artistAlias || song.artist,
-        };
-
-        const response = await fetch("/api/obs/create", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ currentSong }),
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-          setObsActive(true);
-          console.log(`OBS 상태 ON: ${result.obsUrl}`);
-        } else if (response.status === 409) {
-          // 기존 OBS가 활성화되어 있지만 UI상 ON 상태로 표시 (수동으로 끌 수 있도록)
-          setObsActive(true);
-          showError("OBS 이미 활성화됨", "다른 곡의 OBS가 활성화되어 있습니다. 먼저 끄고 다시 시도하세요.");
-        } else {
-          showError("OBS 오류", result.error || "OBS 켜기에 실패했습니다.");
-        }
-      }
-    } catch (error) {
-      console.error("OBS 토글 오류:", error);
-      showError("OBS 오류", "OBS 설정 중 오류가 발생했습니다.");
-    } finally {
-      setObsLoading(false);
-    }
-  };
-
-  // OBS 링크 복사 함수
-  const copyOBSLink = async () => {
-    if (!session?.user?.userId) {
-      showError(
-        "로그인 필요",
-        "OBS 링크 복사 기능을 사용하려면 로그인이 필요합니다."
-      );
-      return;
-    }
-
-    const obsUrl = `${window.location.origin}/obs/overlay/${session.user.userId}`;
-
-    try {
-      await navigator.clipboard.writeText(obsUrl);
-      showSuccess("복사 완료", "OBS 링크가 클립보드에 복사되었습니다!");
-    } catch (error) {
-      console.error("클립보드 복사 오류:", error);
-      // 대체 방법으로 텍스트 선택
-      const textArea = document.createElement("textarea");
-      textArea.value = obsUrl;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
-      showSuccess("복사 완료", "OBS 링크가 클립보드에 복사되었습니다!");
-    }
-  };
-
-  // 태그 변경 핸들러
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isExpanded, handleCloseDialog]);
 
   const languageColors = {
     Korean: "bg-blue-500",
@@ -468,41 +168,6 @@ export default function SongCard({
     }
   };
 
-  const handleModalPlay = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (youtubeMR) {
-      // MR 링크가 있을 때만 재생 기능 실행
-      if (
-        youtubePlayer &&
-        typeof youtubePlayer.playVideo === "function" &&
-        typeof youtubePlayer.pauseVideo === "function"
-      ) {
-        // 플레이어가 준비되었을 때
-        try {
-          if (isPlaying) {
-            youtubePlayer.pauseVideo();
-            setIsPlaying(false);
-          } else {
-            youtubePlayer.playVideo();
-            setIsPlaying(true);
-          }
-        } catch (error) {
-          console.warn("YouTube player control error:", error);
-          // 에러 발생 시 MR 탭으로 전환
-          setCurrentTab("mr");
-        }
-      } else {
-        // 플레이어가 아직 준비되지 않았을 때 - MR 탭으로 전환
-        console.log("YouTube player not ready, switching to MR tab");
-        setCurrentTab("mr");
-      }
-    } else {
-      // MR 링크가 없을 때는 검색 기능 실행
-      handleMRSearch(e);
-    }
-  };
-
   const handleMRSearch = (e: React.MouseEvent) => {
     e.stopPropagation();
     // 직접 YouTube 검색 수행 (더 안정적)
@@ -515,97 +180,9 @@ export default function SongCard({
     );
   };
 
-  const handleOpenInNewTab = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (youtubeMR) {
-      window.open(youtubeMR.fullUrl, "_blank");
-    }
-  };
-
-  const onYouTubeReady = (event: { target: YouTubePlayer | null }) => {
-    // 컴포넌트가 unmount된 경우 처리 중단
-    if (!event?.target) {
-      console.log("YouTube player target is null, component may be unmounted");
-      return;
-    }
-
-    console.log("YouTube player ready:", event.target);
-    setYoutubePlayer(event.target);
-
-    // 플레이어가 준비되면 자동 재생 방지
-    try {
-      if (event.target && typeof event.target.pauseVideo === "function") {
-        // 더 긴 지연으로 플레이어 완전 초기화 대기
-        setTimeout(() => {
-          try {
-            // 다시 한번 null 체크 (컴포넌트가 unmount될 수 있음)
-            if (!event?.target) return;
-
-            // 플레이어 상태를 확인한 후 일시정지 시도
-            if (typeof event.target.getPlayerState === "function") {
-              const playerState = event.target.getPlayerState();
-              if (playerState !== undefined && playerState !== -1) {
-                event.target.pauseVideo();
-                setIsPlaying(false);
-              }
-            } else {
-              // getPlayerState가 없으면 그냥 일시정지 시도
-              event.target.pauseVideo();
-              setIsPlaying(false);
-            }
-          } catch (err) {
-            // 에러가 발생해도 조용히 처리 (플레이어가 아직 완전히 로드되지 않은 경우)
-            console.log(
-              "Failed to pause video on ready (normal during initialization)"
-            );
-          }
-        }, 500); // 지연 시간을 늘림
-      }
-    } catch (error) {
-      console.warn("YouTube player ready error:", error);
-    }
-  };
-
-  const onYouTubeStateChange = (event: { data: number }) => {
-    // 컴포넌트가 unmount된 경우 처리 중단
-    if (!event || typeof event.data !== 'number') {
-      console.log("YouTube state change event is invalid, component may be unmounted");
-      return;
-    }
-
-    try {
-      // YouTube 플레이어 상태와 동기화
-      // -1: 시작되지 않음, 0: 종료, 1: 재생 중, 2: 일시정지, 3: 버퍼링, 5: 동영상 신호
-      const playerState = event.data;
-      const isCurrentlyPlaying = playerState === 1;
-      setIsPlaying(isCurrentlyPlaying);
-    } catch (error) {
-      console.warn("YouTube state change error:", error);
-    }
-  };
-
-  const switchTab = (tab: "lyrics" | "mr" | "videos") => {
-    setCurrentTab(tab);
-  };
-
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
     await toggleLike();
-  };
-
-  const handlePlaylistClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // 로그인하지 않은 경우 플레이리스트 메뉴 표시하지 않음
-    if (!songPlaylists || songPlaylists.length === 0) {
-      console.log("🔒 로그인이 필요한 기능입니다");
-      return;
-    }
-    const rect = e.currentTarget.getBoundingClientRect();
-    setMenuPosition({
-      x: rect.left,
-      y: rect.bottom + 8,
-    });
-    setShowPlaylistMenu(true);
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -618,302 +195,48 @@ export default function SongCard({
     setShowPlaylistMenu(true);
   };
 
-  // 실제 뷰포트 높이 계산 및 body 스크롤 비활성화
+  // 모달이 열린 동안 뷰포트 높이(--vh) 설정 + body 스크롤 잠금.
+  // SongDetailModal이 높이 계산에 --vh에 의존하고 스크롤 잠금은 직접 하지 않으므로 여기서 관리.
   useEffect(() => {
     const setViewportHeight = () => {
-      // 실제 뷰포트 높이 계산 (모바일 브라우저 주소창/메뉴바 고려)
       const vh = window.innerHeight * 0.01;
       document.documentElement.style.setProperty("--vh", `${vh}px`);
-
-      // 모바일 화면 여부 체크
-      setIsMobileScreen(window.innerWidth < 640);
+    };
+    const restore = () => {
+      document.body.style.overflow = "";
+      document.body.style.paddingRight = "";
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
     };
 
     if (isExpanded) {
-      // 뷰포트 높이 설정
       setViewportHeight();
-
-      // 리사이즈 이벤트 리스너 추가 (모바일에서 주소창이 사라질 때 감지)
       window.addEventListener("resize", setViewportHeight);
       window.addEventListener("orientationchange", setViewportHeight);
-
-      // body 스크롤 완전 비활성화
       document.body.style.overflow = "hidden";
-      document.body.style.paddingRight = "0px"; // 스크롤바 공간 보정
-      document.body.style.touchAction = "none"; // 터치 스크롤 방지
-      document.documentElement.style.overflow = "hidden"; // html 요소도 차단
+      document.body.style.paddingRight = "0px";
+      document.body.style.touchAction = "none";
+      document.documentElement.style.overflow = "hidden";
     } else {
-      // 이벤트 리스너 제거
       window.removeEventListener("resize", setViewportHeight);
       window.removeEventListener("orientationchange", setViewportHeight);
-
-      // body 스크롤 복원
-      document.body.style.overflow = "";
-      document.body.style.paddingRight = "";
-      document.body.style.touchAction = "";
-      document.documentElement.style.overflow = "";
-      // 모달이 닫힐 때 YouTube 플레이어 초기화
-      setYoutubePlayer(null);
-      setIsPlaying(false);
-      setCurrentTab("lyrics");
+      restore();
     }
 
-    // 컴포넌트 언마운트 시 정리
     return () => {
       window.removeEventListener("resize", setViewportHeight);
       window.removeEventListener("orientationchange", setViewportHeight);
-      document.body.style.overflow = "";
-      document.body.style.paddingRight = "";
-      document.body.style.touchAction = "";
-      document.documentElement.style.overflow = "";
-      setYoutubePlayer(null);
-      setIsPlaying(false);
+      restore();
     };
   }, [isExpanded]);
 
   // 다이얼로그 상태 변경 시 부모 컴포넌트에 알림
   useEffect(() => {
-    if (onDialogStateChange) {
-      onDialogStateChange(isExpanded);
-    }
+    onDialogStateChange?.(isExpanded);
   }, [isExpanded, onDialogStateChange]);
 
-  // 다이얼로그 전체에서 스크롤 이벤트 완전 차단
-  const handleDialogScroll = (e: React.WheelEvent) => {
-    e.stopPropagation();
-
-    // passive 이벤트 리스너 경고 방지 - 이벤트가 cancellable일 때만 preventDefault 호출
-    if (e.cancelable) {
-      e.preventDefault();
-    }
-
-    // 추가 보안: 네이티브 이벤트도 차단
-    if (e.nativeEvent) {
-      e.nativeEvent.stopImmediatePropagation();
-    }
-  };
-
-  // 스크롤 가능한 영역에서만 스크롤 허용
-  const handleScrollableAreaScroll = (e: React.WheelEvent) => {
-    e.stopPropagation();
-    // 여기서는 preventDefault를 호출하지 않아 자연스러운 스크롤 허용
-  };
-
-  // MR 플레이어 & LiveClip 위치 계산 및 표시 조건
-  useEffect(() => {
-    if (!isExpanded || isEditMode) return;
-
-    const updatePositions = () => {
-      const xlScreen = window.innerWidth >= 1280;
-      setIsXLScreen((prev) => (prev !== xlScreen ? xlScreen : prev));
-
-      // MR 플레이어 위치 계산
-      if (youtubeMR) {
-        let playerTargetContainer = null;
-
-        if (xlScreen && (currentTab === "mr" || currentTab === "lyrics")) {
-          playerTargetContainer = document.getElementById("xl-player-target");
-        } else if (!xlScreen && currentTab === "mr") {
-          playerTargetContainer = document.getElementById(
-            "mobile-player-target"
-          );
-        }
-
-        if (playerTargetContainer) {
-          const targetRect = playerTargetContainer.getBoundingClientRect();
-          const computedStyle = window.getComputedStyle(playerTargetContainer);
-
-          // 패딩과 보더를 제외한 실제 내부 크기 계산
-          const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
-          const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
-          const paddingTop = parseFloat(computedStyle.paddingTop) || 0;
-          const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0;
-
-          const borderLeft = parseFloat(computedStyle.borderLeftWidth) || 0;
-          const borderRight = parseFloat(computedStyle.borderRightWidth) || 0;
-          const borderTop = parseFloat(computedStyle.borderTopWidth) || 0;
-          const borderBottom = parseFloat(computedStyle.borderBottomWidth) || 0;
-
-          const actualWidth = Math.max(
-            0,
-            targetRect.width -
-              paddingLeft -
-              paddingRight -
-              borderLeft -
-              borderRight
-          );
-          const actualHeight = Math.max(
-            0,
-            targetRect.height -
-              paddingTop -
-              paddingBottom -
-              borderTop -
-              borderBottom
-          );
-
-          const newPosition = {
-            top: targetRect.top + paddingTop + borderTop,
-            left: targetRect.left + paddingLeft + borderLeft,
-            width: actualWidth,
-            height: actualHeight,
-          };
-
-          setPlayerPosition((prev) => {
-            if (
-              prev.top !== newPosition.top ||
-              prev.left !== newPosition.left ||
-              prev.width !== newPosition.width ||
-              prev.height !== newPosition.height
-            ) {
-              return newPosition;
-            }
-            return prev;
-          });
-        }
-      }
-
-      // LiveClip 위치 계산
-      if (currentTab === "videos") {
-        let liveClipTargetContainer = null;
-
-        if (xlScreen) {
-          liveClipTargetContainer =
-            document.getElementById("xl-liveclip-target");
-        } else {
-          liveClipTargetContainer = document.getElementById(
-            "mobile-liveclip-target"
-          );
-        }
-
-        if (liveClipTargetContainer) {
-          const targetRect = liveClipTargetContainer.getBoundingClientRect();
-          const computedStyle = window.getComputedStyle(
-            liveClipTargetContainer
-          );
-
-          // 패딩과 보더를 제외한 실제 내부 크기 계산
-          const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0;
-          const paddingRight = parseFloat(computedStyle.paddingRight) || 0;
-          const paddingTop = parseFloat(computedStyle.paddingTop) || 0;
-          const paddingBottom = parseFloat(computedStyle.paddingBottom) || 0;
-
-          const borderLeft = parseFloat(computedStyle.borderLeftWidth) || 0;
-          const borderRight = parseFloat(computedStyle.borderRightWidth) || 0;
-          const borderTop = parseFloat(computedStyle.borderTopWidth) || 0;
-          const borderBottom = parseFloat(computedStyle.borderBottomWidth) || 0;
-
-          const actualWidth = Math.max(
-            0,
-            targetRect.width -
-              paddingLeft -
-              paddingRight -
-              borderLeft -
-              borderRight
-          );
-          const actualHeight = Math.max(
-            0,
-            targetRect.height -
-              paddingTop -
-              paddingBottom -
-              borderTop -
-              borderBottom
-          );
-
-          const newLiveClipPosition = {
-            top: targetRect.top + paddingTop + borderTop,
-            left: targetRect.left + paddingLeft + borderLeft,
-            width: actualWidth,
-            height: actualHeight,
-          };
-
-          setLiveClipPosition((prev) => {
-            if (
-              prev.top !== newLiveClipPosition.top ||
-              prev.left !== newLiveClipPosition.left ||
-              prev.width !== newLiveClipPosition.width ||
-              prev.height !== newLiveClipPosition.height
-            ) {
-              return newLiveClipPosition;
-            }
-            return prev;
-          });
-        }
-      }
-    };
-
-    // 초기 위치 계산
-    updatePositions();
-
-    // 리사이즈 및 스크롤 이벤트 리스너 등록
-    const handleResize = () => {
-      // 리사이즈 시 약간의 지연으로 성능 최적화
-      setTimeout(updatePositions, 50);
-    };
-
-    window.addEventListener("resize", handleResize);
-    window.addEventListener("scroll", updatePositions, { passive: true });
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("scroll", updatePositions);
-    };
-  }, [isExpanded, currentTab, isEditMode, youtubeMR]);
-
-  const handleCardClick = async () => {
-    // 곡 데이터를 콘솔에 출력
-    console.group(`🎵 ${song.title} - ${song.artist}`);
-    console.log("📋 기본 정보:", {
-      title: song.title,
-      artist: song.artist,
-      language: song.language,
-      id: song.id,
-    });
-
-    if (song.titleAlias || song.artistAlias) {
-      console.log("🏷️ 별칭 정보:", {
-        titleAlias: song.titleAlias,
-        artistAlias: song.artistAlias,
-      });
-    }
-
-    if (song.sungCount !== undefined || song.lastSungDate) {
-      console.log("📊 활동 정보:", {
-        sungCount: song.sungCount,
-        lastSungDate: song.lastSungDate,
-        keyAdjustment: song.keyAdjustment ?? null,
-      });
-    }
-
-    if (song.mrLinks?.length) {
-      console.log("🎤 MR 정보:", {
-        mrLinks: song.mrLinks,
-        selectedMRIndex: song.selectedMRIndex,
-      });
-    }
-
-    if (songPlaylists?.length || song.searchTags?.length) {
-      console.log("🏷️ 태그/플레이리스트:", {
-        tags: song.tags,
-        searchTags: song.searchTags,
-        playlists: songPlaylists,
-      });
-    }
-
-    if (song.lyrics) {
-      console.log(
-        "📝 가사:",
-        song.lyrics.substring(0, 100) + (song.lyrics.length > 100 ? "..." : "")
-      );
-    }
-
-    if (song.personalNotes) {
-      console.log("📝 개인 메모:", song.personalNotes);
-    }
-
-    console.log("🔍 전체 객체:", song);
-    console.groupEnd();
-
-    // 다이얼로그 토글 - 닫을 때는 공통 함수 사용
+  const handleCardClick = () => {
+    // 다이얼로그 토글 — 닫을 때는 공통 함수 사용
     if (isExpanded) {
       handleCloseDialog();
     } else {
@@ -1101,11 +424,13 @@ export default function SongCard({
                   {songPlaylists.slice(0, 2).map((playlist) => (
                     <span
                       key={playlist._id}
-                      className="px-2 py-1 rounded-full text-xs font-medium
-                               bg-purple-100 dark:bg-purple-900 
-                               text-purple-800 dark:text-purple-200"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
+                               bg-light-purple/10 dark:bg-dark-secondary/20
+                               text-light-purple dark:text-dark-secondary
+                               border border-light-purple/20 dark:border-dark-secondary/25"
                     >
-                      🎵 {playlist.name}
+                      <QueueListIcon className="w-3 h-3" />
+                      {playlist.name}
                     </span>
                   ))}
                   {songPlaylists.length > 2 && (
@@ -1269,11 +594,13 @@ export default function SongCard({
                   {songPlaylists.slice(0, 2).map((playlist) => (
                     <span
                       key={playlist._id}
-                      className="px-2 py-1 rounded-full text-xs font-medium
-                               bg-purple-100 dark:bg-purple-900 
-                               text-purple-800 dark:text-purple-200"
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium
+                               bg-light-purple/10 dark:bg-dark-secondary/20
+                               text-light-purple dark:text-dark-secondary
+                               border border-light-purple/20 dark:border-dark-secondary/25"
                     >
-                      🎵 {playlist.name}
+                      <QueueListIcon className="w-3 h-3" />
+                      {playlist.name}
                     </span>
                   ))}
                   {songPlaylists.length > 2 && (

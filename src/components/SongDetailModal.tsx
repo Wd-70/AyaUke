@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { SongData } from "@/types";
+import { Song, SongVideo } from "@/types";
 import {
   MusicalNoteIcon,
   XMarkIcon,
@@ -37,26 +37,24 @@ interface YouTubePlayer {
 }
 
 interface SongDetailModalProps {
-  song: SongData;
+  song: Song;
   isExpanded: boolean;
   onClose: () => void;
-  onPlay?: (song: SongData) => void;
   isMobileScreen: boolean;
-  songVideos?: any[];
-  setSongVideos?: (videos: any[]) => void;
-  videosLoading?: boolean;
-  loadSongVideos?: () => void;
+  songVideos: SongVideo[];
+  setSongVideos: Dispatch<SetStateAction<SongVideo[]>>;
+  videosLoading: boolean;
+  loadSongVideos: () => Promise<void>;
 }
 
 export default function SongDetailModal({
   song,
   isExpanded,
   onClose,
-  onPlay,
   isMobileScreen,
-  songVideos = [],
+  songVideos,
   setSongVideos,
-  videosLoading = false,
+  videosLoading,
   loadSongVideos,
 }: SongDetailModalProps) {
   const { data: session } = useSession();
@@ -76,6 +74,14 @@ export default function SongDetailModal({
   useEffect(() => {
     if (typeof window !== 'undefined') window.localStorage.setItem('songDetailModalTab', activeTab);
   }, [activeTab]);
+  // 다이얼로그가 열릴 때마다 저장된 탭을 다시 읽어 반영한다.
+  // (모달이 카드마다 인스턴스로 존재 → 초기화(카드 마운트) 시점에만 읽으면, 같은 세션에서
+  //  다른 카드가 바꾼 값이 반영되지 않아 "저장이 안 먹는" 것처럼 보인다.)
+  useEffect(() => {
+    if (!isExpanded || typeof window === 'undefined') return;
+    const saved = window.localStorage.getItem('songDetailModalTab');
+    if (saved === 'mr' || saved === 'clips') setActiveTab(saved);
+  }, [isExpanded]);
   const [selectedMRIndex, setSelectedMRIndex] = useState(song.selectedMRIndex || 0);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [playlistMenuPos, setPlaylistMenuPos] = useState({ x: 0, y: 0 });
@@ -105,26 +111,16 @@ export default function SongDetailModal({
   const displayTitle = song.titleAlias || song.title;
   const displayArtist = song.artistAlias || song.artist;
 
-  // YouTube MR 데이터 처리 (문자열/객체 형태 모두 지원 → videoId 추출)
+  // YouTube MR 데이터 처리 (MRLink 객체 → videoId 추출)
   const youtubeMRs = useMemo(() => {
     if (!song.mrLinks || !Array.isArray(song.mrLinks)) {
       return [];
     }
     return song.mrLinks
       .map((link, index) => {
-        let url: string;
-        let skipSeconds = 0;
-
-        if (typeof link === 'string') {
-          url = link;
-          const skipMatch = link.match(/[?&]t=(\d+)/);
-          skipSeconds = skipMatch ? parseInt(skipMatch[1]) : 0;
-        } else if (typeof link === 'object' && link.url) {
-          url = link.url;
-          skipSeconds = link.skipSeconds || 0;
-        } else {
-          return null;
-        }
+        if (!link?.url) return null;
+        const url = link.url;
+        const skipSeconds = link.skipSeconds || 0;
 
         const match = url.match(/(?:v=|\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
         if (match) {
@@ -215,7 +211,7 @@ export default function SongDetailModal({
   };
 
   // 편집 저장 핸들러
-  const handleSaveEdit = (updatedSong: SongData) => {
+  const handleSaveEdit = (updatedSong: Song) => {
     Object.assign(song, updatedSong);
     setIsEditMode(false);
   };
@@ -507,11 +503,6 @@ export default function SongDetailModal({
                   }`}
                 >
                   {song.language}
-                </span>
-              )}
-              {song.isFavorite && (
-                <span className="px-2 py-1 text-xs bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 rounded-full">
-                  ★ 즐겨찾기
                 </span>
               )}
               {song.searchTags &&

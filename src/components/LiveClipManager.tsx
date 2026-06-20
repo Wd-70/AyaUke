@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { motion } from 'framer-motion';
 import { SongVideo } from '@/types';
 import { 
@@ -38,7 +38,7 @@ interface LiveClipManagerProps {
   songId: string;
   songTitle: string;
   songVideos: SongVideo[];
-  setSongVideos: (videos: SongVideo[]) => void;
+  setSongVideos: Dispatch<SetStateAction<SongVideo[]>>;
   videosLoading: boolean;
   loadSongVideos: () => Promise<void>;
   onEditingStateChange?: (isEditing: boolean) => void;

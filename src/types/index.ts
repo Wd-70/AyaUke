@@ -1,3 +1,10 @@
+export interface MRLink {
+  url: string;
+  skipSeconds?: number;
+  label?: string;
+  duration?: string;
+}
+
 export interface Song {
   id: string;                              // MongoDB ObjectId (메인 ID)
   sheetId?: string;                        // 구글시트 원본 ID (병합된 데이터의 경우)
@@ -5,7 +12,7 @@ export interface Song {
   artist: string;
   language: string;
   genre?: string;
-  mrLinks?: string[];
+  mrLinks?: MRLink[];                      // 런타임 실제 형태(객체 배열)
   lyrics?: string;
   difficulty?: string;
   tags?: string[];
@@ -23,18 +30,6 @@ export interface Song {
   selectedMRIndex?: number;
   personalNotes?: string;
   imageUrl?: string;
-}
-
-// SongCard에서 사용하는 확장된 Song 타입
-export interface SongData extends Song {
-  mrLinks?: MRLink[];  // string[] 대신 MRLink[] 사용
-}
-
-export interface MRLink {
-  url: string;
-  skipSeconds?: number;
-  label?: string;
-  duration?: string;
 }
 
 export interface SongDetail {
