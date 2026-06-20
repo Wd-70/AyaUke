@@ -11,6 +11,7 @@ import { MusicalNoteIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/reac
 import { useState, useEffect } from 'react';
 import { useBulkLikes } from '@/hooks/useLikes';
 import { useSongFilters } from '@/hooks/useSongFilters';
+import { useScrollNav } from '@/hooks/useScrollNav';
 import { useActivity } from '@/hooks/useActivity';
 
 function useChunkedRender(items: Song[], chunkSize: number = 20) {
@@ -73,6 +74,10 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   // (useSongFilters 내부에서 useGlobalPlaylists를 호출하므로 플레이리스트 프리페치도 포함)
   const filters = useSongFilters(initialSongs || []);
   const filteredSongs = filters.filteredSongs;
+  // 스크롤 연동 네비/스티키 바 (songbook 한정). CSS 변수(--nav-shift/--nav-height)를
+  // 갱신하면 네비·검색바가 이를 CSS로 읽어 함께 움직인다(props 불필요).
+  // 검색 바 셀렉터를 넘겨, 필터 접힘 앵커링 보정 + 바 고정(stuck) 동기 계산.
+  const barStuck = useScrollNav('[data-sticky-bar]');
 
   const visibleSongs = useChunkedRender(filteredSongs, 24);
 
@@ -147,7 +152,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   return (
     <div className="min-h-screen bg-light-background dark:bg-dark-background">
       <Navigation currentPath="/songbook" />
-      
+
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-20 w-96 h-96 bg-light-accent/5 dark:bg-dark-accent/5 
                         rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
@@ -167,6 +172,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
 
         <SongSearch
           filters={filters}
+          stuck={barStuck}
           showNumbers={showNumbers}
           onToggleNumbers={handleToggleNumbers}
         />

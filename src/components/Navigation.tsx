@@ -14,8 +14,17 @@ interface NavigationProps {
 export default function Navigation({ currentPath = '/' }: NavigationProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { data: session, status, update } = useSession(); // 한 번만 호출
+  // 스크롤 연동: useScrollNav가 --nav-shift를 갱신하면 그만큼 위로 밀려 올라간다.
+  // (변수가 없는 페이지는 0px → 이동 없음). 모바일 메뉴가 열려 있으면 항상 표시.
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-light-primary/20 dark:border-dark-primary/20">
+    <nav
+      className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-light-primary/20 dark:border-dark-primary/20"
+      style={{
+        transform: isMobileMenuOpen
+          ? 'translateY(0)'
+          : 'translateY(calc(-1 * var(--nav-shift, 0px)))',
+      }}
+    >
       <div className="px-3 sm:px-6 lg:px-8">
         <div className="flex items-center h-12 sm:h-16">
           {/* Left side - Logo */}

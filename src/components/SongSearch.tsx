@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   MagnifyingGlassIcon,
@@ -23,12 +23,15 @@ import type { SongFilters } from "@/hooks/useSongFilters";
 interface SongSearchProps {
   /** useSongFilters() 반환값 — 필터 상태·핸들러·파생 결과 일체 (부모가 소유) */
   filters: SongFilters;
+  /** 검색 바가 sticky top에 고정됐는지 (useScrollNav가 같은 rAF에서 동기 계산) */
+  stuck?: boolean;
   showNumbers?: boolean;
   onToggleNumbers?: (show: boolean) => void;
 }
 
 export default function SongSearch({
   filters,
+  stuck = false,
   showNumbers = false,
   onToggleNumbers,
 }: SongSearchProps) {
@@ -90,6 +93,35 @@ export default function SongSearch({
         };
     }
   }, [filterMode]);
+
+  // stuck(고정 여부)은 부모의 useScrollNav가 --nav-shift와 같은 rAF에서 동기 계산해
+  // prop으로 내려준다(IO의 비동기 "한 박자 늦음" 제거).
+
+  // 필터 패널 자동 접기/펼치기 (인메모리·페이지 한정):
+  // 기본은 stuck이면 접고 해제되면 펼친다. 단, 사용자가 직접 토글한 뒤로는 그 상태를
+  // 유지하고 자동 동작을 멈춘다(한 번 펼쳐두면 재진입해도 펼친 채 유지).
+  const userToggledFilterRef = useRef(false);
+  const prevStuckRef = useRef(stuck);
+  // 자동 접힘/펼침은 스크롤 중에 일어나므로 즉시(0초) 처리해 "줄어드는 동안" 구간이
+  // 스크롤과 겹치지 않게 한다. 수동 토글만 부드럽게 애니메이션.
+  const [filterAnimSec, setFilterAnimSec] = useState(0.3);
+  useEffect(() => {
+    if (userToggledFilterRef.current) {
+      prevStuckRef.current = stuck;
+      return;
+    }
+    if (stuck !== prevStuckRef.current) {
+      setFilterAnimSec(0); // 자동 = 즉시
+      setIsFilterOpen(!stuck);
+      prevStuckRef.current = stuck;
+    }
+  }, [stuck, setIsFilterOpen]);
+
+  const handleToggleFilter = () => {
+    userToggledFilterRef.current = true; // 이후 자동 접기/펼치기 중단
+    setFilterAnimSec(0.3); // 수동 = 애니메이션
+    setIsFilterOpen(!isFilterOpen);
+  };
 
   // 툴팁 컴포넌트
   const TooltipButton = ({
@@ -159,7 +191,18 @@ export default function SongSearch({
   );
 
   return (
-    <div className="mb-8">
+    <>
+      <div
+        data-sticky-bar
+        // top은 --nav-height - --nav-shift 로 스크롤에 연동(트랜지션 없이 rAF가 매끄럽게
+        // 갱신). 배경/보더/그림자만 stuck 시 트랜지션. 변수 미설정 페이지는 64px 기본.
+        style={{ top: "calc(var(--nav-height, 64px) - var(--nav-shift, 0px))" }}
+        className={`sticky z-30 mb-8 py-3 transition-[background-color,border-color,box-shadow] duration-200 ${
+          stuck
+            ? "bg-light-background/95 dark:bg-dark-background/95 backdrop-blur-md border-b border-light-primary/20 dark:border-dark-primary/20 shadow-sm -mx-3 sm:-mx-4 lg:-mx-6 xl:-mx-8 px-3 sm:px-4 lg:px-6 xl:px-8"
+            : ""
+        }`}
+      >
       {/* Search bar */}
       <div className="relative mb-3 sm:mb-4">
         <div className="absolute inset-y-0 left-0 pl-2.5 sm:pl-3 flex items-center pointer-events-none">
@@ -199,7 +242,7 @@ export default function SongSearch({
 
           {/* 필터 토글 버튼 */}
           <TooltipButton
-            onClick={() => setIsFilterOpen(!isFilterOpen)}
+            onClick={handleToggleFilter}
             active={false}
             tooltip={isFilterOpen ? "필터 숨기기" : "필터 보기"}
           >
@@ -219,7 +262,7 @@ export default function SongSearch({
           height: isFilterOpen ? "auto" : 0,
           opacity: isFilterOpen ? 1 : 0,
         }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: filterAnimSec }}
         className="overflow-hidden"
       >
         <div className="space-y-3">
@@ -535,6 +578,7 @@ export default function SongSearch({
           </div>
         </div>
       </motion.div>
-    </div>
+      </div>
+    </>
   );
 }

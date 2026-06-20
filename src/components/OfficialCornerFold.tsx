@@ -20,7 +20,7 @@ export default function OfficialCornerFold({
   const gradId = useId();
   return (
     <div
-      className={`absolute top-0 left-0 z-20 pointer-events-none ${className}`}
+      className={`absolute top-0 left-0 z-10 pointer-events-none ${className}`}
       title={title}
     >
       <svg width={size} height={size} viewBox="0 0 32 32" role="img" aria-label={title}>

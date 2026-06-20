@@ -24,8 +24,11 @@
 
 html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
+  /* overflow-x: clip은 가로 넘침을 막되 스크롤 컨테이너를 만들지 않아
+     position: sticky가 뷰포트 기준으로 정상 동작한다. (hidden은 overflow-y를
+     auto로 계산시켜 body를 스크롤 컨테이너로 만들고 sticky를 깬다)
+     max-width: 100vw는 세로 스크롤바 폭만큼 가로 넘침을 유발할 수 있어 제거. */
+  overflow-x: clip;
   scroll-behavior: smooth;
 }
 
@@ -35,7 +38,7 @@ body {
   font-family: 'Inter', system-ui, sans-serif;
   line-height: 1.6;
   position: relative;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* 모바일 기본 폰트 크기 최적화 */
