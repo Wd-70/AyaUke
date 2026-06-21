@@ -138,19 +138,8 @@ export default function SongDetailModal({
 
   const youtubeMR = youtubeMRs[selectedMRIndex] || null;
 
-  // 모달이 열릴 때 라이브 클립 자동 로드
-  useEffect(() => {
-    if (isExpanded && loadSongVideos && songVideos.length === 0 && !videosLoading) {
-      loadSongVideos();
-    }
-  }, [isExpanded, loadSongVideos, songVideos.length, videosLoading]);
-
-  // 탭 변경 시 라이브 클립 로드
-  useEffect(() => {
-    if (isExpanded && activeTab === 'clips' && loadSongVideos && songVideos.length === 0 && !videosLoading) {
-      loadSongVideos();
-    }
-  }, [activeTab, isExpanded, loadSongVideos, songVideos.length, videosLoading]);
+  // 라이브 클립 메타데이터 로드는 useSongVideos(enabled: isExpanded)가 자동 처리한다.
+  // (loadSongVideos는 클립 추가/편집/삭제 후 강제 새로고침용으로 LiveClipManager에 전달)
 
   // Escape 처리: 팝오버/편집 모드가 열려 있으면 그것만 닫고 모달은 유지한다.
   // (부모 SongCard에도 document Escape 리스너가 있어, capture 단계에서 먼저

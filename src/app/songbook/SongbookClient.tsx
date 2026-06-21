@@ -12,6 +12,8 @@ import { useState, useEffect } from 'react';
 import { useBulkLikes } from '@/hooks/useLikes';
 import { useSongFilters } from '@/hooks/useSongFilters';
 import { useScrollNav } from '@/hooks/useScrollNav';
+import { prefetchSongVideos } from '@/hooks/useSongVideos';
+import { useQueryClient } from '@tanstack/react-query';
 import { useActivity } from '@/hooks/useActivity';
 
 function useChunkedRender(items: Song[], chunkSize: number = 20) {
@@ -70,6 +72,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   const [isLoading, setIsLoading] = useState(!initialSongs || initialSongs.length === 0); // 로딩 상태
   const [hasOpenDialog, setHasOpenDialog] = useState(false); // 다이얼로그 열림 상태
   const { loadLikes } = useBulkLikes();
+  const queryClient = useQueryClient();
   // 필터/정렬 상태와 파생 결과를 부모가 소유(단일 진실원). SongSearch는 이걸 받아 렌더만.
   // (useSongFilters 내부에서 useGlobalPlaylists를 호출하므로 플레이리스트 프리페치도 포함)
   const filters = useSongFilters(initialSongs || []);
@@ -101,6 +104,26 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
       });
     }
   }, [filteredSongs.length, loadLikes]); // 필터된 곡 수와 loadLikes 함수에 의존
+
+  // 클립 메타데이터 API 라우트/DB 연결을 미리 데운다(idle 시 첫 곡 videos 1회 프리페치).
+  // 첫 호출은 (dev) 라우트 컴파일 / (prod) 서버리스 콜드스타트+연결로 느린데, 이걸
+  // 백그라운드로 미리 치워 첫 다이얼로그의 클립 탭이 바로 뜨게 한다. 캐시에도 적재돼
+  // 첫 곡을 열면 즉시 표시된다.
+  useEffect(() => {
+    const first = initialSongs?.[0];
+    if (!first) return;
+    const warm = () => prefetchSongVideos(queryClient, first.id);
+    const ric = (window as typeof window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    }).requestIdleCallback;
+    if (ric) {
+      const id = ric(warm, { timeout: 2500 });
+      return () => (window as typeof window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(warm, 1000);
+    return () => clearTimeout(t);
+  }, [initialSongs, queryClient]);
 
   // 주석: 중복 로딩 방지를 위해 제거됨 - 초기 로딩에서 모든 곡 처리
 

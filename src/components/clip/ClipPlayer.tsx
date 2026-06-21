@@ -120,6 +120,9 @@ export default function ClipPlayer({
   const hlsRef = useRef<Hls | null>(null);
   const rafRef = useRef<number>(0);
 
+  // 클릭(또는 autoplay) 전까지 스트림을 만들지 않는다(facade). 다이얼로그를 열어도
+  // 영상 버퍼링 0 → 가볍고 즉각, 모바일 데이터 낭비 없음. 클릭 시 그때 플레이어 생성.
+  const [activated, setActivated] = useState(autoplay);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -169,6 +172,9 @@ export default function ClipPlayer({
     // (이 줄이 없으면 같은 클립을 편집해 시간만 바꿀 때 진행바·시간표시가 옛값으로 남음)
     setClipDuration(validEndTime != null ? Math.max(0, validEndTime - startTime) : 0);
 
+    // facade: 활성화(클릭/autoplay) 전엔 플레이어를 만들지 않는다.
+    if (!activated) return;
+
     if (platform === "youtube") {
       let player: any = null;
       let host: HTMLDivElement | null = null;
@@ -195,7 +201,7 @@ export default function ClipPlayer({
             playsinline: 1,
             start: Math.floor(startTime),
             ...(validEndTime != null ? { end: Math.ceil(validEndTime) } : {}),
-            autoplay: autoplay ? 1 : 0,
+            autoplay: 1, // 이 effect는 activated일 때만 도므로 항상 재생
           },
           events: {
             onReady: (e: any) => {
@@ -294,7 +300,7 @@ export default function ClipPlayer({
       video.volume = volumeRef.current.volume;
       video.muted = volumeRef.current.muted;
       setReady(true);
-      if (autoplay) void video.play();
+      void video.play(); // activated일 때만 도는 effect → 항상 재생
     };
 
     fetch(`/api/clips/chzzk-hls?videoNo=${videoNo}`)
@@ -384,7 +390,7 @@ export default function ClipPlayer({
       hlsRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [platform, videoId, startTime, endTime]);
+  }, [platform, videoId, startTime, endTime, activated]);
 
   // ── 구간 경계 강제 + 진행 추적 ──────────────────────────────────
   // rAF로 포그라운드에선 60fps 부드럽게 그리되, rAF는 탭이 백그라운드면 완전히
@@ -581,16 +587,66 @@ export default function ClipPlayer({
         <video ref={videoRef} className="absolute inset-0 w-full h-full" playsInline />
       )}
 
-      {/* 클릭으로 재생/일시정지 (컨트롤 바 제외 영역) */}
-      <button
-        type="button"
-        aria-label={playing ? "일시정지" : "재생"}
-        onClick={togglePlay}
-        className="absolute inset-0 w-full h-full cursor-pointer"
-      />
+      {/* facade: 활성화 전 — 포스터(유튜브 썸네일 / 치지직 정보) + 재생버튼.
+          클릭해야 스트림을 로드한다(다이얼로그는 가볍게 열림, 데이터 낭비 없음). */}
+      {!activated && (
+        <button
+          type="button"
+          aria-label="재생"
+          onClick={() => setActivated(true)}
+          className="absolute inset-0 w-full h-full cursor-pointer group/facade"
+        >
+          {platform === "youtube" && (
+            <img
+              src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/15 to-black/55" />
+          {platform === "chzzk" && (posterDate || posterAddedBy) && (
+            <div className="absolute top-0 left-0 right-0 px-3 pt-2.5 sm:px-4 sm:pt-3 text-left">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#00FFA3]/20 border border-[#00FFA3]/40 text-[#00FFA3] text-[11px] font-semibold tracking-wide">
+                  치지직 다시보기
+                </span>
+                {posterDate && (
+                  <span className="inline-flex items-center gap-1 text-white/75 text-xs">
+                    <CalendarDaysIcon className="w-3.5 h-3.5" />
+                    {posterDate}
+                  </span>
+                )}
+                {posterAddedBy && (
+                  <span className="inline-flex items-center gap-1 text-white/55 text-xs">
+                    <UserIcon className="w-3.5 h-3.5" />
+                    {posterAddedBy}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="w-16 h-16 rounded-full bg-gradient-to-br from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple flex items-center justify-center shadow-lg shadow-black/40 transition-transform duration-200 group-hover/facade:scale-110">
+              <PlayIcon className="w-8 h-8 text-white translate-x-0.5" />
+            </span>
+          </span>
+        </button>
+      )}
+
+      {/* 클릭으로 재생/일시정지 (활성화 후, 컨트롤 바 제외 영역) */}
+      {activated && (
+        <button
+          type="button"
+          aria-label={playing ? "일시정지" : "재생"}
+          onClick={togglePlay}
+          className="absolute inset-0 w-full h-full cursor-pointer"
+        />
+      )}
 
       {/* 재생 전 포스터 (치지직 전용 — 유튜브는 자체 썸네일·제목이 표시됨) */}
-      {platform === "chzzk" && !started && (vodTitle || posterDate) && (
+      {activated && platform === "chzzk" && !started && (vodTitle || posterDate) && (
         <div className="absolute inset-0 pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/30 to-black/75" />
           <div className="absolute top-0 left-0 right-0 px-3 pt-2.5 pb-4 sm:px-4 sm:pt-3">
@@ -620,8 +676,8 @@ export default function ClipPlayer({
         </div>
       )}
 
-      {/* 로딩 오버레이 */}
-      {!ready && (
+      {/* 로딩 오버레이 (활성화 후 스트림 로드 중) */}
+      {activated && !ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none">
           <div className="w-10 h-10 border-2 border-white/20 border-t-light-accent dark:border-t-dark-accent rounded-full animate-spin" />
         </div>
@@ -640,10 +696,14 @@ export default function ClipPlayer({
         </div>
       )}
 
-      {/* 커스텀 컨트롤 바 */}
+      {/* 커스텀 컨트롤 바 (활성화 후에만 노출) */}
       <div
         className={`absolute bottom-0 left-0 right-0 px-3 pb-2 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
-          controlsVisible || !playing ? "opacity-100" : "opacity-0"
+          !activated
+            ? "opacity-0 pointer-events-none"
+            : controlsVisible || !playing
+            ? "opacity-100"
+            : "opacity-0"
         }`}
         onClick={(e) => e.stopPropagation()}
       >

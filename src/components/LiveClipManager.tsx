@@ -56,7 +56,26 @@ export default function LiveClipManager({
   const { data: session } = useSession();
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
-  
+
+  // 클립 화면이 열려 있는 동안 영상 도메인에 미리 연결(preconnect)해 둔다. 미디어 바이트는
+  // 받지 않고 TCP/TLS만 미리 → facade에서 재생 클릭 시 첫 로딩이 체감상 빨라진다.
+  useEffect(() => {
+    const origins = [
+      'https://i.ytimg.com',      // 유튜브 썸네일(facade 포스터)
+      'https://www.youtube.com',  // 유튜브 iframe
+      'https://googleads.g.doubleclick.net',
+    ];
+    const links = origins.map((href) => {
+      const l = document.createElement('link');
+      l.rel = 'preconnect';
+      l.href = href;
+      l.crossOrigin = '';
+      document.head.appendChild(l);
+      return l;
+    });
+    return () => links.forEach((l) => l.remove());
+  }, []);
+
   // YouTube URL에서 비디오 ID 추출
   const extractVideoId = (url: string): string => {
     const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
@@ -1043,8 +1062,15 @@ export default function LiveClipManager({
       <div className="flex flex-col h-full min-h-0 p-0 pb-1">
         {!showAddVideoForm ? (
           videosLoading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-light-accent dark:border-dark-accent"></div>
+            // 빈 스피너 대신 클립 화면(플레이어 + 목록) 모양의 스켈레톤 — 체감 속도↑
+            <div className="flex-1 min-h-0 p-2 space-y-2">
+              <div className="w-full aspect-video max-h-[40vh] min-h-[140px] sm:min-h-[250px] rounded-lg bg-gray-200/70 dark:bg-gray-700/50 animate-pulse" />
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-12 rounded-lg bg-gray-200/60 dark:bg-gray-700/40 animate-pulse"
+                />
+              ))}
             </div>
           ) : songVideos.length > 0 ? (
             <div className="flex-1 min-h-0 overflow-y-auto" 

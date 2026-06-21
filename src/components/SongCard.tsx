@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Song, SongVideo } from "@/types";
+import { Song } from "@/types";
 import {
   MusicalNoteIcon,
   MagnifyingGlassIcon,
@@ -10,8 +10,10 @@ import {
   QueueListIcon,
 } from "@heroicons/react/24/outline";
 import { HeartIcon, MicrophoneIcon } from "@heroicons/react/24/solid";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLike } from "@/hooks/useLikes";
 import { useSongPlaylists } from "@/hooks/useGlobalPlaylists";
+import { useSongVideos, prefetchSongVideos } from "@/hooks/useSongVideos";
 import PlaylistContextMenu from "./PlaylistContextMenu";
 import SongDetailModal from "./SongDetailModal";
 import OfficialCornerFold from "./OfficialCornerFold";
@@ -33,39 +35,23 @@ export default function SongCard({
   compact = false,
   onDialogStateChange,
 }: SongCardProps) {
+  const queryClient = useQueryClient();
   const { liked, isLoading: likeLoading, toggleLike } = useLike(song.id);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
-  // 라이브 클립 데이터 (SongDetailModal과 공유 — 모달이 열릴 때 모달에서 로드 트리거)
-  const [songVideos, setSongVideos] = useState<SongVideo[]>([]);
-  const [videosLoading, setVideosLoading] = useState(false);
+  // 라이브 클립 메타데이터 — TanStack Query 캐시(재오픈 즉시 + hover 프리페치).
+  // 다이얼로그가 열리면(enabled) 자동 로드, 곡별 캐시는 query key로 분리된다.
+  const { songVideos, videosLoading, setSongVideos, loadSongVideos } =
+    useSongVideos(song.id, isExpanded);
 
-  // 라이브 클립 데이터 로드
-  const loadSongVideos = useCallback(async () => {
-    setVideosLoading(true);
-    try {
-      const response = await fetch(`/api/songs/${song.id}/videos`);
-      if (response.ok) {
-        const data = await response.json();
-        setSongVideos(data.videos || []);
-      } else {
-        console.error("라이브 클립 로딩 실패");
-      }
-    } catch (error) {
-      console.error("라이브 클립 로딩 오류:", error);
-    } finally {
-      setVideosLoading(false);
-    }
-  }, [song.id]);
-
-  // 곡이 바뀌면 라이브 클립 상태 초기화
-  useEffect(() => {
-    setSongVideos([]);
-    setVideosLoading(false);
-  }, [song.id]);
+  // 카드에 마우스를 올리면 그 곡의 클립 목록을 미리 받아둔다(열 때 즉시 표시).
+  const prefetchClips = useCallback(
+    () => prefetchSongVideos(queryClient, song.id),
+    [queryClient, song.id]
+  );
 
   // 다이얼로그 닫기
   const handleCloseDialog = useCallback(() => {
@@ -253,6 +239,7 @@ export default function SongCard({
         <div
           onClick={handleCardClick}
           onContextMenu={handleContextMenu}
+          onMouseEnter={prefetchClips}
           className="group relative flex items-center gap-3 rounded-lg border border-light-primary/20 dark:border-dark-primary/20
                      bg-white/60 dark:bg-gray-900/50 px-3 py-2.5 cursor-pointer overflow-hidden
                      hover:border-light-accent/40 dark:hover:border-dark-accent/40 hover:bg-light-primary/5 dark:hover:bg-dark-primary/10
@@ -296,6 +283,7 @@ export default function SongCard({
           transition={{ duration: 0.3 }}
           onClick={handleCardClick}
           onContextMenu={handleContextMenu}
+          onMouseEnter={prefetchClips}
           className="group relative rounded-xl border border-light-primary/20 dark:border-dark-primary/20
                      hover:border-light-accent/40 dark:hover:border-dark-accent/40
                      hover:shadow-xl hover:shadow-light-accent/5 dark:hover:shadow-dark-accent/10
