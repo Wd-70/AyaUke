@@ -1098,6 +1098,8 @@ export default function LiveClipManager({
                     autoplay={shouldAutoPlay}
                     posterDate={formatOriginalDateForDisplay(selectedVideo.originalDateString, selectedVideo.sungDate)}
                     posterAddedBy={selectedVideo.addedByName}
+                    posterThumbnail={selectedVideo.thumbnailUrl}
+                    posterDescription={selectedVideo.description}
                     onEnded={() => {
                       setIsVideoPlaying(false);
                       // 다음 클립 연속 재생

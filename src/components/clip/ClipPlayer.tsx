@@ -22,6 +22,7 @@ import { CalendarDaysIcon, UserIcon } from "@heroicons/react/24/outline";
 import type { VideoPlatform } from "@/shared/utils/video-url";
 import { resolveVodMp4Url } from "@/shared/utils/chzzk-vod";
 import { loadStoredVolume, saveStoredVolume } from "./volume-storage";
+import { useClipTitle } from "@/hooks/useClipTitle";
 
 interface ClipPlayerProps {
   platform: VideoPlatform;
@@ -43,6 +44,10 @@ interface ClipPlayerProps {
    */
   posterDate?: string;
   posterAddedBy?: string;
+  /** 클립 썸네일(유튜브 자동추출 / 치지직 thumbnailImageUrl) — facade 배경 */
+  posterThumbnail?: string;
+  /** 클립 설명/메모 — facade에 제목처럼 표시 */
+  posterDescription?: string;
 }
 
 /** 내부 플레이어 추상화: 두 플랫폼을 같은 인터페이스로 다룬다 */
@@ -106,6 +111,8 @@ export default function ClipPlayer({
   className = "",
   posterDate,
   posterAddedBy,
+  posterThumbnail,
+  posterDescription,
 }: ClipPlayerProps) {
   // endTime이 없거나 startTime 이하(잘못된 구간)면 "끝까지"로 취급한다.
   // (이 값이 0/음수가 되면 clipDuration이 0이 되어 진행바가 멈추거나, VOD 전체를
@@ -123,6 +130,8 @@ export default function ClipPlayer({
   // 클릭(또는 autoplay) 전까지 스트림을 만들지 않는다(facade). 다이얼로그를 열어도
   // 영상 버퍼링 0 → 가볍고 즉각, 모바일 데이터 낭비 없음. 클릭 시 그때 플레이어 생성.
   const [activated, setActivated] = useState(autoplay);
+  // facade에 보여줄 실제 영상 제목을 가볍게 lazy-load(스트림 없이). 받기 전엔 메모로 폴백.
+  const lazyTitle = useClipTitle(platform, videoId, !activated);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -596,35 +605,44 @@ export default function ClipPlayer({
           onClick={() => setActivated(true)}
           className="absolute inset-0 w-full h-full cursor-pointer group/facade"
         >
-          {platform === "youtube" && (
+          {/* 썸네일 배경: 메타데이터 thumbnailUrl(양 플랫폼) 우선, 없으면 유튜브 ytimg 폴백 */}
+          {(posterThumbnail || platform === "youtube") && (
             <img
-              src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
+              src={posterThumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
               alt=""
               className="absolute inset-0 w-full h-full object-cover"
               loading="lazy"
               decoding="async"
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/15 to-black/55" />
-          {platform === "chzzk" && (posterDate || posterAddedBy) && (
+          <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/20 to-black/65" />
+          {/* 정보: (치지직)배지·날짜·업로더 + 제목(lazy-load, 받기 전엔 메모) — 양 플랫폼 공통 */}
+          {(posterDate || posterAddedBy || posterDescription || lazyTitle) && (
             <div className="absolute top-0 left-0 right-0 px-3 pt-2.5 sm:px-4 sm:pt-3 text-left">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#00FFA3]/20 border border-[#00FFA3]/40 text-[#00FFA3] text-[11px] font-semibold tracking-wide">
-                  치지직 다시보기
-                </span>
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                {platform === "chzzk" && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#00FFA3]/20 border border-[#00FFA3]/40 text-[#00FFA3] text-[11px] font-semibold tracking-wide">
+                    치지직 다시보기
+                  </span>
+                )}
                 {posterDate && (
-                  <span className="inline-flex items-center gap-1 text-white/75 text-xs">
+                  <span className="inline-flex items-center gap-1 text-white/80 text-xs">
                     <CalendarDaysIcon className="w-3.5 h-3.5" />
                     {posterDate}
                   </span>
                 )}
                 {posterAddedBy && (
-                  <span className="inline-flex items-center gap-1 text-white/55 text-xs">
+                  <span className="inline-flex items-center gap-1 text-white/60 text-xs">
                     <UserIcon className="w-3.5 h-3.5" />
                     {posterAddedBy}
                   </span>
                 )}
               </div>
+              {(lazyTitle || posterDescription) && (
+                <h4 className="text-white font-semibold text-sm sm:text-base leading-snug line-clamp-2 drop-shadow-md">
+                  {lazyTitle || posterDescription}
+                </h4>
+              )}
             </div>
           )}
           <span className="absolute inset-0 flex items-center justify-center">
@@ -645,9 +663,18 @@ export default function ClipPlayer({
         />
       )}
 
-      {/* 재생 전 포스터 (치지직 전용 — 유튜브는 자체 썸네일·제목이 표시됨) */}
+      {/* 재생 전 포스터 (치지직 전용 — 유튜브는 자체 썸네일·제목이 표시됨).
+          스트림 로드 중 검은 화면 대신 썸네일을 유지해 facade와 연속성을 준다. */}
       {activated && platform === "chzzk" && !started && (vodTitle || posterDate) && (
         <div className="absolute inset-0 pointer-events-none">
+          {posterThumbnail && (
+            <img
+              src={posterThumbnail}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover"
+              decoding="async"
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/30 to-black/75" />
           <div className="absolute top-0 left-0 right-0 px-3 pt-2.5 pb-4 sm:px-4 sm:pt-3">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
