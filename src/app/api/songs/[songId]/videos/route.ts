@@ -7,6 +7,7 @@ import SongDetail from '@/domains/catalog/song.schema';
 import { SongVideo as SongVideoType } from '@/types';
 import { parseVideoUrl } from '@/shared/utils/video-url';
 import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
+import { resolveUploaderNames } from '@/domains/archive/clip.service';
 
 // GET: 특정 곡의 영상 목록 조회
 export async function GET(
@@ -32,11 +33,14 @@ export async function GET(
       .sort({ sungDate: -1, createdAt: -1 })
       .lean();
 
+    // 업로더 닉네임은 저장된 복사본(stale) 대신 User에서 최신값으로 채운다 (배치 조인 1회)
+    const resolved = await resolveUploaderNames(videos as { addedBy?: unknown; addedByName?: string }[]);
+
     return NextResponse.json({
       success: true,
-      videos: videos.map(video => ({
+      videos: resolved.map(video => ({
         ...video,
-        _id: String(video._id),
+        _id: String((video as { _id: unknown })._id),
       })),
     });
   } catch (error) {

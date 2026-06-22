@@ -1,6 +1,85 @@
 import SongVideo from './schemas/song-video.schema';
 import SongDetail from '@/domains/catalog/song.schema';
+import User from '@/models/User';
 import { NotFoundError, ValidationError } from '@/shared/api/errors';
+
+// ── 업로더 닉네임 정규화 (읽기 시 resolve) ───────────────────────
+// 클립에 저장된 addedByName은 추가 시점의 복사본이라 사용자가 닉네임을 바꾸면
+// stale해진다. 표시용 이름은 addedBy(User 참조)로 읽을 때마다 최신값을 조인해 채운다.
+// (저장된 addedByName은 탈퇴/레거시 사용자 + 기존 검색·집계 호환용 폴백으로만 유지)
+
+/** clips 배열의 addedByName을 User의 현재 표시이름으로 덮어쓴다 (배치 조인 1회). */
+export async function resolveUploaderNames<
+  T extends { addedBy?: unknown; addedByName?: string },
+>(clips: T[]): Promise<T[]> {
+  const ids = [...new Set(clips.map((c) => c.addedBy && String(c.addedBy)).filter(Boolean))];
+  if (ids.length === 0) return clips;
+
+  const users = await User.find({ _id: { $in: ids } })
+    .select('displayName channelName')
+    .lean<{ _id: unknown; displayName?: string; channelName?: string }[]>();
+  const nameById = new Map(
+    users.map((u) => [String(u._id), u.displayName || u.channelName || '']),
+  );
+
+  return clips.map((c) => {
+    const fresh = c.addedBy ? nameById.get(String(c.addedBy)) : '';
+    return fresh ? { ...c, addedByName: fresh } : c;
+  });
+}
+
+// ── 공개 클립 DTO (공유 페이지 / 공개 API) ────────────────────────
+
+export interface PublicClipDTO {
+  id: string;
+  songId: string;
+  title: string;
+  artist: string;
+  platform: 'youtube' | 'chzzk';
+  videoId: string;
+  startTime: number;
+  endTime: number | null;
+  sungDate: string | null;
+  description: string | null;
+  uploaderName: string;
+  thumbnailUrl: string | null;
+  isVerified: boolean;
+  available: boolean;
+  likeCount: number;
+  playCount: number;
+}
+
+/** 공개 클립 단건 조회 — 내부 필드(addedBy/verifiedBy 등) 미노출, 업로더명은 최신값. */
+export async function getPublicClip(clipId: string): Promise<PublicClipDTO | null> {
+  if (!/^[0-9a-fA-F]{24}$/.test(clipId)) return null;
+  const clip = await SongVideo.findById(clipId).lean<Record<string, unknown> | null>();
+  if (!clip) return null;
+
+  const [resolved] = await resolveUploaderNames([
+    clip as { addedBy?: unknown; addedByName?: string },
+  ]);
+
+  const sungDate = clip.sungDate as Date | undefined;
+  const endTime = clip.endTime as number | undefined;
+  return {
+    id: String(clip._id),
+    songId: String(clip.songId),
+    title: String(clip.title ?? ''),
+    artist: String(clip.artist ?? ''),
+    platform: (clip.platform as 'youtube' | 'chzzk') || 'youtube',
+    videoId: String(clip.videoId),
+    startTime: (clip.startTime as number) || 0,
+    endTime: endTime != null && endTime > 0 ? endTime : null,
+    sungDate: sungDate ? new Date(sungDate).toISOString() : null,
+    description: (clip.description as string) || null,
+    uploaderName: (resolved.addedByName as string) || '익명',
+    thumbnailUrl: (clip.thumbnailUrl as string) || null,
+    isVerified: !!clip.isVerified,
+    available: !clip.sourceUnavailable,
+    likeCount: (clip.likeCount as number) || 0,
+    playCount: (clip.playCount as number) || 0,
+  };
+}
 
 /**
  * 라이브 클립(SongVideo) 관리 유스케이스.

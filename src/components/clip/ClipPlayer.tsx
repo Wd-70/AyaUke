@@ -23,6 +23,7 @@ import type { VideoPlatform } from "@/shared/utils/video-url";
 import { resolveVodMp4Url } from "@/shared/utils/chzzk-vod";
 import { loadStoredVolume, saveStoredVolume } from "./volume-storage";
 import { useClipTitle } from "@/hooks/useClipTitle";
+import { formatClipTime } from "@/shared/utils/clip-time";
 
 interface ClipPlayerProps {
   platform: VideoPlatform;
@@ -88,17 +89,6 @@ export function loadYouTubeApi(): Promise<void> {
     }, 100);
   });
 }
-
-const formatClipTime = (seconds: number): string => {
-  const s = Math.max(0, Math.floor(seconds));
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  if (m >= 60) {
-    const h = Math.floor(m / 60);
-    return `${h}:${String(m % 60).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-  }
-  return `${m}:${String(sec).padStart(2, "0")}`;
-};
 
 export default function ClipPlayer({
   platform,

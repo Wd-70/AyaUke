@@ -3,12 +3,10 @@
 import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { motion } from 'framer-motion';
 import { SongVideo } from '@/types';
-import { 
-  PlayIcon, 
-  PlusIcon, 
-  XMarkIcon, 
-  PencilIcon, 
-  TrashIcon,
+import {
+  PlayIcon,
+  PlusIcon,
+  XMarkIcon,
   PauseIcon,
   ForwardIcon,
   BackwardIcon,
@@ -17,6 +15,7 @@ import {
 } from '@heroicons/react/24/outline';
 import YouTube from 'react-youtube';
 import ClipPlayer from './clip/ClipPlayer';
+import ClipRow from './clip/ClipRow';
 import ChzzkPlayer, { type ChzzkPlayerHandle } from './video/ChzzkPlayer';
 import { useSession } from 'next-auth/react';
 import { UserRole, roleToIsAdmin } from '@/lib/permissions';
@@ -24,6 +23,8 @@ import { updateVideoData } from '@/lib/youtube';
 import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
 import { parseOriginalDateString, formatOriginalDateForDisplay } from '@/utils/dateUtils';
+import { formatPreciseTime, parseTimeToSeconds } from '@/shared/utils/clip-time';
+import { checkTimeOverlap, getOverlapInfo } from '@/shared/utils/clip-overlap';
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -99,20 +100,9 @@ export default function LiveClipManager({
     return 0;
   };
 
-  // 시간을 hh:mm:ss 형식으로 변환 (소수점 아래 1자리)
-  const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    const decimal = Math.floor((seconds % 1) * 10);
-    
-    const timeStr = hours > 0 
-      ? `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}` 
-      : `${mins}:${secs.toString().padStart(2, '0')}`;
-    
-    return `${timeStr}.${decimal}`;
-  };
-  
+  // 시간 표기는 공통 유틸(formatPreciseTime) 사용 — 0.1초 단위
+  const formatTime = formatPreciseTime;
+
   // 라이브 클립 관련 상태 (videos 탭의 상태만 유지)
   const [selectedVideoIndex, setSelectedVideoIndex] = useState(0);
   const [videoPlayer, setVideoPlayer] = useState<YouTubePlayer | null>(null);
@@ -155,38 +145,8 @@ export default function LiveClipManager({
   // 선택된 영상 정보
   const selectedVideo = songVideos[selectedVideoIndex];
 
-  // 시간 중복 검사 함수
-  const checkTimeOverlap = (video1: SongVideo, video2: SongVideo): boolean => {
-    // 같은 영상이 아니면 중복 아님
-    if (video1.videoId !== video2.videoId) return false;
-    
-    // 같은 클립이면 중복 아님
-    if (video1._id === video2._id) return false;
-    
-    const start1 = video1.startTime || 0;
-    const end1 = video1.endTime || Number.MAX_SAFE_INTEGER; // 종료시간이 없으면 무한대로 처리
-    const start2 = video2.startTime || 0;
-    const end2 = video2.endTime || Number.MAX_SAFE_INTEGER;
-    
-    // 시작시간과 종료시간이 정확히 연결되는 경우는 정상 (중복 아님)
-    if (end1 === start2 || end2 === start1) return false;
-    
-    // 중복 구간이 있는지 확인
-    return Math.max(start1, start2) < Math.min(end1, end2);
-  };
-
-  // 각 영상의 중복 상태를 계산
-  const getVideoOverlapInfo = (video: SongVideo) => {
-    const overlappingVideos = songVideos.filter((otherVideo: SongVideo) => 
-      checkTimeOverlap(video, otherVideo)
-    );
-    
-    return {
-      hasOverlap: overlappingVideos.length > 0,
-      overlappingVideos,
-      overlappingCount: overlappingVideos.length
-    };
-  };
+  // 시간 중복 검사: 순수 로직은 @/shared/utils/clip-overlap 사용
+  const getVideoOverlapInfo = (video: SongVideo) => getOverlapInfo(video, songVideos);
 
 
   // YouTube URL에서 시간 파라미터 제거
@@ -324,185 +284,6 @@ export default function LiveClipManager({
 
   // 데이터 로드 여부 추적 제거 - 상위 컴포넌트에서 관리
 
-  // 업로더 현재 정보 조회 함수
-  const getUploaderInfo = async (userId: string): Promise<{ displayName?: string; channelName?: string; success: boolean }> => {
-    try {
-      const response = await fetch(`/api/user/${userId}`);
-      const result = await response.json();
-      
-      if (result.success && result.user) {
-        return { 
-          displayName: result.user.displayName, 
-          channelName: result.user.channelName, 
-          success: true 
-        };
-      }
-      return { success: false };
-    } catch (error) {
-      console.error('업로더 정보 조회 실패:', error);
-      return { success: false };
-    }
-  };
-
-  // 업로더 닉네임 동기화 함수
-  const syncUploaderName = async (videoId: string): Promise<{ updated: boolean; newName?: string }> => {
-    try {
-      const response = await fetch(`/api/videos/${videoId}/sync-uploader`, {
-        method: 'PATCH',
-      });
-      const result = await response.json();
-      
-      if (result.success && result.updated) {
-        console.log(`✅ 닉네임 동기화: ${result.previousNickname} → ${result.currentNickname}`);
-        return { updated: true, newName: result.currentNickname };
-      }
-      return { updated: false };
-    } catch (error) {
-      console.error('닉네임 동기화 실패:', error);
-      return { updated: false };
-    }
-  };
-
-  // 닉네임 동기화는 props로 받은 데이터에 대해서만 수행
-  useEffect(() => {
-    if (!songVideos || songVideos.length === 0) return;
-    
-    // 백그라운드에서 닉네임 동기화 처리
-    setTimeout(async () => {
-      // 업로더별로 그룹핑 (중복 제거)
-      const uploaderGroups = new Map<string, { 
-        uploaderInfo: { displayName?: string; channelName?: string; success: boolean } | null; 
-        videoIndexes: number[]; 
-        videoNames: string[];  // 모든 클립의 닉네임들
-      }>();
-      
-      // 업로더별 비디오 그룹핑
-      songVideos.forEach((video: SongVideo, index: number) => {
-        if (!uploaderGroups.has(video.addedBy)) {
-          uploaderGroups.set(video.addedBy, {
-            uploaderInfo: null,
-            videoIndexes: [],
-            videoNames: []
-          });
-        }
-        const group = uploaderGroups.get(video.addedBy)!;
-        group.videoIndexes.push(index);
-        group.videoNames.push(video.addedByName);
-      });
-      
-      if (uploaderGroups.size === 0) return;
-      
-      console.log(`🔄 닉네임 동기화 시작: ${uploaderGroups.size}명의 업로더`);
-      
-      const updatePromises = Array.from(uploaderGroups.entries()).map(async ([uploaderId, group]) => {
-        try {
-          // 업로더 정보 조회 (업로더당 1회만)  
-          const firstVideoName = group.videoNames?.[0] || 'Unknown';
-          console.log(`🔍 업로더 "${uploaderId}" (${firstVideoName}) 정보 확인`);
-          const uploaderInfo = await getUploaderInfo(uploaderId);
-          const currentDisplayName = uploaderInfo.displayName || uploaderInfo.channelName;
-          
-          if (!uploaderInfo.success || !currentDisplayName) {
-            console.log(`⚠️ 업로더 "${uploaderId}" 정보 조회 실패`);
-            return;
-          }
-          
-          // 모든 클립의 닉네임과 비교하여 동기화 필요 여부 확인
-          const outdatedIndexes: number[] = [];
-          const uniqueCurrentNames = [...new Set(group.videoNames || [])];
-          
-          group.videoIndexes?.forEach((videoIndex, i) => {
-            const currentVideoName = group.videoNames?.[i];
-            if (currentVideoName !== currentDisplayName) {
-              outdatedIndexes.push(videoIndex);
-            }
-          });
-          
-          if (outdatedIndexes.length === 0) {
-            console.log(`ℹ️ 업로더 "${uploaderId}" 모든 클립 닉네임 최신: "${currentDisplayName}" (${group.videoIndexes.length}개 클립)`);
-            return;
-          }
-          
-          console.log(`🔄 닉네임 동기화 필요: 업로더 "${uploaderId}" ${outdatedIndexes.length}/${group.videoIndexes.length}개 클립`);
-          uniqueCurrentNames.forEach(oldName => {
-            if (oldName !== currentDisplayName) {
-              console.log(`   변경: "${oldName}" → "${currentDisplayName}"`);
-            }
-          });
-          
-          // 즉시 화면 업데이트 (해당 업로더의 모든 비디오)
-          setSongVideos(prevVideos => {
-            const updatedVideos = [...prevVideos];
-            group.videoIndexes.forEach(index => {
-              if (updatedVideos[index] && updatedVideos[index].addedBy === uploaderId) {
-                updatedVideos[index] = { ...updatedVideos[index], addedByName: currentDisplayName };
-              }
-            });
-            return updatedVideos;
-          });
-          
-          // DB 동기화 (업데이트가 필요한 클립들만)
-          const syncPromises = outdatedIndexes.map(async (index) => {
-            try {
-              const videoId = songVideos[index]._id;
-              const oldName = songVideos[index].addedByName;
-              const syncResult = await syncUploaderName(videoId);
-              return { 
-                videoId, 
-                oldName, 
-                success: syncResult.updated, 
-                error: null 
-              };
-            } catch (error) {
-              return { 
-                videoId: songVideos[index]._id, 
-                oldName: songVideos[index].addedByName,
-                success: false, 
-                error 
-              };
-            }
-          });
-          
-          try {
-            const syncResults = await Promise.all(syncPromises);
-            const successCount = syncResults.filter(r => r.success).length;
-            const totalCount = syncResults.length;
-            
-            if (successCount > 0) {
-              console.log(`✅ 업로더 "${uploaderId}" DB 동기화 완료: ${successCount}/${totalCount}개 클립 업데이트됨 → "${currentDisplayName}"`);
-              
-              // 성공한 클립들의 이전 닉네임들 표시
-              const successResults = syncResults.filter(r => r.success);
-              const uniqueOldNames = [...new Set(successResults.map(r => r.oldName))];
-              uniqueOldNames.forEach(oldName => {
-                console.log(`   "${oldName}" → "${currentDisplayName}"`);
-              });
-            } else if (totalCount > 0) {
-              console.log(`ℹ️ 업로더 "${uploaderId}" DB 동기화: ${totalCount}개 클립 이미 최신 상태 또는 업데이트 불필요`);
-            }
-            
-            // 실패한 클립이 있다면 로그 출력
-            const failedResults = syncResults.filter(r => !r.success && r.error);
-            if (failedResults.length > 0) {
-              console.log(`⚠️ 업로더 "${uploaderId}" 일부 클립 동기화 실패: ${failedResults.length}개`);
-              failedResults.forEach(result => {
-                console.log(`   실패: ${result.videoId} (${result.oldName})`, result.error);
-              });
-            }
-          } catch (error) {
-            console.log(`❌ 업로더 "${uploaderId}" DB 동기화 중 오류:`, error);
-          }
-          
-        } catch (error) {
-          console.error(`❌ 업로더 "${uploaderId}" 처리 실패:`, error);
-        }
-      });
-      
-      // 모든 업로더 처리 완료 대기 (백그라운드에서)
-      await Promise.all(updatePromises);
-      console.log('🎯 모든 업로더 동기화 완료');
-    }, 0); // 다음 이벤트 루프에서 실행
-  }, [songVideos]); // songVideos가 변경될 때만 동기화 수행
 
   // 관리자 여부 확인
   const isAdmin = (): boolean => {
@@ -547,30 +328,7 @@ export default function LiveClipManager({
   };
 
 
-  // 시간 형식을 초로 변환 (mm:ss.d 또는 h:mm:ss.d 형식 지원)
-  const parseTimeToSeconds = (timeStr: string): number => {
-    if (!timeStr) return 0;
-    
-    // 숫자만 있으면 초 단위로 처리
-    if (/^\d+$/.test(timeStr)) {
-      return parseInt(timeStr) || 0;
-    }
-    
-    // mm:ss.d 또는 h:mm:ss.d 형식 처리
-    const timePattern = /^(?:(\d+):)?(\d+):(\d+)(?:\.(\d))?$/;
-    const match = timeStr.match(timePattern);
-    
-    if (match) {
-      const hours = parseInt(match[1] || '0') || 0;
-      const minutes = parseInt(match[2] || '0') || 0;
-      const seconds = parseInt(match[3] || '0') || 0;
-      const decimal = parseInt(match[4] || '0') || 0;
-      
-      return hours * 3600 + minutes * 60 + seconds + decimal / 10;
-    }
-    
-    return 0;
-  };
+  // parseTimeToSeconds는 공통 유틸(@/shared/utils/clip-time) 사용
 
   // 재생시간을 입력받아 종료시간 설정 (시간 형식 지원)
   const handleDurationInputChange = (value: string) => {
@@ -919,19 +677,6 @@ export default function LiveClipManager({
   const handleDeleteVideo = async (videoId: string) => {
     const video = songVideos.find(v => v._id === videoId);
     if (!video) return;
-
-    // 시간 포맷 함수
-    const formatTime = (seconds: number) => {
-      const hours = Math.floor(seconds / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      const remainingSeconds = Math.floor(seconds % 60);
-      
-      if (hours > 0) {
-        return `${hours}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-      } else {
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-      }
-    };
 
     const clipInfo = [
       `부른날: ${formatOriginalDateForDisplay(video.originalDateString, video.sungDate)}`,
@@ -1749,141 +1494,23 @@ export default function LiveClipManager({
                       </div>
                     </div>
                   ) : (
-                    // 일반 모드
-                    <div
+                    <ClipRow
                       key={video._id}
-                      onClick={() => handleVideoSelect(index)}
-                      className={`p-2 sm:p-3 rounded-lg border transition-all duration-200 relative group ${
-                        editingVideoId && selectedVideoIndex !== index
-                          ? 'cursor-not-allowed opacity-60'
-                          : 'cursor-pointer'
-                      } ${
-                        overlapInfo.hasOverlap
-                          ? selectedVideoIndex === index
-                            ? 'border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-900/20 shadow-amber-100 dark:shadow-amber-900/20 shadow-md'
-                            : editingVideoId && selectedVideoIndex !== index
-                              ? 'border-amber-300 dark:border-amber-600 bg-amber-50/70 dark:bg-amber-900/10'
-                              : 'border-amber-300 dark:border-amber-600 bg-amber-50/70 dark:bg-amber-900/10 hover:border-amber-400 dark:hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                          : selectedVideoIndex === index
-                            ? 'border-light-accent/50 dark:border-dark-accent/50 bg-light-accent/10 dark:bg-dark-accent/10'
-                            : editingVideoId && selectedVideoIndex !== index
-                              ? 'border-light-primary/20 dark:border-dark-primary/20'
-                              : 'border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent/30 dark:hover:border-dark-accent/30 hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-light-text dark:text-dark-text truncate">
-                            {formatOriginalDateForDisplay(video.originalDateString, video.sungDate)}
-                            {/* 재생시간 표시 */}
-                            {video.startTime !== undefined && video.endTime !== undefined && video.endTime > video.startTime && (
-                              <span className="ml-2 text-blue-600 dark:text-blue-400">
-                                ({formatTime(video.endTime - video.startTime)})
-                              </span>
-                            )}
-                          </div>
-                          {video.description && (
-                            <div className="text-xs text-light-text/60 dark:text-dark-text/60 mt-1 whitespace-pre-line">
-                              {video.description}
-                            </div>
-                          )}
-                          <div className="text-xs text-light-text/50 dark:text-dark-text/50 mt-1">
-                            {video.addedByName}
-                            {video.isVerified && (
-                              <span className="ml-2 text-green-600 dark:text-green-400" title="검증됨">✓</span>
-                            )}
-                            {overlapInfo.hasOverlap && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setExpandedOverlapInfo(
-                                    expandedOverlapInfo === video._id ? null : video._id
-                                  );
-                                }}
-                                className="ml-2 text-amber-600 dark:text-amber-400 font-medium hover:text-amber-700 dark:hover:text-amber-300 underline decoration-dotted"
-                                title="중복 상세 정보 보기"
-                              >
-                                ⚠️ 시간 중복 ({overlapInfo.overlappingCount}개)
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          {/* 편집/삭제 버튼 (권한 있는 사용자만, 편집 중이 아닐 때만, 선택된 클립만) */}
-                          {canEditVideo(video) && !editingVideoId && selectedVideoIndex === index && (
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  startEditVideo(video);
-                                }}
-                                className="p-1.5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors"
-                                title="수정"
-                              >
-                                <PencilIcon className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteVideo(video._id);
-                                }}
-                                disabled={isDeletingVideo === video._id}
-                                className="p-1.5 rounded-full bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50"
-                                title="삭제"
-                              >
-                                {isDeletingVideo === video._id ? (
-                                  <div className="animate-spin rounded-full h-3 w-3 border border-red-500 border-t-transparent"></div>
-                                ) : (
-                                  <TrashIcon className="w-3 h-3" />
-                                )}
-                              </button>
-                            </div>
-                          )}
-                          
-                          {selectedVideoIndex === index && (
-                            <PlayIcon className="w-4 h-4 text-light-accent dark:text-dark-accent" />
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* 중복 상세 정보 확장 영역 */}
-                      {expandedOverlapInfo === video._id && overlapInfo.hasOverlap && (
-                        <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800 bg-amber-25 dark:bg-amber-950/30 -mx-3 px-3 pb-3 rounded-b-lg">
-                          <div className="text-xs font-medium text-amber-800 dark:text-amber-200 mb-2">
-                            🔍 시간 중복 상세 정보:
-                          </div>
-                          <div className="space-y-2">
-                            {overlapInfo.overlappingVideos.map((overlappingVideo) => {
-                              const video1Start = video.startTime || 0;
-                              const video1End = video.endTime || '∞';
-                              const video2Start = overlappingVideo.startTime || 0;
-                              const video2End = overlappingVideo.endTime || '∞';
-                              
-                              return (
-                                <div key={overlappingVideo._id} className="text-xs text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 p-2 rounded border border-amber-200 dark:border-amber-800">
-                                  <div className="font-medium mb-1">
-                                    📅 {formatOriginalDateForDisplay(overlappingVideo.originalDateString, overlappingVideo.sungDate)} ({overlappingVideo.addedByName})
-                                  </div>
-                                  <div className="space-y-1 text-amber-600 dark:text-amber-400">
-                                    <div>현재 클립: {formatTime(video1Start)} ~ {typeof video1End === 'number' ? formatTime(video1End) : video1End}</div>
-                                    <div>중복 클립: {formatTime(video2Start)} ~ {typeof video2End === 'number' ? formatTime(video2End) : video2End}</div>
-                                  </div>
-                                  {overlappingVideo.description && (
-                                    <div className="text-amber-600 dark:text-amber-400 mt-1 italic whitespace-pre-line">
-                                      "{overlappingVideo.description}"
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 italic">
-                            💡 관리자에게 문의하여 중복된 클립을 정리하세요.
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      video={video}
+                      isSelected={selectedVideoIndex === index}
+                      isDimmed={!!editingVideoId && selectedVideoIndex !== index}
+                      canEdit={canEditVideo(video) && !editingVideoId}
+                      isDeleting={isDeletingVideo === video._id}
+                      showOverlap={canEditVideo(video)}
+                      overlapInfo={overlapInfo}
+                      overlapExpanded={expandedOverlapInfo === video._id}
+                      onSelect={() => handleVideoSelect(index)}
+                      onEdit={() => startEditVideo(video)}
+                      onDelete={() => handleDeleteVideo(video._id)}
+                      onToggleOverlap={() =>
+                        setExpandedOverlapInfo(expandedOverlapInfo === video._id ? null : video._id)
+                      }
+                    />
                   );
                 })}
               </div>
