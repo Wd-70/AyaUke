@@ -121,6 +121,9 @@ export interface SongVideo {
   verifiedAt?: Date; // 검증 날짜
   thumbnailUrl?: string; // 썸네일 URL (유튜브에서 자동 추출)
   duration?: string; // 영상 길이 (유튜브에서 자동 추출)
+  likeCount?: number; // 좋아요 수
+  playCount?: number; // 재생 수
+  originalDateString?: string; // 원본 날짜 문자열(파싱 전 표시용)
   createdAt?: Date;
   updatedAt?: Date;
 }

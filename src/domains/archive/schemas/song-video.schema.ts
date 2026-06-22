@@ -21,6 +21,8 @@ export interface ISongVideo extends Document {
   duration?: string; // 영상 길이 (유튜브에서 자동 추출)
   sourceUnavailable?: boolean; // 원본 영상 만료/삭제로 재생 불가 (노래책 숨김)
   sourceCheckedAt?: Date; // 마지막 소스 점검 시각
+  likeCount: number; // 좋아요 수 (비정규화 — ClipLike와 원자적 동기)
+  playCount: number; // 재생 수 (facade 활성화 시 증가)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -123,6 +125,17 @@ const SongVideoSchema: Schema = new Schema({
   },
   sourceCheckedAt: {
     type: Date,
+  },
+  // 좋아요 수 (ClipLike와 비정규화 동기 — 공유 페이지/인기 정렬에서 집계 없이 읽기)
+  likeCount: {
+    type: Number,
+    default: 0,
+    index: true,
+  },
+  // 재생 수 (facade 활성화 시 증가)
+  playCount: {
+    type: Number,
+    default: 0,
   },
 }, {
   timestamps: true,

@@ -16,6 +16,8 @@ import {
 import YouTube from 'react-youtube';
 import ClipPlayer from './clip/ClipPlayer';
 import ClipRow from './clip/ClipRow';
+import ClipLikeButton from './clip/ClipLikeButton';
+import { useBulkClipLikes } from '@/hooks/useClipLikes';
 import ChzzkPlayer, { type ChzzkPlayerHandle } from './video/ChzzkPlayer';
 import { useSession } from 'next-auth/react';
 import { UserRole, roleToIsAdmin } from '@/lib/permissions';
@@ -57,6 +59,13 @@ export default function LiveClipManager({
   const { data: session } = useSession();
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
+  const { loadClipLikes } = useBulkClipLikes();
+
+  // 목록의 클립 좋아요 여부를 한 번에 로딩 (캐시에 병합)
+  useEffect(() => {
+    const ids = songVideos.map((v) => v._id).filter(Boolean) as string[];
+    if (ids.length > 0) void loadClipLikes(ids);
+  }, [songVideos, loadClipLikes]);
 
   // 클립 화면이 열려 있는 동안 영상 도메인에 미리 연결(preconnect)해 둔다. 미디어 바이트는
   // 받지 않고 TCP/TLS만 미리 → facade에서 재생 클릭 시 첫 로딩이 체감상 빨라진다.
@@ -1509,6 +1518,11 @@ export default function LiveClipManager({
                       onDelete={() => handleDeleteVideo(video._id)}
                       onToggleOverlap={() =>
                         setExpandedOverlapInfo(expandedOverlapInfo === video._id ? null : video._id)
+                      }
+                      actions={
+                        video._id ? (
+                          <ClipLikeButton clipId={video._id} initialCount={video.likeCount ?? 0} />
+                        ) : null
                       }
                     />
                   );
