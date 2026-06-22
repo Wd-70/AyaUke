@@ -49,6 +49,8 @@ interface ClipPlayerProps {
   posterThumbnail?: string;
   /** 클립 설명/메모 — facade에 제목처럼 표시 */
   posterDescription?: string;
+  /** 설정 시, 최초 활성화(재생) 때 재생 수를 1 증가시킨다 (clipId = SongVideo._id) */
+  trackPlayClipId?: string;
 }
 
 /** 내부 플레이어 추상화: 두 플랫폼을 같은 인터페이스로 다룬다 */
@@ -103,6 +105,7 @@ export default function ClipPlayer({
   posterAddedBy,
   posterThumbnail,
   posterDescription,
+  trackPlayClipId,
 }: ClipPlayerProps) {
   // endTime이 없거나 startTime 이하(잘못된 구간)면 "끝까지"로 취급한다.
   // (이 값이 0/음수가 되면 clipDuration이 0이 되어 진행바가 멈추거나, VOD 전체를
@@ -156,6 +159,15 @@ export default function ClipPlayer({
     () => (validEndTime != null ? validEndTime : startTime + clipDuration || Infinity),
     [validEndTime, startTime, clipDuration],
   );
+
+  // 재생 수 집계 — 최초 활성화 시 1회 (fire-and-forget)
+  const playTrackedRef = useRef(false);
+  useEffect(() => {
+    if (activated && trackPlayClipId && !playTrackedRef.current) {
+      playTrackedRef.current = true;
+      fetch(`/api/clips/${trackPlayClipId}/play`, { method: 'POST' }).catch(() => {});
+    }
+  }, [activated, trackPlayClipId]);
 
   // ── 플레이어 초기화 ──────────────────────────────────────────────
   useEffect(() => {

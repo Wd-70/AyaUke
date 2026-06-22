@@ -17,6 +17,7 @@ import YouTube from 'react-youtube';
 import ClipPlayer from './clip/ClipPlayer';
 import ClipRow from './clip/ClipRow';
 import ClipLikeButton from './clip/ClipLikeButton';
+import ClipShareButton from './clip/ClipShareButton';
 import { useBulkClipLikes } from '@/hooks/useClipLikes';
 import ChzzkPlayer, { type ChzzkPlayerHandle } from './video/ChzzkPlayer';
 import { useSession } from 'next-auth/react';
@@ -1521,7 +1522,10 @@ export default function LiveClipManager({
                       }
                       actions={
                         video._id ? (
-                          <ClipLikeButton clipId={video._id} initialCount={video.likeCount ?? 0} />
+                          <>
+                            <ClipLikeButton clipId={video._id} initialCount={video.likeCount ?? 0} />
+                            <ClipShareButton clipId={video._id} title={video.title} />
+                          </>
                         ) : null
                       }
                     />

@@ -40,6 +40,8 @@ export interface PublicClipDTO {
   startTime: number;
   endTime: number | null;
   sungDate: string | null;
+  /** 표시용 날짜 라벨 "YYYY.MM.DD" (KST) */
+  sungDateLabel: string | null;
   description: string | null;
   uploaderName: string;
   thumbnailUrl: string | null;
@@ -47,6 +49,49 @@ export interface PublicClipDTO {
   available: boolean;
   likeCount: number;
   playCount: number;
+}
+
+export interface PublicClipSummary {
+  id: string;
+  title: string;
+  artist: string;
+  platform: 'youtube' | 'chzzk';
+  sungDate: string | null;
+  thumbnailUrl: string | null;
+  likeCount: number;
+}
+
+/** 같은 곡의 다른 클립들(공유 페이지 rail용) — 좋아요·최신순, 현재 클립 제외. */
+export async function getPublicClipsForSong(
+  songId: string,
+  excludeClipId: string,
+  limit = 8,
+): Promise<PublicClipSummary[]> {
+  const clips = await SongVideo.find({
+    songId,
+    sourceUnavailable: { $ne: true },
+    _id: { $ne: /^[0-9a-fA-F]{24}$/.test(excludeClipId) ? excludeClipId : null },
+  })
+    .sort({ likeCount: -1, sungDate: -1 })
+    .limit(limit)
+    .select('title artist platform sungDate thumbnailUrl likeCount')
+    .lean<Record<string, unknown>[]>();
+
+  return clips.map((c) => ({
+    id: String(c._id),
+    title: String(c.title ?? ''),
+    artist: String(c.artist ?? ''),
+    platform: (c.platform as 'youtube' | 'chzzk') || 'youtube',
+    sungDate: c.sungDate ? new Date(c.sungDate as Date).toISOString() : null,
+    thumbnailUrl: (c.thumbnailUrl as string) || null,
+    likeCount: (c.likeCount as number) || 0,
+  }));
+}
+
+/** 클립 재생 수 증가 (facade 활성화 시). 실패해도 무시. */
+export async function incrementClipPlayCount(clipId: string): Promise<void> {
+  if (!/^[0-9a-fA-F]{24}$/.test(clipId)) return;
+  await SongVideo.findByIdAndUpdate(clipId, { $inc: { playCount: 1 } }).catch(() => {});
 }
 
 /** 공개 클립 단건 조회 — 내부 필드(addedBy/verifiedBy 등) 미노출, 업로더명은 최신값. */
@@ -61,6 +106,15 @@ export async function getPublicClip(clipId: string): Promise<PublicClipDTO | nul
 
   const sungDate = clip.sungDate as Date | undefined;
   const endTime = clip.endTime as number | undefined;
+  // 표시용 날짜 라벨 (KST 기준 YYYY.MM.DD)
+  const sungDateLabel = sungDate
+    ? new Date(sungDate).toLocaleDateString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).replace(/\. /g, '.').replace(/\.$/, '')
+    : null;
   return {
     id: String(clip._id),
     songId: String(clip.songId),
@@ -71,6 +125,7 @@ export async function getPublicClip(clipId: string): Promise<PublicClipDTO | nul
     startTime: (clip.startTime as number) || 0,
     endTime: endTime != null && endTime > 0 ? endTime : null,
     sungDate: sungDate ? new Date(sungDate).toISOString() : null,
+    sungDateLabel,
     description: (clip.description as string) || null,
     uploaderName: (resolved.addedByName as string) || '익명',
     thumbnailUrl: (clip.thumbnailUrl as string) || null,
