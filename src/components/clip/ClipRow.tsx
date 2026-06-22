@@ -1,6 +1,13 @@
 'use client';
 
-import { PlayIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import {
+  PlayIcon,
+  PencilIcon,
+  TrashIcon,
+  CheckBadgeIcon,
+  ExclamationTriangleIcon,
+  MusicalNoteIcon,
+} from '@heroicons/react/24/outline';
 import type { SongVideo } from '@/types';
 import { formatPreciseTime } from '@/shared/utils/clip-time';
 import type { OverlapInfo } from '@/shared/utils/clip-overlap';
@@ -67,44 +74,62 @@ export default function ClipRow({
         isDimmed ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
       } ${borderTone}`}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        {/* 썸네일 */}
+        <div className="relative aspect-video w-20 shrink-0 overflow-hidden rounded-md bg-light-primary/10 dark:bg-dark-primary/10 sm:w-24">
+          {video.thumbnailUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={video.thumbnailUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <MusicalNoteIcon className="h-5 w-5 text-light-accent/40 dark:text-dark-accent/40" />
+            </div>
+          )}
+          {isSelected && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <PlayIcon className="h-5 w-5 text-white" />
+            </div>
+          )}
+        </div>
+
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-light-text dark:text-dark-text">
-            {formatOriginalDateForDisplay(video.originalDateString, video.sungDate)}
+          <div className="flex items-center gap-2 truncate text-sm font-medium text-light-text dark:text-dark-text">
+            <span className="truncate">
+              {formatOriginalDateForDisplay(video.originalDateString, video.sungDate)}
+            </span>
             {video.startTime !== undefined && video.endTime !== undefined && video.endTime > video.startTime && (
-              <span className="ml-2 text-light-accent/80 dark:text-dark-accent/80">
-                ({formatPreciseTime(video.endTime - video.startTime)})
+              <span className="shrink-0 text-light-accent/80 dark:text-dark-accent/80">
+                {formatPreciseTime(video.endTime - video.startTime)}
               </span>
+            )}
+            {video.isVerified && (
+              <CheckBadgeIcon className="h-4 w-4 shrink-0 text-emerald-500" title="검증됨" />
             )}
           </div>
           {video.description && (
-            <div className="mt-1 whitespace-pre-line text-xs text-light-text/60 dark:text-dark-text/60">
+            <div className="mt-1 line-clamp-2 whitespace-pre-line text-xs text-light-text/60 dark:text-dark-text/60">
               {video.description}
             </div>
           )}
-          <div className="mt-1 text-xs text-light-text/50 dark:text-dark-text/50">
-            {video.addedByName}
-            {video.isVerified && (
-              <span className="ml-2 text-green-600 dark:text-green-400" title="검증됨">
-                ✓
-              </span>
-            )}
+          <div className="mt-1 flex items-center gap-2 text-xs text-light-text/50 dark:text-dark-text/50">
+            <span className="truncate">{video.addedByName}</span>
             {hasOverlap && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleOverlap();
                 }}
-                className="ml-2 font-medium text-amber-600 underline decoration-dotted hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                className="inline-flex shrink-0 items-center gap-0.5 font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
                 title="중복 상세 정보 보기"
               >
-                ⚠️ 시간 중복 ({overlapInfo.overlappingCount}개)
+                <ExclamationTriangleIcon className="h-3.5 w-3.5" />
+                시간 중복 ({overlapInfo.overlappingCount})
               </button>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           {actions}
           {canEdit && !isDimmed && isSelected && (
             <div className="flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
@@ -135,8 +160,6 @@ export default function ClipRow({
               </button>
             </div>
           )}
-
-          {isSelected && <PlayIcon className="h-4 w-4 text-light-accent dark:text-dark-accent" />}
         </div>
       </div>
 

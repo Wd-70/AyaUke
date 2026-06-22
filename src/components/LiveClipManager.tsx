@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { motion } from 'framer-motion';
 import { SongVideo } from '@/types';
 import {
@@ -115,6 +115,24 @@ export default function LiveClipManager({
 
   // 라이브 클립 관련 상태 (videos 탭의 상태만 유지)
   const [selectedVideoIndex, setSelectedVideoIndex] = useState(0);
+  const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'verified'>('recent');
+
+  // 정렬된 표시 목록 — 선택/연속재생도 이 배열 기준으로 동작한다.
+  const displayVideos = useMemo(() => {
+    const arr = [...songVideos];
+    if (sortBy === 'popular') {
+      arr.sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0) || new Date(b.sungDate).getTime() - new Date(a.sungDate).getTime());
+    } else if (sortBy === 'verified') {
+      arr.sort((a, b) => Number(b.isVerified) - Number(a.isVerified) || new Date(b.sungDate).getTime() - new Date(a.sungDate).getTime());
+    }
+    // 'recent'는 props 순서(최신순) 유지
+    return arr;
+  }, [songVideos, sortBy]);
+
+  // 정렬이 바뀌면 선택을 첫 항목으로 초기화 (인덱스 기준 선택이 어긋나지 않도록)
+  useEffect(() => {
+    setSelectedVideoIndex(0);
+  }, [sortBy]);
   const [videoPlayer, setVideoPlayer] = useState<YouTubePlayer | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -153,7 +171,7 @@ export default function LiveClipManager({
   const [expandedOverlapInfo, setExpandedOverlapInfo] = useState<string | null>(null);
 
   // 선택된 영상 정보
-  const selectedVideo = songVideos[selectedVideoIndex];
+  const selectedVideo = displayVideos[selectedVideoIndex];
 
   // 시간 중복 검사: 순수 로직은 @/shared/utils/clip-overlap 사용
   const getVideoOverlapInfo = (video: SongVideo) => getOverlapInfo(video, songVideos);
@@ -855,10 +873,11 @@ export default function LiveClipManager({
                     posterAddedBy={selectedVideo.addedByName}
                     posterThumbnail={selectedVideo.thumbnailUrl}
                     posterDescription={selectedVideo.description}
+                    trackPlayClipId={selectedVideo._id}
                     onEnded={() => {
                       setIsVideoPlaying(false);
                       // 다음 클립 연속 재생
-                      if (selectedVideoIndex < songVideos.length - 1) {
+                      if (selectedVideoIndex < displayVideos.length - 1) {
                         setTimeout(() => {
                           setShouldAutoPlay(true);
                           setSelectedVideoIndex(selectedVideoIndex + 1);
@@ -1026,7 +1045,7 @@ export default function LiveClipManager({
                       setIsVideoPlaying(false);
                       
                       // 다음 영상 전환 (수정 중이 아닐 때만)
-                      if (selectedVideoIndex < songVideos.length - 1 && !editingVideoId) {
+                      if (selectedVideoIndex < displayVideos.length - 1 && !editingVideoId) {
                         console.log('🔄 다음 영상으로 전환 시작');
                         setVideoPlayer(null); // 다음 영상으로 넘어갈 때만 플레이어 참조 제거
                         // 약간의 딜레이를 두고 자동재생 플래그 설정
@@ -1225,28 +1244,48 @@ export default function LiveClipManager({
             )}
             
               {/* 영상 목록 헤더 */}
-              <div className="flex items-center justify-between">
-                <h5 className="text-sm font-medium text-light-text/70 dark:text-dark-text/70">
+              <div className="flex items-center justify-between gap-2">
+                <h5 className="shrink-0 text-sm font-medium text-light-text/70 dark:text-dark-text/70">
                   라이브 클립 ({songVideos.length}개)
                 </h5>
-                {session && (
-                  <button
-                    onClick={() => setShowAddVideoForm(true)}
-                    className="px-3 py-1.5 text-xs bg-light-accent/20 dark:bg-dark-accent/20 
-                             text-light-accent dark:text-dark-accent 
-                             rounded-lg hover:bg-light-accent/30 dark:hover:bg-dark-accent/30 
-                             transition-colors duration-200 font-medium
-                             flex items-center gap-1"
-                  >
-                    <PlusIcon className="w-3 h-3" />
-                    추가
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {/* 정렬 */}
+                  {songVideos.length > 1 && (
+                    <div className="flex items-center rounded-lg bg-light-primary/10 p-0.5 text-xs dark:bg-dark-primary/10">
+                      {([
+                        ['recent', '최신'],
+                        ['popular', '인기'],
+                        ['verified', '검증'],
+                      ] as const).map(([key, label]) => (
+                        <button
+                          key={key}
+                          onClick={() => setSortBy(key)}
+                          className={`rounded-md px-2 py-1 font-medium transition-colors ${
+                            sortBy === key
+                              ? 'bg-white text-light-accent shadow-sm dark:bg-gray-700 dark:text-dark-accent'
+                              : 'text-light-text/55 hover:text-light-accent dark:text-dark-text/55 dark:hover:text-dark-accent'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {session && (
+                    <button
+                      onClick={() => setShowAddVideoForm(true)}
+                      className="flex items-center gap-1 rounded-lg bg-light-accent/20 px-3 py-1.5 text-xs font-medium text-light-accent transition-colors duration-200 hover:bg-light-accent/30 dark:bg-dark-accent/20 dark:text-dark-accent dark:hover:bg-dark-accent/30"
+                    >
+                      <PlusIcon className="h-3 w-3" />
+                      추가
+                    </button>
+                  )}
+                </div>
               </div>
               
               {/* 영상 목록 */}
               <div className="space-y-2">
-                {songVideos.map((video, index) => {
+                {displayVideos.map((video, index) => {
                   const overlapInfo = getVideoOverlapInfo(video);
                   
                   return editingVideoId === video._id ? (
