@@ -21,6 +21,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useLandingStats } from '@/hooks/useLandingStats';
 import { useFollowerCount } from '@/hooks/useFollowerCount';
+import { useReveal } from './useReveal';
 
 // 활동 기간 기준일
 const DEBUT = new Date('2024-01-21T00:00:00+09:00'); // 실제 데뷔일
@@ -121,10 +122,10 @@ function PeriodFlipCard({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 28 }}
+      initial={{ opacity: 0, y: reduce ? 0 : 28 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '-80px' }}
-      transition={{ duration: 0.5, delay }}
+      transition={{ duration: reduce ? 0 : 0.5, delay: reduce ? 0 : delay }}
       onHoverStart={() => flipTo(180)}
       onHoverEnd={() => flipTo(0)}
       className="group/flip relative [perspective:1600px]"
@@ -190,6 +191,7 @@ export default function NumbersSection() {
   const { data } = useLandingStats();
   // 팔로워만 1분 폴링으로 실시간성 부여 (나머지는 5분 캐시 유지)
   const { data: liveFollower } = useFollowerCount();
+  const { reveal } = useReveal();
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-100px' });
 
@@ -199,13 +201,7 @@ export default function NumbersSection() {
   return (
     <section className="px-4 py-24 sm:px-6">
       <div className="mx-auto max-w-5xl">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.5 }}
-          className="mb-14 text-center"
-        >
+        <motion.div {...reveal()} className="mb-14 text-center">
           <h2 className="font-display text-4xl font-bold sm:text-5xl">
             <span className="bg-gradient-to-r from-light-accent to-light-purple bg-clip-text text-transparent dark:from-dark-accent dark:to-dark-secondary">
               아야의 발자취
@@ -226,10 +222,7 @@ export default function NumbersSection() {
             return (
               <motion.div
                 key={item.key}
-                initial={{ opacity: 0, y: 28 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-80px' }}
-                transition={{ duration: 0.5, delay: i * 0.08 }}
+                {...reveal({ y: 28, delay: i * 0.08 })}
                 className="group relative flex flex-col items-center justify-center overflow-hidden rounded-3xl border border-light-primary/30 bg-white/60 p-8 text-center shadow-lg shadow-light-primary/10 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/25 dark:bg-gray-800/40 dark:shadow-black/20 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow"
               >
                 <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-light-accent to-light-purple text-white shadow-lg dark:from-dark-primary dark:to-dark-secondary">

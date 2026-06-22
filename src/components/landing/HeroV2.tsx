@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   motion,
   useReducedMotion,
@@ -42,6 +43,10 @@ function useParallax(mx: MotionValue<number>, my: MotionValue<number>, amount: n
 
 export default function HeroV2() {
   const reduce = useReducedMotion();
+  // reduced-motion이면 타이틀 단어가 슬라이드업하지 않고 페이드만
+  const wordVariants = reduce
+    ? { hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.01 } } }
+    : titleWord;
   const sectionRef = useRef<HTMLElement>(null);
   const { data: live } = useLiveStatus();
   const isLive = !!live?.isLive;
@@ -147,13 +152,23 @@ export default function HeroV2() {
               transition={{ duration: 24, repeat: Infinity, ease: 'linear' }}
             />
             <div className="relative h-full w-full overflow-hidden rounded-full border-4 border-white/40 shadow-2xl backdrop-blur-sm dark:border-white/10">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/profile1.png" alt="아야 AyaUke" className="h-full w-full object-cover dark:hidden" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              {/* LCP 이미지 — priority로 프리로드, next/image가 표시 크기로 리사이즈·최적화.
+                  라이트/다크 둘 다 above-the-fold라 모두 priority. */}
+              <Image
+                src="/profile1.png"
+                alt="아야 AyaUke"
+                fill
+                sizes="(min-width: 640px) 288px, 224px"
+                priority
+                className="object-cover dark:hidden"
+              />
+              <Image
                 src="/profile2-large.png"
                 alt="아야 AyaUke"
-                className="hidden h-full w-full object-cover dark:block"
+                fill
+                sizes="(min-width: 640px) 288px, 224px"
+                priority
+                className="hidden object-cover dark:block"
                 style={{ transform: 'scale(1.11) translate(-6px, 1px)' }}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
@@ -169,21 +184,21 @@ export default function HeroV2() {
           className="font-display text-5xl font-extrabold leading-[1.05] sm:text-7xl"
         >
           <span className="inline-block overflow-hidden align-bottom">
-            <motion.span variants={titleWord} className="inline-block bg-gradient-to-r from-light-accent via-light-purple to-light-secondary bg-clip-text text-transparent dark:from-dark-accent dark:via-dark-secondary dark:to-dark-primary">
+            <motion.span variants={wordVariants} className="inline-block bg-gradient-to-r from-light-accent via-light-purple to-light-secondary bg-clip-text text-transparent dark:from-dark-accent dark:via-dark-secondary dark:to-dark-primary">
               아야
             </motion.span>
           </span>{' '}
           <span className="inline-block overflow-hidden align-bottom">
-            <motion.span variants={titleWord} className="inline-block text-light-text dark:text-dark-text">
+            <motion.span variants={wordVariants} className="inline-block text-light-text dark:text-dark-text">
               AyaUke
             </motion.span>
           </span>
         </motion.h1>
 
         <motion.p
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: reduce ? 0 : 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
+          transition={{ delay: reduce ? 0 : 0.5 }}
           className="mt-5 max-w-2xl text-lg text-light-text/70 dark:text-dark-text/70 sm:text-xl"
         >
           허니즈의 메인보컬, 생활애교가 흘러넘치는 치지직의 분내담당
@@ -193,7 +208,7 @@ export default function HeroV2() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.65 }}
+          transition={{ delay: reduce ? 0 : 0.65 }}
           className="mt-6 flex flex-wrap justify-center gap-2"
         >
           {TAGS.map((t) => (
@@ -208,9 +223,9 @@ export default function HeroV2() {
 
         {/* 듀얼 CTA (라이브 상태에 따라 1순위 변경) */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: reduce ? 0 : 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
+          transition={{ delay: reduce ? 0 : 0.8 }}
           className="mt-10 flex flex-col items-center gap-4 sm:flex-row"
         >
           {isLive ? (

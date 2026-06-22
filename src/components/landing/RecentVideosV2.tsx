@@ -11,20 +11,19 @@ import {
   FilmIcon,
 } from '@heroicons/react/24/outline';
 import { useRecentVideos, type RecentVideo } from '@/hooks/useRecentVideos';
+import { useReveal } from './useReveal';
 
 const CHZZK_VIDEOS = 'https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc/videos';
 const YT_ARCHIVE = 'https://www.youtube.com/@AyaUke_Archive/videos';
 
 function VideoCard({ video, i }: { video: RecentVideo; i: number }) {
+  const { reveal } = useReveal();
   return (
     <motion.a
       href={video.url}
       target="_blank"
       rel="noopener noreferrer"
-      initial={{ opacity: 0, y: 28 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-60px' }}
-      transition={{ duration: 0.5, delay: i * 0.1 }}
+      {...reveal({ y: 28, delay: i * 0.1, margin: '-60px' })}
       className="group overflow-hidden rounded-2xl border border-light-primary/15 bg-white/60 shadow-sm transition-all duration-300 hover:-translate-y-2 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/15 dark:bg-gray-800/50 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow"
     >
       <div className="relative aspect-video overflow-hidden bg-light-primary/10 dark:bg-dark-primary/10">
@@ -83,12 +82,10 @@ function FallbackPanel({
   onRetry?: () => void;
   retrying?: boolean;
 }) {
+  const { reveal } = useReveal();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.4 }}
+      {...reveal({ y: 16, duration: 0.4, margin: '0px' })}
       className="flex flex-col items-center justify-center rounded-3xl border border-light-primary/20 bg-white/50 px-6 py-16 text-center backdrop-blur-sm dark:border-dark-primary/20 dark:bg-gray-800/40"
     >
       <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-light-primary/15 text-light-accent dark:bg-dark-primary/20 dark:text-dark-accent">
@@ -115,18 +112,13 @@ function FallbackPanel({
 
 export default function RecentVideosV2() {
   const { data, isLoading, isError, isFetching, refetch } = useRecentVideos();
+  const { reveal } = useReveal();
   const videos = (data ?? []).slice(0, 3);
 
   return (
     <section className="px-4 py-24 sm:px-6">
       <div className="mx-auto max-w-5xl">
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.5 }}
-          className="mb-14 text-center"
-        >
+        <motion.div {...reveal()} className="mb-14 text-center">
           <h2 className="font-display text-4xl font-bold sm:text-5xl">
             <span className="bg-gradient-to-r from-light-accent to-light-purple bg-clip-text text-transparent dark:from-dark-accent dark:to-dark-secondary">
               최근 다시보기

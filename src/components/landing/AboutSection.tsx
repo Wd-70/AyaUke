@@ -6,6 +6,7 @@ import {
   BoltIcon,
   ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
+import { useReveal } from './useReveal';
 
 const CARDS = [
   {
@@ -25,24 +26,24 @@ const CARDS = [
   },
 ];
 
-const reveal = {
-  hidden: { opacity: 0, y: 28 },
-  show: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { duration: 0.5, delay: i * 0.12 },
-  }),
-};
-
 export default function AboutSection() {
+  const { reduce, reveal } = useReveal();
+
+  // 카드 stagger 리빌 — reduced-motion이면 이동 없이 즉시
+  const cardReveal = {
+    hidden: { opacity: 0, y: reduce ? 0 : 28 },
+    show: (i: number) => ({
+      opacity: 1,
+      y: 0,
+      transition: { duration: reduce ? 0 : 0.5, delay: reduce ? 0 : i * 0.12 },
+    }),
+  };
+
   return (
     <section className="px-4 py-24 sm:px-6">
       <div className="mx-auto max-w-5xl">
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.5 }}
+          {...reveal()}
           className="mx-auto mb-16 max-w-3xl text-center"
         >
           <h2 className="font-display text-4xl font-bold sm:text-5xl">
@@ -66,7 +67,7 @@ export default function AboutSection() {
               <motion.div
                 key={card.title}
                 custom={i}
-                variants={reveal}
+                variants={cardReveal}
                 initial="hidden"
                 whileInView="show"
                 viewport={{ once: true, margin: '-60px' }}

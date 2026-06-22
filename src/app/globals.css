@@ -152,6 +152,7 @@ body {
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-marquee { animation: none; }
+  .animate-blob { animation: none; }
 }
 
 .animation-delay-2000 {

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon, MusicalNoteIcon, MicrophoneIcon } from '@heroicons/react/24/outline';
 import { useLandingSongs, type LandingSong } from '@/hooks/useLandingSongs';
+import { useReveal } from './useReveal';
 
 const GRADIENTS = [
   'from-light-accent/25 to-light-purple/20 dark:from-dark-accent/25 dark:to-dark-purple/20',
@@ -55,6 +56,7 @@ function SongMiniCard({ song }: { song: LandingSong }) {
 
 export default function SongbookPreview() {
   const { data: songs } = useLandingSongs();
+  const { reveal } = useReveal();
   const list = songs && songs.length > 0 ? songs : [];
   // 마퀴 이음새 없이: 같은 목록을 2번
   const loop = list.length > 0 ? [...list, ...list] : [];
@@ -63,10 +65,7 @@ export default function SongbookPreview() {
     <section className="overflow-hidden py-24">
       <div className="mx-auto max-w-5xl px-4 text-center sm:px-6">
         <motion.h2
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.5 }}
+          {...reveal()}
           className="font-display text-4xl font-bold sm:text-5xl"
         >
           <span className="bg-gradient-to-r from-light-accent to-light-purple bg-clip-text text-transparent dark:from-dark-accent dark:to-dark-secondary">
@@ -74,10 +73,7 @@ export default function SongbookPreview() {
           </span>
         </motion.h2>
         <motion.p
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.5, delay: 0.1 }}
+          {...reveal({ y: 16, delay: 0.1 })}
           className="mx-auto mt-4 max-w-2xl text-lg text-light-text/60 dark:text-dark-text/60"
         >
           부른 노래마다 라이브 클립까지. 제목·가수·초성으로 바로 찾아보세요.
@@ -85,10 +81,7 @@ export default function SongbookPreview() {
 
         {/* 검색 유도 (클릭 시 노래책으로) */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.5, delay: 0.2 }}
+          {...reveal({ y: 16, delay: 0.2 })}
           className="mx-auto mt-8 max-w-xl"
         >
           <Link
