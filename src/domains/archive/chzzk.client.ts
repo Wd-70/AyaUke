@@ -309,3 +309,117 @@ export async function fetchVideoHlsInfo(videoNo: number | string) {
   const info = await fetchVideoStreamInfo(videoNo);
   return { hlsUrl: info.streamUrl, duration: info.duration, videoTitle: info.videoTitle };
 }
+
+export interface ChzzkChannelInfo {
+  /** 팔로워 수 (없으면 null) */
+  followerCount: number | null;
+}
+
+/** 채널 기본 정보(팔로워 수 등). 실패해도 throw하지 않고 null 폴백. */
+export async function fetchChzzkChannelInfo(channelId: string): Promise<ChzzkChannelInfo> {
+  try {
+    const response = await fetchWithTimeout(
+      `https://api.chzzk.naver.com/service/v1/channels/${channelId}`,
+      { headers: { ...CHZZK_HEADERS, referer: `https://chzzk.naver.com/${channelId}` } },
+      8000,
+    );
+    if (!response.ok) return { followerCount: null };
+    const json = await response.json();
+    const fc = json?.content?.followerCount;
+    return { followerCount: typeof fc === 'number' ? fc : null };
+  } catch {
+    return { followerCount: null };
+  }
+}
+
+export interface ChzzkChannelHistory {
+  /** 치지직 첫 방송 시각 "YYYY-MM-DD HH:mm:ss" (없으면 null) */
+  firstLiveDate: string | null;
+  /** 누적 방송시간(시간 단위). about 페이지에 노출되는 라이브 값 */
+  totalLiveHours: number | null;
+}
+
+/**
+ * 채널 누적 통계(첫 방송일·누적 방송시간). about 페이지가 쓰는 공개 엔드포인트.
+ * 실패해도 throw하지 않고 null 폴백.
+ */
+export async function fetchChzzkChannelHistory(channelId: string): Promise<ChzzkChannelHistory> {
+  const empty: ChzzkChannelHistory = { firstLiveDate: null, totalLiveHours: null };
+  try {
+    const response = await fetchWithTimeout(
+      `https://api.chzzk.naver.com/service/v1/channels/${channelId}/data?fields=channelHistory`,
+      { headers: { ...CHZZK_HEADERS, referer: `https://chzzk.naver.com/${channelId}` } },
+      8000,
+    );
+    if (!response.ok) return empty;
+    const json = await response.json();
+    const h = json?.content?.channelHistory;
+    if (!h) return empty;
+    return {
+      firstLiveDate: typeof h.firstLiveDate === 'string' ? h.firstLiveDate : null,
+      totalLiveHours: typeof h.totalLiveHours === 'number' ? h.totalLiveHours : null,
+    };
+  } catch {
+    return empty;
+  }
+}
+
+export interface ChzzkLiveStatus {
+  isLive: boolean;
+  liveTitle: string | null;
+  concurrentUserCount: number | null;
+  /** 라이브 썸네일 URL (템플릿의 {type}을 적당한 해상도로 치환) */
+  liveImageUrl: string | null;
+  categoryValue: string | null;
+  openDate: string | null;
+  channelName: string | null;
+  channelImageUrl: string | null;
+}
+
+/** 채널의 실시간 라이브 상태 (공개 폴링 API). 실패해도 throw하지 않고 오프라인으로 폴백. */
+export async function fetchChzzkLiveStatus(channelId: string): Promise<ChzzkLiveStatus> {
+  const offline: ChzzkLiveStatus = {
+    isLive: false,
+    liveTitle: null,
+    concurrentUserCount: null,
+    liveImageUrl: null,
+    categoryValue: null,
+    openDate: null,
+    channelName: null,
+    channelImageUrl: null,
+  };
+
+  try {
+    const response = await fetchWithTimeout(
+      `https://api.chzzk.naver.com/service/v2/channels/${channelId}/live-detail`,
+      { headers: { ...CHZZK_HEADERS, referer: `https://chzzk.naver.com/${channelId}` } },
+      8000,
+    );
+    if (!response.ok) return offline;
+
+    const json = await response.json();
+    const c = json?.content;
+    if (!c) return offline;
+
+    const channel = c.channel ?? {};
+    const isLive = c.status === 'OPEN';
+    // liveImageUrl은 "...{type}.jpg" 템플릿 — 480 해상도로 치환
+    const liveImageUrl: string | null =
+      typeof c.liveImageUrl === 'string' ? c.liveImageUrl.replace('{type}', '480') : null;
+
+    return {
+      isLive,
+      liveTitle: c.liveTitle ?? null,
+      // 오프라인이면 과거 라이브의 시청자수라 오해 소지 → null
+      concurrentUserCount:
+        isLive && typeof c.concurrentUserCount === 'number' ? c.concurrentUserCount : null,
+      liveImageUrl: isLive ? liveImageUrl : null,
+      categoryValue: c.liveCategoryValue || c.liveCategory || null,
+      openDate: c.openDate ?? null,
+      channelName: channel.channelName ?? null,
+      channelImageUrl: channel.channelImageUrl ?? null,
+    };
+  } catch {
+    return offline;
+  }
+}
