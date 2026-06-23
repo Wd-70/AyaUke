@@ -53,8 +53,15 @@ interface SongEditModalProps {
   loading: boolean
 }
 
+const formatKeyAdjustment = (value?: number | null) => {
+  if (value == null) return '설정 없음'
+  if (value === 0) return '원본키'
+  return `${value > 0 ? '+' : ''}${value}`
+}
+
 export default function SongEditModal({ song, onClose, onSubmit, loading }: SongEditModalProps) {
   const isAdd = !song
+  const currentKeyAdjustmentLabel = isAdd ? '신규: 설정 없음' : formatKeyAdjustment(song.keyAdjustment)
   const [formData, setFormData] = useState({
     title: song?.title || '',
     artist: song?.artist || '',
@@ -236,7 +243,7 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
       updateData.language = formData.language
     }
     
-    const currentKeyValue = song.keyAdjustment !== null ? song.keyAdjustment?.toString() || '0' : '999'
+    const currentKeyValue = song.keyAdjustment != null ? song.keyAdjustment.toString() : '999'
     if (formData.keyAdjustment !== currentKeyValue) {
       if (formData.keyAdjustment === '999') {
         updateData.keyAdjustment = null
@@ -365,7 +372,7 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
             <label className="block text-sm font-medium text-light-text dark:text-dark-text mb-3">
               키 조절
               <span className="text-xs text-light-text/60 dark:text-dark-text/60 ml-2">
-                (현재: {song.keyAdjustment === null ? '설정 없음' : song.keyAdjustment === 0 ? '원본키' : `${song.keyAdjustment > 0 ? '+' : ''}${song.keyAdjustment}`})
+                (현재: {currentKeyAdjustmentLabel})
               </span>
             </label>
             <div className="space-y-3">

@@ -30,13 +30,15 @@ interface ClipRowProps {
   onEdit: () => void;
   onDelete: () => void;
   onToggleOverlap: () => void;
-  /** 우측 액션 슬롯(좋아요·공유 등) — 선택 */
+  /** 항상 보이는 액션(좋아요 등) */
   actions?: React.ReactNode;
+  /** 선택된 행에서만 보이는 액션(원본·공유·신고 등) */
+  selectedActions?: React.ReactNode;
 }
 
 /**
  * 읽기 전용 클립 목록 행 (시청 화면). 선택·재생 표시·(권한자) 편집/삭제·중복 경고.
- * 좋아요/공유 같은 부가 액션은 `actions` 슬롯으로 주입한다.
+ * 좋아요처럼 항상 보여야 하는 액션은 `actions`, 선택된 행에서만 보여야 하는 액션은 `selectedActions`로 주입한다.
  */
 export default function ClipRow({
   video,
@@ -52,8 +54,11 @@ export default function ClipRow({
   onDelete,
   onToggleOverlap,
   actions,
+  selectedActions,
 }: ClipRowProps) {
   const hasOverlap = showOverlap && overlapInfo.hasOverlap;
+  const hasAlwaysVisibleActions = Boolean(actions);
+  const showSelectedActions = isSelected && (selectedActions || (canEdit && !isDimmed));
 
   const borderTone = hasOverlap
     ? isSelected
@@ -129,37 +134,48 @@ export default function ClipRow({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-0.5">
+          {/* 항상 보이는 액션(좋아요) */}
           {actions}
-          {canEdit && !isDimmed && isSelected && (
+
+          {/* 선택된 행에서만: 원본·공유·신고 (+ 권한자 수정·삭제) */}
+          {showSelectedActions && (
             <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit();
-                }}
-                className="inline-flex items-center px-1.5 py-0.5 text-light-text/45 transition-colors hover:text-blue-500 dark:text-dark-text/45"
-                title="수정"
-                aria-label="클립 수정"
-              >
-                <PencilIcon className="h-4 w-4" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete();
-                }}
-                disabled={isDeleting}
-                className="inline-flex items-center px-1.5 py-0.5 text-light-text/45 transition-colors hover:text-red-500 disabled:opacity-50 dark:text-dark-text/45"
-                title="삭제"
-                aria-label="클립 삭제"
-              >
-                {isDeleting ? (
-                  <div className="h-4 w-4 animate-spin rounded-full border border-red-500 border-t-transparent" />
-                ) : (
-                  <TrashIcon className="h-4 w-4" />
-                )}
-              </button>
+              {hasAlwaysVisibleActions && (
+                <span className="mx-1 h-4 w-px shrink-0 bg-light-primary/25 dark:bg-dark-primary/25" />
+              )}
+              {selectedActions}
+              {canEdit && !isDimmed && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit();
+                    }}
+                    className="inline-flex items-center px-1.5 py-0.5 text-light-text/45 transition-colors hover:text-blue-500 dark:text-dark-text/45"
+                    title="수정"
+                    aria-label="클립 수정"
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete();
+                    }}
+                    disabled={isDeleting}
+                    className="inline-flex items-center px-1.5 py-0.5 text-light-text/45 transition-colors hover:text-red-500 disabled:opacity-50 dark:text-dark-text/45"
+                    title="삭제"
+                    aria-label="클립 삭제"
+                  >
+                    {isDeleting ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border border-red-500 border-t-transparent" />
+                    ) : (
+                      <TrashIcon className="h-4 w-4" />
+                    )}
+                  </button>
+                </>
+              )}
             </>
           )}
         </div>

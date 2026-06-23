@@ -1563,8 +1563,12 @@ export default function LiveClipManager({
                       }
                       actions={
                         video._id ? (
+                          <ClipLikeButton clipId={video._id} initialCount={video.likeCount ?? 0} />
+                        ) : null
+                      }
+                      selectedActions={
+                        video._id ? (
                           <>
-                            <ClipLikeButton clipId={video._id} initialCount={video.likeCount ?? 0} />
                             <ClipSourceLink
                               platform={video.platform || 'youtube'}
                               videoId={video.videoId}

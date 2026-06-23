@@ -352,12 +352,13 @@ export default function SongManagement() {
         setShowAddModal(false)
         // 데이터 다시 로드 (백그라운드에서 조용히)
         await loadSongs()
-      } else {
-        throw new Error(result.error?.message || '곡 추가 실패')
+        return
       }
+
+      showError('추가 실패', result.error?.message || '곡 추가 실패')
     } catch (error) {
-      console.error('❌ 새 곡 추가 오류:', error)
-      showError('추가 실패', '곡 추가 중 오류가 발생했습니다.')
+      console.error('❌ 새 곡 추가 요청 오류:', error)
+      showError('추가 실패', error instanceof Error ? error.message : '곡 추가 중 오류가 발생했습니다.')
     } finally {
       setAddLoading(false)
     }
