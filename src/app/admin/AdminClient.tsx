@@ -10,6 +10,7 @@ import {
   UsersIcon,
   Cog6ToothIcon,
   PlayIcon,
+  FlagIcon,
   MusicalNoteIcon,
   BookOpenIcon,
   ShieldCheckIcon,
@@ -33,12 +34,14 @@ import UserManagementTab from "./tabs/UserManagementTab";
 import MaintenanceTab from "./tabs/MaintenanceTab";
 import DashboardTab from "./tabs/DashboardTab";
 import LiveClipManagementTab from "./tabs/live-clips/LiveClipManagementTab";
+import ClipReportsTab from "./tabs/ClipReportsTab";
 import ChzzkYoutubeConverterTab from "./tabs/ChzzkYoutubeConverterTab";
 import ClipWorkflowTab from "./tabs/clip-workflow/ClipWorkflowTab";
 
 type TabType =
   | "dashboard"
   | "clips"
+  | "clip-reports"
   | "clip-workflow"
   | "songs"
   | "timeline"
@@ -80,6 +83,13 @@ const tabs = [
     access: "songs" as TabAccess,
     external: true,
     externalLink: "/admin/songs",
+  },
+  {
+    id: "clip-reports" as const,
+    name: "클립 신고",
+    icon: FlagIcon,
+    description: "사용자 클립 신고 검토 및 처리",
+    access: "songs" as TabAccess,
   },
   {
     id: "clip-workflow" as const,
@@ -189,6 +199,8 @@ export default function AdminClient() {
 
       case "clips":
         return <LiveClipManagementTab />;
+      case "clip-reports":
+        return <ClipReportsTab />;
       case "clip-workflow":
         return <ClipWorkflowTab />;
 

@@ -18,6 +18,7 @@ import ClipPlayer from './clip/ClipPlayer';
 import ClipRow from './clip/ClipRow';
 import ClipLikeButton from './clip/ClipLikeButton';
 import ClipShareButton from './clip/ClipShareButton';
+import ClipReportButton from './clip/ClipReportButton';
 import { useBulkClipLikes } from '@/hooks/useClipLikes';
 import ChzzkPlayer, { type ChzzkPlayerHandle } from './video/ChzzkPlayer';
 import { useSession } from 'next-auth/react';
@@ -1564,6 +1565,7 @@ export default function LiveClipManager({
                           <>
                             <ClipLikeButton clipId={video._id} initialCount={video.likeCount ?? 0} />
                             <ClipShareButton clipId={video._id} title={video.title} />
+                            <ClipReportButton clipId={video._id} />
                           </>
                         ) : null
                       }

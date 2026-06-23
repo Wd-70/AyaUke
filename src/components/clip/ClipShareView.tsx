@@ -13,6 +13,7 @@ import {
 import ClipPlayer from './ClipPlayer';
 import ClipLikeButton from './ClipLikeButton';
 import ClipShareButton from './ClipShareButton';
+import ClipReportButton from './ClipReportButton';
 import { useReveal } from '@/components/landing/useReveal';
 import type { PublicClipDTO, PublicClipSummary } from '@/domains/archive/clip.service';
 
@@ -122,6 +123,7 @@ export default function ClipShareView({
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <ClipLikeButton clipId={clip.id} initialCount={clip.likeCount} size="lg" />
             <ClipShareButton clipId={clip.id} title={clip.title} size="lg" />
+            <ClipReportButton clipId={clip.id} size="lg" />
             <Link
               href="/songbook"
               className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-light-accent to-light-purple px-5 py-2 text-base font-bold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-purple-glow dark:from-dark-primary dark:to-dark-secondary dark:hover:shadow-pink-glow"
