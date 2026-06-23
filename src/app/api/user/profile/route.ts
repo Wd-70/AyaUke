@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/authOptions'
 import dbConnect from '@/shared/db/mongodb'
 import User from '@/models/User'
+import { roleToIsAdmin, UserRole } from '@/lib/permissions'
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -91,7 +92,7 @@ export async function PATCH(request: NextRequest) {
         channelName: updatedUser.channelName,
         displayName: updatedUser.displayName,
         profileImageUrl: updatedUser.profileImageUrl,
-        isAdmin: updatedUser.isAdmin,
+        isAdmin: roleToIsAdmin(updatedUser.role as UserRole),
         lastLoginAt: updatedUser.lastLoginAt,
         preferences: updatedUser.preferences
       }
@@ -149,7 +150,7 @@ export async function GET(request: NextRequest) {
         channelName: user.channelName,
         displayName: user.displayName,
         profileImageUrl: user.profileImageUrl,
-        isAdmin: user.isAdmin,
+        isAdmin: roleToIsAdmin(user.role as UserRole),
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
         preferences: user.preferences

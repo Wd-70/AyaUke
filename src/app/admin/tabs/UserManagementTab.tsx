@@ -18,10 +18,10 @@ import {
   HeartIcon,
   QueueListIcon
 } from '@heroicons/react/24/outline'
-import { IUser } from '@/models/User'
+import type { AdminUserView } from '@/domains/identity/user.view'
 import UserDetailModal from '@/components/admin/UserDetailModal'
 
-interface UserWithCounts extends IUser {
+type UserWithCounts = AdminUserView & {
   likesCount: number
   playlistsCount: number
 }
@@ -123,7 +123,7 @@ export default function UserManagementTab() {
     }
   }
 
-  const openUserModal = (user: IUser) => {
+  const openUserModal = (user: UserWithCounts) => {
     setSelectedUser(user)
     setIsModalOpen(true)
   }
@@ -133,9 +133,9 @@ export default function UserManagementTab() {
     setIsModalOpen(false)
   }
 
-  const handleUserUpdate = (updatedUser: IUser) => {
-    setUsers(users.map(user => 
-      user._id === updatedUser._id ? updatedUser : user
+  const handleUserUpdate = (updatedUser: AdminUserView) => {
+    setUsers(users.map(user =>
+      user._id === updatedUser._id ? { ...user, ...updatedUser } : user
     ))
     closeUserModal()
   }

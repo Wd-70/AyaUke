@@ -11,6 +11,8 @@ declare module "next-auth" {
       channelImageUrl: string
       followerCount: number
       isAdmin: boolean
+      /** 아야우케(스트리머 본인) 여부 — 레거시 디버그용, 미설정 가능 */
+      isAyauke?: boolean
       adminRole: string
       /** UserRole enum 값 (super_admin | song_admin | ayauke_admin | song_editor | user) */
       role: string

@@ -25,10 +25,10 @@ import {
   MusicalNoteIcon,
   ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline'
-import { IUser } from '@/models/User'
+import type { AdminUserView, UserRoleValue } from '@/domains/identity/user.view'
 
 interface UserDetailData {
-  user: IUser & { likesCount?: number; playlistsCount?: number }
+  user: AdminUserView
   likedSongs?: Array<{
     _id: string
     title: string
@@ -49,10 +49,10 @@ interface UserDetailData {
 }
 
 interface UserDetailModalProps {
-  user: IUser & { likesCount?: number; playlistsCount?: number }
+  user: AdminUserView
   isOpen: boolean
   onClose: () => void
-  onUserUpdate: (updatedUser: IUser) => void
+  onUserUpdate: (updatedUser: AdminUserView) => void
 }
 
 const roleLabels = {
@@ -547,7 +547,7 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
                       {isEditing ? (
                         <select
                           value={editForm.role}
-                          onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                          onChange={(e) => setEditForm({ ...editForm, role: e.target.value as UserRoleValue })}
                           className="w-full px-3 py-2 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 
                                      bg-white/50 dark:bg-gray-900/50 text-light-text dark:text-dark-text
                                      focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent"
