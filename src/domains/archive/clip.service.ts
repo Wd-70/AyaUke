@@ -53,12 +53,51 @@ export interface PublicClipDTO {
 
 export interface PublicClipSummary {
   id: string;
+  songId: string;
   title: string;
   artist: string;
   platform: 'youtube' | 'chzzk';
   sungDate: string | null;
+  /** 표시용 날짜 "YYYY.MM.DD" (KST) */
+  sungDateLabel: string | null;
   thumbnailUrl: string | null;
+  isVerified: boolean;
   likeCount: number;
+  playCount: number;
+}
+
+const SUMMARY_FIELDS = 'songId title artist platform sungDate thumbnailUrl isVerified likeCount playCount';
+
+/** 표시용 날짜 라벨 (KST YYYY.MM.DD) */
+function toDateLabel(d: Date | string | undefined): string | null {
+  if (!d) return null;
+  return new Date(d)
+    .toLocaleDateString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    })
+    .replace(/\. /g, '.')
+    .replace(/\.$/, '');
+}
+
+/** lean SongVideo 문서 → 공개 요약 DTO */
+function toClipSummary(c: Record<string, unknown>): PublicClipSummary {
+  const sungDate = c.sungDate as Date | undefined;
+  return {
+    id: String(c._id),
+    songId: String(c.songId ?? ''),
+    title: String(c.title ?? ''),
+    artist: String(c.artist ?? ''),
+    platform: (c.platform as 'youtube' | 'chzzk') || 'youtube',
+    sungDate: sungDate ? new Date(sungDate).toISOString() : null,
+    sungDateLabel: toDateLabel(sungDate),
+    thumbnailUrl: (c.thumbnailUrl as string) || null,
+    isVerified: !!c.isVerified,
+    likeCount: (c.likeCount as number) || 0,
+    playCount: (c.playCount as number) || 0,
+  };
 }
 
 /** 같은 곡의 다른 클립들(공유 페이지 rail용) — 좋아요·최신순, 현재 클립 제외. */
@@ -74,18 +113,70 @@ export async function getPublicClipsForSong(
   })
     .sort({ likeCount: -1, sungDate: -1 })
     .limit(limit)
-    .select('title artist platform sungDate thumbnailUrl likeCount')
+    .select(SUMMARY_FIELDS)
     .lean<Record<string, unknown>[]>();
 
-  return clips.map((c) => ({
-    id: String(c._id),
-    title: String(c.title ?? ''),
-    artist: String(c.artist ?? ''),
-    platform: (c.platform as 'youtube' | 'chzzk') || 'youtube',
-    sungDate: c.sungDate ? new Date(c.sungDate as Date).toISOString() : null,
-    thumbnailUrl: (c.thumbnailUrl as string) || null,
-    likeCount: (c.likeCount as number) || 0,
-  }));
+  return clips.map(toClipSummary);
+}
+
+// ── 공개 클립 갤러리 (/clips) ─────────────────────────────────────
+
+export interface PublicClipsQuery {
+  sort?: 'popular' | 'mostPlayed' | 'recent';
+  platform?: 'all' | 'youtube' | 'chzzk';
+  verified?: boolean;
+  q?: string;
+  page?: number;
+  limit?: number;
+}
+
+const PUBLIC_SORTS: Record<NonNullable<PublicClipsQuery['sort']>, Record<string, 1 | -1>> = {
+  popular: { likeCount: -1, sungDate: -1 },
+  mostPlayed: { playCount: -1, sungDate: -1 },
+  recent: { sungDate: -1, createdAt: -1 },
+};
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** 공개 클립 목록 — 갤러리용. 정렬/플랫폼/검증/검색 + 페이지네이션. 재생 불가 제외. */
+export async function listPublicClips({
+  sort = 'popular',
+  platform = 'all',
+  verified = false,
+  q,
+  page = 1,
+  limit = 24,
+}: PublicClipsQuery) {
+  const match: Record<string, unknown> = { sourceUnavailable: { $ne: true } };
+  if (platform === 'chzzk') match.platform = 'chzzk';
+  if (platform === 'youtube') match.platform = { $in: ['youtube', null] };
+  if (verified) match.isVerified = true;
+  if (q && q.trim()) {
+    const re = new RegExp(escapeRe(q.trim()), 'i');
+    match.$or = [{ title: re }, { artist: re }];
+  }
+
+  const safeLimit = Math.min(Math.max(limit, 1), 48);
+  const [clips, total] = await Promise.all([
+    SongVideo.find(match)
+      .sort(PUBLIC_SORTS[sort])
+      .skip((page - 1) * safeLimit)
+      .limit(safeLimit)
+      .select(SUMMARY_FIELDS)
+      .lean<Record<string, unknown>[]>(),
+    SongVideo.countDocuments(match),
+  ]);
+
+  return {
+    clips: clips.map(toClipSummary),
+    pagination: {
+      page,
+      limit: safeLimit,
+      total,
+      totalPages: Math.ceil(total / safeLimit),
+      hasMore: page * safeLimit < total,
+    },
+  };
 }
 
 /** 클립 재생 수 증가 (facade 활성화 시). 실패해도 무시. */

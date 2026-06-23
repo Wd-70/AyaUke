@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import {
   motion,
   animate,
@@ -18,6 +19,7 @@ import {
   CalendarDaysIcon,
   SparklesIcon,
   ArrowPathIcon,
+  ArrowUpRightIcon,
 } from '@heroicons/react/24/outline';
 import { useLandingStats } from '@/hooks/useLandingStats';
 import { useFollowerCount } from '@/hooks/useFollowerCount';
@@ -79,8 +81,8 @@ function CountUp({ value, inView }: { value: number; inView: boolean }) {
 }
 
 const ITEMS = [
-  { key: 'songCount' as const, label: '노래책 수록곡', icon: MusicalNoteIcon, suffix: '곡' },
-  { key: 'clipCount' as const, label: '라이브 클립', icon: FilmIcon, suffix: '개' },
+  { key: 'songCount' as const, label: '노래책 수록곡', icon: MusicalNoteIcon, suffix: '곡', href: '/songbook' },
+  { key: 'clipCount' as const, label: '라이브 클립', icon: FilmIcon, suffix: '개', href: '/clips' },
   { key: 'vodCount' as const, label: '다시보기', icon: VideoCameraIcon, suffix: '개' },
   { key: 'totalLiveHours' as const, label: '치지직 누적 방송시간', icon: ClockIcon, suffix: '시간' },
   { key: 'followerCount' as const, label: '치지직 팔로워', icon: UserGroupIcon, suffix: '명' },
@@ -219,12 +221,19 @@ export default function NumbersSection() {
                 ? liveFollower ?? data?.followerCount ?? 0
                 : data?.[item.key] ?? 0;
             const Icon = item.icon;
+            const href = 'href' in item ? (item.href as string | undefined) : undefined;
             return (
               <motion.div
                 key={item.key}
                 {...reveal({ y: 28, delay: i * 0.08 })}
-                className="group relative flex flex-col items-center justify-center overflow-hidden rounded-3xl border border-light-primary/30 bg-white/60 p-8 text-center shadow-lg shadow-light-primary/10 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/25 dark:bg-gray-800/40 dark:shadow-black/20 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow"
+                className={`group relative flex flex-col items-center justify-center overflow-hidden rounded-3xl border border-light-primary/30 bg-white/60 p-8 text-center shadow-lg shadow-light-primary/10 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/25 dark:bg-gray-800/40 dark:shadow-black/20 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow ${href ? 'cursor-pointer' : ''}`}
               >
+                {href && (
+                  <>
+                    <Link href={href} className="absolute inset-0 z-10" aria-label={item.label} />
+                    <ArrowUpRightIcon className="absolute right-4 top-4 h-4 w-4 text-light-text/25 opacity-0 transition-opacity duration-200 group-hover:opacity-100 dark:text-dark-text/30" />
+                  </>
+                )}
                 <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-light-accent to-light-purple text-white shadow-lg dark:from-dark-primary dark:to-dark-secondary">
                   <Icon className="h-7 w-7" />
                 </div>

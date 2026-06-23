@@ -18,6 +18,7 @@ interface NavigationProps {
 const NAV_LINKS = [
   { href: '/', label: '홈' },
   { href: '/songbook', label: '노래책' },
+  { href: '/clips', label: '클립' },
 ] as const;
 
 /**
