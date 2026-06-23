@@ -33,24 +33,24 @@ export function buildChzzkVideoUrl(videoNo: number): string {
 }
 
 /**
- * 영상 URL에 시작 시각(초)을 붙여 반환한다.
- * - 유튜브(watch?v=…): 이미 쿼리가 있으므로 `&t={초}`
- * - 치지직(video/{no}): 쿼리가 없으므로 `?t={초}` — 기존의 무조건 `&t=`는
- *   `.../video/123&t=100` 처럼 깨진 URL을 만들었다.
- * connector를 URL에 `?` 유무로 판단해 플랫폼과 무관하게 올바른 형식을 만든다.
- * (치지직 t 파라미터 지원이 불확실해도 형식은 유효하므로 안전)
+ * 영상 URL에 시작 시각(초)을 붙여 반환한다(원본 영상의 그 장면으로 딥링크).
+ * - 유튜브: `t={초}`
+ * - 치지직 VOD: `currentTime={초}` — 치지직은 `?t=`를 무시하고 `?currentTime=`로만
+ *   seek된다(댓글 타임스탬프 클릭이 내부적으로 쓰는 값). 실측으로 확인.
+ * connector는 URL의 `?` 유무로 판단한다.
  */
 export function buildVideoUrlWithTime(url: string, seconds: number): string {
   if (!url) return url;
   const t = Math.max(0, Math.floor(seconds || 0));
+  const param = CHZZK_VIDEO_REGEX.test(url) ? 'currentTime' : 't';
   const connector = url.includes('?') ? '&' : '?';
-  return `${url}${connector}t=${t}`;
+  return `${url}${connector}${param}=${t}`;
 }
 
 /**
  * 플랫폼/식별자/시작초로 "원본 영상" URL을 만든다 (클립 시작 시각으로 딥링크).
  *   - youtube: https://www.youtube.com/watch?v={id}&t={초}
- *   - chzzk:   https://chzzk.naver.com/video/{no}?t={초}
+ *   - chzzk:   https://chzzk.naver.com/video/{no}?currentTime={초}
  */
 export function buildSourceUrl(platform: VideoPlatform, videoId: string, seconds = 0): string {
   const base =
