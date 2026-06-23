@@ -38,5 +38,8 @@
       "Bash(python3:*)"
     ],
     "deny": []
-  }
+  },
+  "enabledMcpjsonServers": [
+    "browsermcp"
+  ]
 }
