@@ -47,6 +47,19 @@ export function buildVideoUrlWithTime(url: string, seconds: number): string {
   return `${url}${connector}t=${t}`;
 }
 
+/**
+ * 플랫폼/식별자/시작초로 "원본 영상" URL을 만든다 (클립 시작 시각으로 딥링크).
+ *   - youtube: https://www.youtube.com/watch?v={id}&t={초}
+ *   - chzzk:   https://chzzk.naver.com/video/{no}?t={초}
+ */
+export function buildSourceUrl(platform: VideoPlatform, videoId: string, seconds = 0): string {
+  const base =
+    platform === 'chzzk'
+      ? buildChzzkVideoUrl(Number(videoId))
+      : `https://www.youtube.com/watch?v=${videoId}`;
+  return buildVideoUrlWithTime(base, seconds);
+}
+
 /** URL에서 플랫폼과 식별자를 파싱. 지원하지 않는 URL이면 null */
 export function parseVideoUrl(url: string): ParsedVideoUrl | null {
   if (!url || typeof url !== 'string') return null;

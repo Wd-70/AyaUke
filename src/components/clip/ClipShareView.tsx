@@ -8,8 +8,10 @@ import {
   PlayIcon,
   CheckBadgeIcon,
   ArrowRightIcon,
+  ArrowTopRightOnSquareIcon,
   MusicalNoteIcon,
 } from '@heroicons/react/24/outline';
+import { buildSourceUrl } from '@/shared/utils/video-url';
 import ClipPlayer from './ClipPlayer';
 import ClipLikeButton from './ClipLikeButton';
 import ClipShareButton from './ClipShareButton';
@@ -46,6 +48,7 @@ export default function ClipShareView({
 }) {
   const { reveal } = useReveal();
   const isChzzk = clip.platform === 'chzzk';
+  const sourceUrl = buildSourceUrl(clip.platform, clip.videoId, clip.startTime);
 
   return (
     <main className="relative min-h-[calc(100vh-3rem)] overflow-hidden px-4 pb-24 pt-24 sm:px-6">
@@ -89,15 +92,20 @@ export default function ClipShareView({
         {/* 정보 */}
         <motion.div {...reveal({ y: 18, delay: 0.05 })} className="mt-7 text-center">
           <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
-            <span
-              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-semibold ${
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={isChzzk ? '치지직에서 원본 다시보기 열기' : 'YouTube에서 원본 영상 열기'}
+              className={`group/src inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-semibold ring-1 ring-inset transition-all hover:-translate-y-0.5 ${
                 isChzzk
-                  ? 'bg-[#00FFA3]/15 text-[#0bbf7d] dark:text-[#00FFA3]'
-                  : 'bg-red-500/15 text-red-500'
+                  ? 'bg-[#00FFA3]/15 text-[#0bbf7d] ring-[#00FFA3]/20 hover:bg-[#00FFA3]/25 hover:ring-[#00FFA3]/40 dark:text-[#00FFA3]'
+                  : 'bg-red-500/15 text-red-500 ring-red-500/20 hover:bg-red-500/25 hover:ring-red-500/40'
               }`}
             >
               {isChzzk ? '치지직 다시보기' : 'YouTube'}
-            </span>
+              <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5 opacity-70 transition-opacity group-hover/src:opacity-100" />
+            </a>
             {clip.isVerified && (
               <Chip icon={CheckBadgeIcon}>검증된 클립</Chip>
             )}
