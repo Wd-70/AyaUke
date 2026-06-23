@@ -411,7 +411,13 @@ function isMusicContent(text: string): boolean {
 function splitCommentByTimestamps(decodedHtml: string) {
   console.log('🔍 범용 타임라인 파싱 시작...');
   
-  const results = [];
+  const results: {
+    timeText: string;
+    timeSeconds: number;
+    content: string;
+    baseVideoUrl: string;
+    source: string;
+  }[] = [];
   let baseVideoUrl = '';
   
   // 첫 번째 유튜브 링크에서 기본 URL 추출
@@ -423,7 +429,13 @@ function splitCommentByTimestamps(decodedHtml: string) {
   // 1단계: 모든 타임스탬프 링크를 찾고 주변 텍스트 추출
   const allTimestampPattern = /<a[^>]*>(\d{1,2}:\d{2}(?::\d{2})?)<\/a>/g;
   let match;
-  const timestampPositions = [];
+  const timestampPositions: {
+    timeText: string;
+    timeSeconds: number;
+    startPos: number;
+    endPos: number;
+    fullMatch: string;
+  }[] = [];
   
   while ((match = allTimestampPattern.exec(decodedHtml)) !== null) {
     timestampPositions.push({
@@ -683,7 +695,7 @@ async function findSongMatches(artist: string, songTitle: string) {
       // 최소 신뢰도 기준 (0.6 이상만 후보로 선정)
       if (overallConfidence >= 0.6) {
         matches.push({
-          songId: song._id.toString(),
+          songId: String(song._id),
           title: song.title,
           artist: song.artist,
           confidence: overallConfidence,

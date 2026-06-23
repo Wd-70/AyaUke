@@ -57,6 +57,7 @@ interface YouTubePlayer {
   getCurrentTime(): number;
   seekTo(seconds: number, allowSeekAhead?: boolean): void;
   loadVideoById(options: { videoId: string; startSeconds?: number; endSeconds?: number }): void;
+  destroy(): void;
 }
 
 // YouTube API 타입 정의
@@ -64,18 +65,6 @@ declare global {
   interface Window {
     YT: any;
     onYouTubeIframeAPIReady: () => void;
-  }
-}
-
-// requestIdleCallback 타입 정의 추가
-declare global {
-  interface Window {
-    requestIdleCallback?: (callback: (deadline: IdleDeadline) => void, options?: { timeout?: number }) => number;
-    cancelIdleCallback?: (id: number) => void;
-  }
-  interface IdleDeadline {
-    timeRemaining(): number;
-    readonly didTimeout: boolean;
   }
 }
 
@@ -184,7 +173,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
   const [isMobile, setIsMobile] = useState(false);
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   const [savedScrollPosition, setSavedScrollPosition] = useState(0);
-  const timelineListRef = useRef<HTMLDivElement>(null);
+  const timelineListRef = useRef<HTMLDivElement | null>(null);
   const scrollSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // YouTube 플레이어 상태
@@ -858,7 +847,7 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
       '3': 'BUFFERING',
       '5': 'CUED'
     };
-    console.log('상태명:', stateNames[event.data as keyof typeof stateNames] || 'UNKNOWN');
+    console.log('상태명:', stateNames[String(event.data) as keyof typeof stateNames] || 'UNKNOWN');
     
     // 1 = playing, 2 = paused
     setIsPlaying(event.data === 1);
@@ -1168,7 +1157,8 @@ export default function TimelineParsingView({ onStatsUpdate, onUploadRequest }: 
         return {
           ...timeline,
           isDuplicate,
-          originalIndex: index
+          originalIndex: index,
+          error: undefined as string | undefined
         };
       });
 

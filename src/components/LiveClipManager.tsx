@@ -13,7 +13,7 @@ import {
   ArrowRightIcon,
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
-import YouTube from 'react-youtube';
+import YouTube, { type YouTubeEvent } from 'react-youtube';
 import ClipPlayer from './clip/ClipPlayer';
 import ClipRow from './clip/ClipRow';
 import ClipLikeButton from './clip/ClipLikeButton';
@@ -334,7 +334,7 @@ export default function LiveClipManager({
 
   // 편집 모드 시작
   const startEditVideo = (video: SongVideo) => {
-    setEditingVideoId(video._id);
+    setEditingVideoId(video._id ?? null);
     setEditingVideoData({
       videoUrl: video.videoUrl,
       sungDate: parseOriginalDateString(video.originalDateString, video.sungDate),
@@ -465,7 +465,7 @@ export default function LiveClipManager({
         }
       }
     } catch (e) {
-      console.warn('⚠️ 재생/일시정지 실패 (영상에 문제가 있을 수 있음):', e.message);
+      console.warn('⚠️ 재생/일시정지 실패 (영상에 문제가 있을 수 있음):', e instanceof Error ? e.message : e);
       // 오류 발생 시 플레이어 참조 초기화
       setVideoPlayer(null);
       setIsVideoPlaying(false);
@@ -780,8 +780,8 @@ export default function LiveClipManager({
     e.preventDefault();
     if (!songId || !addVideoData.videoUrl) return;
     
-    // originalDateString을 파싱해서 정확한 날짜 사용 (fallback으로 addVideoData.sungDate 사용)
-    const sungDate = parseOriginalDateString(selectedTimeline?.originalDateString, addVideoData.sungDate) || new Date().toISOString().split('T')[0];
+    // 영상 제목에서 자동 추출한 날짜를 우선 사용, 없으면 사용자가 입력한 sungDate로 폴백
+    const sungDate = parseOriginalDateString(videoMetadata.extractedDate || undefined, addVideoData.sungDate) || new Date().toISOString().split('T')[0];
 
     setIsAddingVideo(true);
     try {
@@ -925,7 +925,7 @@ export default function LiveClipManager({
                         enablejsapi: 1
                       },
                     }}
-                    onReady={(event) => {
+                    onReady={(event: YouTubeEvent) => {
                       if (event.target && typeof event.target.playVideo === 'function') {
                         console.log('🎵 LiveClip 플레이어 준비 완료');
                         setVideoPlayer(event.target);
@@ -957,7 +957,7 @@ export default function LiveClipManager({
                                   }
                                 }
                               } catch (e) {
-                                console.warn('⚠️ 백업 자동 재생 실패 (영상에 문제가 있을 수 있음):', e.message);
+                                console.warn('⚠️ 백업 자동 재생 실패 (영상에 문제가 있을 수 있음):', e instanceof Error ? e.message : e);
                                 setShouldAutoPlay(false);
                                 // 플레이어 참조 초기화
                                 setVideoPlayer(null);
@@ -967,7 +967,7 @@ export default function LiveClipManager({
                         }
                       }
                     }}
-                    onStateChange={(event) => {
+                    onStateChange={(event: YouTubeEvent) => {
                       // YouTube 플레이어 상태와 동기화
                       const playerState = event.data;
                       const isCurrentlyPlaying = playerState === 1; // 재생 중
@@ -977,14 +977,14 @@ export default function LiveClipManager({
                       console.log('🎵 플레이어 상태 변경:', {
                         state: playerState,
                         shouldAutoPlay,
-                        stateNames: {
+                        stateNames: ({
                           [-1]: '시작되지 않음',
                           0: '종료됨',
                           1: '재생 중',
                           2: '일시정지됨',
                           3: '버퍼링 중',
                           5: '준비완료'
-                        }[playerState] || '알 수 없음'
+                        } as Record<number, string>)[playerState] || '알 수 없음'
                       });
                       
                       setIsVideoPlaying(isCurrentlyPlaying);
@@ -1000,7 +1000,7 @@ export default function LiveClipManager({
                               console.log('✅ 자동 재생 성공');
                             }
                           } catch (e) {
-                            console.warn('⚠️ 상태 변경 시 자동 재생 실패 (영상에 문제가 있을 수 있음):', e.message);
+                            console.warn('⚠️ 상태 변경 시 자동 재생 실패 (영상에 문제가 있을 수 있음):', e instanceof Error ? e.message : e);
                             setShouldAutoPlay(false);
                             // 플레이어 참조 초기화
                             setVideoPlayer(null);
@@ -1025,17 +1025,17 @@ export default function LiveClipManager({
                     }}
                     onPlay={() => setIsVideoPlaying(true)}
                     onPause={() => setIsVideoPlaying(false)}
-                    onError={(event) => {
+                    onError={(event: YouTubeEvent) => {
                       console.warn('⚠️ YouTube 영상 재생 오류:', {
                         errorCode: event.data,
                         videoId: selectedVideo.videoId,
-                        errorMessages: {
+                        errorMessages: ({
                           2: '잘못된 매개변수 - 영상 ID가 올바르지 않음',
                           5: '플레이어 HTML5 오류',
                           100: '영상을 찾을 수 없음 - 삭제되었거나 비공개',
                           101: '영상 소유자가 임베드를 허용하지 않음',
                           150: '영상 소유자가 임베드를 허용하지 않음'
-                        }[event.data] || '알 수 없는 오류'
+                        } as Record<number, string>)[event.data] || '알 수 없는 오류'
                       });
                       
                       // 재생 상태 초기화
@@ -1100,7 +1100,7 @@ export default function LiveClipManager({
                     <div 
                       className="text-xs sm:text-xs text-blue-600 dark:text-blue-400 mt-1 cursor-pointer hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
                       onClick={() => {
-                        const clipDuration = formatTime(editingVideoData.endTime - editingVideoData.startTime);
+                        const clipDuration = formatTime((editingVideoData.endTime ?? 0) - editingVideoData.startTime);
                         navigator.clipboard.writeText(clipDuration).then(() => {
                           console.log('클립 길이 복사됨:', clipDuration);
                         }).catch(() => {
@@ -1234,7 +1234,7 @@ export default function LiveClipManager({
                   {editingVideoData.endTime && (
                     <button
                       type="button"
-                      onClick={() => seekToTime(Math.max(0, editingVideoData.endTime - 3))}
+                      onClick={() => seekToTime(Math.max(0, (editingVideoData.endTime ?? 0) - 3))}
                       className="px-2 py-1.5 sm:px-3 sm:py-2 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-800 transition-colors text-xs sm:text-sm font-medium min-w-[3rem] min-h-[2rem] sm:min-w-[4rem] sm:min-h-[2.5rem] flex items-center justify-center"
                       title="종료시간 3초 전으로 이동"
                     >
@@ -1454,7 +1454,7 @@ export default function LiveClipManager({
                             {isAdmin() && (
                               <button
                                 onClick={() => {
-                                  const currentDuration = editingVideoData.endTime - editingVideoData.startTime;
+                                  const currentDuration = (editingVideoData.endTime ?? 0) - editingVideoData.startTime;
                                   if (currentDuration > 0 && editingVideoId) {
                                     applyDurationToSameSongClips(editingVideoId, currentDuration);
                                   }
@@ -1557,9 +1557,9 @@ export default function LiveClipManager({
                       overlapExpanded={expandedOverlapInfo === video._id}
                       onSelect={() => handleVideoSelect(index)}
                       onEdit={() => startEditVideo(video)}
-                      onDelete={() => handleDeleteVideo(video._id)}
+                      onDelete={() => video._id && handleDeleteVideo(video._id)}
                       onToggleOverlap={() =>
-                        setExpandedOverlapInfo(expandedOverlapInfo === video._id ? null : video._id)
+                        setExpandedOverlapInfo(expandedOverlapInfo === video._id ? null : (video._id ?? null))
                       }
                       actions={
                         video._id ? (

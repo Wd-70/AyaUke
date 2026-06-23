@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, Model } from 'mongoose';
 
 /**
  * 타임라인 댓글 원문(정규화 저장소).
@@ -34,7 +34,7 @@ const TimelineCommentSchema = new Schema<ITimelineComment>(
 );
 
 export const TimelineComment =
-  mongoose.models.TimelineComment ||
+  (mongoose.models.TimelineComment as Model<ITimelineComment> | undefined) ||
   mongoose.model<ITimelineComment>('TimelineComment', TimelineCommentSchema);
 
 export default TimelineComment;
