@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { MagnifyingGlassIcon, FilmIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, FilmIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import ClipGalleryCard from './ClipGalleryCard';
 import { usePublicClips, useAllClips, type ClipsFilters } from '@/hooks/usePublicClips';
 import { useReveal } from '@/components/landing/useReveal';
@@ -131,13 +131,23 @@ export default function ClipsGallery() {
         {/* 컨트롤 */}
         <div className="mb-8 flex flex-col items-center gap-3">
           <div className="relative w-full max-w-md">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-light-text/40 dark:text-dark-text/40" />
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-light-accent/70 dark:text-dark-accent/70" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="곡 제목 · 가수 · 초성으로 검색"
-              className="w-full rounded-2xl border border-light-primary/25 bg-white/60 py-3 pl-11 pr-4 text-light-text placeholder:text-light-text/40 backdrop-blur-sm transition-colors focus:border-light-accent/50 focus:outline-none dark:border-dark-primary/25 dark:bg-gray-800/50 dark:text-dark-text dark:placeholder:text-dark-text/40"
+              className="w-full rounded-2xl border border-light-primary/25 bg-white/60 py-3 pl-11 pr-11 text-light-text placeholder:text-light-text/40 backdrop-blur-sm transition-colors focus:border-light-accent/50 focus:outline-none dark:border-dark-primary/25 dark:bg-gray-800/50 dark:text-dark-text dark:placeholder:text-dark-text/40"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                aria-label="검색어 지우기"
+                className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-light-text/40 transition-colors hover:bg-light-primary/15 hover:text-light-text/70 dark:text-dark-text/40 dark:hover:bg-dark-primary/15 dark:hover:text-dark-text/70"
+              >
+                <XMarkIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2">
             <Segmented value={sort} options={SORTS} onChange={setSort} />

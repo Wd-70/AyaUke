@@ -206,7 +206,7 @@ export default function SongSearch({
       {/* Search bar */}
       <div className="relative mb-3 sm:mb-4">
         <div className="absolute inset-y-0 left-0 pl-2.5 sm:pl-3 flex items-center pointer-events-none">
-          <MagnifyingGlassIcon className="h-4 w-4 sm:h-5 sm:w-5 text-light-text/40 dark:text-dark-text/40" />
+          <MagnifyingGlassIcon className="h-4 w-4 sm:h-5 sm:w-5 text-light-accent/70 dark:text-dark-accent/70" />
         </div>
         <input
           type="text"
@@ -220,6 +220,18 @@ export default function SongSearch({
                      focus:border-transparent transition-all duration-200"
         />
         <div className="absolute inset-y-0 right-0 pr-2 sm:pr-3 flex items-center gap-1">
+          {/* 검색어 지우기 */}
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm("")}
+              aria-label="검색어 지우기"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-light-text/40 transition-colors hover:bg-light-primary/15 hover:text-light-text/70 dark:text-dark-text/40 dark:hover:bg-dark-primary/15 dark:hover:text-dark-text/70"
+            >
+              <XMarkIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+            </button>
+          )}
+
           {/* 가사 검색 토글 버튼 */}
           <TooltipButton
             onClick={() => setIncludeLyrics(!includeLyrics)}
