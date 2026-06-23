@@ -5,6 +5,11 @@
 
 import { ChzzkClient } from 'chzzk'
 
+// chzzk 라이브러리 타입에 노출되지 않은 me API의 런타임 형태 (동작 무변경, 타입 보강용)
+type ChzzkClientWithMe = ChzzkClient & {
+  me: { user: ChzzkClient['user'] }
+}
+
 // 수동으로 설정할 수 있는 치지직 쿠키 저장소
 const MANUAL_CHZZK_COOKIES: Record<string, string> = {
   // 네이버 ID: 치지직 쿠키 매핑
@@ -68,22 +73,22 @@ export async function createManualChzzkClient(naverId: string, providedCookies?:
       console.log('client.user() 실패:', userError)
       
       try {
-        console.log('client.me.user() 메서드 시도...')
-        userInfo = await client.me.user()
-        console.log('client.me.user() 결과:', JSON.stringify(userInfo, null, 2))
+        console.log('(client as ChzzkClientWithMe).me.user() 메서드 시도...')
+        userInfo = await (client as ChzzkClientWithMe).me.user()
+        console.log('(client as ChzzkClientWithMe).me.user() 결과:', JSON.stringify(userInfo, null, 2))
       } catch (meError) {
-        console.log('client.me.user() 실패:', meError)
+        console.log('(client as ChzzkClientWithMe).me.user() 실패:', meError)
         
         try {
-          console.log('client.me 프로퍼티 확인...')
-          console.log('client.me:', client.me)
+          console.log('(client as ChzzkClientWithMe).me 프로퍼티 확인...')
+          console.log('(client as ChzzkClientWithMe).me:', (client as ChzzkClientWithMe).me)
           
-          if (client.me && typeof client.me.user === 'function') {
-            userInfo = await client.me.user()
-            console.log('client.me.user() 재시도 결과:', JSON.stringify(userInfo, null, 2))
+          if ((client as ChzzkClientWithMe).me && typeof (client as ChzzkClientWithMe).me.user === 'function') {
+            userInfo = await (client as ChzzkClientWithMe).me.user()
+            console.log('(client as ChzzkClientWithMe).me.user() 재시도 결과:', JSON.stringify(userInfo, null, 2))
           }
         } catch (me2Error) {
-          console.log('client.me 재시도 실패:', me2Error)
+          console.log('(client as ChzzkClientWithMe).me 재시도 실패:', me2Error)
         }
       }
     }

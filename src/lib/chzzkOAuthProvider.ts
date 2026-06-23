@@ -16,7 +16,10 @@ let currentAccessToken: string | null = null
 export default function ChzzkProvider(
   options: OAuthUserConfig<ChzzkProfile>
 ): OAuthConfig<ChzzkProfile> {
-  return {
+  // 커스텀 치지직 OAuth 프로토콜 핸들러가 NextAuth의 엄격한 OAuthConfig 내부 타입과
+  // 정확히 맞지 않아(토큰/유저인포 request, profile 반환 형태) 객체 단위로 캐스트한다.
+  // 런타임 동작은 변경하지 않는다.
+  const config = {
     id: "chzzk",
     name: "치지직",
     type: "oauth",
@@ -34,7 +37,8 @@ export default function ChzzkProvider(
     }),
     token: {
       url: "https://chzzk.naver.com/auth/v1/token",
-      async request(context) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      async request(context: any) {
         const response = await fetch("https://chzzk.naver.com/auth/v1/token", {
           method: "POST",
           headers: {
@@ -84,7 +88,8 @@ export default function ChzzkProvider(
     },
     userinfo: {
       url: "https://chzzk.naver.com/open/v1/users/me",
-      async request(context) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      async request(context: any) {
         // context에서 토큰을 가져오거나 임시 저장된 토큰 사용
         const accessToken = context.tokens?.access_token || currentAccessToken
         
@@ -138,7 +143,7 @@ export default function ChzzkProvider(
           console.error('치지직 공식 API 호출 실패:', error)
           
           // API 승인 관련 오류라면 더 명확한 메시지 표시
-          if (error.message && error.message.includes('승인')) {
+          if (error instanceof Error && error.message.includes('승인')) {
             throw error
           }
         }
@@ -190,7 +195,7 @@ export default function ChzzkProvider(
         throw new Error('Chzzk user info API failed')
       },
     },
-    profile(profile) {
+    profile(profile: ChzzkProfile) {
       return {
         id: profile.userIdHash,
         name: profile.channelName || profile.nickname,
@@ -204,4 +209,5 @@ export default function ChzzkProvider(
     },
     ...options,
   }
+  return config as OAuthConfig<ChzzkProfile>
 }

@@ -18,7 +18,8 @@ export const ChzzkOfficialProvider = {
   },
   token: {
     url: "https://comm-api.game.naver.com/nng_main/v1/oauth2/token",
-    async request({ params, provider }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async request({ params, provider }: any) {
       const response = await fetch(provider.token.url, {
         method: "POST",
         headers: {
@@ -44,7 +45,8 @@ export const ChzzkOfficialProvider = {
   },
   userinfo: {
     url: "https://api.chzzk.naver.com/service/v1/user/me", // 추정 URL (문서에서 확인 필요)
-    async request({ tokens }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async request({ tokens }: any) {
       console.log('=== 치지직 공식 API 사용자 정보 조회 ===')
       
       const response = await fetch(this.url, {
@@ -73,7 +75,8 @@ export const ChzzkOfficialProvider = {
       }
     },
   },
-  profile(profile) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  profile(profile: any) {
     return {
       id: profile.id,
       name: profile.name,

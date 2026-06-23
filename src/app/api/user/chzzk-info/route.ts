@@ -27,7 +27,17 @@ export async function GET(request: NextRequest) {
         console.log('=== 치지직 채널 정보 조회 ===')
         console.log('Channel ID:', session.user.channelId)
         
-        const channelInfo = await client.channel.detail(session.user.channelId)
+        // chzzk 라이브러리 타입에 detail이 노출되지 않아 런타임 형태로 캐스트
+        const channelApi = client.channel as unknown as {
+          detail: (channelId: string) => Promise<{
+            channelId: string
+            channelName: string
+            channelImageUrl: string
+            followerCount: number
+            openLive: boolean
+          }>
+        }
+        const channelInfo = await channelApi.detail(session.user.channelId)
         chzzkInfo = {
           channelId: channelInfo.channelId,
           channelName: channelInfo.channelName,

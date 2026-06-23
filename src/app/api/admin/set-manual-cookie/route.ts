@@ -34,13 +34,15 @@ export async function POST(request: NextRequest) {
     
     if (userInfo) {
       console.log('수동 쿠키 인증 성공!')
-      
+
+      // chzzk 기본 user 응답에는 채널 메타가 없을 수 있어 옵셔널로 접근(런타임 동작 무변경)
+      const info = userInfo as { channelId?: string; channelName?: string }
       return NextResponse.json({
         success: true,
         message: '쿠키가 성공적으로 설정되었습니다',
         userInfo: {
-          channelId: userInfo.channelId,
-          channelName: userInfo.channelName,
+          channelId: info.channelId,
+          channelName: info.channelName,
           verified: true
         }
       })

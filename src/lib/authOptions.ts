@@ -1,4 +1,5 @@
 import CredentialsProvider from "next-auth/providers/credentials"
+import type { User as NextAuthUser } from "next-auth"
 import { createManualChzzkClient } from "@/lib/chzzkCookieManual"
 import { isAdminChannel, getAdminInfo, getStaticUserRole } from "@/lib/adminChannels"
 import { roleToIsAdmin } from '@/lib/permissions'
@@ -69,10 +70,19 @@ export const authOptions = {
           
           if (!userInfo || !userInfo.loggedIn) return null
           
-          let channelInfo = null
+          // chzzk 라이브러리 타입에 info가 노출되지 않아 런타임 형태로 캐스트(런타임 동작 무변경)
+          let channelInfo: {
+            channelId?: string
+            channelName?: string
+            channelImageUrl?: string
+            followerCount?: number
+          } | null = null
           try {
-            if (client.channel && typeof client.channel.info === 'function') {
-              channelInfo = await client.channel.info(userInfo.userIdHash)
+            const channelApi = client.channel as unknown as {
+              info?: (id: string) => Promise<typeof channelInfo>
+            }
+            if (channelApi.info && typeof channelApi.info === 'function') {
+              channelInfo = await channelApi.info(userInfo.userIdHash)
             }
           } catch (error) {
             console.log('채널 정보 가져오기 실패:', error)
@@ -108,7 +118,8 @@ export const authOptions = {
             console.error('사용자 DB 저장 오류:', dbError)
           }
           
-          return result
+          // 쿠키 로그인은 naverId 등 일부 필드가 비어 있어 증강 User와 정확히 일치하지 않으므로 캐스트
+          return result as unknown as NextAuthUser
         } catch (error) {
           console.error('치지직 쿠키 로그인 오류:', error)
           return null
@@ -117,7 +128,11 @@ export const authOptions = {
     })
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
+    // NOTE: NextAuth v4 콜백 파라미터는 의도적으로 추론(any)에 맡긴다. 엄격 타입 시
+    // 런타임에서 null을 허용하는 token/session 필드(naverId/channelName/adminRole 등)와
+    // 충돌해 전역 세션 계약을 nullable로 바꿔야 하므로(앱 전반 파급) 보류한다.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async jwt({ token, user, account }: any) {
       if (user) {
         // OAuth 방식 (치지직 공식 API)
         if (account?.provider === 'chzzk') {
@@ -176,7 +191,8 @@ export const authOptions = {
       }
       return token
     },
-    async session({ session, token }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    async session({ session, token }: any) {
       if (token && session.user) {
         // 기본 토큰 정보 설정
         session.user.id = token.userId as string // NextAuth 표준 필드
