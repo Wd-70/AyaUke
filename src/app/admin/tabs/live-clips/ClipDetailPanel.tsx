@@ -212,7 +212,7 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
       setDisplayClip((prev) => ({
         ...prev,
         startTime: editData.startTime,
-        endTime: editData.endTime ?? null,
+        endTime: editData.endTime ?? undefined,
         description: editData.description,
         ...(editData.videoUrl !== clip.videoUrl ? { videoUrl: editData.videoUrl } : {}),
       }));

@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         total = totalCount
         console.log('✅ populate 성공')
       } catch (error) {
-        console.warn('⚠️ populate 실패, 기본 정보만 반환:', error.message)
+        console.warn('⚠️ populate 실패, 기본 정보만 반환:', error instanceof Error ? error.message : error)
         // populate 실패 시 새로운 쿼리로 기본 플레이리스트 정보만 반환
         const [basicPlaylists, totalCount] = await Promise.all([
           Playlist.find(baseFilter)

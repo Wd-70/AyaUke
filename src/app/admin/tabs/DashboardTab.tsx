@@ -113,7 +113,7 @@ export default function DashboardTab() {
       value: stats.overview.totalSongs.toLocaleString(),
       icon: MusicalNoteIcon,
       change: `MR: ${stats.songs.withMR}곡`,
-      changeType: "neutral" as const,
+      changeType: "neutral" as "increase" | "decrease" | "neutral",
       color: "from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple",
     },
     {
@@ -121,7 +121,7 @@ export default function DashboardTab() {
       value: stats.overview.totalUsers.toLocaleString(),
       icon: UsersIcon,
       change: `활성: ${stats.users.active}`,
-      changeType: "neutral" as const,
+      changeType: "neutral" as "increase" | "decrease" | "neutral",
       color: "from-light-secondary to-light-accent dark:from-dark-secondary dark:to-dark-accent",
     },
     {
@@ -129,7 +129,7 @@ export default function DashboardTab() {
       value: stats.overview.totalClips.toLocaleString(),
       icon: PlayIcon,
       change: `최근 7일: ${stats.overview.recentClipsWeek}개`,
-      changeType: "neutral" as const,
+      changeType: "neutral" as "increase" | "decrease" | "neutral",
       color: "from-blue-400 to-indigo-500 dark:from-blue-500 dark:to-indigo-600",
     },
     {
@@ -137,7 +137,7 @@ export default function DashboardTab() {
       value: stats.overview.totalPlaylists.toLocaleString(),
       icon: ListBulletIcon,
       change: `공개: ${stats.playlists.public}개`,
-      changeType: "neutral" as const,
+      changeType: "neutral" as "increase" | "decrease" | "neutral",
       color: "from-light-purple to-light-secondary dark:from-dark-purple dark:to-dark-secondary",
     },
   ];

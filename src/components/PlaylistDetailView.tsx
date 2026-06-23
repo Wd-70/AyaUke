@@ -91,7 +91,7 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
   // 플레이리스트 곡들의 좋아요 정보 미리 로드 (react-query 캐시에 병합)
   useEffect(() => {
     if (playlist.songs.length === 0) return
-    const songIds = playlist.songs.map(item => item.songId.id || item.songId._id)
+    const songIds = playlist.songs.map(item => item.songId.id)
     loadLikes(songIds)
   }, [playlist.songs, loadLikes])
 
@@ -274,9 +274,11 @@ export default function PlaylistDetailView({ data, shareId }: PlaylistDetailView
     })
   }
 
-  const formatDuration = (songs: unknown[]) => {
+  const formatDuration = (
+    songs: Array<{ songId?: { mrLinks?: { duration?: string }[]; selectedMRIndex?: number } }>,
+  ) => {
     let totalMinutes = 0
-    
+
     songs.forEach(songItem => {
       const song = songItem.songId
       if (!song) return

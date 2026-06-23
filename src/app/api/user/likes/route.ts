@@ -105,8 +105,8 @@ export async function GET(request: NextRequest) {
 
     // 두 쿼리를 병렬로 실행
     const [likes, countResult] = await Promise.all([
-      Like.aggregate(pipeline),
-      Like.aggregate(countPipeline)
+      Like.aggregate(pipeline as unknown as Parameters<typeof Like.aggregate>[0]),
+      Like.aggregate(countPipeline as unknown as Parameters<typeof Like.aggregate>[0])
     ])
 
     const total = countResult.length > 0 ? countResult[0].total : 0

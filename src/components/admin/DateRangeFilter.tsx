@@ -92,7 +92,7 @@ export default function DateRangeFilter({ onDateChange }: DateRangeFilterProps) 
           <div className="flex items-center gap-2 flex-1">
             <DatePicker
               selected={customStartDate}
-              onChange={(date) => setCustomStartDate(date)}
+              onChange={(date: Date | null) => setCustomStartDate(date)}
               selectsStart
               startDate={customStartDate}
               endDate={customEndDate}
@@ -102,11 +102,11 @@ export default function DateRangeFilter({ onDateChange }: DateRangeFilterProps) 
             <span className="text-light-text/60 dark:text-dark-text/60">~</span>
             <DatePicker
               selected={customEndDate}
-              onChange={(date) => setCustomEndDate(date)}
+              onChange={(date: Date | null) => setCustomEndDate(date)}
               selectsEnd
               startDate={customStartDate}
               endDate={customEndDate}
-              minDate={customStartDate}
+              minDate={customStartDate ?? undefined}
               placeholderText="종료일"
               className="px-3 py-2 bg-white/50 dark:bg-gray-800/50 border border-light-primary/20 dark:border-dark-primary/20 rounded-lg text-sm text-light-text dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent"
             />

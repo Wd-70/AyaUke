@@ -42,13 +42,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // 사용자의 플레이리스트들 조회
     const playlists = await Playlist.find({ channelId: user.channelId })
-      .select('name description isPublic songIds shareId createdAt updatedAt')
+      .select('name description isPublic songs shareId createdAt updatedAt')
       .lean()
 
     // 플레이리스트별 곡 수 추가
     const playlistsWithSongCount = playlists.map(playlist => ({
       ...playlist,
-      songCount: playlist.songIds?.length || 0
+      songCount: playlist.songs?.length || 0
     }))
 
     return NextResponse.json({ 

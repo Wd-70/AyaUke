@@ -127,8 +127,8 @@ export default function PlaylistManager() {
     showNotification('success', '플레이리스트가 성공적으로 수정되었습니다.')
   }
 
-  const handlePlaylistCreate = (newPlaylist: Playlist) => {
-    setPlaylists(prev => [newPlaylist, ...prev])
+  const handlePlaylistCreate = (newPlaylist: unknown) => {
+    setPlaylists(prev => [newPlaylist as Playlist, ...prev])
     showNotification('success', '새 플레이리스트가 성공적으로 생성되었습니다.')
   }
 

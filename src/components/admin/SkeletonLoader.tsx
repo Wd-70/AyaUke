@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, type Variants } from 'framer-motion';
 
 /**
  * Skeleton Loader Component Library
@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
  */
 
 // Base shimmer animation variants
-const shimmerVariants = {
+const shimmerVariants: Variants = {
   initial: { backgroundPosition: '-200% 0' },
   animate: {
     backgroundPosition: '200% 0',

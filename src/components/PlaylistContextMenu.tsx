@@ -243,7 +243,7 @@ export default function PlaylistContextMenu({ songId, isOpen, position, onClose 
                   </button>
                   {playlist.shareId && (
                     <button
-                      onClick={(e) => handleGoToPlaylist(e, playlist.shareId)}
+                      onClick={(e) => handleGoToPlaylist(e, playlist.shareId!)}
                       className="p-1 rounded hover:bg-light-primary/20 dark:hover:bg-dark-primary/20 transition-colors duration-200"
                       title="플레이리스트 상세 보기"
                     >

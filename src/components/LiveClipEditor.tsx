@@ -353,7 +353,7 @@ export default function LiveClipEditor({
 
   // 편집 시작
   const startEdit = (video: SongVideo) => {
-    setEditingVideoId(video._id);
+    setEditingVideoId(video._id ?? null);
     
     // originalDateString을 파싱해서 정확한 날짜 사용 (fallback으로 기존 sungDate 사용)
     const formattedDate = parseOriginalDateString(video.originalDateString, video.sungDate);
@@ -927,7 +927,7 @@ export default function LiveClipEditor({
                         <PencilIcon className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(video._id)}
+                        onClick={() => video._id && handleDelete(video._id)}
                         disabled={isDeletingVideo === video._id}
                         className="p-2 text-gray-400 hover:text-red-500 transition-colors duration-200 disabled:opacity-50"
                       >

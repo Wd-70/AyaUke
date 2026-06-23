@@ -9,7 +9,11 @@ import { forwardRef } from 'react';
  * Standardizes button loading states with spinner and disabled state management
  */
 
-export interface LoadingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface LoadingButtonProps
+  extends Omit<
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
+    'onAnimationStart' | 'onAnimationEnd' | 'onDrag' | 'onDragStart' | 'onDragEnd'
+  > {
   isLoading?: boolean;
   variant?: 'primary' | 'accent' | 'danger' | 'ghost';
   icon?: React.ReactNode;

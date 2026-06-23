@@ -33,7 +33,7 @@ export default function ManualResetButton({ disabled, onReset, isLoading = false
       onClick={handleClick}
       disabled={disabled}
       isLoading={isLoading}
-      variant="secondary"
+      variant="ghost"
       icon={<ArrowPathIcon className="w-4 h-4" />}
       className="text-sm"
     >

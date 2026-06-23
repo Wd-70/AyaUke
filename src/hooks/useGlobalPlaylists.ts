@@ -16,6 +16,8 @@ interface PlaylistWithSongs {
   coverImage?: string
   tags: string[]
   songCount: number
+  shareId?: string
+  isPublic?: boolean
   songs: Array<{
     songId: string | { _id: string }
     addedAt: string
