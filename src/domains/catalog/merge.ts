@@ -47,7 +47,7 @@ export function mergeSongsData(
       usedMongoSongs.add(songKey);
 
       return {
-        id: detail._id, // MongoDB ObjectId를 메인 ID로 사용
+        id: detail._id || song.id, // MongoDB ObjectId를 메인 ID로 사용 (없으면 시트 ID)
         sheetId: song.id, // 구글시트 원본 ID는 별도 보관
         title: song.title, // 구글시트 우선
         artist: song.artist, // 구글시트 우선
@@ -78,7 +78,7 @@ export function mergeSongsData(
     if (usedMongoSongs.has(mongoSongKey)) return;
 
     mongoOnlySongs.push({
-      id: detail._id,
+      id: detail._id || createSongKey(detail.title, detail.artist),
       title: detail.title,
       artist: detail.artist,
       language: detail.language || '미설정',

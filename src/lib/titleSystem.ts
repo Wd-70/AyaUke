@@ -230,9 +230,10 @@ export function getSelectedTitleInfo(user: IUser) {
   if (!selectedTitle) return null;
 
   // Mongoose 객체를 순수한 JavaScript 객체로 변환
+  const maybeDoc = selectedTitle as { toObject?: () => typeof selectedTitle };
   const titleObj =
-    typeof selectedTitle.toObject === "function"
-      ? selectedTitle.toObject()
+    typeof maybeDoc.toObject === "function"
+      ? maybeDoc.toObject()
       : JSON.parse(JSON.stringify(selectedTitle));
 
   return {

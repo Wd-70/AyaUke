@@ -87,7 +87,7 @@ export function parseSheetData(values: string[][]): Song[] {
 
   return dataRows
     .filter((row) => row.length > 0 && (row[titleIndex] || row[0]))
-    .map((row, index) => {
+    .map((row, index): Song | null => {
       let title: string, artist: string;
 
       if (hasRealHeader && titleIndex !== -1 && artistIndex !== -1) {
@@ -108,7 +108,7 @@ export function parseSheetData(values: string[][]): Song[] {
         language: 'Korean', // 기본값, MongoDB에서 덮어씀
         dateAdded: new Date().toISOString().split('T')[0],
         source: 'sheet' as const,
-      } satisfies Song;
+      };
     })
     .filter((song): song is Song => song !== null)
     .filter((song) => {

@@ -1,7 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
-import { SongDetail } from '@/types';
+import type { SongDetail } from '@/types';
 
-export interface ISongDetail extends SongDetail, Document {}
+export interface ISongDetail extends Omit<SongDetail, '_id'>, Document {}
 
 const MRLinkSchema = new Schema({
   url: {

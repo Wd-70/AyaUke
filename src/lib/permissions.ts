@@ -20,7 +20,7 @@ export enum Permission {
   SONGS_STATS = 'songs.stats',
 }
 
-const ROLE_PERMISSIONS = {
+const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   [UserRole.SUPER_ADMIN]: [
     Permission.SYSTEM_ADMIN,
     Permission.USER_MANAGE,

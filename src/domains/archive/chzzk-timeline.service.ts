@@ -169,7 +169,10 @@ export async function parseChzzkTimelineComments(options?: {
 
   // 댓글 원문 정규화 저장 (항목 저장 전에 선반영)
   if (commentUpserts.length > 0) {
-    await TimelineComment.bulkWrite(commentUpserts, { ordered: false }).catch(() => undefined);
+    await TimelineComment.bulkWrite(
+      commentUpserts as Parameters<typeof TimelineComment.bulkWrite>[0],
+      { ordered: false },
+    ).catch(() => undefined);
   }
 
   if (docsToInsert.length > 0) {

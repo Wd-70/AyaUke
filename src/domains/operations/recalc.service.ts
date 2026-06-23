@@ -31,7 +31,7 @@ export async function recalculateLikeCounts(): Promise<RecalcResult> {
     const updates = allSongs
       .slice(i, i + batchSize)
       .map((song) => {
-        const actual = likeCountsMap.get(song._id.toString()) || 0;
+        const actual = likeCountsMap.get(String(song._id)) || 0;
         if (actual === (song.likeCount || 0)) return null;
         updatedCount++;
         return {

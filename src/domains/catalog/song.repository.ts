@@ -31,7 +31,7 @@ export async function fetchSongDetailsFromMongo(): Promise<{
     );
 
     const processedSongDetails = songDetails.map((doc) => ({
-      _id: doc._id.toString(),
+      _id: String(doc._id),
       title: doc.title,
       artist: doc.artist,
       titleAlias: doc.titleAlias,
