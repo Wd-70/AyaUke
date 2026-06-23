@@ -132,16 +132,17 @@ export default function ClipRow({
         <div className="flex shrink-0 items-center gap-1.5">
           {actions}
           {canEdit && !isDimmed && isSelected && (
-            <div className="flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+            <>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onEdit();
                 }}
-                className="rounded-full bg-blue-100 p-1.5 text-blue-600 transition-colors hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-400 dark:hover:bg-blue-800"
+                className="inline-flex items-center px-1.5 py-0.5 text-light-text/45 transition-colors hover:text-blue-500 dark:text-dark-text/45"
                 title="수정"
+                aria-label="클립 수정"
               >
-                <PencilIcon className="h-3 w-3" />
+                <PencilIcon className="h-4 w-4" />
               </button>
               <button
                 onClick={(e) => {
@@ -149,16 +150,17 @@ export default function ClipRow({
                   onDelete();
                 }}
                 disabled={isDeleting}
-                className="rounded-full bg-red-100 p-1.5 text-red-600 transition-colors hover:bg-red-200 disabled:opacity-50 dark:bg-red-900 dark:text-red-400 dark:hover:bg-red-800"
+                className="inline-flex items-center px-1.5 py-0.5 text-light-text/45 transition-colors hover:text-red-500 disabled:opacity-50 dark:text-dark-text/45"
                 title="삭제"
+                aria-label="클립 삭제"
               >
                 {isDeleting ? (
-                  <div className="h-3 w-3 animate-spin rounded-full border border-red-500 border-t-transparent" />
+                  <div className="h-4 w-4 animate-spin rounded-full border border-red-500 border-t-transparent" />
                 ) : (
-                  <TrashIcon className="h-3 w-3" />
+                  <TrashIcon className="h-4 w-4" />
                 )}
               </button>
-            </div>
+            </>
           )}
         </div>
       </div>
