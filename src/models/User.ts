@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { Model } from "mongoose";
 
 export interface IUser extends mongoose.Document {
   channelId: string;
@@ -162,5 +162,7 @@ const userSchema = new mongoose.Schema<IUser>(
 // 인덱스 추가 (channelId는 unique: true로 자동 인덱스 생성됨)
 userSchema.index({ role: 1 });
 
-export default mongoose.models.User ||
+const User = (mongoose.models.User as Model<IUser> | undefined) ||
   mongoose.model<IUser>("User", userSchema);
+
+export default User;

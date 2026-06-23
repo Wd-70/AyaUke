@@ -26,28 +26,7 @@ import {
 import Navigation from '@/components/Navigation'
 import SongEditModal from '@/components/admin/SongEditModal'
 import { useToast } from '@/components/Toast'
-
-interface AdminSong {
-  id: string
-  title: string
-  artist: string
-  originalTitle: string
-  originalArtist: string
-  language: string
-  tags?: string[]
-  mrLinks?: string[]
-  hasLyrics: boolean
-  lyrics?: string
-  sungCount: number
-  likedCount: number
-  addedDate: string
-  status: 'complete' | 'missing-mr' | 'missing-lyrics' | 'incomplete'
-  keyAdjustment?: number | null
-  selectedMRIndex?: number
-  personalNotes?: string
-  imageUrl?: string
-  source?: string
-}
+import type { AdminSong, MRLink } from '@/components/admin/song-admin-types'
 
 interface AdminStats {
   total: number
@@ -326,7 +305,7 @@ export default function SongManagement() {
     language?: string
     keyAdjustment?: number | null
     lyrics?: string
-    mrLinks?: { url: string; skipSeconds?: number; label?: string; duration?: string }[]
+    mrLinks?: MRLink[]
     tags?: string[]
     selectedMRIndex?: number
     imageUrl?: string
@@ -528,7 +507,7 @@ export default function SongManagement() {
     language?: string
     keyAdjustment?: number | null
     lyrics?: string
-    mrLinks?: { url: string; skipSeconds?: number; label?: string; duration?: string }[]
+    mrLinks?: MRLink[]
     tags?: string[]
     selectedMRIndex?: number
     imageUrl?: string

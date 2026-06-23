@@ -9,9 +9,9 @@ import Playlist from '@/domains/engagement/playlist.schema'
 import SongDetail from '@/domains/catalog/song.schema'
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     userId: string
-  }
+  }>
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {

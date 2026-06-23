@@ -14,9 +14,9 @@ function generateUUID() {
 }
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     userId: string
-  }
+  }>
 }
 
 // 타이틀 부여
@@ -41,8 +41,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     await connectToDatabase()
 
-    const user = await User.findById(params.userId)
-    
+    const { userId } = await params
+    const user = await User.findById(userId)
+
     if (!user) {
       return NextResponse.json({ error: '사용자를 찾을 수 없습니다.' }, { status: 404 })
     }
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const updatedUser = await User.findByIdAndUpdate(
-      params.userId,
+      userId,
       { $push: { titles: newTitle } },
       { new: true, runValidators: true }
     ).select('-__v').lean()
@@ -97,8 +98,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     await connectToDatabase()
 
-    const user = await User.findById(params.userId)
-    
+    const { userId } = await params
+    const user = await User.findById(userId)
+
     if (!user) {
       return NextResponse.json({ error: '사용자를 찾을 수 없습니다.' }, { status: 404 })
     }
@@ -116,7 +118,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const updatedUser = await User.findByIdAndUpdate(
-      params.userId,
+      userId,
       updateData,
       { new: true, runValidators: true }
     ).select('-__v').lean()
