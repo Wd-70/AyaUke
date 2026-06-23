@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon, FilmIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import ClipGalleryCard from './ClipGalleryCard';
-import { usePublicClips, type ClipsFilters } from '@/hooks/usePublicClips';
+import { usePublicClips, useAllClips, type ClipsFilters } from '@/hooks/usePublicClips';
 import { useReveal } from '@/components/landing/useReveal';
+import { isTextMatch } from '@/lib/searchUtils';
 
 const SORTS: { key: ClipsFilters['sort']; label: string }[] = [
   { key: 'popular', label: '인기순' },
@@ -54,14 +55,43 @@ export default function ClipsGallery() {
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
 
-  // 검색 디바운스
+  // 검색 디바운스 (짧게 — 클라이언트 필터라 즉시성 좋음)
   useEffect(() => {
-    const t = setTimeout(() => setQ(search), 300);
+    const t = setTimeout(() => setQ(search.trim()), 150);
     return () => clearTimeout(t);
   }, [search]);
 
-  const { clips, total, isLoading, isError, isFetchingNextPage, hasNextPage, fetchNextPage, refetch } =
-    usePublicClips({ sort, platform, verified, q });
+  const searching = q.length > 0;
+
+  // 둘러보기: 서버 페이지네이션 무한스크롤
+  const browse = usePublicClips({ sort, platform, verified, q: '' });
+  // 검색: 전체를 받아 노래책처럼 isTextMatch(초성·한영·띄어쓰기 무시)로 즉시 필터
+  const { allClips, isLoading: allLoading, isError: allError } = useAllClips({ sort, platform, verified }, searching);
+
+  const searchResults = useMemo(() => {
+    if (!searching) return [];
+    return allClips.filter((c) => isTextMatch(q, c.title) || isTextMatch(q, c.artist));
+  }, [searching, allClips, q]);
+
+  // 검색 결과 클라이언트 페이지네이션
+  const [visibleCount, setVisibleCount] = useState(24);
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [q, sort, platform, verified]);
+
+  // 표시 데이터 통합
+  const displayClips = searching ? searchResults.slice(0, visibleCount) : browse.clips;
+  const total = searching ? searchResults.length : browse.total;
+  const isLoading = searching ? allLoading : browse.isLoading;
+  const isError = searching ? allError : browse.isError;
+  const hasMore = searching ? visibleCount < searchResults.length : browse.hasNextPage;
+  const isLoadingMore = searching ? false : browse.isFetchingNextPage;
+  const refetch = searching ? () => {} : browse.refetch;
+
+  const loadMore = () => {
+    if (searching) setVisibleCount((c) => c + 24);
+    else if (browse.hasNextPage && !browse.isFetchingNextPage) void browse.fetchNextPage();
+  };
 
   // 무한 스크롤 sentinel
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -70,15 +100,14 @@ export default function ClipsGallery() {
     if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) {
-          void fetchNextPage();
-        }
+        if (entries[0].isIntersecting && hasMore) loadMore();
       },
       { rootMargin: '600px' },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, searching, browse.isFetchingNextPage, searchResults.length, visibleCount]);
 
   return (
     <main className="relative min-h-[calc(100vh-3rem)] overflow-hidden px-4 pb-24 pt-24 sm:px-6">
@@ -106,7 +135,7 @@ export default function ClipsGallery() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="곡 제목 · 가수로 검색"
+              placeholder="곡 제목 · 가수 · 초성으로 검색"
               className="w-full rounded-2xl border border-light-primary/25 bg-white/60 py-3 pl-11 pr-4 text-light-text placeholder:text-light-text/40 backdrop-blur-sm transition-colors focus:border-light-accent/50 focus:outline-none dark:border-dark-primary/25 dark:bg-gray-800/50 dark:text-dark-text dark:placeholder:text-dark-text/40"
             />
           </div>
@@ -151,28 +180,33 @@ export default function ClipsGallery() {
               </div>
             ))}
           </div>
-        ) : clips.length === 0 ? (
+        ) : displayClips.length === 0 ? (
           <div className="py-20 text-center text-light-text/50 dark:text-dark-text/50">
             <FilmIcon className="mx-auto mb-4 h-12 w-12 opacity-40" />
             <p>{q ? `'${q}' 검색 결과가 없어요` : '표시할 클립이 없어요'}</p>
           </div>
         ) : (
           <>
+            {searching && (
+              <p className="mb-4 text-center text-sm text-light-text/50 dark:text-dark-text/50">
+                &lsquo;{q}&rsquo; 검색 결과 {total.toLocaleString()}개
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {clips.map((clip) => (
+              {displayClips.map((clip) => (
                 <ClipGalleryCard key={clip.id} clip={clip} />
               ))}
             </div>
             {/* 무한 스크롤 sentinel + 로딩 */}
             <div ref={sentinelRef} className="h-10" />
-            {isFetchingNextPage && (
+            {isLoadingMore && (
               <div className="mt-4 flex justify-center">
                 <div className="h-7 w-7 animate-spin rounded-full border-2 border-light-accent/30 border-t-light-accent dark:border-dark-accent/30 dark:border-t-dark-accent" />
               </div>
             )}
-            {!hasNextPage && clips.length > 12 && (
+            {!hasMore && displayClips.length > 12 && (
               <p className="mt-8 text-center text-sm text-light-text/40 dark:text-dark-text/40">
-                마지막 클립까지 모두 봤어요
+                {searching ? '검색 결과를 모두 봤어요' : '마지막 클립까지 모두 봤어요'}
               </p>
             )}
           </>

@@ -130,13 +130,38 @@ export interface PublicClipsQuery {
   limit?: number;
 }
 
+// _id를 마지막 정렬키로 둬 동률(likeCount/sungDate 동일) 시에도 순서를 고정한다.
+// (없으면 offset 페이지네이션이 비결정적이라 같은 클립이 여러 페이지에 중복 등장)
 const PUBLIC_SORTS: Record<NonNullable<PublicClipsQuery['sort']>, Record<string, 1 | -1>> = {
-  popular: { likeCount: -1, sungDate: -1 },
-  mostPlayed: { playCount: -1, sungDate: -1 },
-  recent: { sungDate: -1, createdAt: -1 },
+  popular: { likeCount: -1, sungDate: -1, _id: -1 },
+  mostPlayed: { playCount: -1, sungDate: -1, _id: -1 },
+  recent: { sungDate: -1, createdAt: -1, _id: -1 },
 };
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * 공개 클립 전체 요약 — 검색 모드용. 클라이언트가 isTextMatch(초성·한영·띄어쓰기 무시)로
+ * 즉시 필터링한다(노래책 검색과 동일 UX). 검색은 q를 받지 않고 플랫폼/검증만 적용.
+ */
+export async function listAllClipSummaries({
+  sort = 'popular',
+  platform = 'all',
+  verified = false,
+}: Omit<PublicClipsQuery, 'q' | 'page' | 'limit'>): Promise<PublicClipSummary[]> {
+  const match: Record<string, unknown> = { sourceUnavailable: { $ne: true } };
+  if (platform === 'chzzk') match.platform = 'chzzk';
+  if (platform === 'youtube') match.platform = { $in: ['youtube', null] };
+  if (verified) match.isVerified = true;
+
+  const clips = await SongVideo.find(match)
+    .sort(PUBLIC_SORTS[sort])
+    .limit(6000) // 안전 상한
+    .select(SUMMARY_FIELDS)
+    .lean<Record<string, unknown>[]>();
+
+  return clips.map(toClipSummary);
+}
 
 /** 공개 클립 목록 — 갤러리용. 정렬/플랫폼/검증/검색 + 페이지네이션. 재생 불가 제외. */
 export async function listPublicClips({
