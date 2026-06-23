@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose'
+import mongoose, { Schema, Document, Model } from 'mongoose'
 
 export interface IUserActivity extends Document {
   userId: mongoose.Types.ObjectId
@@ -43,7 +43,7 @@ UserActivitySchema.index({ userId: 1, date: 1 }, { unique: true })
 // 날짜별 인덱스: 오래된 데이터 정리 시 사용
 UserActivitySchema.index({ date: 1 })
 
-const UserActivity = mongoose.models.UserActivity || mongoose.model<IUserActivity>('UserActivity', UserActivitySchema)
+const UserActivity = (mongoose.models.UserActivity as Model<IUserActivity> | undefined) || mongoose.model<IUserActivity>('UserActivity', UserActivitySchema)
 
 export { UserActivity }
 export default UserActivity

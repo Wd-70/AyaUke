@@ -1,4 +1,4 @@
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Schema, Model } from 'mongoose';
 
 /**
  * 유튜브 댓글에서 파싱된 노래 타임라인 항목.
@@ -96,7 +96,7 @@ ParsedTimelineSchema.index({ uploadedDate: -1, startTimeSeconds: 1 });
 ParsedTimelineSchema.index({ platform: 1, videoId: 1, startTimeSeconds: 1 });
 
 export const ParsedTimeline =
-  mongoose.models.ParsedTimeline ||
+  (mongoose.models.ParsedTimeline as Model<IParsedTimeline> | undefined) ||
   mongoose.model<IParsedTimeline>('ParsedTimeline', ParsedTimelineSchema);
 
 export default ParsedTimeline;

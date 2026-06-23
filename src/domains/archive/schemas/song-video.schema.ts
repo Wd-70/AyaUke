@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 import { parseVideoUrl, validateVideoUrl, type VideoPlatform } from '@/shared/utils/video-url';
 
 export interface ISongVideo extends Document {
@@ -165,6 +165,6 @@ SongVideoSchema.pre('save', function(next) {
 });
 
 // 모델 생성
-const SongVideo = mongoose.models.SongVideo || mongoose.model<ISongVideo>('SongVideo', SongVideoSchema);
+const SongVideo = (mongoose.models.SongVideo as Model<ISongVideo> | undefined) || mongoose.model<ISongVideo>('SongVideo', SongVideoSchema);
 
 export default SongVideo;

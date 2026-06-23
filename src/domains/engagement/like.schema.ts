@@ -1,4 +1,4 @@
-import mongoose from 'mongoose'
+import mongoose, { Model } from 'mongoose'
 
 export interface ILike extends mongoose.Document {
   userId: mongoose.Types.ObjectId
@@ -32,5 +32,5 @@ likeSchema.index({ userId: 1, songId: 1 }, { unique: true })
 likeSchema.index({ userId: 1, createdAt: -1 })
 likeSchema.index({ songId: 1 })
 
-export const Like = mongoose.models.Like || mongoose.model<ILike>('Like', likeSchema)
+export const Like = (mongoose.models.Like as Model<ILike> | undefined) || mongoose.model<ILike>('Like', likeSchema)
 export default Like

@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 
 /**
  * 클립(SongVideo) 좋아요. 곡 단위 Like와 동일한 구조 — clipId가 SongVideo를 가리킨다.
@@ -38,5 +38,5 @@ clipLikeSchema.index({ userId: 1, createdAt: -1 });
 clipLikeSchema.index({ clipId: 1 });
 
 export const ClipLike =
-  mongoose.models.ClipLike || mongoose.model<IClipLike>('ClipLike', clipLikeSchema);
+  (mongoose.models.ClipLike as Model<IClipLike> | undefined) || mongoose.model<IClipLike>('ClipLike', clipLikeSchema);
 export default ClipLike;

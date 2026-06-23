@@ -67,6 +67,13 @@ export async function PUT(
       { new: true, runValidators: true }
     );
 
+    if (!updatedVideo) {
+      return NextResponse.json(
+        { error: '영상을 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       video: {

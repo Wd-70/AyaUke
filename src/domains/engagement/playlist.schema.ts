@@ -1,4 +1,4 @@
-import mongoose from 'mongoose'
+import mongoose, { Model } from 'mongoose'
 import { randomUUID } from 'crypto'
 
 export interface IPlaylist extends mongoose.Document {
@@ -135,4 +135,4 @@ playlistSchema.virtual('songCount').get(function() {
   }
 })
 
-export default mongoose.models.Playlist || mongoose.model<IPlaylist>('Playlist', playlistSchema)
+export default (mongoose.models.Playlist as Model<IPlaylist> | undefined) || mongoose.model<IPlaylist>('Playlist', playlistSchema)

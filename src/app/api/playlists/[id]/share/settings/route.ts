@@ -68,6 +68,10 @@ export async function PUT(
       { new: true }
     )
 
+    if (!updatedPlaylist) {
+      return NextResponse.json({ error: '플레이리스트를 찾을 수 없습니다.' }, { status: 404 })
+    }
+
     console.log('✅ 플레이리스트 설정 업데이트 완료')
 
     return NextResponse.json({

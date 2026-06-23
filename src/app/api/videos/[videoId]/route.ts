@@ -135,6 +135,13 @@ export async function PUT(
       { new: true, runValidators: true }
     );
 
+    if (!updatedVideo) {
+      return NextResponse.json(
+        { error: '영상을 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
     // sungDate가 수정된 경우 해당 곡의 lastSungDate 재계산 (수정된 클립이 최신일 경우만)
     if (sungDate !== undefined && updatedVideo) {
       try {

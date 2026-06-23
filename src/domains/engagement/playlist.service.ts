@@ -82,7 +82,7 @@ export async function updatePlaylist(
     playlist.name = updates.name.trim();
   }
   if (typeof updates.description === 'string') playlist.description = updates.description.trim();
-  if (updates.coverImage !== undefined) playlist.coverImage = updates.coverImage || null;
+  if (updates.coverImage !== undefined) playlist.coverImage = updates.coverImage || undefined;
   if (updates.tags !== undefined) playlist.tags = normalizeTags(updates.tags);
   if (typeof updates.isPublic === 'boolean') playlist.isPublic = updates.isPublic;
 
@@ -174,13 +174,19 @@ export async function getSharedPlaylist(shareId: string, viewerChannelId: string
       description: playlist.description,
       coverImage: playlist.coverImage,
       tags: playlist.tags,
-      songs: playlist.songs.map((item: { toObject: () => object; songId: { toObject: () => object; _id: unknown } }) => ({
-        ...item.toObject(),
-        songId: {
-          ...item.songId.toObject(),
-          id: String(item.songId._id),
-        },
-      })),
+      songs: (playlist.songs as unknown[]).map((raw) => {
+        const item = raw as {
+          toObject: () => object;
+          songId: { toObject: () => object; _id: unknown };
+        };
+        return {
+          ...item.toObject(),
+          songId: {
+            ...item.songId.toObject(),
+            id: String(item.songId._id),
+          },
+        };
+      }),
       songCount: playlist.songs.length,
       createdAt: playlist.createdAt,
       updatedAt: playlist.updatedAt,

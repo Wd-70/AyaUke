@@ -67,6 +67,10 @@ export async function POST(
       { new: true }
     )
 
+    if (!updatedPlaylist) {
+      return NextResponse.json({ error: '플레이리스트를 찾을 수 없습니다.' }, { status: 404 })
+    }
+
     console.log('✅ 공유 링크 재생성 완료')
 
     return NextResponse.json({
