@@ -1,15 +1,4 @@
-interface ParsedTimelineItem {
-  id: string;
-  artist: string;
-  songTitle: string;
-  startTimeSeconds: number;
-  endTimeSeconds?: number;
-  // 수동 검증 관련 필드
-  isTimeVerified?: boolean;
-  verifiedBy?: string;
-  verifiedAt?: string;
-  verificationNotes?: string;
-}
+import type { ParsedTimelineItem } from '@/domains/archive/parsed-timeline.types';
 
 /**
  * 시간 검증 상태를 업데이트하는 함수

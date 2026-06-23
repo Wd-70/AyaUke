@@ -43,6 +43,7 @@ interface ChzzkVideo {
   videoId: string;
   videoTitle: string;
   thumbnailImageUrl: string;
+  videoUrl: string;
   publishDate: string;
   duration: number;
   readCount: number;
@@ -51,6 +52,7 @@ interface ChzzkVideo {
   youtubeUrl?: string;
   youtubeVideoId?: string;
   timeOffset?: number;
+  syncSetAt?: string;
   isDeleted: boolean;
 }
 
@@ -58,6 +60,8 @@ interface ChzzkComment {
   _id: string;
   commentId: number;
   videoNo: number;
+  commentType?: string;
+  parentCommentId?: number;
   content: string;
   authorName: string;
   publishedAt: string;
@@ -247,11 +251,11 @@ export default function ChzzkYoutubeConverterTab() {
         });
       }
     } else if (progress.stage === 'videos') {
-      setSyncAnnouncement(`영상 수집 중: ${progress.current}/${progress.total}`);
+      setSyncAnnouncement(`영상 수집 중: ${progress.currentVideo}/${progress.totalVideos}`);
     } else if (progress.stage === 'comments') {
-      setSyncAnnouncement(`댓글 수집 중: ${progress.current}/${progress.total}`);
+      setSyncAnnouncement(`댓글 수집 중: ${progress.currentVideo}/${progress.totalVideos}`);
     }
-  }, [progress.stage, finalStats, progress.current, progress.total]);
+  }, [progress.stage, finalStats, progress.currentVideo, progress.totalVideos]);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -365,7 +369,7 @@ export default function ChzzkYoutubeConverterTab() {
     if (isUrlChange && hasExistingOffset) {
       const confirmed = await confirm({
         title: '유튜브 URL 변경',
-        message: `기존에 설정된 오프셋 (${formatOffset(selectedVideo.timeOffset)})이 있습니다.\nURL을 변경하면 오프셋이 초기화됩니다. 계속하시겠습니까?`,
+        message: `기존에 설정된 오프셋 (${formatOffset(selectedVideo.timeOffset ?? 0)})이 있습니다.\nURL을 변경하면 오프셋이 초기화됩니다. 계속하시겠습니까?`,
         confirmText: '변경 및 초기화',
         cancelText: '취소',
         type: 'warning'
