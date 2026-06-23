@@ -205,8 +205,8 @@ export default function SongSearch({
       >
       {/* Search bar */}
       <div className="relative mb-3 sm:mb-4">
-        <div className="absolute inset-y-0 left-0 pl-2.5 sm:pl-3 flex items-center pointer-events-none">
-          <MagnifyingGlassIcon className="h-4 w-4 sm:h-5 sm:w-5 text-light-accent/70 dark:text-dark-accent/70" />
+        <div className="absolute inset-y-0 left-0 z-10 pl-2.5 sm:pl-3 flex items-center pointer-events-none">
+          <MagnifyingGlassIcon className="h-4 w-4 sm:h-5 sm:w-5 text-light-accent dark:text-dark-accent" />
         </div>
         <input
           type="text"

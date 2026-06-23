@@ -131,7 +131,7 @@ export default function ClipsGallery() {
         {/* 컨트롤 */}
         <div className="mb-8 flex flex-col items-center gap-3">
           <div className="relative w-full max-w-md">
-            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-light-accent/70 dark:text-dark-accent/70" />
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-light-accent dark:text-dark-accent" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
