@@ -102,6 +102,36 @@ async function scanTab(tabId) {
   return mergeCandidates(frames);
 }
 
+function mergeList(frames) {
+  const seen = new Set();
+  const items = [];
+  for (const f of frames) for (const it of (f && f.items) || []) {
+    if (seen.has(it.articleid)) continue;
+    seen.add(it.articleid);
+    items.push(it);
+  }
+  return items;
+}
+
+/** 글 목록 페이지를 (URL이 있으면 백그라운드 탭으로 열어) 스캔해 게시글 항목을 반환. */
+async function listTab(url) {
+  if (url) {
+    const tab = await chrome.tabs.create({ url, active: false });
+    try {
+      await waitTabComplete(tab.id, 20000);
+      await sleep(4000); // 목록 iframe 렌더 대기
+      const items = mergeList(await runFrames(tab.id, scanListFrame));
+      return { listUrl: url, count: items.length, items };
+    } finally {
+      try { await chrome.tabs.remove(tab.id); } catch (_) {}
+    }
+  }
+  const tab = await getActiveTab();
+  if (!tab) return { error: '활성 탭 없음', items: [] };
+  const items = mergeList(await runFrames(tab.id, scanListFrame));
+  return { listUrl: tab.url, count: items.length, items };
+}
+
 function waitTabComplete(tabId, timeoutMs) {
   return new Promise((resolve) => {
     let done = false;
@@ -164,6 +194,8 @@ async function execCommand(cmd) {
       const r = await sendDump({ capturedAt: new Date().toISOString(), pageUrl: tab.url, frames });
       return { ok: r.ok, data: r.data };
     }
+    case 'scanList':
+      return { ok: true, data: await listTab(cmd.payload && cmd.payload.url) };
     case 'openCollect':
       return await openCollect(cmd.payload && cmd.payload.url);
     default:

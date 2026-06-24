@@ -163,6 +163,26 @@ function dumpFrame() {
   };
 }
 
+/** 글 목록(회원 작성글/게시판)에서 게시글 항목 추출: a.article 의 제목+articleid → 새 URL. 댓글링크(a.cmt) 제외. */
+function scanListFrame() {
+  if (!location.hostname.includes('cafe.naver.com')) return { items: [] };
+  const items = [];
+  const seen = new Set();
+  document.querySelectorAll('a.article').forEach((a) => {
+    const href = a.href || '';
+    const idm = href.match(/articleid=(\d+)/) || href.match(/\/articles\/(\d+)/);
+    if (!idm) return;
+    const id = idm[1];
+    if (seen.has(id)) return;
+    seen.add(id);
+    const cm = href.match(/clubid=(\d+)/) || href.match(/cafes\/(\d+)/) || location.href.match(/cafes\/(\d+)/);
+    const club = cm ? cm[1] : '';
+    const title = (a.textContent || '').trim();
+    items.push({ articleid: id, title, url: club ? `https://cafe.naver.com/ca-fe/cafes/${club}/articles/${id}` : href });
+  });
+  return { listUrl: location.href, items };
+}
+
 /** 여러 프레임의 scanFrame 결과를 sourceUrl 기준으로 합친다(이미지 합집합). */
 function mergeCandidates(frameResults) {
   const map = new Map();
