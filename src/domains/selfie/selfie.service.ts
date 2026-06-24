@@ -8,6 +8,19 @@ import { ValidationError } from '@/shared/api/errors'
 
 const ARCHIVE_ROOT = path.join(process.cwd(), 'selfie-archive')
 
+/**
+ * 개발용: 확장이 보낸 페이지 DOM/이미지 인벤토리 덤프를 로컬에 저장한다.
+ * Claude가 이 파일을 읽어 카페 본문 셀렉터·날짜 위치를 정확히 파악하는 용도.
+ * selfie-archive/_debug/<타임스탬프>.json
+ */
+export async function saveDebugDump(payload: unknown): Promise<{ path: string }> {
+  const dir = path.join(ARCHIVE_ROOT, '_debug')
+  await fsp.mkdir(dir, { recursive: true })
+  const name = `${new Date().toISOString().replace(/[:.]/g, '-')}.json`
+  await fsp.writeFile(path.join(dir, name), JSON.stringify(payload, null, 2), 'utf8')
+  return { path: `selfie-archive/_debug/${name}` }
+}
+
 /** Date → KST 기준 YYYY-MM-DD */
 export function toKstDate(d: Date): string {
   // en-CA 로케일은 YYYY-MM-DD 형식을 보장
