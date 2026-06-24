@@ -138,6 +138,18 @@ function dumpFrame() {
     }
   });
 
+  // 글 목록 페이지용: 게시글 링크 후보(제목+URL). 회원 작성글/게시판 목록 구조 파악에 쓴다.
+  const linkSeen = new Set();
+  const links = [];
+  document.querySelectorAll('a[href*="/articles/"], a[href*="articleid="], a[href*="ArticleRead"]').forEach((a) => {
+    const href = a.href;
+    if (!href || linkSeen.has(href)) return;
+    linkSeen.add(href);
+    if (links.length < 80) {
+      links.push({ href, text: (a.textContent || '').trim().slice(0, 60), anc: ancestry(a).slice(0, 5) });
+    }
+  });
+
   return {
     frameUrl: location.href,
     isTop: window.top === window,
@@ -146,6 +158,8 @@ function dumpFrame() {
     imgs: imgs.slice(0, 100),
     containers,
     dates: dates.slice(0, 40),
+    linkCount: links.length,
+    links,
   };
 }
 
