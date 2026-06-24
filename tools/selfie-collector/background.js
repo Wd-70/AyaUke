@@ -148,6 +148,31 @@ function waitTabComplete(tabId, timeoutMs) {
   });
 }
 
+/** URL들을 백그라운드 탭으로 열어 본문 이미지만 가져온다(수집 없이 — 훑어보기용). */
+async function peekUrls(urls) {
+  const results = [];
+  for (const url of urls || []) {
+    const tab = await chrome.tabs.create({ url, active: false });
+    try {
+      await waitTabComplete(tab.id, 20000);
+      await sleep(3500);
+      const cands = await scanTab(tab.id);
+      const c = cands[0] || null;
+      results.push({
+        url,
+        postedAt: c ? c.postedAt : null,
+        imageCount: c ? c.images.length : 0,
+        images: c ? c.images.map((i) => i.imageUrl) : [],
+      });
+    } catch (e) {
+      results.push({ url, error: String(e), images: [] });
+    } finally {
+      try { await chrome.tabs.remove(tab.id); } catch (_) {}
+    }
+  }
+  return { results };
+}
+
 /** URL을 백그라운드 탭으로 열어 스캔·수집 후 닫는다. */
 async function openCollect(url) {
   if (!url) return { ok: false, data: { error: 'url이 필요합니다.' } };
@@ -196,6 +221,8 @@ async function execCommand(cmd) {
     }
     case 'scanList':
       return { ok: true, data: await listTab(cmd.payload && cmd.payload.url) };
+    case 'peek':
+      return { ok: true, data: await peekUrls(cmd.payload && cmd.payload.urls) };
     case 'openCollect':
       return await openCollect(cmd.payload && cmd.payload.url);
     default:
