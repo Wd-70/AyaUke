@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
-import { randomUUID } from 'crypto';
+import { generateShortId } from '@/shared/utils/short-id';
 import { parseVideoUrl, validateVideoUrl, type VideoPlatform } from '@/shared/utils/video-url';
 
 export interface ISongVideo extends Document {
@@ -37,7 +37,7 @@ const SongVideoSchema: Schema = new Schema({
     unique: true,
     sparse: true,
     index: true,
-    default: () => randomUUID(),
+    default: () => generateShortId(),
   },
   songId: {
     type: String,

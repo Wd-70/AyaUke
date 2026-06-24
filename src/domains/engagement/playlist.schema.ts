@@ -1,5 +1,5 @@
 import mongoose, { Model } from 'mongoose'
-import { randomUUID } from 'crypto'
+import { generateShortId } from '@/shared/utils/short-id'
 
 export interface IPlaylist extends mongoose.Document {
   userId: mongoose.Types.ObjectId
@@ -78,7 +78,7 @@ const playlistSchema = new mongoose.Schema<IPlaylist>({
     type: String,
     required: true,
     unique: true,
-    default: () => randomUUID()
+    default: () => generateShortId()
   },
   isPublic: {
     type: Boolean,

@@ -1,8 +1,21 @@
 // 기존 SongVideo(라이브 클립) 문서에 공개 URL용 shareId를 백필한다.
-// 공개 URL(/clip/[shareId])에서 내부 ObjectId 노출을 없애기 위함.
+// 공개 URL(/clip/[shareId])에서 내부 ObjectId 노출을 없애기 위함. (12자 짧은 토큰)
 // 사용: node scripts/db/backfill-clip-shareids.mjs   (또는 npm run db:backfill-clip-shareids)
-import { randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { getDb } from './client.mjs';
+
+const ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+function shortId(length = 12) {
+  let out = '';
+  while (out.length < length) {
+    const buf = randomBytes(length);
+    for (let i = 0; i < buf.length && out.length < length; i++) {
+      const v = buf[i];
+      if (v < 248) out += ALPHABET[v % 62];
+    }
+  }
+  return out;
+}
 
 const { db, close } = await getDb();
 
@@ -22,7 +35,7 @@ try {
   };
 
   for await (const doc of cursor) {
-    ops.push({ updateOne: { filter: { _id: doc._id }, update: { $set: { shareId: randomUUID() } } } });
+    ops.push({ updateOne: { filter: { _id: doc._id }, update: { $set: { shareId: shortId() } } } });
     processed++;
     if (ops.length >= 500) await flush();
   }

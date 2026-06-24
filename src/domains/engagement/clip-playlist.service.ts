@@ -1,5 +1,5 @@
 import mongoose from 'mongoose'
-import { randomUUID } from 'crypto'
+import { generateShortId } from '@/shared/utils/short-id'
 import ClipPlaylist from './clip-playlist.schema'
 import SongVideo from '@/domains/archive/schemas/song-video.schema'
 import User from '@/models/User'
@@ -175,7 +175,7 @@ export async function regenerateShareId(channelId: string, playlistId: string) {
     createdAt: playlist.createdAt,
     revokedAt: new Date(),
   })
-  playlist.shareId = randomUUID()
+  playlist.shareId = generateShortId()
   await playlist.save()
 
   return playlist

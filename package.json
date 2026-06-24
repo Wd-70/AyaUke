@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "db:inspect": "node scripts/db/inspect.mjs",
     "db:backup": "node scripts/db/backup.mjs",
-    "db:backfill-clip-shareids": "node scripts/db/backfill-clip-shareids.mjs"
+    "db:backfill-clip-shareids": "node scripts/db/backfill-clip-shareids.mjs",
+    "db:migrate-shareids-short": "node scripts/db/migrate-shareids-short.mjs"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.10.0",

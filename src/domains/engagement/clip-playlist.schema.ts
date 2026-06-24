@@ -1,5 +1,5 @@
 import mongoose, { Model } from 'mongoose'
-import { randomUUID } from 'crypto'
+import { generateShortId } from '@/shared/utils/short-id'
 
 /**
  * 라이브 클립(SongVideo) 플레이리스트.
@@ -83,7 +83,7 @@ const clipPlaylistSchema = new mongoose.Schema<IClipPlaylist>({
     type: String,
     required: true,
     unique: true,
-    default: () => randomUUID(),
+    default: () => generateShortId(),
   },
   isPublic: {
     type: Boolean,
