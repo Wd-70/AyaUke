@@ -50,18 +50,30 @@ function scanFrame() {
       'cafefiles.pstatic.net',
       'mblogthumb-phinf.pstatic.net',
     ];
-    const container = document.querySelector(
-      '.se-main-container, #postViewArea, .ContentRenderer, .article_viewer, .NHN_Writeform_Main',
-    );
-    const root = container || document.body;
-    let imgs = [...root.querySelectorAll('img')]
-      .map((i) => i.currentSrc || i.src)
+    // 본문 컨테이너 우선순위 — 에디터 본문(.se-main-container)부터. 댓글/프로필은 이 바깥이라 제외된다.
+    // 컨테이너가 없는 프레임(최상위=카페 대문/사이드바)은 건너뛴다 → 배너 광고 오수집 방지.
+    const SELS = ['.se-main-container', '#postViewArea', '.ContentRenderer', '.NHN_Writeform_Main', '.article_viewer'];
+    let container = null;
+    for (const s of SELS) { container = document.querySelector(s); if (container) break; }
+    if (!container) return { candidates: [] };
+
+    let imgs = [...container.querySelectorAll('img')]
+      .map((i) => i.currentSrc || i.src || i.getAttribute('data-src') || '')
       .filter(Boolean)
       .filter((s) => HOSTS.includes(hostOf(s)));
     imgs = [...new Set(imgs)];
     if (imgs.length === 0) return { candidates: [] };
-    const t = document.querySelector('.se-main-container time[datetime], time[datetime]');
-    const postedAt = t ? t.getAttribute('datetime') : null;
+
+    // 게시물 작성일: .article_info .date 의 'YYYY.MM.DD. HH:MM' (댓글 .comment_info_date 는 제외).
+    let postedAt = null;
+    const dateEl = document.querySelector('.article_info .date') || document.querySelector('.WriterInfo .date');
+    const m = (dateEl ? (dateEl.textContent || '').trim() : '')
+      .match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})\.?(?:\s*(\d{1,2}):(\d{2}))?/);
+    if (m) {
+      const p = (n) => String(n).padStart(2, '0');
+      postedAt = `${m[1]}-${p(m[2])}-${p(m[3])}T${p(m[4] || 0)}:${p(m[5] || 0)}:00+09:00`;
+    }
+
     return {
       candidates: [{
         source: 'cafe',
