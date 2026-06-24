@@ -5,6 +5,17 @@
 const $ = (s) => document.querySelector(s);
 let candidates = [];
 
+// 토큰 설정 여부 안내
+chrome.storage.local.get('selfieToken').then(({ selfieToken }) => {
+  if (!selfieToken) $('#status').textContent = '⚠ 먼저 확장 옵션에서 토큰을 설정하세요 (확장 우클릭 → 옵션).';
+});
+
+function serverMsg(resp) {
+  if (resp && resp.data && resp.data.error && resp.data.error.message) return resp.data.error.message;
+  if (resp && resp.status === 0) return 'dev 서버 연결 실패(서버 켜짐 확인)';
+  return resp ? `HTTP ${resp.status}` : '확장 통신 실패';
+}
+
 async function activeTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   return tab;
@@ -201,10 +212,8 @@ $('#dump').addEventListener('click', async () => {
       if (resp.ok) {
         $('#status').textContent = `덤프 저장됨: ${resp.data.path}\n프레임 ${results.length}개. 이 경로를 Claude에게 알려주세요.`;
         try { await navigator.clipboard.writeText(resp.data.path || ''); } catch (_) {}
-      } else if (resp.status === 0) {
-        $('#status').textContent = `덤프 전송 실패 — localhost:3000 dev 서버가 켜져 있는지 확인하세요. (${resp.error || 'network'})`;
       } else {
-        $('#status').textContent = `덤프 전송 실패(${resp.status}) — localhost:3000 관리자 로그인을 확인하세요.`;
+        $('#status').textContent = `덤프 전송 실패: ${serverMsg(resp)}`;
       }
     });
   } catch (e) {
@@ -226,6 +235,11 @@ $('#ingest').addEventListener('click', () => {
     }
     const ok = resp.results.filter((r) => r.ok).length;
     const added = resp.results.reduce((s, r) => s + (r.data && r.data.addedImages ? r.data.addedImages : 0), 0);
-    $('#status').textContent = `완료: ${ok}/${resp.results.length} 게시물 성공, 이미지 ${added}장 신규 저장`;
+    if (ok === 0) {
+      const first = resp.results[0];
+      $('#status').textContent = `수집 실패: ${serverMsg(first)}`;
+    } else {
+      $('#status').textContent = `완료: ${ok}/${resp.results.length} 게시물 성공, 이미지 ${added}장 신규 저장`;
+    }
   });
 });

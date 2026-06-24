@@ -21,8 +21,11 @@ export function authorizeSelfieDev(
   if (!isLocalEnvironment()) throw new AppError('LOCAL_ONLY', '로컬 서버에서만 가능합니다.', 400)
   const devToken = process.env.SELFIE_DEV_TOKEN
   if (devToken && headerToken && headerToken === devToken) return
+  // 세션 인증이 없으면(=확장 요청), 어디서 막혔는지 구분해 알려준다.
   if (!session?.user) {
-    throw new AppError('UNAUTHORIZED', '로그인 또는 X-Selfie-Token 헤더가 필요합니다.', 401)
+    if (!devToken) throw new AppError('NO_SERVER_TOKEN', '서버에 SELFIE_DEV_TOKEN 미설정 — .env.local 확인 후 dev 서버 재시작하세요.', 401)
+    if (!headerToken) throw new AppError('NO_CLIENT_TOKEN', '요청에 토큰이 없습니다 — 확장 옵션에서 토큰을 입력·저장했는지 확인하세요.', 401)
+    throw new AppError('TOKEN_MISMATCH', '토큰 불일치 — 확장 옵션 값과 .env.local의 SELFIE_DEV_TOKEN을 동일하게 맞추세요.', 401)
   }
   if (!canAccessAdminPanel(session.user.role as UserRole)) {
     throw new ForbiddenError('관리자만 사용할 수 있습니다.')
