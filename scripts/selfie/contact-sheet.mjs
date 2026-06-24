@@ -15,7 +15,7 @@ let items;
 try { items = JSON.parse(raw || '[]'); } catch (e) { console.error('stdin JSON 파싱 실패:', e.message); process.exit(1); }
 if (!Array.isArray(items) || items.length === 0) { console.error('입력이 비었습니다. [{id,imageUrl}] 배열 필요.'); process.exit(1); }
 
-const COLS = 5, CW = 280, TH = 158, LH = 24, CH = TH + LH, PAD = 4;
+const COLS = Number(process.env.SHEET_COLS || 5), CW = 280, TH = 158, LH = 24, CH = TH + LH, PAD = 4;
 const rows = Math.ceil(items.length / COLS);
 const W = COLS * CW, H = rows * CH;
 
