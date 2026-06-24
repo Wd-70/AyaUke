@@ -20,6 +20,7 @@ import ClipLikeButton from './clip/ClipLikeButton';
 import ClipShareButton from './clip/ClipShareButton';
 import ClipReportButton from './clip/ClipReportButton';
 import ClipSourceLink from './clip/ClipSourceLink';
+import AddClipToPlaylistButton from './clip/AddClipToPlaylistButton';
 import { useBulkClipLikes } from '@/hooks/useClipLikes';
 import ChzzkPlayer, { type ChzzkPlayerHandle } from './video/ChzzkPlayer';
 import { useSession } from 'next-auth/react';
@@ -1574,6 +1575,7 @@ export default function LiveClipManager({
                               videoId={video.videoId}
                               startTime={video.startTime || 0}
                             />
+                            <AddClipToPlaylistButton clipId={video._id} />
                             <ClipShareButton clipId={video._id} title={video.title} />
                             <ClipReportButton clipId={video._id} />
                           </>

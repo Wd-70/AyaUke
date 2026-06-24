@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { PlayCircleIcon } from '@heroicons/react/24/outline';
 import type { PublicClipSummary } from '@/domains/archive/clip.service';
+import AddClipToPlaylistButton from './AddClipToPlaylistButton';
 
 const GRADIENTS = [
   'from-light-accent/25 to-light-purple/20 dark:from-dark-accent/25 dark:to-dark-purple/20',
@@ -55,6 +56,14 @@ export default function ClipGalleryCard({ clip }: { clip: PublicClipSummary }) {
         {clip.isVerified && (
           <CheckBadgeIcon className="absolute right-2 top-2 h-5 w-5 text-emerald-400 drop-shadow" />
         )}
+
+        {/* 클립 플레이리스트 추가 (호버 시 노출) */}
+        <div className="absolute bottom-2 right-2 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <AddClipToPlaylistButton
+            clipId={clip.id}
+            className="!px-1.5 !py-1.5 rounded-full bg-black/40 !text-white hover:!text-white hover:bg-black/60 backdrop-blur-sm"
+          />
+        </div>
 
         {/* 호버 재생 오버레이 */}
         <div className="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition-opacity duration-300 group-hover:opacity-100">

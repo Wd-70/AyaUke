@@ -16,6 +16,7 @@ import ClipPlayer from './ClipPlayer';
 import ClipLikeButton from './ClipLikeButton';
 import ClipShareButton from './ClipShareButton';
 import ClipReportButton from './ClipReportButton';
+import AddClipToPlaylistButton from './AddClipToPlaylistButton';
 import { useReveal } from '@/components/landing/useReveal';
 import type { PublicClipDTO, PublicClipSummary } from '@/domains/archive/clip.service';
 
@@ -130,6 +131,7 @@ export default function ClipShareView({
           {/* 액션 */}
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <ClipLikeButton clipId={clip.id} initialCount={clip.likeCount} size="lg" />
+            <AddClipToPlaylistButton clipId={clip.id} variant="button" />
             <ClipShareButton clipId={clip.id} title={clip.title} size="lg" />
             <ClipReportButton clipId={clip.id} size="lg" />
             <Link
