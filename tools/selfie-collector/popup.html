@@ -19,6 +19,8 @@
     .thumbs img { width: 72px; height: 72px; object-fit: cover; border-radius: 4px; background: #f2f2f2; }
     .src { font-size: 11px; color: #888; word-break: break-all; margin-top: 4px; }
     .hint { padding: 0 12px 10px; font-size: 11px; color: #999; }
+    .agent { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid #eee; font-size: 12px; }
+    .agent #agentState { color: #888; }
   </style>
 </head>
 <body>
@@ -28,9 +30,11 @@
     <button id="dump">개발용 덤프</button>
     <button id="ingest" disabled>선택 수집</button>
   </div>
+  <label class="agent"><input type="checkbox" id="agent" /> 에이전트 연결 · <span id="agentState">에이전트 OFF</span></label>
   <div id="status">네이버 카페 셀카 글에서 '본문 스캔' 또는 '개발용 덤프'를 누르세요.</div>
-  <div class="hint">덤프는 로컬 서버(localhost:3000, 관리자 로그인)로 보내 <code>selfie-archive/_debug/</code>에 저장됩니다.</div>
+  <div class="hint">덤프는 로컬 서버(localhost:3000)로 보내 <code>selfie-archive/_debug/</code>에 저장됩니다. 에이전트 ON이면 서버 명령(스캔/수집/덤프)을 받아 실행합니다.</div>
   <div id="list"></div>
+  <script src="inject.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

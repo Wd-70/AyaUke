@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "방종셀카 수집기 (AyaUke)",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "X/네이버 팬카페의 방종셀카 이미지를 로컬 dev 서버로 수집·아카이빙하고, 개발용 DOM 덤프를 로컬에 저장합니다.",
-  "permissions": ["activeTab", "scripting", "tabs", "storage"],
+  "permissions": ["activeTab", "scripting", "tabs", "storage", "alarms"],
   "options_ui": { "page": "options.html", "open_in_tab": true },
   "host_permissions": [
     "https://x.com/*",
