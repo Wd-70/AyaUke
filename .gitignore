@@ -61,6 +61,9 @@ next-env.d.ts
 # db analysis reports (scripts/db/analyze-*.mjs output)
 /reports
 
+# 방종셀카 로컬 아카이브 (수집된 이미지 원본 — 분석/백업용, 배포 제외)
+/selfie-archive
+
 # Claude settings
 .claude/
 
