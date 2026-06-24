@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>방종셀카 수집기 설정</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 540px; margin: 24px auto; padding: 0 16px; color: #1a1a1a; }
+    h1 { font-size: 18px; }
+    label { display: block; font-weight: 600; margin: 16px 0 6px; }
+    input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    button { margin-top: 12px; padding: 8px 16px; border: 0; border-radius: 6px; background: #6c5ce7; color: #fff; font-weight: 600; cursor: pointer; }
+    .hint { color: #777; font-size: 12px; line-height: 1.6; margin-top: 8px; }
+    code { background: #f2f2f2; padding: 1px 4px; border-radius: 3px; }
+    #saved { color: #2d9c5a; font-weight: 600; margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <h1>방종셀카 수집기 설정</h1>
+  <label for="token">로컬 수집 토큰 (SELFIE_DEV_TOKEN)</label>
+  <input id="token" type="text" placeholder="dev 서버 .env.local의 SELFIE_DEV_TOKEN 값" />
+  <button id="save">저장</button>
+  <span id="saved"></span>
+  <p class="hint">
+    확장은 <code>localhost:3000</code>으로 수집/덤프를 보낼 때 이 토큰을 <code>X-Selfie-Token</code> 헤더로 보냅니다.
+    (브라우저 세션 쿠키는 SameSite 때문에 확장 요청에 안 붙어 토큰으로 인증합니다.)<br />
+    프로젝트의 <code>.env.local</code>에 있는 <code>SELFIE_DEV_TOKEN</code> 값을 그대로 붙여넣고 dev 서버를 재시작하세요.
+  </p>
+  <script src="options.js"></script>
+</body>
+</html>

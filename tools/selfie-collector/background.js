@@ -6,6 +6,16 @@ const BASE = 'http://localhost:3000';
 const INGEST_URL = `${BASE}/api/admin/selfie/ingest`;
 const DEBUG_URL = `${BASE}/api/admin/selfie/debug`;
 
+/** 옵션에 저장된 로컬 수집 토큰 (X-Selfie-Token). 세션 쿠키 대용. */
+async function authHeaders() {
+  try {
+    const { selfieToken } = await chrome.storage.local.get('selfieToken');
+    return selfieToken ? { 'X-Selfie-Token': selfieToken } : {};
+  } catch (_) {
+    return {};
+  }
+}
+
 function bufferToBase64(buf) {
   const bytes = new Uint8Array(buf);
   let binary = '';
@@ -35,7 +45,7 @@ async function ingestCandidate(c) {
     const res = await fetch(INGEST_URL, {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({
         source: c.source,
         sourceUrl: c.sourceUrl,
@@ -56,7 +66,7 @@ async function sendDump(payload) {
     const res = await fetch(DEBUG_URL, {
       method: 'POST',
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));

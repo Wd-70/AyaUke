@@ -4,9 +4,30 @@ import { createHash } from 'node:crypto'
 import { SelfiePost, SelfieDay, SelfieAlias } from './selfie.schema'
 import { normalizeText } from '@/shared/utils/song-match'
 import { isLocalEnvironment } from '@/domains/operations/local-backup.service'
-import { ValidationError } from '@/shared/api/errors'
+import { AppError, ForbiddenError, ValidationError } from '@/shared/api/errors'
+import { canAccessAdminPanel, UserRole } from '@/lib/permissions'
 
 const ARCHIVE_ROOT = path.join(process.cwd(), 'selfie-archive')
+
+/**
+ * 수집/덤프 엔드포인트 인가 — 로컬 전용.
+ * 확장은 SameSite 쿠키가 안 붙으므로 X-Selfie-Token(.env.local의 SELFIE_DEV_TOKEN)로 인증.
+ * 브라우저 관리 도구는 관리자 세션으로도 허용.
+ */
+export function authorizeSelfieDev(
+  headerToken: string | null,
+  session: { user?: { role?: string } } | null,
+): void {
+  if (!isLocalEnvironment()) throw new AppError('LOCAL_ONLY', '로컬 서버에서만 가능합니다.', 400)
+  const devToken = process.env.SELFIE_DEV_TOKEN
+  if (devToken && headerToken && headerToken === devToken) return
+  if (!session?.user) {
+    throw new AppError('UNAUTHORIZED', '로그인 또는 X-Selfie-Token 헤더가 필요합니다.', 401)
+  }
+  if (!canAccessAdminPanel(session.user.role as UserRole)) {
+    throw new ForbiddenError('관리자만 사용할 수 있습니다.')
+  }
+}
 
 /**
  * 개발용: 확장이 보낸 페이지 DOM/이미지 인벤토리 덤프를 로컬에 저장한다.
