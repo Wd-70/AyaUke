@@ -22,6 +22,7 @@ import Navigation from '@/components/Navigation'
 import ProfileEditor from './components/ProfileEditor'
 import LikedSongs from './components/LikedSongs'
 import PlaylistManager from './components/PlaylistManager'
+import ClipPlaylistManager from './components/ClipPlaylistManager'
 import ProfileStats from './components/ProfileStats'
 import TitleManager from './components/TitleManager'
 
@@ -264,7 +265,12 @@ export default function ProfileClient() {
 
             {activeTab === 'titles' && <TitleManager />}
             {activeTab === 'likes' && <LikedSongs />}
-            {activeTab === 'playlists' && <PlaylistManager />}
+            {activeTab === 'playlists' && (
+              <>
+                <PlaylistManager />
+                <ClipPlaylistManager />
+              </>
+            )}
           </motion.div>
         </div>
       </div>
