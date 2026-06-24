@@ -2,7 +2,9 @@
  * 후보별 이미지를 확장 컨텍스트에서 fetch(쿠키/Referer 포함)해 base64로 만들고
  * 로컬 dev 서버의 수집 엔드포인트로 전송한다. (관리자로 localhost:3000 로그인 필요) */
 
-const INGEST_URL = 'http://localhost:3000/api/admin/selfie/ingest';
+const BASE = 'http://localhost:3000';
+const INGEST_URL = `${BASE}/api/admin/selfie/ingest`;
+const DEBUG_URL = `${BASE}/api/admin/selfie/debug`;
 
 function bufferToBase64(buf) {
   const bytes = new Uint8Array(buf);
@@ -48,6 +50,22 @@ async function ingestCandidate(c) {
   }
 }
 
+/** 개발용 덤프 전송 — 크로스오리진 fetch는 백그라운드에서(팝업 직접 fetch는 MV3에서 막힐 수 있음) */
+async function sendDump(payload) {
+  try {
+    const res = await fetch(DEBUG_URL, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  } catch (e) {
+    return { ok: false, status: 0, error: String(e) };
+  }
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg && msg.type === 'ingest') {
     (async () => {
@@ -56,5 +74,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       sendResponse({ results });
     })();
     return true; // 비동기 응답
+  }
+  if (msg && msg.type === 'dump') {
+    (async () => { sendResponse(await sendDump(msg.payload)); })();
+    return true;
   }
 });

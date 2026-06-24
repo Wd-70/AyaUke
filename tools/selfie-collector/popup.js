@@ -192,19 +192,21 @@ $('#dump').addEventListener('click', async () => {
   try {
     const { tab, results } = await runAllFrames(dumpFrame);
     const payload = { capturedAt: new Date().toISOString(), pageUrl: tab.url, frames: results };
-    const res = await fetch('http://localhost:3000/api/admin/selfie/debug', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+    // 크로스오리진 전송은 백그라운드 경유(팝업 직접 fetch는 MV3에서 'Failed to fetch'가 날 수 있음)
+    chrome.runtime.sendMessage({ type: 'dump', payload }, async (resp) => {
+      if (chrome.runtime.lastError || !resp) {
+        $('#status').textContent = '덤프 전송 실패(확장 통신). 확장을 새로고침해 보세요.';
+        return;
+      }
+      if (resp.ok) {
+        $('#status').textContent = `덤프 저장됨: ${resp.data.path}\n프레임 ${results.length}개. 이 경로를 Claude에게 알려주세요.`;
+        try { await navigator.clipboard.writeText(resp.data.path || ''); } catch (_) {}
+      } else if (resp.status === 0) {
+        $('#status').textContent = `덤프 전송 실패 — localhost:3000 dev 서버가 켜져 있는지 확인하세요. (${resp.error || 'network'})`;
+      } else {
+        $('#status').textContent = `덤프 전송 실패(${resp.status}) — localhost:3000 관리자 로그인을 확인하세요.`;
+      }
     });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) {
-      $('#status').textContent = `덤프 저장됨: ${data.path}\n프레임 ${results.length}개. 이 경로를 Claude에게 알려주세요.`;
-      try { await navigator.clipboard.writeText(data.path || ''); } catch (_) {}
-    } else {
-      $('#status').textContent = `덤프 전송 실패(${res.status}) — localhost:3000 dev 서버 + 관리자 로그인을 확인하세요.`;
-    }
   } catch (e) {
     $('#status').textContent = '덤프 실패: ' + String(e);
   }
