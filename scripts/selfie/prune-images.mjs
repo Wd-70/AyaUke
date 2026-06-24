@@ -1,6 +1,7 @@
 // 방종셀카: 방종셀카가 아닌 이미지(손편지·스케줄표·일러스트 등)를 회차에서 제거한다.
-// selfieposts.images 에서 해당 hash 제거 + 로컬 원본/크롭 파일 삭제 → 갤러리(/selfie)에서도 사라짐.
-// hash = 파일명(확장자 제외) = 크롭 파일명. 빈 게시물이 되면 그 SelfiePost는 삭제.
+// selfieposts.images 에서 해당 hash 제거 + 크롭 삭제 → 갤러리(/selfie)에서 사라짐.
+// 로컬 원본(selfie-archive/<date>/<hash>.<ext>)은 내구성용으로 남긴다. 빈 게시물이 되면 SelfiePost 삭제.
+// hash = 파일명(확장자 제외) = 크롭 파일명.
 // 사용: node scripts/selfie/prune-images.mjs --date=2025-01-01 --hashes=9b8f9e81...,abc123...
 import fs from 'node:fs';
 import path from 'node:path';
@@ -15,14 +16,11 @@ if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !hashes.length) {
 const hset = new Set(hashes);
 
 const dir = path.join(process.cwd(), 'selfie-archive', date);
-// 로컬 원본 + 크롭 삭제
-let filesDeleted = 0;
+// 크롭만 삭제(로컬 원본은 내구성용으로 보존)
+let cropsDeleted = 0;
 for (const h of hashes) {
-  for (const f of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
-    if (f.startsWith(h)) { fs.rmSync(path.join(dir, f), { force: true }); filesDeleted++; }
-  }
   const crop = path.join(dir, '_chat', `${h}.png`);
-  if (fs.existsSync(crop)) { fs.rmSync(crop, { force: true }); filesDeleted++; }
+  if (fs.existsSync(crop)) { fs.rmSync(crop, { force: true }); cropsDeleted++; }
 }
 
 const { db, close } = await getDb();
@@ -37,7 +35,7 @@ try {
     if (kept.length === 0) { await db.collection('selfieposts').deleteOne({ _id: p._id }); postsDeleted++; }
     else await db.collection('selfieposts').updateOne({ _id: p._id }, { $set: { images: kept } });
   }
-  console.log(`✅ ${date}: 이미지 ${removed}장 DB 제거, 파일 ${filesDeleted}개 삭제${postsDeleted ? `, 빈 게시물 ${postsDeleted}개 삭제` : ''}`);
+  console.log(`✅ ${date}: 이미지 ${removed}장 DB 제거, 크롭 ${cropsDeleted}개 삭제, 로컬 원본 보존${postsDeleted ? `, 빈 게시물 ${postsDeleted}개 삭제` : ''}`);
 } finally {
   await close();
 }
