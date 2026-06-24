@@ -55,4 +55,9 @@ out.push('');
 const dir = path.join(process.cwd(), 'selfie-archive', date);
 fs.mkdirSync(dir, { recursive: true });
 fs.writeFileSync(path.join(dir, 'attendees-review.txt'), out.join('\n') + '\n', 'utf8');
-console.log(`작성: selfie-archive/${date}/attendees-review.txt  (확실① ${rosterConfident.length} / 확실② ${dictConfident.length} / 애매 ${uncertain.length})`);
+
+// 회차 내 출현수(counts): { 검토파일에 적힌 닉(=내 판독값): 횟수 }. apply-review가 읽어 attendees[].count 로 저장.
+if (input.counts && Object.keys(input.counts).length) {
+  fs.writeFileSync(path.join(dir, '_counts.json'), JSON.stringify(input.counts), 'utf8');
+}
+console.log(`작성: selfie-archive/${date}/attendees-review.txt  (확실① ${rosterConfident.length} / 확실② ${dictConfident.length} / 애매 ${uncertain.length}${input.counts ? ', counts 저장' : ''})`);

@@ -169,16 +169,20 @@ export async function getSelfieStats() {
   const days = await SelfieDay.find().sort({ date: -1 }).lean()
   const dateCounts = days.map((d) => ({ date: d.date, count: (d.attendees || []).length }))
 
-  // 정규화 닉네임 → { 대표 닉네임, 출현 날짜 수 }
-  const tally = new Map<string, { nickname: string; days: number }>()
+  // 정규화 닉네임 → { 대표 닉네임, 출현 날짜 수, 누적 출현 횟수 }
+  // days = 출석한 회차 수(주지표), totalCount = 회차 내 출현수 합(동순위 세부 정렬용)
+  const tally = new Map<string, { nickname: string; days: number; totalCount: number }>()
   for (const d of days) {
     for (const a of d.attendees || []) {
+      const c = (a as { count?: number }).count ?? 1
       const cur = tally.get(a.normalized)
-      if (cur) cur.days += 1
-      else tally.set(a.normalized, { nickname: a.nickname, days: 1 })
+      if (cur) { cur.days += 1; cur.totalCount += c }
+      else tally.set(a.normalized, { nickname: a.nickname, days: 1, totalCount: c })
     }
   }
-  const leaderboard = [...tally.values()].sort((a, b) => b.days - a.days).slice(0, 50)
+  const leaderboard = [...tally.values()]
+    .sort((a, b) => b.days - a.days || b.totalCount - a.totalCount)
+    .slice(0, 50)
 
   return {
     totalDays: days.length,

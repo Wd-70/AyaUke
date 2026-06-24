@@ -33,30 +33,36 @@ const normalize = (s) =>
     .replace(/[^\w가-힣]/g, '');
 
 const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
-const seen = new Set();
-const attendees = [];
+// 회차 내 출현수: { 검토파일 col1(내 판독값): 횟수 }. make-review가 _counts.json 으로 남긴다.
+const countsFile = path.join(path.dirname(file), '_counts.json');
+const counts = fs.existsSync(countsFile) ? JSON.parse(fs.readFileSync(countsFile, 'utf8')) : {};
+const byNorm = new Map(); // normalized -> { nickname, normalized, count }
 let corrected = 0, excluded = 0, added = 0, asRead = 0;
 const log = { corrected: [], excluded: [], added: [] };
 
 for (const ln of lines) {
   if (!ln.trim() || ln.trim().startsWith('#')) continue;
-  let name;
+  let name, cnt = 1;
   if (ln.includes('\t')) {
     const i = ln.indexOf('\t');
     const col1 = ln.slice(0, i).trim();
     const col2 = ln.slice(i + 1).trim();
+    cnt = counts[col1] ?? 1; // 횟수는 내 판독값(col1) 기준
     if (col2 === '-') { excluded++; log.excluded.push(col1); continue; }
     if (col2) { name = col2; corrected++; log.corrected.push(`${col1} → ${col2}`); }
     else { name = col1; asRead++; }
   } else {
     name = ln.trim();
+    cnt = counts[name] ?? 1;
     added++; log.added.push(name);
   }
   const normalized = normalize(name);
-  if (!name || !normalized || seen.has(normalized)) continue;
-  seen.add(normalized);
-  attendees.push({ nickname: name, normalized });
+  if (!name || !normalized) continue;
+  const cur = byNorm.get(normalized);
+  if (cur) cur.count += cnt;                                  // 정규화 동일(병합) → 횟수 합산
+  else byNorm.set(normalized, { nickname: name, normalized, count: cnt });
 }
+const attendees = [...byNorm.values()];
 
 console.log(`판독유지 ${asRead} · 교정 ${corrected} · 제외 ${excluded} · 추가 ${added} → 최종 ${attendees.length}명`);
 if (log.corrected.length) console.log('  교정:', log.corrected.join(', '));
@@ -64,8 +70,8 @@ if (log.excluded.length) console.log('  제외:', log.excluded.join(', '));
 if (log.added.length) console.log('  추가:', log.added.join(', '));
 
 if (dry) {
-  console.log('\n[--dry] 기록하지 않았습니다. 최종 명단:');
-  console.log('  ' + attendees.map((a) => a.nickname).join(', '));
+  console.log('\n[--dry] 기록하지 않았습니다. 최종 명단(×=회차 내 출현수):');
+  console.log('  ' + attendees.map((a) => a.nickname + (a.count > 1 ? `×${a.count}` : '')).join(', '));
   process.exit(0);
 }
 

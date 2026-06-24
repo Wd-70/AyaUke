@@ -47,7 +47,7 @@ selfiePostSchema.index({ 'images.hash': 1 })
 
 export interface ISelfieDay extends mongoose.Document {
   date: string // YYYY-MM-DD (unique)
-  attendees: Array<{ nickname: string; normalized: string }>
+  attendees: Array<{ nickname: string; normalized: string; count?: number }>
   analyzed: boolean
   analyzedAt?: Date
   note?: string
@@ -62,6 +62,8 @@ const selfieDaySchema = new mongoose.Schema<ISelfieDay>(
       {
         nickname: { type: String, required: true },
         normalized: { type: String, required: true },
+        // 그 회차(여러 셀카 스샷) 안에서 잡힌 횟수. 총 출석수엔 영향 없고, 동순위 세부 정렬·회차 내 순위용.
+        count: { type: Number, default: 1 },
       },
     ],
     analyzed: { type: Boolean, default: false },
