@@ -29,9 +29,14 @@ for (let i = 0; i < items.length; i++) {
   composites.push({ input: Buffer.from(svg), top: y, left: x });
   if (!it.imageUrl) continue;
   try {
-    const res = await fetch(it.imageUrl);
-    if (!res.ok) continue;
-    const buf = Buffer.from(await res.arrayBuffer());
+    let buf;
+    if (/^https?:/.test(it.imageUrl)) {
+      const res = await fetch(it.imageUrl);
+      if (!res.ok) continue;
+      buf = Buffer.from(await res.arrayBuffer());
+    } else {
+      buf = fs.readFileSync(it.imageUrl); // 로컬 경로 지원
+    }
     const thumb = await sharp(buf)
       .resize(CW - PAD * 2, TH - PAD * 2, { fit: 'contain', background: { r: 235, g: 235, b: 240 } })
       .png().toBuffer();
