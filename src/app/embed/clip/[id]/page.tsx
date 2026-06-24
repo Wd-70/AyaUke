@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { connectDB } from '@/shared/db/mongodb';
 import { getPublicClip } from '@/domains/archive/clip.service';
 import ClipPlayer from '@/components/clip/ClipPlayer';
@@ -18,6 +18,10 @@ export default async function ClipEmbedPage({ params }: EmbedPageProps) {
   await connectDB();
   const clip = await getPublicClip(id);
   if (!clip) notFound();
+
+  if (/^[0-9a-fA-F]{24}$/.test(id) && clip.shareId && clip.shareId !== id) {
+    permanentRedirect(`/embed/clip/${clip.shareId}`);
+  }
 
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-black">

@@ -27,7 +27,7 @@ export default function ClipGalleryCard({ clip }: { clip: PublicClipSummary }) {
   const isChzzk = clip.platform === 'chzzk';
   return (
     <Link
-      href={`/clip/${clip.id}`}
+      href={`/clip/${clip.shareId || clip.id}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-light-primary/15 bg-white/60 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/15 dark:bg-gray-800/50 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow"
     >
       <div className="relative aspect-video overflow-hidden bg-light-primary/10 dark:bg-dark-primary/10">

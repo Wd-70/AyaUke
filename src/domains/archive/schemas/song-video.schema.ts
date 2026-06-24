@@ -1,7 +1,10 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
+import { randomUUID } from 'crypto';
 import { parseVideoUrl, validateVideoUrl, type VideoPlatform } from '@/shared/utils/video-url';
 
 export interface ISongVideo extends Document {
+  /** 공개 URL용 불투명 식별자(/clip/[shareId]) — 내부 _id 노출 방지 */
+  shareId?: string;
   songId: string; // SongDetail의 _id와 연결
   title: string; // 곡 제목 (검색용)
   artist: string; // 아티스트 (검색용)
@@ -28,6 +31,14 @@ export interface ISongVideo extends Document {
 }
 
 const SongVideoSchema: Schema = new Schema({
+  // 공개 URL용 불투명 식별자. sparse라 백필 전 기존 문서(null)는 unique 제약에서 제외된다.
+  shareId: {
+    type: String,
+    unique: true,
+    sparse: true,
+    index: true,
+    default: () => randomUUID(),
+  },
   songId: {
     type: String,
     required: true,

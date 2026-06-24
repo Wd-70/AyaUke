@@ -19,8 +19,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'url is required' }, { status: 400 });
   }
 
-  // url에서 클립 ID 추출 (/clip/<id>)
-  const m = url.match(/\/clip\/([0-9a-fA-F]{24})/);
+  // url에서 클립 식별자 추출 (/clip/<shareId> 또는 레거시 /clip/<ObjectId>)
+  const m = url.match(/\/clip\/([0-9a-zA-Z-]{8,64})/);
   if (!m) {
     return NextResponse.json({ error: 'Not a clip url' }, { status: 404 });
   }
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   const maxWidth = Number(searchParams.get('maxwidth')) || 640;
   const maxHeight = Math.round((maxWidth * 9) / 16);
-  const embedUrl = `${origin}/embed/clip/${clip.id}`;
+  const embedUrl = `${origin}/embed/clip/${clip.shareId}`;
   const title = `${clip.title} - ${clip.artist} | 아야 AyaUke`;
 
   return NextResponse.json(

@@ -31,7 +31,10 @@ export async function resolveUploaderNames<
 // ── 공개 클립 DTO (공유 페이지 / 공개 API) ────────────────────────
 
 export interface PublicClipDTO {
+  /** 내부 ObjectId (좋아요/신고 등 API용) */
   id: string;
+  /** 공개 URL용 불투명 식별자 (/clip/[shareId]) */
+  shareId: string;
   songId: string;
   title: string;
   artist: string;
@@ -53,6 +56,8 @@ export interface PublicClipDTO {
 
 export interface PublicClipSummary {
   id: string;
+  /** 공개 URL용 불투명 식별자 (/clip/[shareId]) */
+  shareId: string;
   songId: string;
   title: string;
   artist: string;
@@ -66,7 +71,7 @@ export interface PublicClipSummary {
   playCount: number;
 }
 
-const SUMMARY_FIELDS = 'songId title artist platform sungDate thumbnailUrl isVerified likeCount playCount';
+const SUMMARY_FIELDS = 'shareId songId title artist platform sungDate thumbnailUrl isVerified likeCount playCount';
 
 /** 표시용 날짜 라벨 (KST YYYY.MM.DD) */
 function toDateLabel(d: Date | string | undefined): string | null {
@@ -87,6 +92,7 @@ function toClipSummary(c: Record<string, unknown>): PublicClipSummary {
   const sungDate = c.sungDate as Date | undefined;
   return {
     id: String(c._id),
+    shareId: String(c.shareId ?? c._id),
     songId: String(c.songId ?? ''),
     title: String(c.title ?? ''),
     artist: String(c.artist ?? ''),
@@ -211,9 +217,11 @@ export async function incrementClipPlayCount(clipId: string): Promise<void> {
 }
 
 /** 공개 클립 단건 조회 — 내부 필드(addedBy/verifiedBy 등) 미노출, 업로더명은 최신값. */
-export async function getPublicClip(clipId: string): Promise<PublicClipDTO | null> {
-  if (!/^[0-9a-fA-F]{24}$/.test(clipId)) return null;
-  const clip = await SongVideo.findById(clipId).lean<Record<string, unknown> | null>();
+export async function getPublicClip(idOrShareId: string): Promise<PublicClipDTO | null> {
+  // 공개 URL은 shareId, 레거시 URL/내부 호출은 24-hex ObjectId 모두 허용
+  const clip = /^[0-9a-fA-F]{24}$/.test(idOrShareId)
+    ? await SongVideo.findById(idOrShareId).lean<Record<string, unknown> | null>()
+    : await SongVideo.findOne({ shareId: idOrShareId }).lean<Record<string, unknown> | null>();
   if (!clip) return null;
 
   const [resolved] = await resolveUploaderNames([
@@ -233,6 +241,7 @@ export async function getPublicClip(clipId: string): Promise<PublicClipDTO | nul
     : null;
   return {
     id: String(clip._id),
+    shareId: String(clip.shareId ?? clip._id),
     songId: String(clip.songId),
     title: String(clip.title ?? ''),
     artist: String(clip.artist ?? ''),

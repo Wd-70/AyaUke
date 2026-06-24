@@ -132,7 +132,7 @@ export default function ClipShareView({
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <ClipLikeButton clipId={clip.id} initialCount={clip.likeCount} size="lg" />
             <AddClipToPlaylistButton clipId={clip.id} variant="button" />
-            <ClipShareButton clipId={clip.id} title={clip.title} size="lg" />
+            <ClipShareButton clipId={clip.id} shareId={clip.shareId} title={clip.title} size="lg" />
             <ClipReportButton clipId={clip.id} size="lg" />
             <Link
               href="/songbook"
@@ -154,7 +154,7 @@ export default function ClipShareView({
               {related.map((r) => (
                 <Link
                   key={r.id}
-                  href={`/clip/${r.id}`}
+                  href={`/clip/${r.shareId || r.id}`}
                   className="group/card w-40 shrink-0 overflow-hidden rounded-2xl border border-light-primary/15 bg-white/60 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/15 dark:bg-gray-800/50 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow"
                 >
                   <div className="relative aspect-video overflow-hidden">

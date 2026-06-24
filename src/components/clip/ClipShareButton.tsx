@@ -6,6 +6,8 @@ import { useToast } from '@/components/Toast';
 
 interface ClipShareButtonProps {
   clipId: string;
+  /** 공개 URL용 불투명 식별자. 없으면 clipId(ObjectId)로 폴백(서버에서 정규 URL로 리다이렉트). */
+  shareId?: string;
   /** 공유 카드 제목(Web Share용) */
   title?: string;
   size?: 'sm' | 'lg';
@@ -15,6 +17,7 @@ interface ClipShareButtonProps {
 /** 클립 개별 공유 — Web Share(모바일) 우선, 미지원 시 링크 복사. */
 export default function ClipShareButton({
   clipId,
+  shareId,
   title,
   size = 'sm',
   className = '',
@@ -25,7 +28,7 @@ export default function ClipShareButton({
 
   const onShare = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const url = `${window.location.origin}/clip/${clipId}`;
+    const url = `${window.location.origin}/clip/${shareId || clipId}`;
     const shareTitle = title ? `${title} · 아야 AyaUke 클립` : '아야 AyaUke 클립';
 
     // Web Share API (주로 모바일)

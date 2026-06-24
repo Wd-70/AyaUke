@@ -104,6 +104,7 @@ export interface NotificationSettings {
 // 노래 영상 관련 타입들
 export interface SongVideo {
   _id?: string;
+  shareId?: string; // 공개 URL용 불투명 식별자(/clip/[shareId])
   songId: string; // SongDetail의 _id와 연결
   title: string; // 곡 제목 (검색용)
   artist: string; // 아티스트 (검색용)

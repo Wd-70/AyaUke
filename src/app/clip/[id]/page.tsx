@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
 import ClipShareView from '@/components/clip/ClipShareView';
@@ -29,8 +29,8 @@ export async function generateMetadata({ params }: ClipPageProps): Promise<Metad
   const description = clip.description
     ? clip.description
     : `${clip.uploaderName}님이 공유한 아야의 라이브 클립${clip.sungDateLabel ? ` (${clip.sungDateLabel})` : ''}`;
-  const embedUrl = `${BASE_URL}/embed/clip/${clip.id}`;
-  const pageUrl = `${BASE_URL}/clip/${clip.id}`;
+  const embedUrl = `${BASE_URL}/embed/clip/${clip.shareId}`;
+  const pageUrl = `${BASE_URL}/clip/${clip.shareId}`;
   const oembedUrl = `${BASE_URL}/api/oembed?url=${encodeURIComponent(pageUrl)}&format=json`;
   const images = clip.thumbnailUrl ? [{ url: clip.thumbnailUrl, width: 480, height: 270 }] : [];
 
@@ -68,6 +68,11 @@ export default async function ClipPage({ params }: ClipPageProps) {
   await connectDB();
   const clip = await getPublicClip(id);
   if (!clip) notFound();
+
+  // 레거시 ObjectId URL로 들어오면 불투명 shareId 정규 URL로 영구 리다이렉트(SEO/기존 링크 보존)
+  if (/^[0-9a-fA-F]{24}$/.test(id) && clip.shareId && clip.shareId !== id) {
+    permanentRedirect(`/clip/${clip.shareId}`);
+  }
 
   const related = await getPublicClipsForSong(clip.songId, clip.id, 8);
 

@@ -1576,7 +1576,7 @@ export default function LiveClipManager({
                               startTime={video.startTime || 0}
                             />
                             <AddClipToPlaylistButton clipId={video._id} />
-                            <ClipShareButton clipId={video._id} title={video.title} />
+                            <ClipShareButton clipId={video._id} shareId={video.shareId} title={video.title} />
                             <ClipReportButton clipId={video._id} />
                           </>
                         ) : null
