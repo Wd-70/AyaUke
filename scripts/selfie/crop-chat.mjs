@@ -24,7 +24,7 @@ const args = Object.fromEntries(
 )
 
 const date = args.date
-const ratio = args.ratio ? Number(args.ratio) : 0.68 // 왼쪽 경계 비율(이 지점부터 오른쪽 끝까지 크롭)
+const ratio = args.ratio ? Number(args.ratio) : 0.82 // 왼쪽 경계 비율(이 지점부터 오른쪽 끝까지 크롭). 타이트. 잘리면 낮춰서 재실행
 const scale = args.scale ? Number(args.scale) : 2 // 판독 편의를 위한 업스케일 배율
 const outDir = args.out || '_chat'
 

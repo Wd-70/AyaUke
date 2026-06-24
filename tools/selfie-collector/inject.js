@@ -25,10 +25,19 @@ function scanFrame() {
     for (const s of SELS) { container = document.querySelector(s); if (container) break; }
     if (!container) return { candidates: [] };
 
+    // 원본 해상도 수집: pstatic CDN의 ?type=w1600 등 리사이즈 파라미터를 제거하면 원본을 받는다.
+    const origUrl = (u) => {
+      try {
+        const x = new URL(u, location.href);
+        if (x.hostname.endsWith('pstatic.net')) { x.searchParams.delete('type'); return x.toString(); }
+      } catch (_) {}
+      return u;
+    };
     let imgs = [...container.querySelectorAll('img')]
       .map((i) => i.currentSrc || i.src || i.getAttribute('data-src') || '')
       .filter(Boolean)
-      .filter((s) => HOSTS.includes(hostOf(s)));
+      .filter((s) => HOSTS.includes(hostOf(s)))
+      .map(origUrl);
     imgs = [...new Set(imgs)];
     if (imgs.length === 0) return { candidates: [] };
 
