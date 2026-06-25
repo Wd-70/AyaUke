@@ -1,8 +1,10 @@
 // 방종셀카: 회차 내 출현수(count) 검토 파일을 만든다.
 // **승인된 명단**(selfiedays.attendees)을 기준으로, Claude가 정답지 대조로 센 횟수를 채워
 // 사용자가 숫자만 고칠 수 있는 파일(counts-review.txt)로 출력한다.
-// stdin JSON = { "닉네임": 횟수, ... }(정답지 대조 결과). 명단에 있으나 입력에 없으면 1.
+// stdin JSON = { "닉네임": 횟수, ... }(정답지 대조 결과). 입력에 없는 닉은 DB의 기존 count 유지.
+// stdin을 비우면(또는 {}) 전부 DB에 기록된 count를 그대로 가져온다(이미 카운트한 회차 재생성용).
 // 사용: echo '{"머슬머슬맨":3}' | node scripts/selfie/make-count-review.mjs --date=2025-07-30
+//       echo '{}' | node scripts/selfie/make-count-review.mjs --date=2024-11-24   # DB값 그대로
 import fs from 'node:fs';
 import path from 'node:path';
 import { getDb } from '../db/client.mjs';
@@ -33,7 +35,8 @@ try {
   if (!day) { console.error(`selfiedays에 ${date} 없음 — 먼저 apply-review로 명단을 기록하세요.`); process.exit(1); }
   const rows = (day.attendees || []).map((a) => ({
     nickname: a.nickname,
-    count: byNorm.has(a.normalized) ? byNorm.get(a.normalized) : 1,
+    // 입력에 있으면 그 값, 없으면 DB의 기존 count(없으면 1)
+    count: byNorm.has(a.normalized) ? byNorm.get(a.normalized) : (a.count ?? 1),
   }));
   // 횟수 내림차순 → 닉네임 오름차순
   rows.sort((a, b) => b.count - a.count || a.nickname.localeCompare(b.nickname, 'ko'));
