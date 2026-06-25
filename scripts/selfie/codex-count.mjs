@@ -12,12 +12,15 @@ const arg = (k) => { const m = process.argv.find((a) => a.startsWith(`--${k}=`))
 const date = arg('date');
 const model = arg('model') || 'gpt-5.5';
 const effort = arg('effort') || 'high';
+// --exclude=hash1,hash2 : 중복 스샷(스트리머 실수로 거의 동일) 등을 카운트에서 제외(파일명 해시로 지정)
+const exclude = new Set((arg('exclude') || '').split(',').map((s) => s.trim()).filter(Boolean));
 if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { console.error('--date=YYYY-MM-DD 가 필요합니다.'); process.exit(1); }
 
 const dir = path.join(process.cwd(), 'selfie-archive', date, '_chat');
 if (!fs.existsSync(dir)) { console.error(`크롭 폴더 없음: ${dir}`); process.exit(1); }
-const files = fs.readdirSync(dir).filter((f) => f.endsWith('.png')).sort();
+const files = fs.readdirSync(dir).filter((f) => f.endsWith('.png') && !exclude.has(f.replace(/\.png$/, ''))).sort();
 if (!files.length) { console.error('크롭 PNG가 없습니다.'); process.exit(1); }
+if (exclude.size) console.error(`[codex-count] 제외 ${exclude.size}장 → ${files.length}장으로 집계`);
 
 const { db, close } = await getDb();
 let roster;
