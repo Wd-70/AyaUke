@@ -62,10 +62,13 @@ try {
   if (countSource) console.log(`  카운트 작성자: ${countSource}`);
 
   if (dry) { console.log('[--dry] 기록 안 함'); process.exit(0); }
+  // 이 명령을 돌린다는 것 = 사용자가 검토파일을 확인·승인한 시점. 검토 완료로 기록.
+  const reviewed = !process.argv.includes('--no-review');
   const set = { attendees: updated, updatedAt: new Date(), countAt: new Date() };
   if (countSource) set.countSource = countSource; // 누가 집계했는지 DB에 영구 기록
+  if (reviewed) { set.countReviewed = true; set.countReviewedAt = new Date(); } // 사용자 검토 승인
   await db.collection('selfiedays').updateOne({ date }, { $set: set });
-  console.log(`✅ ${date}: count 기록 완료${countSource ? ` (작성자 ${countSource})` : ''}`);
+  console.log(`✅ ${date}: count 기록 완료${countSource ? ` · 작성:${countSource}` : ''}${reviewed ? ' · 사용자 검토✓' : ''}`);
 } finally {
   await close();
 }

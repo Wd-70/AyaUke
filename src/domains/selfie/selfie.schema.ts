@@ -53,6 +53,8 @@ export interface ISelfieDay extends mongoose.Document {
   note?: string
   countSource?: string // 회차 내 출현수(count)를 누가 집계했는지 (예: 'codex:gpt-5.5 high', 'claude')
   countAt?: Date // 카운트 기록 시각
+  countReviewed?: boolean // 사용자가 카운트 검토파일을 확인·승인했는지 (닉네임의 analyzed에 대응)
+  countReviewedAt?: Date // 사용자 검토 승인 시각
   createdAt: Date
   updatedAt: Date
 }
@@ -73,6 +75,8 @@ const selfieDaySchema = new mongoose.Schema<ISelfieDay>(
     note: { type: String },
     countSource: { type: String },
     countAt: { type: Date },
+    countReviewed: { type: Boolean, default: false },
+    countReviewedAt: { type: Date },
   },
   { timestamps: true },
 )
