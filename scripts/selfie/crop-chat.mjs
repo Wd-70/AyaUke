@@ -28,8 +28,8 @@ const ratio = args.ratio ? Number(args.ratio) : 0.82 // 왼쪽 경계 비율(이
 const scale = args.scale ? Number(args.scale) : 2 // 판독 편의를 위한 업스케일 배율
 const outDir = args.out || '_chat'
 
-if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-  console.error('사용법: node scripts/selfie/crop-chat.mjs --date=YYYY-MM-DD [--ratio=0.68]')
+if (!date || !/^\d{4}-\d{2}-\d{2}(_\d{4})?$/.test(date)) {
+  console.error('사용법: node scripts/selfie/crop-chat.mjs --date=YYYY-MM-DD[_HHMM] [--ratio=0.68]')
   process.exit(1)
 }
 if (!(ratio > 0 && ratio < 1)) {

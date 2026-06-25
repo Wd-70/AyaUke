@@ -14,7 +14,7 @@ const arg = (k) => {
 };
 const date = arg('date');
 const dry = process.argv.includes('--dry');
-if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+if (!date || !/^\d{4}-\d{2}-\d{2}(_\d{4})?$/.test(date)) {
   console.error('--date=YYYY-MM-DD 가 필요합니다.');
   process.exit(1);
 }

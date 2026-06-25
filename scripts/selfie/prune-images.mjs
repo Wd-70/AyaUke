@@ -10,7 +10,7 @@ import { getDb } from '../db/client.mjs';
 const arg = (k) => { const m = process.argv.find((a) => a.startsWith(`--${k}=`)); return m ? m.slice(k.length + 3) : undefined; };
 const date = arg('date');
 const hashes = (arg('hashes') || '').split(',').map((s) => s.trim()).filter(Boolean);
-if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !hashes.length) {
+if (!date || !/^\d{4}-\d{2}-\d{2}(_\d{4})?$/.test(date) || !hashes.length) {
   console.error('--date=YYYY-MM-DD --hashes=h1,h2 (hash=크롭/파일명) 필요'); process.exit(1);
 }
 const hset = new Set(hashes);

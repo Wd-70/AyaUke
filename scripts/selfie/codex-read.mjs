@@ -11,7 +11,7 @@ const arg = (k) => { const m = process.argv.find((a) => a.startsWith(`--${k}=`))
 const date = arg('date');
 const model = arg('model') || 'gpt-5.5';
 const effort = arg('effort') || 'high';
-if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { console.error('--date=YYYY-MM-DD 가 필요합니다.'); process.exit(1); }
+if (!date || !/^\d{4}-\d{2}-\d{2}(_\d{4})?$/.test(date)) { console.error('--date=YYYY-MM-DD 가 필요합니다.'); process.exit(1); }
 
 const dir = path.join(process.cwd(), 'selfie-archive', date, '_chat');
 if (!fs.existsSync(dir)) { console.error(`크롭 폴더 없음: ${dir} — 먼저 crop-chat.mjs 실행`); process.exit(1); }

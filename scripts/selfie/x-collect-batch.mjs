@@ -1,8 +1,9 @@
-// 방종셀카: probe.json 기반으로 방종셀카 후보 X 게시물을 일괄 수집(syndication 직접, 원본 해상도).
-// 후보 규칙: 게시물의 '이미지 중 하나라도' 비율이 [minRatio,maxRatio]면 셀카 후보로 보고 수집.
-//   (극단 비율 배너가 섞여 있어도 셀카 비율 이미지가 있으면 그 글은 가져온다.)
-// 한 게시물의 사진은 전부 받는다(채팅 아닌 건 이후 crop+codex-read 단계에서 자동 prune).
-// 입력: selfie-archive/_x/probe.json + media-urls.json   출력: selfie-archive/<날짜>/ + selfieposts
+// 방종셀카: probe.json 기반 X 방종셀카 후보를 '게시글 1건 = 세션 1개'로 일괄 수집.
+// 세션키/폴더 = <방송일>_<HHMM>  (방송일: 새벽~정오(00:00~11:59) 종료 셀카는 전날로 라벨, HHMM=게시 KST 시각)
+//   병합 안 함 — 가까운 시각 게시글은 폴더명 시각으로 사람이 판단(같은 방송이면 검토 때 합치기).
+// 후보 규칙: 게시물 이미지 중 하나라도 비율 [minRatio,maxRatio] → 수집(극단 배너 섞여도 셀카 있으면 포함).
+// 한 게시물의 사진은 전부 받음(채팅 아닌 건 이후 codex-read NON-CHAT → prune).
+// 출력: selfie-archive/<세션키>/<hash>.<ext> + selfieposts(date=세션키) + selfie-archive/_x/sessions.json
 // 사용: node scripts/selfie/x-collect-batch.mjs [--max-id=...] [--min-ratio=2.0] [--max-ratio=2.4] [--limit=N] [--dry]
 import fs from 'node:fs';
 import path from 'node:path';
@@ -20,7 +21,6 @@ const ARCHIVE = path.join(process.cwd(), 'selfie-archive');
 const DIR = path.join(ARCHIVE, '_x');
 const probe = JSON.parse(fs.readFileSync(path.join(DIR, 'probe.json'), 'utf8'));
 
-// 후보: 이미지 비율 중 하나라도 [minR,maxR]
 let cands = probe.filter((o) => !o.error && (o.ratios || []).some((r) => r >= minR && r <= maxR));
 if (maxId) cands = cands.filter((c) => BigInt(c.id) <= BigInt(maxId));
 cands.sort((a, b) => (a.id < b.id ? 1 : -1)); // 최신→과거
@@ -31,53 +31,64 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const tokenOf = (id) => ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '');
 const origUrl = (m) => { const ext = (m.media_url_https.match(/\.(\w+)$/) || [, 'jpg'])[1]; return `${m.media_url_https.replace(/\.\w+$/, '')}?format=${ext}&name=orig`; };
 
+/** 게시 시각(ISO) → { sessionKey:<방송일>_<HHMM>, broadcastDate, hhmm }. 00:00~11:59 종료는 전날. */
+function sessionKeyFor(iso) {
+  const kst = new Date(new Date(iso).getTime() + 9 * 3600 * 1000); // UTC 필드 = KST 벽시계
+  const H = kst.getUTCHours(), Mi = kst.getUTCMinutes();
+  const bd = new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate()));
+  if (H < 12) bd.setUTCDate(bd.getUTCDate() - 1); // 새벽~정오 = 전날 방송
+  const broadcastDate = bd.toISOString().slice(0, 10);
+  const hhmm = String(H).padStart(2, '0') + String(Mi).padStart(2, '0');
+  return { sessionKey: `${broadcastDate}_${hhmm}`, broadcastDate, hhmm };
+}
+
 const { db, close } = await getDb();
-let posts = 0, imgsAdded = 0, skipped = 0, failed = 0;
+const usedKeys = new Set();
+const manifest = [];
+let sessions = 0, imgs = 0, skipped = 0, failed = 0;
 try {
   for (const c of cands) {
     const id = c.id;
     try {
-      const api = `https://cdn.syndication.twimg.com/tweet-result?id=${id}&token=${tokenOf(id)}&lang=ko`;
-      const r = await fetch(api, { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } });
-      if (!r.ok) { failed++; console.error(`  ${id} syndication ${r.status}`); await sleep(500); continue; }
+      const r = await fetch(`https://cdn.syndication.twimg.com/tweet-result?id=${id}&token=${tokenOf(id)}&lang=ko`, { headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' } });
+      if (!r.ok) { failed++; console.error(`  ${id} syndication ${r.status}`); await sleep(600); continue; }
       const tw = await r.json();
       const photos = (tw.mediaDetails || []).filter((m) => m.type === 'photo');
       if (!photos.length) { skipped++; continue; }
       const postedAt = new Date(tw.created_at);
-      const date = postedAt.toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
+      let { sessionKey, broadcastDate, hhmm } = sessionKeyFor(tw.created_at);
+      while (usedKeys.has(sessionKey)) sessionKey += 'b'; // 동일 분(分) 충돌 방지
+      usedKeys.add(sessionKey);
       const sourceUrl = `https://x.com/${tw.user?.screen_name || 'AyaUke_V'}/status/${id}`;
+      manifest.push({ sessionKey, broadcastDate, hhmm, id, sourceUrl, postedAt: postedAt.toISOString(), photoCount: photos.length, text: (tw.text || '').replace(/\s+/g, ' ').slice(0, 50) });
 
-      const existing = await db.collection('selfieposts').findOne({ sourceUrl });
-      const seen = new Set((existing?.images || []).map((i) => i.hash));
+      if (dry) { sessions++; continue; }
       const fresh = [];
       for (const m of photos) {
         const u = origUrl(m);
         const ext = (m.media_url_https.match(/\.(\w+)$/) || [, 'jpg'])[1];
-        if (dry) { fresh.push({ imageUrl: u, hash: 'dry', width: m.original_info?.width, height: m.original_info?.height, ext }); continue; }
         const ir = await fetch(u);
         if (!ir.ok) { console.error(`    img ${ir.status} ${u}`); continue; }
         const bytes = Buffer.from(await ir.arrayBuffer());
         const hash = createHash('sha1').update(bytes).digest('hex');
-        if (seen.has(hash)) continue;
-        seen.add(hash);
-        const dir = path.join(ARCHIVE, date);
+        const dir = path.join(ARCHIVE, sessionKey);
         fs.mkdirSync(dir, { recursive: true });
         fs.writeFileSync(path.join(dir, `${hash}.${ext}`), bytes);
-        fresh.push({ imageUrl: u, localPath: `selfie-archive/${date}/${hash}.${ext}`, hash, width: m.original_info?.width, height: m.original_info?.height });
+        fresh.push({ imageUrl: u, localPath: `selfie-archive/${sessionKey}/${hash}.${ext}`, hash, width: m.original_info?.width, height: m.original_info?.height });
         await sleep(150);
       }
-      if (dry) { console.error(`  [dry] ${date} ${id} 사진 ${photos.length}장`); posts++; continue; }
-      if (!existing) {
-        await db.collection('selfieposts').insertOne({ date, source: 'x', sourceUrl, postedAt, images: fresh, createdAt: new Date(), updatedAt: new Date() });
-        posts++; imgsAdded += fresh.length;
-      } else if (fresh.length) {
-        await db.collection('selfieposts').updateOne({ _id: existing._id }, { $push: { images: { $each: fresh } }, $set: { date, postedAt, updatedAt: new Date() } });
-        imgsAdded += fresh.length;
-      } else { skipped++; }
-      if ((posts + skipped) % 10 === 0) process.stderr.write(`\r  진행 ${posts + skipped + failed}/${cands.length} · 게시물 ${posts} · 이미지 ${imgsAdded}`);
+      await db.collection('selfieposts').updateOne(
+        { sourceUrl },
+        { $set: { date: sessionKey, source: 'x', sourceUrl, postedAt, images: fresh, updatedAt: new Date() }, $setOnInsert: { createdAt: new Date() } },
+        { upsert: true },
+      );
+      sessions++; imgs += fresh.length;
+      if (sessions % 10 === 0) process.stderr.write(`\r  진행 ${sessions + skipped + failed}/${cands.length} · 세션 ${sessions} · 이미지 ${imgs}`);
       await sleep(250);
-    } catch (e) { failed++; console.error(`  ${id} ERR ${e.message}`); await sleep(500); }
+    } catch (e) { failed++; console.error(`  ${id} ERR ${e.message}`); await sleep(600); }
   }
   process.stderr.write('\n');
-  console.error(`완료: 새 게시물 ${posts} · 이미지 ${imgsAdded}장 · 스킵 ${skipped} · 실패 ${failed}`);
+  manifest.sort((a, b) => (a.sessionKey < b.sessionKey ? 1 : -1));
+  fs.writeFileSync(path.join(DIR, 'sessions.json'), JSON.stringify(manifest, null, 0), 'utf8');
+  console.error(`완료: 세션 ${sessions} · 이미지 ${imgs}장 · 스킵 ${skipped} · 실패 ${failed} · manifest=selfie-archive/_x/sessions.json`);
 } finally { await close(); }

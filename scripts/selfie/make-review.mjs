@@ -18,7 +18,7 @@ import path from 'node:path';
 
 const arg = (k) => { const m = process.argv.find((a) => a.startsWith(`--${k}=`)); return m ? m.slice(k.length + 3) : undefined; };
 const date = arg('date');
-if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { console.error('--date=YYYY-MM-DD 가 필요합니다.'); process.exit(1); }
+if (!date || !/^\d{4}-\d{2}-\d{2}(_\d{4})?$/.test(date)) { console.error('--date=YYYY-MM-DD 가 필요합니다.'); process.exit(1); }
 
 let raw = '';
 for await (const c of process.stdin) raw += c;

@@ -14,7 +14,7 @@ const model = arg('model') || 'gpt-5.5';
 const effort = arg('effort') || 'high';
 // --exclude=hash1,hash2 : 중복 스샷(스트리머 실수로 거의 동일) 등을 카운트에서 제외(파일명 해시로 지정)
 const exclude = new Set((arg('exclude') || '').split(',').map((s) => s.trim()).filter(Boolean));
-if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) { console.error('--date=YYYY-MM-DD 가 필요합니다.'); process.exit(1); }
+if (!date || !/^\d{4}-\d{2}-\d{2}(_\d{4})?$/.test(date)) { console.error('--date=YYYY-MM-DD 가 필요합니다.'); process.exit(1); }
 
 const dir = path.join(process.cwd(), 'selfie-archive', date, '_chat');
 if (!fs.existsSync(dir)) { console.error(`크롭 폴더 없음: ${dir}`); process.exit(1); }
