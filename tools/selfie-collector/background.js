@@ -102,6 +102,14 @@ async function scanTab(tabId) {
   return mergeCandidates(frames);
 }
 
+/** 활성 탭 최상위 프레임에서 async 함수를 실행해 결과를 반환(스크롤 수집 등 장시간 작업용). */
+async function runActiveTop(func) {
+  const tab = await getActiveTab();
+  if (!tab) return { error: '활성 탭 없음' };
+  const [r] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func });
+  return { pageUrl: tab.url, ...(r && r.result ? r.result : {}) };
+}
+
 function mergeList(frames) {
   const seen = new Set();
   const items = [];
@@ -221,6 +229,8 @@ async function execCommand(cmd) {
     }
     case 'scanList':
       return { ok: true, data: await listTab(cmd.payload && cmd.payload.url) };
+    case 'scanXMedia':
+      return { ok: true, data: await runActiveTop(scanXMediaFrame) };
     case 'peek':
       return { ok: true, data: await peekUrls(cmd.payload && cmd.payload.urls) };
     case 'openCollect':

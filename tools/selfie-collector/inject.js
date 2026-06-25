@@ -183,6 +183,38 @@ function scanListFrame() {
   return { listUrl: location.href, items };
 }
 
+/** X 미디어/프로필 탭을 아래로 스크롤하며 본인 계정 status URL을 모은다(가상 스크롤 대비 매 회 수집).
+ * 활성 탭(최상위 프레임)에서 async 로 주입된다. 반환: { items:[{id,url}], scrolls, stoppedBy } */
+async function scanXMediaFrame() {
+  const host = location.hostname;
+  if (!(host.includes('x.com') || host.includes('twitter.com'))) return { items: [], stoppedBy: 'not-x' };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const me = (location.pathname.split('/')[1] || '').toLowerCase(); // 미디어 탭 주인(본인) 핸들
+  const ids = new Map(); // id -> url
+  const collect = () => {
+    document.querySelectorAll('a[href*="/status/"]').forEach((a) => {
+      const m = (a.getAttribute('href') || '').match(/^\/?([^/]+)\/status\/(\d+)/);
+      if (!m) return;
+      if (me && m[1].toLowerCase() !== me) return; // 사이드바(트렌드/추천) 타 계정 글 제외
+      if (!ids.has(m[2])) ids.set(m[2], `https://x.com/${m[1]}/status/${m[2]}`);
+    });
+  };
+
+  const startT = Date.now();
+  const MAX_MS = 180000;     // 최대 3분
+  const STABLE_STOP = 10;    // 새 글 없이 N회 연속이면 끝으로 간주
+  let stable = 0, last = 0, scrolls = 0, stoppedBy = 'max-time';
+  for (; Date.now() - startT < MAX_MS; scrolls++) {
+    collect();
+    window.scrollBy(0, Math.round(window.innerHeight * 0.9));
+    await sleep(650);
+    if (ids.size === last) { if (++stable >= STABLE_STOP) { stoppedBy = 'end'; break; } }
+    else { stable = 0; last = ids.size; }
+  }
+  collect();
+  return { items: [...ids.entries()].map(([id, url]) => ({ id, url })), scrolls, stoppedBy };
+}
+
 /** 여러 프레임의 scanFrame 결과를 sourceUrl 기준으로 합친다(이미지 합집합). */
 function mergeCandidates(frameResults) {
   const map = new Map();

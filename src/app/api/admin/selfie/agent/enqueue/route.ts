@@ -5,7 +5,7 @@ import { authorizeSelfieDev } from '@/domains/selfie/selfie.service'
 import { enqueueCommand } from '@/domains/selfie/agent-queue'
 
 const Body = z.object({
-  type: z.enum(['ping', 'scan', 'ingest', 'dump', 'openCollect', 'scanList', 'peek']),
+  type: z.enum(['ping', 'scan', 'ingest', 'dump', 'openCollect', 'scanList', 'peek', 'scanXMedia']),
   payload: z.any().optional(),
 })
 
