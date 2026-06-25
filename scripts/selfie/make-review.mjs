@@ -35,7 +35,7 @@ const line = (n) => n + ' '.repeat(Math.max(1, TARGET - w(n))) + '\t';
 
 const out = [];
 out.push(`# 방종셀카 ${date} 참석자 검토 — 왼쪽 = Claude 판독`);
-out.push('# 탭 뒤 비움=판독 맞음 / 올바른 닉=교체 / "-"=제외 / 맨 아래 누락추가에 탭없이 한 줄=추가');
+out.push('# 탭 뒤 비움 또는 0=판독 맞음(0=확인 표시) / 올바른 닉=교체 / "-"=제외 / 맨 아래 누락추가에 탭없이 한 줄=추가');
 out.push('');
 out.push('# ═══ 확실 ① 정답노트(이전 승인 목록) 일치 ═══');
 for (const n of rosterConfident) out.push(line(n));

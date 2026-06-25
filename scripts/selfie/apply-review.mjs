@@ -49,7 +49,8 @@ for (const ln of lines) {
     const col2 = ln.slice(i + 1).trim();
     cnt = counts[col1] ?? 1; // 횟수는 내 판독값(col1) 기준
     if (col2 === '-') { excluded++; log.excluded.push(col1); continue; }
-    if (col2) { name = col2; corrected++; log.corrected.push(`${col1} → ${col2}`); }
+    // 탭 뒤 비움 또는 '0' = "확인했고 판독 맞음"(0은 사용자가 체크 표시로 적는 값)
+    if (col2 && col2 !== '0') { name = col2; corrected++; log.corrected.push(`${col1} → ${col2}`); }
     else { name = col1; asRead++; }
   } else {
     name = ln.trim();
