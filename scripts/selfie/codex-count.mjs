@@ -18,7 +18,7 @@ if (!date || !/^\d{4}-\d{2}-\d{2}(_\d{4})?$/.test(date)) { console.error('--date
 
 const dir = path.join(process.cwd(), 'selfie-archive', date, '_chat');
 if (!fs.existsSync(dir)) { console.error(`크롭 폴더 없음: ${dir}`); process.exit(1); }
-const files = fs.readdirSync(dir).filter((f) => f.endsWith('.png') && !exclude.has(f.replace(/\.png$/, ''))).sort();
+const files = fs.readdirSync(dir).filter((f) => /\.(png|jpe?g|webp)$/i.test(f) && !exclude.has(f.replace(/\.\w+$/, ''))).sort();
 if (!files.length) { console.error('크롭 PNG가 없습니다.'); process.exit(1); }
 if (exclude.size) console.error(`[codex-count] 제외 ${exclude.size}장 → ${files.length}장으로 집계`);
 

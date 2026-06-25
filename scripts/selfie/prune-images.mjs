@@ -19,8 +19,10 @@ const dir = path.join(process.cwd(), 'selfie-archive', date);
 // 크롭만 삭제(로컬 원본은 내구성용으로 보존)
 let cropsDeleted = 0;
 for (const h of hashes) {
-  const crop = path.join(dir, '_chat', `${h}.png`);
-  if (fs.existsSync(crop)) { fs.rmSync(crop, { force: true }); cropsDeleted++; }
+  for (const ext of ['png', 'jpg', 'jpeg', 'webp']) {
+    const crop = path.join(dir, '_chat', `${h}.${ext}`);
+    if (fs.existsSync(crop)) { fs.rmSync(crop, { force: true }); cropsDeleted++; }
+  }
 }
 
 const { db, close } = await getDb();

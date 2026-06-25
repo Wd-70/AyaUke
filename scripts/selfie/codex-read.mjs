@@ -15,7 +15,7 @@ if (!date || !/^\d{4}-\d{2}-\d{2}(_\d{4})?$/.test(date)) { console.error('--date
 
 const dir = path.join(process.cwd(), 'selfie-archive', date, '_chat');
 if (!fs.existsSync(dir)) { console.error(`크롭 폴더 없음: ${dir} — 먼저 crop-chat.mjs 실행`); process.exit(1); }
-const files = fs.readdirSync(dir).filter((f) => f.endsWith('.png')).sort();
+const files = fs.readdirSync(dir).filter((f) => /\.(png|jpe?g|webp)$/i.test(f)).sort();
 if (!files.length) { console.error('크롭 PNG가 없습니다.'); process.exit(1); }
 
 const listing = files.map((f, i) => `이미지 ${i + 1}: ${f}`).join('\n');
