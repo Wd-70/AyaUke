@@ -1,6 +1,7 @@
 // 방종셀카: 회차 내 출현수 검토 파일(counts-review.txt)을 읽어 attendees[].count 를 기록한다.
 // 멤버십(명단)은 건드리지 않는다 — count 필드만 갱신. 정규화로 매칭.
-// 파일 형식: '<횟수><탭><닉네임>'. '#'/빈 줄 무시. 명단에 없는 줄은 경고 후 무시.
+// 파일 형식: '<횟수><탭>[확인표시]<탭><닉네임>'. '#'/빈 줄 무시. 명단에 없는 줄은 경고 후 무시.
+//   가운데 칸(확인표시 v 등)은 결과에 영향 없음 — 사용자 "확인함" 체크용. 닉네임은 항상 마지막 탭 칸.
 // 사용: node scripts/selfie/apply-count-review.mjs --date=2025-07-30 [--dry]
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,10 +24,10 @@ const normalize = (s) =>
 const byNorm = new Map(); // normalized -> count
 for (const ln of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
   if (!ln.trim() || ln.trim().startsWith('#')) continue;
-  const i = ln.indexOf('\t');
-  if (i < 0) { console.warn('  ⚠ 탭 없는 줄 무시:', ln.trim()); continue; }
-  const count = parseInt(ln.slice(0, i).trim(), 10);
-  const nick = ln.slice(i + 1).trim();
+  const parts = ln.split('\t');
+  if (parts.length < 2) { console.warn('  ⚠ 탭 없는 줄 무시:', ln.trim()); continue; }
+  const count = parseInt(parts[0].trim(), 10);
+  const nick = parts[parts.length - 1].trim(); // 닉네임은 항상 마지막 칸(가운데 확인표시는 무시)
   const n = normalize(nick);
   if (!n || !Number.isFinite(count)) { console.warn('  ⚠ 형식 오류 무시:', ln.trim()); continue; }
   byNorm.set(n, Math.max(1, count));

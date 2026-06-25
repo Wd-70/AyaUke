@@ -43,10 +43,10 @@ try {
 
   const out = [];
   out.push(`# 방종셀카 ${date} 회차 내 출현수(count) 검토`);
-  out.push('# 형식: <횟수><탭><닉네임>. 숫자만 고치면 됨(총 출석수엔 무관, 회차 내 순위·동순위 정렬용).');
-  out.push('# 정답지(승인 명단) 기준 — 줄을 추가/삭제하지 말고 횟수만 조정하세요.');
+  out.push('# 형식: <횟수><탭>[확인]<탭><닉네임>. 숫자만 고치면 됨(총 출석수엔 무관, 회차 내 순위·동순위 정렬용).');
+  out.push('# 가운데 칸에 v 등을 적으면 "확인함" 표시(결과 무영향). 줄은 추가/삭제하지 말고 횟수만 조정.');
   out.push('');
-  for (const r of rows) out.push(`${r.count}\t${r.nickname}`);
+  for (const r of rows) out.push(`${r.count}\t\t${r.nickname}`); // 가운데 = 확인표시 칸(비움)
   out.push('');
 
   const dir = path.join(process.cwd(), 'selfie-archive', date);
