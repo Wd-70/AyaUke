@@ -22,8 +22,14 @@ const normalize = (s) =>
     .replace(/[^\w가-힣]/g, '');
 
 const byNorm = new Map(); // normalized -> count
+let countSource = arg('source') || ''; // --source 우선, 없으면 파일 헤더의 '# 카운트 작성자:'
 for (const ln of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-  if (!ln.trim() || ln.trim().startsWith('#')) continue;
+  if (!ln.trim()) continue;
+  if (ln.trim().startsWith('#')) {
+    const m = ln.match(/^#\s*카운트 작성자:\s*(.+?)\s*$/);
+    if (m && !arg('source')) countSource = m[1];
+    continue;
+  }
   const parts = ln.split('\t');
   if (parts.length < 2) { console.warn('  ⚠ 탭 없는 줄 무시:', ln.trim()); continue; }
   const count = parseInt(parts[0].trim(), 10);
@@ -53,13 +59,13 @@ try {
   console.log(`${date}: 참석자 ${att.length}명 · count 갱신 ${changed}건 · ×2이상 ${top.length}명`);
   if (top.length) console.log('  ' + top.join(', '));
   if (orphan.length) console.log('  ⚠ 명단에 없어 무시된 닉:', orphan.join(', '));
+  if (countSource) console.log(`  카운트 작성자: ${countSource}`);
 
   if (dry) { console.log('[--dry] 기록 안 함'); process.exit(0); }
-  await db.collection('selfiedays').updateOne(
-    { date },
-    { $set: { attendees: updated, updatedAt: new Date() } },
-  );
-  console.log(`✅ ${date}: count 기록 완료`);
+  const set = { attendees: updated, updatedAt: new Date(), countAt: new Date() };
+  if (countSource) set.countSource = countSource; // 누가 집계했는지 DB에 영구 기록
+  await db.collection('selfiedays').updateOne({ date }, { $set: set });
+  console.log(`✅ ${date}: count 기록 완료${countSource ? ` (작성자 ${countSource})` : ''}`);
 } finally {
   await close();
 }

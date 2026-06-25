@@ -47,5 +47,22 @@ const args = ['exec', '-m', model, '-c', `model_reasoning_effort=${effort}`, '-s
 console.error(`[codex-count] ${date} · ${files.length}장 · 정답지 ${roster.length}명 · ${model}/${effort} 호출 중…`);
 const res = spawnSync('codex', args, { input: prompt, encoding: 'utf8', maxBuffer: 1024 * 1024 * 32, shell: true });
 if (res.error) { console.error('codex 실행 실패:', res.error.message); process.exit(1); }
-process.stdout.write(res.stdout || '');
-if (res.status !== 0) { console.error(res.stderr || ''); process.exit(res.status || 1); }
+
+// codex의 잡담/프리앰블을 걷어내고 '<닉네임>\t<횟수>' TSV만 stdout으로 (make-count-review 직결).
+// codex가 답을 두 번 출력하는 경우가 있어 닉별 마지막 값으로 dedup.
+const seen = new Map();
+for (const ln of (res.stdout || '').split(/\r?\n/)) {
+  const m = ln.match(/^(.+?)\t+(\d+)\s*$/);
+  if (!m) continue;
+  const nick = m[1].trim();
+  if (!nick || nick.startsWith('#')) continue;
+  seen.set(nick, parseInt(m[2], 10));
+}
+if (!seen.size) {
+  console.error('codex 출력에서 TSV를 찾지 못함 — 원본 출력:');
+  console.error(res.stdout || '');
+  process.exit(1);
+}
+for (const [nick, c] of seen) process.stdout.write(`${nick}\t${c}\n`);
+console.error(`[codex-count] ${seen.size}개 닉 집계 완료`);
+if (res.status !== 0) console.error(res.stderr || '');
