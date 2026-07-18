@@ -80,6 +80,19 @@ export default function Navigation({ currentPath }: NavigationProps) {
   const activePath = currentPath ?? pathname ?? '/';
   const scrolled = useScrolled();
   const reduce = useReducedMotion();
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+        mobileMenuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isMobileMenuOpen]);
 
   // 스크롤 연동: useScrollNav가 --nav-shift를 갱신하면 그만큼 위로 밀려 올라간다.
   // (변수가 없는 페이지는 0px → 이동 없음). 모바일 메뉴가 열려 있으면 항상 표시.
@@ -96,7 +109,7 @@ export default function Navigation({ currentPath }: NavigationProps) {
           : 'translateY(calc(-1 * var(--nav-shift, 0px)))',
       }}
     >
-      <div className="px-3 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-3 sm:px-6 lg:px-8">
         <div className="flex h-12 items-center sm:h-16">
           {/* Left side - Logo */}
           <div className="flex-1">
@@ -120,7 +133,7 @@ export default function Navigation({ currentPath }: NavigationProps) {
                   href={link.href}
                   className={`relative whitespace-nowrap px-2 py-1 text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 ${
                     isActive
-                      ? 'text-light-accent dark:text-dark-primary'
+                      ? 'text-light-accent-deep dark:text-dark-primary'
                       : 'text-gray-600 hover:text-light-accent dark:text-gray-300 dark:hover:text-dark-primary'
                   }`}
                 >
@@ -146,9 +159,11 @@ export default function Navigation({ currentPath }: NavigationProps) {
 
             {/* Mobile menu button */}
             <button
-              className="rounded-full bg-light-primary/20 p-1.5 transition-all duration-300 hover:bg-light-primary/30 dark:bg-dark-primary/20 dark:hover:bg-dark-primary/30 md:hidden sm:p-2"
+              ref={mobileMenuButtonRef}
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-full bg-light-primary/20 p-1.5 transition-all duration-300 hover:bg-light-primary/30 dark:bg-dark-primary/20 dark:hover:bg-dark-primary/30 md:hidden sm:p-2"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              aria-label="Toggle mobile menu"
+              aria-label={isMobileMenuOpen ? '모바일 메뉴 닫기' : '모바일 메뉴 열기'}
+              aria-controls="mobile-navigation-menu"
               aria-expanded={isMobileMenuOpen}
             >
               <svg className="h-5 w-5 text-gray-600 dark:text-gray-300 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -179,6 +194,7 @@ export default function Navigation({ currentPath }: NavigationProps) {
         <AnimatePresence>
           {isMobileMenuOpen && (
             <motion.div
+              id="mobile-navigation-menu"
               key="mobile-menu"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
@@ -197,9 +213,9 @@ export default function Navigation({ currentPath }: NavigationProps) {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`block rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                      className={`flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
                         isActive
-                          ? 'bg-light-primary/10 text-light-accent dark:bg-dark-primary/10 dark:text-dark-primary'
+                          ? 'bg-light-primary/10 text-light-accent-deep dark:bg-dark-primary/10 dark:text-dark-primary'
                           : 'text-gray-600 hover:bg-light-primary/5 hover:text-light-accent dark:text-gray-300 dark:hover:bg-dark-primary/5 dark:hover:text-dark-primary'
                       }`}
                       onClick={() => setIsMobileMenuOpen(false)}
@@ -221,7 +237,7 @@ export default function Navigation({ currentPath }: NavigationProps) {
                     type="button"
                     data-theme-toggle
                     aria-label="테마 전환"
-                    className="flex w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-light-primary/5 hover:text-light-accent dark:text-gray-300 dark:hover:bg-dark-primary/5 dark:hover:text-dark-primary"
+                    className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-light-primary/5 hover:text-light-accent dark:text-gray-300 dark:hover:bg-dark-primary/5 dark:hover:text-dark-primary"
                   >
                     <span className="mr-3">
                       <ThemeIcons sizeClass="h-5 w-5" />
@@ -248,6 +264,7 @@ function AuthControls({
 }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const dropdownButtonRef = useRef<HTMLButtonElement>(null);
 
   // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -257,12 +274,21 @@ function AuthControls({
       }
     };
 
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsDropdownOpen(false);
+        dropdownButtonRef.current?.focus();
+      }
+    };
+
     if (isDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
     };
   }, [isDropdownOpen]);
 
@@ -281,7 +307,7 @@ function AuthControls({
         ) : (
           <Link
             href="/auth/signin"
-            className="flex items-center space-x-1.5 rounded-lg bg-gradient-to-r from-light-accent to-light-secondary px-3 py-1.5 text-sm font-medium text-white shadow-lg transition-all duration-300 hover:from-light-secondary hover:to-light-accent hover:shadow-xl dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent"
+            className="flex items-center space-x-1.5 rounded-lg bg-gradient-to-r from-light-cta-accent to-light-cta-purple px-3 py-1.5 text-sm font-medium text-white shadow-lg transition-all duration-300 hover:from-light-cta-purple hover:to-light-cta-accent hover:shadow-xl dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent"
           >
             <UserIcon className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">로그인</span>
@@ -300,7 +326,11 @@ function AuthControls({
   return (
     <div className="relative" ref={dropdownRef}>
       <button
+        ref={dropdownButtonRef}
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+
+        aria-expanded={isDropdownOpen}
+        aria-controls="user-navigation-menu"
         className="flex items-center space-x-2 rounded-lg bg-light-primary/10 p-2 transition-all duration-300 hover:bg-light-primary/20 dark:bg-dark-primary/10 dark:hover:bg-dark-primary/20"
       >
         {session.user.image ? (
@@ -324,7 +354,10 @@ function AuthControls({
       </button>
 
       {isDropdownOpen && (
-        <div className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-light-primary/20 bg-white/95 py-1 shadow-lg backdrop-blur-md dark:border-dark-primary/20 dark:bg-gray-800/95">
+        <div
+          id="user-navigation-menu"
+          className="absolute right-0 z-50 mt-2 w-56 rounded-lg border border-light-primary/20 bg-white/95 py-1 shadow-lg backdrop-blur-md dark:border-dark-primary/20 dark:bg-gray-800/95"
+        >
           <div className="border-b border-light-primary/10 px-4 py-2 dark:border-dark-primary/10">
             <div className="text-sm font-medium text-gray-900 dark:text-white">
               {session.user.name || session.user.channelName}
@@ -401,7 +434,7 @@ function MobileUserProfile({
       <div className="mb-3 border-b border-light-primary/10 pb-3 dark:border-dark-primary/10">
         <Link
           href="/auth/signin"
-          className="flex w-full items-center rounded-lg bg-gradient-to-r from-light-accent to-light-secondary px-3 py-2 text-sm font-medium text-white transition-all duration-200 hover:from-light-secondary hover:to-light-accent dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent"
+          className="flex min-h-11 w-full items-center rounded-lg bg-gradient-to-r from-light-cta-accent to-light-cta-purple px-3 py-2 text-sm font-medium text-white transition-all duration-200 hover:from-light-cta-purple hover:to-light-cta-accent dark:from-dark-accent dark:to-dark-secondary dark:hover:from-dark-secondary dark:hover:to-dark-accent"
         >
           <UserIcon className="mr-3 h-5 w-5" />
           <span>로그인</span>
@@ -440,7 +473,7 @@ function MobileUserProfile({
       {/* 프로필 링크도 사용자 정보에 포함 */}
       <Link
         href="/profile"
-        className="block rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-light-primary/5 hover:text-light-accent dark:text-gray-300 dark:hover:bg-dark-primary/5 dark:hover:text-dark-primary"
+        className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-light-primary/5 hover:text-light-accent dark:text-gray-300 dark:hover:bg-dark-primary/5 dark:hover:text-dark-primary"
       >
         내 프로필
       </Link>
@@ -467,7 +500,7 @@ function MobileAdminMenus({
         <Link
           key={item.href}
           href={item.href}
-          className="block rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-light-primary/5 hover:text-light-accent dark:text-gray-300 dark:hover:bg-dark-primary/5 dark:hover:text-dark-primary"
+          className="flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-light-primary/5 hover:text-light-accent dark:text-gray-300 dark:hover:bg-dark-primary/5 dark:hover:text-dark-primary"
           onClick={onMenuClose}
         >
           {item.label}
@@ -496,7 +529,7 @@ function MobileLogout({
           onMenuClose();
           signOut();
         }}
-        className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition-all duration-200 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+        className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 transition-all duration-200 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
       >
         로그아웃
       </button>

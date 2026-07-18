@@ -65,7 +65,7 @@ export default function LiveStatusPill() {
         오프라인
       </span>
       {data.liveTitle && (
-        <span className="max-w-[40vw] truncate text-sm text-light-text/55 dark:text-dark-text/55 sm:max-w-[260px]">
+        <span className="max-w-[40vw] truncate text-sm text-light-text/65 dark:text-dark-text/55 sm:max-w-[260px]">
           최근 방송 · {data.liveTitle}
           {rel ? ` (${rel})` : ''}
         </span>

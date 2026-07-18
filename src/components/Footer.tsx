@@ -56,7 +56,7 @@ export default function Footer() {
     currentYear > FOUNDED_YEAR ? `${FOUNDED_YEAR}–${currentYear}` : `${FOUNDED_YEAR}`;
 
   return (
-    <footer className="relative border-t border-gray-200/50 bg-gray-50/80 backdrop-blur-sm dark:border-gray-700/50 dark:bg-gray-900/80">
+    <footer className="relative border-t border-light-primary/25 bg-gradient-to-b from-light-primary/[0.08] to-white/70 backdrop-blur-sm dark:border-dark-primary/25 dark:from-dark-primary/[0.06] dark:to-gray-900/80">
       {/* 상단 브랜드 헤어라인 */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-light-accent/50 to-transparent dark:via-dark-primary/50" />
 
@@ -115,7 +115,7 @@ export default function Footer() {
                   rel="noopener noreferrer"
                   aria-label={s.label}
                   title={s.label}
-                  className={`group flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200/70 bg-white/60 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-gray-700/60 dark:bg-gray-800/60 ${s.hover}`}
+                  className={`group flex h-11 w-11 items-center justify-center rounded-xl border border-light-primary/25 bg-white/70 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-dark-primary/25 dark:bg-gray-800/60 ${s.hover}`}
                 >
                   {s.icon}
                 </a>
@@ -125,13 +125,13 @@ export default function Footer() {
         </div>
 
         {/* 하단 구분선 및 저작권 */}
-        <div className="mt-8 border-t border-gray-200/50 pt-8 dark:border-gray-700/50">
+        <div className="mt-8 border-t border-light-primary/25 pt-8 dark:border-dark-primary/25">
           <div className="flex flex-col items-center justify-between space-y-4 md:flex-row md:space-y-0">
-            <div className="text-center text-sm text-gray-500 dark:text-gray-400 md:text-left">
+            <div className="text-center text-sm text-gray-600 dark:text-gray-400 md:text-left">
               <div>© {yearLabel} AyaUke Fan Page • 비공식 팬 페이지</div>
               <div className="mt-1 text-xs">Developed by Wd-70</div>
             </div>
-            <div className="flex items-center space-x-4 text-xs text-gray-400 dark:text-gray-500">
+            <div className="flex items-center space-x-4 text-xs text-gray-600 dark:text-gray-500">
               <span>HONEYZ 허니즈</span>
               <span>•</span>
               <span>아야 AyaUke</span>

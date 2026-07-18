@@ -46,10 +46,10 @@ function VideoCard({ video, i }: { video: RecentVideo; i: number }) {
         )}
       </div>
       <div className="p-5">
-        <h3 className="mb-2 line-clamp-2 text-base font-bold text-light-text transition-colors group-hover:text-light-accent dark:text-dark-text dark:group-hover:text-dark-accent">
+        <h3 className="mb-2 line-clamp-2 text-base font-bold text-light-text transition-colors group-hover:text-light-accent-deep dark:text-dark-text dark:group-hover:text-dark-accent">
           {video.title}
         </h3>
-        <div className="flex items-center gap-4 text-sm text-light-text/50 dark:text-dark-text/50">
+        <div className="flex items-center gap-4 text-sm text-light-text/65 dark:text-dark-text/65">
           {video.viewCount && (
             <span className="inline-flex items-center gap-1">
               <EyeIcon className="h-4 w-4" />
@@ -92,7 +92,7 @@ function FallbackPanel({
         <Icon className="h-7 w-7" />
       </div>
       <p className="text-lg font-bold text-light-text dark:text-dark-text">{title}</p>
-      <p className="mt-2 max-w-md text-sm leading-relaxed text-light-text/55 dark:text-dark-text/55">
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-light-text/65 dark:text-dark-text/55">
         {desc}
       </p>
       {onRetry && (
@@ -116,15 +116,16 @@ export default function RecentVideosV2() {
   const videos = (data ?? []).slice(0, 3);
 
   return (
-    <section className="px-4 py-24 sm:px-6">
+    <section className="bg-light-primary/[0.05] px-4 py-20 dark:bg-dark-primary/[0.04] sm:px-6 lg:py-28">
       <div className="mx-auto max-w-5xl">
         <motion.div {...reveal()} className="mb-14 text-center">
-          <h2 className="font-display text-4xl font-bold sm:text-5xl">
-            <span className="bg-gradient-to-r from-light-accent to-light-purple bg-clip-text text-transparent dark:from-dark-accent dark:to-dark-secondary">
+          <p className="mb-3 text-xs font-semibold tracking-[0.2em] text-light-accent-deep dark:text-dark-accent">REPLAY</p>
+          <h2 className="font-display break-keep text-4xl font-bold tracking-tight text-light-text dark:text-dark-text sm:text-5xl">
+            <span>
               최근 다시보기
             </span>
           </h2>
-          <p className="mt-4 text-lg text-light-text/60 dark:text-dark-text/60">
+          <p className="mt-4 break-keep text-lg text-light-text/65 dark:text-dark-text/60">
             놓친 방송이 있나요? 최근 방송을 다시 시청해보세요.
           </p>
         </motion.div>
@@ -168,7 +169,7 @@ export default function RecentVideosV2() {
             href={CHZZK_VIDEOS}
             target="_blank"
             rel="noopener noreferrer"
-            className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-light-accent to-light-purple px-7 py-3.5 font-bold text-white shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-purple-glow dark:from-dark-primary dark:to-dark-secondary dark:hover:shadow-pink-glow"
+            className="group inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-light-cta-accent to-light-cta-purple px-7 py-3.5 font-bold text-white shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-purple-glow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-light-accent-deep dark:from-dark-primary dark:to-dark-secondary dark:hover:shadow-pink-glow dark:focus-visible:outline-dark-accent"
           >
             치지직 다시보기
             <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -177,7 +178,7 @@ export default function RecentVideosV2() {
             href={YT_ARCHIVE}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-light-primary/30 bg-white/40 px-7 py-3.5 font-semibold text-light-text backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/60 dark:border-dark-primary/30 dark:bg-gray-800/40 dark:text-dark-text dark:hover:bg-gray-800/60"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-light-primary/30 bg-white/40 px-7 py-3.5 font-semibold text-light-text backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-light-accent-deep dark:border-dark-primary/30 dark:bg-gray-800/40 dark:text-dark-text dark:hover:bg-gray-800/60 dark:focus-visible:outline-dark-accent"
           >
             다시보기 채널
             <ArrowRightIcon className="h-4 w-4" />

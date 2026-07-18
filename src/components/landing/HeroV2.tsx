@@ -69,8 +69,8 @@ export default function HeroV2() {
   const spotX = useSpring(useTransform(cursorX, (v) => v - 320), { stiffness: 150, damping: 28 });
   const spotY = useSpring(useTransform(cursorY, (v) => v - 320), { stiffness: 150, damping: 28 });
   // 포트레이트는 커서 쪽으로 살짝 "고개를 돌리는" 3D 틸트 — 방문자를 바라보는 의도.
-  const rotY = useSpring(useTransform(mx, (v) => (reduce ? 0 : v * 18)), { stiffness: 120, damping: 18 });
-  const rotX = useSpring(useTransform(my, (v) => (reduce ? 0 : v * -14)), { stiffness: 120, damping: 18 });
+  const rotY = useSpring(useTransform(mx, (v) => (reduce ? 0 : v * 8)), { stiffness: 120, damping: 18 });
+  const rotX = useSpring(useTransform(my, (v) => (reduce ? 0 : v * -6)), { stiffness: 120, damping: 18 });
   // 배경은 반대로(앞으로 다가오는 캐릭터와 분리되는 깊이감) 커서를 따라간다.
   const bgBlob = useParallax(mx, my, reduce ? 0 : 30);
 
@@ -89,8 +89,8 @@ export default function HeroV2() {
       <div className="absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-light-primary/8 via-transparent to-transparent dark:from-dark-primary/8" />
         <motion.div style={bgBlob} className="absolute inset-0">
-          <div className="absolute -top-20 left-[12%] h-[34rem] w-[34rem] rounded-full bg-light-accent/8 blur-3xl dark:bg-dark-accent/8 animate-blob" />
-          <div className="absolute bottom-[-6rem] right-[10%] h-[32rem] w-[32rem] rounded-full bg-light-purple/8 blur-3xl dark:bg-dark-secondary/8 animate-blob animation-delay-4000" />
+          <div className="absolute -top-20 left-[12%] h-[34rem] w-[34rem] rounded-full bg-light-accent/15 blur-3xl dark:bg-dark-accent/8 animate-blob" />
+          <div className="absolute bottom-[-6rem] right-[10%] h-[32rem] w-[32rem] rounded-full bg-light-purple/15 blur-3xl dark:bg-dark-secondary/8 animate-blob animation-delay-4000" />
         </motion.div>
         {/* 비네팅 */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_45%,rgba(0,0,0,0.06)_100%)] dark:bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(0,0,0,0.5)_100%)]" />
@@ -181,10 +181,10 @@ export default function HeroV2() {
           variants={titleContainer}
           initial="hidden"
           animate="show"
-          className="font-display text-5xl font-extrabold leading-[1.05] sm:text-7xl"
+          className="font-display break-keep text-5xl font-extrabold leading-[1.05] sm:text-7xl"
         >
           <span className="inline-block overflow-hidden align-bottom">
-            <motion.span variants={wordVariants} className="inline-block bg-gradient-to-r from-light-accent via-light-purple to-light-secondary bg-clip-text text-transparent dark:from-dark-accent dark:via-dark-secondary dark:to-dark-primary">
+            <motion.span variants={wordVariants} className="inline-block bg-gradient-to-r from-light-title-1 via-light-title-2 to-light-title-3 bg-clip-text text-transparent dark:from-dark-accent dark:via-dark-secondary dark:to-dark-primary">
               아야
             </motion.span>
           </span>{' '}
@@ -199,7 +199,7 @@ export default function HeroV2() {
           initial={{ opacity: 0, y: reduce ? 0 : 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: reduce ? 0 : 0.5 }}
-          className="mt-5 max-w-2xl text-lg text-light-text/70 dark:text-dark-text/70 sm:text-xl"
+          className="mt-5 max-w-2xl break-keep text-lg text-light-text/70 dark:text-dark-text/70 sm:text-xl"
         >
           허니즈의 메인보컬, 생활애교가 흘러넘치는 치지직의 분내담당
         </motion.p>
@@ -234,7 +234,7 @@ export default function HeroV2() {
                 href={CHZZK_LIVE}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group inline-flex items-center gap-3 rounded-2xl bg-red-500 px-9 py-4 text-lg font-bold text-white shadow-[0_10px_40px_-8px_rgba(239,68,68,0.7)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_50px_-8px_rgba(239,68,68,0.85)]"
+                className="group inline-flex items-center gap-3 rounded-2xl bg-red-500 px-9 py-4 text-lg font-bold text-white shadow-[0_10px_40px_-8px_rgba(239,68,68,0.7)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_50px_-8px_rgba(239,68,68,0.85)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-light-accent-deep dark:focus-visible:outline-dark-accent"
               >
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
@@ -244,7 +244,7 @@ export default function HeroV2() {
               </a>
               <Link
                 href="/songbook"
-                className="inline-flex items-center gap-2 rounded-2xl border border-light-primary/30 bg-white/40 px-8 py-4 text-lg font-semibold text-light-text backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/60 dark:border-dark-primary/30 dark:bg-gray-800/40 dark:text-dark-text dark:hover:bg-gray-800/60"
+                className="inline-flex items-center gap-2 rounded-2xl border border-light-primary/30 bg-white/40 px-8 py-4 text-lg font-semibold text-light-text backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-light-accent-deep dark:border-dark-primary/30 dark:bg-gray-800/40 dark:text-dark-text dark:hover:bg-gray-800/60 dark:focus-visible:outline-dark-accent"
               >
                 <MusicalNoteIcon className="h-5 w-5" />
                 노래책 둘러보기
@@ -254,7 +254,7 @@ export default function HeroV2() {
             <>
               <Link
                 href="/songbook"
-                className="group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-light-accent to-light-purple px-9 py-4 text-lg font-bold text-white shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-purple-glow dark:from-dark-primary dark:to-dark-secondary dark:hover:shadow-pink-glow"
+                className="group relative inline-flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-light-cta-accent to-light-cta-purple px-9 py-4 text-lg font-bold text-white shadow-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-purple-glow focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-light-accent-deep dark:from-dark-primary dark:to-dark-secondary dark:hover:shadow-pink-glow dark:focus-visible:outline-dark-accent"
               >
                 <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
                 <MusicalNoteIcon className="relative h-5 w-5" />
@@ -264,7 +264,7 @@ export default function HeroV2() {
                 href={CHZZK_LIVE}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-2xl border border-light-primary/30 bg-white/40 px-8 py-4 text-lg font-semibold text-light-text backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/60 dark:border-dark-primary/30 dark:bg-gray-800/40 dark:text-dark-text dark:hover:bg-gray-800/60"
+                className="inline-flex items-center gap-2 rounded-2xl border border-light-primary/30 bg-white/40 px-8 py-4 text-lg font-semibold text-light-text backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:bg-white/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-light-accent-deep dark:border-dark-primary/30 dark:bg-gray-800/40 dark:text-dark-text dark:hover:bg-gray-800/60 dark:focus-visible:outline-dark-accent"
               >
                 방송 보러가기
               </a>

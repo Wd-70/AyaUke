@@ -40,18 +40,19 @@ export default function AboutSection() {
   };
 
   return (
-    <section className="px-4 py-24 sm:px-6">
+    <section className="px-4 py-24 sm:px-6 lg:py-32">
       <div className="mx-auto max-w-5xl">
         <motion.div
           {...reveal()}
           className="mx-auto mb-16 max-w-3xl text-center"
         >
-          <h2 className="font-display text-4xl font-bold sm:text-5xl">
-            <span className="bg-gradient-to-r from-light-accent to-light-purple bg-clip-text text-transparent dark:from-dark-accent dark:to-dark-secondary">
+          <p className="mb-3 text-xs font-semibold tracking-[0.2em] text-light-accent-deep dark:text-dark-accent">ABOUT</p>
+          <h2 className="font-display break-keep text-4xl font-bold tracking-tight text-light-text dark:text-dark-text sm:text-5xl">
+            <span>
               아야는 이런 스트리머
             </span>
           </h2>
-          <p className="mt-5 text-lg leading-relaxed text-light-text/65 dark:text-dark-text/65">
+          <p className="mt-5 break-keep text-lg leading-relaxed text-light-text/65 dark:text-dark-text/65">
             시청자와의 소통을 소중히 여기는 허니즈의 막내,
             <br className="hidden sm:block" />
             생활애교가 흘러넘치는 치지직의 분내담당이자,
@@ -82,7 +83,7 @@ export default function AboutSection() {
                   <h3 className="mb-3 text-xl font-bold text-light-text dark:text-dark-text">
                     {card.title}
                   </h3>
-                  <p className="leading-relaxed text-light-text/60 dark:text-dark-text/60">
+                  <p className="leading-relaxed text-light-text/70 dark:text-dark-text/70">
                     {card.desc}
                   </p>
                 </div>

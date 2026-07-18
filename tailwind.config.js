@@ -15,6 +15,16 @@ module.exports = {
           secondary: '#F9D891',  // Yellow accent
           accent: '#E38BFF',     // Bright purple
           purple: '#A171D5',     // Medium purple
+          'accent-deep': '#8B3DA7', // Foreground purple, 6.32:1 on white
+          'purple-deep': '#6F43A5', // Foreground violet, 6.95:1 on white
+          'cta-accent': '#A23DC5',  // CTA start, 5.24:1 with white text
+          'cta-purple': '#70378C',  // CTA end, 8.03:1 with white text
+          // 히어로 대형 타이틀 전용 그라데이션 — 초대형(large text) 기준 3:1을 만족하는
+          // 부드러운(저채도) 라벤더→모브→더스티 로즈. 고채도는 쨍하고 deep 토큰은 칙칙해서
+          // 그 중간의 은은한 톤으로.
+          'title-1': '#A96FC4',     // Soft lavender-purple, ~3.65:1 on white
+          'title-2': '#B26FB0',     // Muted mauve, ~3.63:1
+          'title-3': '#C06F92',     // Dusty rose, ~3.54:1
           background: '#FFFFFF', // White
           text: '#1F2937',       // Dark gray for text
         },
@@ -57,8 +67,8 @@ module.exports = {
         'live-region-highlight': 'rgba(249, 216, 145, 0.2)',
       },
       fontFamily: {
-        sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
-        display: ['var(--font-poppins)', 'Poppins', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'Inter', 'Pretendard Variable', 'system-ui', 'sans-serif'],
+        display: ['var(--font-poppins)', 'Poppins', 'Pretendard Variable', 'system-ui', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
