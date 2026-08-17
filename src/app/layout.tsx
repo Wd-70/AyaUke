@@ -7,6 +7,9 @@ import { Analytics } from "@vercel/analytics/next";
 import AuthProvider from "@/contexts/AuthProvider";
 import QueryProvider from "@/contexts/QueryProvider";
 import { ToastProvider } from "@/components/Toast";
+import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
+import { ClipPlayerProvider } from "@/components/clip/player/ClipPlayerProvider";
+import MiniPlayer from "@/components/clip/player/MiniPlayer";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -29,7 +32,12 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon.png",
     shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    apple: "/icons/icon-192.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "AyaUke",
   },
   openGraph: {
     title: "아야 AyaUke - 노래책",
@@ -73,10 +81,14 @@ export default function RootLayout({
         <AuthProvider>
           <QueryProvider>
             <ToastProvider>
-              {children}
+              <ClipPlayerProvider>
+                {children}
+                <MiniPlayer />
+              </ClipPlayerProvider>
             </ToastProvider>
           </QueryProvider>
         </AuthProvider>
+        <ServiceWorkerRegistrar />
         <Analytics />
       </body>
     </html>

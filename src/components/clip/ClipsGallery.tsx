@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon, FilmIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import ClipGalleryCard from './ClipGalleryCard';
 import { usePublicClips, useAllClips, type ClipsFilters } from '@/hooks/usePublicClips';
+import { useBulkClipLikes } from '@/hooks/useClipLikes';
 import { useReveal } from '@/components/landing/useReveal';
 import { isTextMatch } from '@/lib/searchUtils';
 
@@ -81,6 +82,15 @@ export default function ClipsGallery() {
 
   // 표시 데이터 통합
   const displayClips = searching ? searchResults.slice(0, visibleCount) : browse.clips;
+
+  // 표시 중인 클립들의 좋아요 여부를 한 번에 로딩 (카드 하트 초기상태 → 취소 동작 정상화).
+  // loadClipLikes는 아직 안 불러온 id만 요청하므로 반복 호출해도 저렴하다.
+  const { loadClipLikes } = useBulkClipLikes();
+  const displayIdsKey = displayClips.map((c) => c.id).join(',');
+  useEffect(() => {
+    if (displayClips.length) void loadClipLikes(displayClips.map((c) => c.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayIdsKey, loadClipLikes]);
   const total = searching ? searchResults.length : browse.total;
   const isLoading = searching ? allLoading : browse.isLoading;
   const isError = searching ? allError : browse.isError;

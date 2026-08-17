@@ -31,6 +31,7 @@ export default function ClipLikeButton({
     <button
       type="button"
       onClick={(e) => {
+        e.preventDefault();
         e.stopPropagation();
         if (!session) {
           showInfo('로그인이 필요해요', '좋아요는 로그인 후 이용할 수 있어요.');

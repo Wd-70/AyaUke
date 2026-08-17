@@ -19,6 +19,7 @@ const NAV_LINKS = [
   { href: '/', label: '홈' },
   { href: '/songbook', label: '노래책' },
   { href: '/clips', label: '클립' },
+  { href: '/player', label: '플레이어' },
 ] as const;
 
 /**

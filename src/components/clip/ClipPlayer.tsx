@@ -7,7 +7,7 @@
  * 유튜브(IFrame API)와 치지직(HLS)을 동일한 컨트롤 UI로 재생한다.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import Hls from "hls.js";
 import {
   PlayIcon,
@@ -51,6 +51,30 @@ interface ClipPlayerProps {
   posterDescription?: string;
   /** 설정 시, 최초 활성화(재생) 때 재생 수를 1 증가시킨다 (clipId = SongVideo._id) */
   trackPlayClipId?: string;
+  /** 재생/일시정지 상태 변화 통지 (미니플레이어 컨트롤 동기화용) */
+  onPlayingChange?: (playing: boolean) => void;
+  /** 다음/이전 트랙 (제공 시 MediaSession 잠금화면 컨트롤에 연결) */
+  onNext?: () => void;
+  onPrev?: () => void;
+  /**
+   * MediaSession 메타데이터(잠금화면·알림·미디어키). 제공 시 이 클립이 활성화되면
+   * OS 미디어 세션에 곡 정보를 싣고 재생/정지/이전/다음 액션을 연결한다.
+   * 백그라운드 재생 컨트롤의 핵심 — 치지직(video)은 화면을 꺼도 오디오가 이어진다.
+   */
+  mediaMeta?: { title: string; artist?: string; album?: string; artwork?: string };
+  /** 구간 종료가 임박(기본 12초 전)했을 때 1회 호출 — 다음 곡 프리로드/워밍용 */
+  onNearEnd?: () => void;
+}
+
+/** onNearEnd를 발화할 잔여시간 임계값(초) */
+const NEAR_END_SEC = 12;
+
+/** 미니플레이어 등 외부에서 재생을 제어하기 위한 명령형 핸들 */
+export interface ClipPlayerHandle {
+  play: () => void;
+  pause: () => void;
+  toggle: () => void;
+  isPlaying: () => boolean;
 }
 
 /** 내부 플레이어 추상화: 두 플랫폼을 같은 인터페이스로 다룬다 */
@@ -92,7 +116,7 @@ export function loadYouTubeApi(): Promise<void> {
   });
 }
 
-export default function ClipPlayer({
+const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPlayer({
   platform,
   videoId,
   startTime,
@@ -106,7 +130,12 @@ export default function ClipPlayer({
   posterThumbnail,
   posterDescription,
   trackPlayClipId,
-}: ClipPlayerProps) {
+  onPlayingChange,
+  onNext,
+  onPrev,
+  mediaMeta,
+  onNearEnd,
+}: ClipPlayerProps, ref) {
   // endTime이 없거나 startTime 이하(잘못된 구간)면 "끝까지"로 취급한다.
   // (이 값이 0/음수가 되면 clipDuration이 0이 되어 진행바가 멈추거나, VOD 전체를
   //  분모로 잡아 게이지가 거의 안 움직이는 문제가 생긴다)
@@ -149,8 +178,11 @@ export default function ClipPlayer({
   // 마지막 신선한 샘플 시각을 기준으로 벽시계로 보간한다. {media:-1}이면 재동기화 필요.
   const syncRef = useRef({ media: -1, wall: 0 });
   const onEndedRef = useRef(onEnded);
+  const onNearEndRef = useRef(onNearEnd);
+  const nearEndFiredRef = useRef(false);
   playingRef.current = playing;
   onEndedRef.current = onEnded;
+  onNearEndRef.current = onNearEnd;
   // 플레이어 초기화 시 저장된 음량을 적용하기 위한 최신 값 참조
   const volumeRef = useRef({ volume, muted });
   volumeRef.current = { volume, muted };
@@ -408,6 +440,7 @@ export default function ClipPlayer({
   // 멈추므로(오디오는 계속 재생 → 게이지만 수십 초 얼어붙음) 1Hz setInterval로 보강한다.
   useEffect(() => {
     if (!ready) return;
+    nearEndFiredRef.current = false; // 새 구간(클립)마다 프리로드 트리거 재무장
 
     const runTick = () => {
       const adapter = adapterRef.current;
@@ -447,6 +480,11 @@ export default function ClipPlayer({
             }
             const capped = end !== Infinity ? Math.min(absDisplay, end) : absDisplay;
             setClipPosition(Math.max(0, capped - startTime));
+            // 종료 임박 → 다음 곡 프리로드 트리거 (1회)
+            if (end !== Infinity && !nearEndFiredRef.current && end - abs <= NEAR_END_SEC) {
+              nearEndFiredRef.current = true;
+              onNearEndRef.current?.();
+            }
           }
         } else if (abs >= startTime) {
           syncRef.current = { media: -1, wall: 0 };
@@ -508,6 +546,81 @@ export default function ClipPlayer({
       adapter.play();
     }
   };
+
+  // 외부(미니플레이어/플레이어 페이지)에서 재생 제어할 수 있도록 명령형 핸들 노출.
+  // 아직 활성화(facade) 전이면 play() 시 스트림을 만들어 재생을 시작한다.
+  useImperativeHandle(ref, () => ({
+    play: () => {
+      if (!activated) { setActivated(true); return; }
+      adapterRef.current?.play();
+    },
+    pause: () => adapterRef.current?.pause(),
+    toggle: () => {
+      if (!activated) { setActivated(true); return; }
+      togglePlay();
+    },
+    isPlaying: () => playingRef.current,
+  }));
+
+  // 재생상태 변화 통지
+  const onPlayingChangeRef = useRef(onPlayingChange);
+  onPlayingChangeRef.current = onPlayingChange;
+  useEffect(() => {
+    onPlayingChangeRef.current?.(playing);
+  }, [playing]);
+
+  // ── MediaSession: 잠금화면/알림/미디어키 + 백그라운드 컨트롤 ──────
+  // 메타데이터·액션 핸들러를 등록한다. 치지직(video)은 화면을 꺼도 오디오가 이어지고,
+  // 유튜브(iframe)는 포그라운드 컨트롤까지만 동작(플랫폼 제약).
+  const navHandlersRef = useRef({ onNext, onPrev });
+  navHandlersRef.current = { onNext, onPrev };
+  useEffect(() => {
+    if (!activated || !mediaMeta) return;
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession;
+
+    try {
+      ms.metadata = new MediaMetadata({
+        title: mediaMeta.title,
+        artist: mediaMeta.artist || "",
+        album: mediaMeta.album || "아야 AyaUke",
+        ...(mediaMeta.artwork
+          ? { artwork: [{ src: mediaMeta.artwork, sizes: "512x512", type: "image/jpeg" }] }
+          : {}),
+      });
+    } catch {
+      /* 일부 브라우저는 MediaMetadata 미지원 */
+    }
+
+    const setAction = (action: MediaSessionAction, handler: (() => void) | null) => {
+      try {
+        ms.setActionHandler(action, handler as MediaSessionActionHandler | null);
+      } catch {
+        /* 미지원 액션 무시 */
+      }
+    };
+    setAction("play", () => adapterRef.current?.play());
+    setAction("pause", () => adapterRef.current?.pause());
+    setAction("previoustrack", navHandlersRef.current.onPrev ? () => navHandlersRef.current.onPrev?.() : null);
+    setAction("nexttrack", navHandlersRef.current.onNext ? () => navHandlersRef.current.onNext?.() : null);
+
+    return () => {
+      (["play", "pause", "previoustrack", "nexttrack"] as MediaSessionAction[]).forEach((a) =>
+        setAction(a, null),
+      );
+    };
+  }, [activated, mediaMeta, onNext, onPrev]);
+
+  // 재생상태를 OS 미디어 세션에 반영 (잠금화면 재생/정지 표시)
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    if (!activated || !mediaMeta) return;
+    try {
+      navigator.mediaSession.playbackState = playing ? "playing" : "paused";
+    } catch {
+      /* 무시 */
+    }
+  }, [playing, activated, mediaMeta]);
 
   /** 구간 내 상대 위치로 시킹 (클램프 + ended 해제 공통 처리) */
   const seekToClipPosition = (rel: number) => {
@@ -840,4 +953,6 @@ export default function ClipPlayer({
       </div>
     </div>
   );
-}
+});
+
+export default ClipPlayer;
