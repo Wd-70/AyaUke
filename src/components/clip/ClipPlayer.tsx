@@ -20,7 +20,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { CalendarDaysIcon, UserIcon } from "@heroicons/react/24/outline";
 import type { VideoPlatform } from "@/shared/utils/video-url";
-import { resolveVodMp4Url } from "@/shared/utils/chzzk-vod";
+import { loadChzzkStream } from "./chzzk-stream-cache";
 import { loadStoredVolume, saveStoredVolume } from "./volume-storage";
 import { useClipTitle } from "@/hooks/useClipTitle";
 import { formatClipTime } from "@/shared/utils/clip-time";
@@ -346,33 +346,18 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       void video.play(); // activated일 때만 도는 effect → 항상 재생
     };
 
-    fetch(`/api/clips/chzzk-hls?videoNo=${videoNo}`)
-      .then(async (res) => {
-        const result = await res.json();
-        if (!res.ok || !result.success) {
-          throw new Error(result.error?.message || "영상 정보를 불러올 수 없습니다.");
-        }
-        return result.data as {
-          streamUrl: string;
-          streamType: 'hls' | 'mp4' | 'vod';
-          videoTitle?: string;
-          vodVideoId?: string;
-          vodInKey?: string;
-        };
-      })
-      .then(async ({ streamUrl, streamType, videoTitle, vodVideoId, vodInKey }) => {
+    // 캐시 우선 로더 사용 — 다음 곡 prefetch가 채운 스트림 정보를 재사용해 전환 지연을 줄인다.
+    loadChzzkStream(videoNo)
+      .then(({ streamUrl, streamType, videoTitle, mp4Url: resolvedMp4 }) => {
         if (cancelled) return;
         if (videoTitle) setVodTitle(videoTitle);
 
         // 영구 보존 VOD: vodplay 토큰이 호출 IP에 묶이므로 브라우저가 직접 MP4 URL을 받는다.
-        let mp4Url: string | null = streamType === 'mp4' ? streamUrl : null;
-        if (streamType === 'vod' && vodVideoId && vodInKey) {
-          mp4Url = await resolveVodMp4Url(vodVideoId, vodInKey);
-          if (cancelled) return;
-          if (!mp4Url) {
-            setError("재생할 수 있는 영상이 아닙니다.");
-            return;
-          }
+        // (loadChzzkStream이 vod의 mp4Url을 미리 해석해둔다)
+        const mp4Url: string | null = streamType === 'mp4' ? streamUrl : resolvedMp4 ?? null;
+        if (streamType === 'vod' && !mp4Url) {
+          setError("재생할 수 있는 영상이 아닙니다.");
+          return;
         }
 
         // progressive MP4 — 네이티브 재생 (Range 시킹 지원)

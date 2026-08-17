@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { useClipPlayer } from './ClipPlayerProvider';
 import { clipArtwork } from './types';
+import { prefetchChzzkStream } from '../chzzk-stream-cache';
 
 // ClipPlayer(및 hls.js)는 무겁다. 레이아웃 상주 컴포넌트라 모든 페이지 공용 번들에
 // 들어가지 않도록, 실제 재생이 시작될 때만 지연 로드한다.
@@ -145,8 +146,9 @@ export default function MiniPlayer() {
         preconnect('https://i.ytimg.com');
         preconnect('https://googlevideo.com');
       } else {
-        // 치지직: HLS 해석 엔드포인트를 미리 호출해 서버/CDN 워밍 (세그먼트는 재생 시 로드)
-        fetch(`/api/clips/chzzk-hls?videoNo=${clip.videoId}`).catch(() => {});
+        // 치지직: 스트림 정보(+vod면 MP4 URL)를 미리 받아 캐시에 넣어둔다.
+        // 실제 플레이어 마운트 시 이 캐시를 재사용해 조회 라운드트립을 건너뛴다.
+        prefetchChzzkStream(clip.videoId);
       }
     } catch {
       /* 무시 */

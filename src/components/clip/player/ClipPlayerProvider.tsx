@@ -30,7 +30,7 @@ interface ClipPlayerContextValue {
   hasPrev: boolean;
   /** 같은 곡을 강제로 다시 마운트/재생하기 위한 nonce (한곡반복용). ClipPlayer key에 포함 */
   playNonce: number;
-  playQueue: (clips: PlayerClip[], startIndex?: number) => void;
+  playQueue: (clips: PlayerClip[], startIndex?: number, opts?: { shuffle?: boolean }) => void;
   playAt: (queueIndex: number) => void;
   next: () => void;
   prev: () => void;
@@ -95,14 +95,15 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
   }, [repeat]);
 
   const playQueue = useCallback(
-    (clips: PlayerClip[], startIndex = 0) => {
+    (clips: PlayerClip[], startIndex = 0, opts?: { shuffle?: boolean }) => {
       if (clips.length === 0) return;
       const start = Math.max(0, Math.min(startIndex, clips.length - 1));
+      const useShuffle = opts?.shuffle ?? shuffle;
+      if (opts?.shuffle !== undefined && opts.shuffle !== shuffle) setShuffle(opts.shuffle);
       setHasInteracted(true);
       setQueue(clips);
-      const nextOrder = shuffle ? shuffledOrder(clips.length, start) : identityOrder(clips.length);
-      setOrder(nextOrder);
-      setPos(shuffle ? 0 : start);
+      setOrder(useShuffle ? shuffledOrder(clips.length, start) : identityOrder(clips.length));
+      setPos(useShuffle ? 0 : start);
       setPlayNonce((n) => n + 1);
     },
     [shuffle],
