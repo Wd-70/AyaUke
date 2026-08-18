@@ -8,7 +8,7 @@
  */
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type Hls from "hls.js";
+import Hls from "hls.js";
 import {
   PlayIcon,
   PauseIcon,
@@ -20,7 +20,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { CalendarDaysIcon, UserIcon } from "@heroicons/react/24/outline";
 import type { VideoPlatform } from "@/shared/utils/video-url";
-import { prepareChzzkMedia, takePrebufferedChzzk, destroyPreparedMedia } from "./chzzk-prebuffer";
+import { loadChzzkStream } from "./chzzk-stream-cache";
 import { loadStoredVolume, saveStoredVolume } from "./volume-storage";
 import { useClipTitle } from "@/hooks/useClipTitle";
 import { formatClipTime } from "@/shared/utils/clip-time";
@@ -144,11 +144,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
 
   const containerRef = useRef<HTMLDivElement>(null);
   const ytMountRef = useRef<HTMLDivElement>(null);
-  // 치지직 <video>는 프리버퍼 모듈이 만들어 넘겨준 요소를 이 컨테이너에 append한다
-  // (프리버퍼된 요소를 그대로 재사용 → 매끄러운 전환). React가 소유하는 건 컨테이너뿐.
-  const chzzkMountRef = useRef<HTMLDivElement>(null);
-  const chzzkVideoRef = useRef<HTMLVideoElement | null>(null);
-  const chzzkListenerCleanupRef = useRef<(() => void) | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const adapterRef = useRef<PlayerAdapter | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const rafRef = useRef<number>(0);
@@ -313,99 +309,112 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       };
     }
 
-    // ── chzzk: 네이티브 <video> (프리버퍼 재사용) ──
-    // 다음곡으로 미리 버퍼된 요소가 있으면 그대로 넘겨받아 즉시 이어 재생(gapless).
-    // 없으면 같은 준비 경로(prepareChzzkMedia)로 새로 만든다. HLS/MP4 해석·seek·버퍼는
-    // chzzk-prebuffer 모듈이 담당(관심사 분리) — 여기선 요소를 붙이고 재생만 한다.
+    // ── chzzk: HLS ──
     const videoNo = videoId;
-    const mount = chzzkMountRef.current;
-    if (!mount) return;
+    const video = videoRef.current;
+    if (!video) return;
 
-    const taken = takePrebufferedChzzk(videoNo, startTime);
-    const mediaPromise =
-      taken ?? prepareChzzkMedia(videoNo, startTime, { muted: volumeRef.current.muted });
+    const setupAdapter = () => {
+      adapterRef.current = {
+        play: () => void video.play(),
+        pause: () => video.pause(),
+        seekTo: (s) => {
+          video.currentTime = s;
+        },
+        getCurrentTime: () => video.currentTime,
+        getDuration: () => video.duration || 0,
+        setVolume: (v) => {
+          video.volume = v;
+        },
+        setMuted: (m) => {
+          video.muted = m;
+        },
+      };
+    };
 
-    mediaPromise
-      .then((media) => {
-        if (cancelled) {
-          destroyPreparedMedia(media);
+    const onLoaded = () => {
+      if (cancelled) return;
+      setupAdapter();
+      video.currentTime = startTime;
+      if (validEndTime == null && video.duration) {
+        setClipDuration(Math.max(0, video.duration - startTime));
+      }
+      // 저장된 음량 설정 적용 (영상 전환 시에도 유지)
+      video.volume = volumeRef.current.volume;
+      video.muted = volumeRef.current.muted;
+      setReady(true);
+      void video.play(); // activated일 때만 도는 effect → 항상 재생
+    };
+
+    // 캐시 우선 로더 사용 — 다음 곡 prefetch가 채운 스트림 정보를 재사용해 전환 지연을 줄인다.
+    loadChzzkStream(videoNo)
+      .then(({ streamUrl, streamType, videoTitle, mp4Url: resolvedMp4 }) => {
+        if (cancelled) return;
+        if (videoTitle) setVodTitle(videoTitle);
+
+        // 영구 보존 VOD: vodplay 토큰이 호출 IP에 묶이므로 브라우저가 직접 MP4 URL을 받는다.
+        // (loadChzzkStream이 vod의 mp4Url을 미리 해석해둔다)
+        const mp4Url: string | null = streamType === 'mp4' ? streamUrl : resolvedMp4 ?? null;
+        if (streamType === 'vod' && !mp4Url) {
+          setError("재생할 수 있는 영상이 아닙니다.");
           return;
         }
-        const video = media.video;
-        chzzkVideoRef.current = video;
-        hlsRef.current = media.hls;
-        if (media.videoTitle) setVodTitle(media.videoTitle);
 
-        video.className = "absolute inset-0 w-full h-full";
-        video.playsInline = true;
-        mount.appendChild(video);
-
-        adapterRef.current = {
-          play: () => void video.play(),
-          pause: () => video.pause(),
-          seekTo: (s) => {
-            video.currentTime = s;
-          },
-          getCurrentTime: () => video.currentTime,
-          getDuration: () => video.duration || 0,
-          setVolume: (v) => {
-            video.volume = v;
-          },
-          setMuted: (m) => {
-            video.muted = m;
-          },
-        };
-
-        // 저장된 음량 설정 적용 (프리버퍼는 무음이었을 수 있음)
-        video.volume = volumeRef.current.volume;
-        video.muted = volumeRef.current.muted;
-        if (validEndTime == null && video.duration) {
-          setClipDuration(Math.max(0, video.duration - startTime));
+        // progressive MP4 — 네이티브 재생 (Range 시킹 지원)
+        if (mp4Url) {
+          video.src = mp4Url;
+          video.addEventListener("loadedmetadata", onLoaded, { once: true });
+          return;
         }
-        // 준비 단계에서 startTime으로 seek됨. 어긋나면 보정.
-        if (Math.abs(video.currentTime - startTime) > 1) video.currentTime = startTime;
 
-        const onPlay = () => {
-          setPlaying(true);
-          setEnded(false);
-          setStarted(true);
-        };
-        const onPause = () => setPlaying(false);
-        const onVideoEnded = () => {
-          setPlaying(false);
-          setEnded(true);
-          if (!endedRef.current) {
-            endedRef.current = true;
-            onEndedRef.current?.();
-          }
-        };
-        video.addEventListener("play", onPlay);
-        video.addEventListener("pause", onPause);
-        video.addEventListener("ended", onVideoEnded);
-        chzzkListenerCleanupRef.current = () => {
-          video.removeEventListener("play", onPlay);
-          video.removeEventListener("pause", onPause);
-          video.removeEventListener("ended", onVideoEnded);
-        };
-
-        setReady(true);
-        void video.play(); // activated일 때만 도는 effect → 항상 재생
+        if (Hls.isSupported()) {
+          const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+          hls.loadSource(streamUrl);
+          hls.attachMedia(video);
+          hls.on(Hls.Events.MANIFEST_PARSED, onLoaded);
+          hls.on(Hls.Events.ERROR, (_e, data) => {
+            if (!data.fatal) return;
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+            else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+            else setError("재생 중 오류가 발생했습니다.");
+          });
+          hlsRef.current = hls;
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          video.src = streamUrl;
+          video.addEventListener("loadedmetadata", onLoaded, { once: true });
+        } else {
+          setError("이 브라우저는 HLS 재생을 지원하지 않습니다.");
+        }
       })
       .catch((err) => {
-        if (!cancelled) setError(err?.message || "영상을 로드할 수 없습니다.");
+        if (!cancelled) setError(err.message || "영상을 로드할 수 없습니다.");
       });
+
+    const onPlay = () => {
+      setPlaying(true);
+      setEnded(false);
+      setStarted(true);
+    };
+    const onPause = () => setPlaying(false);
+    const onVideoEnded = () => {
+      setPlaying(false);
+      setEnded(true);
+      if (!endedRef.current) {
+        endedRef.current = true;
+        onEndedRef.current?.();
+      }
+    };
+    video.addEventListener("play", onPlay);
+    video.addEventListener("pause", onPause);
+    video.addEventListener("ended", onVideoEnded);
 
     return () => {
       cancelled = true;
       adapterRef.current = null;
-      chzzkListenerCleanupRef.current?.();
-      chzzkListenerCleanupRef.current = null;
-      // 현재 재생 요소와 HLS 정리 (아직 미해결이면 위 .then의 cancelled 분기가 정리).
-      // 프리버퍼 슬롯은 별도 관리(discardPrebuffered).
-      if (chzzkVideoRef.current) {
-        destroyPreparedMedia({ video: chzzkVideoRef.current, hls: hlsRef.current });
-      }
-      chzzkVideoRef.current = null;
+      video.removeEventListener("play", onPlay);
+      video.removeEventListener("pause", onPause);
+      video.removeEventListener("ended", onVideoEnded);
+      hlsRef.current?.destroy();
       hlsRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -676,15 +685,15 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       onTouchStart={showControls}
     >
       {/* 영상 영역 — 네이티브 UI 없이 렌더.
-          유튜브: ytMountRef 내부 host 노드(iframe으로 교체), 치지직: chzzkMountRef 내부에
-          프리버퍼 모듈이 만든 <video>를 append. 둘 다 React 가상DOM 밖이라 언마운트 충돌 없음. */}
+          ytMountRef는 React가 소유하는 빈 컨테이너. 내부 host 노드(YouTube가 iframe으로
+          교체)는 React 가상DOM 밖이라 자식으로 추적되지 않는다 → 언마운트 충돌 없음. */}
       {platform === "youtube" ? (
         <div
           ref={ytMountRef}
           className="absolute inset-0 [&>div]:w-full [&>div]:h-full [&>iframe]:w-full [&>iframe]:h-full"
         />
       ) : (
-        <div ref={chzzkMountRef} className="absolute inset-0" />
+        <video ref={videoRef} className="absolute inset-0 w-full h-full" playsInline />
       )}
 
       {/* facade: 활성화 전 — 포스터(유튜브 썸네일 / 치지직 정보) + 재생버튼.
