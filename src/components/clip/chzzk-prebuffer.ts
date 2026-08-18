@@ -21,6 +21,23 @@ const PREBUFFER_LEAD_SEC = 6;
 const LOAD_TIMEOUT_MS = 15_000;
 const BUFFER_TIMEOUT_MS = 8_000;
 
+/**
+ * 화면 밖(1px) 이지만 **문서에 연결된** 버퍼링용 호스트.
+ * 브라우저는 DOM에 연결되지 않은 <video>의 미디어 로딩을 스로틀/디프리오리티하므로,
+ * 준비 단계의 <video>도 항상 연결 상태로 두어 정상 우선순위로 버퍼링되게 한다.
+ * (display:none이 아니라 offscreen 1px — display:none은 일부 브라우저가 미디어를 멈춘다)
+ */
+let bufferHost: HTMLDivElement | null = null;
+function getBufferHost(): HTMLDivElement {
+  if (bufferHost && bufferHost.isConnected) return bufferHost;
+  bufferHost = document.createElement('div');
+  bufferHost.setAttribute('aria-hidden', 'true');
+  bufferHost.style.cssText =
+    'position:fixed;left:-9999px;top:0;width:1px;height:1px;overflow:hidden;pointer-events:none;opacity:0;';
+  document.body.appendChild(bufferHost);
+  return bufferHost;
+}
+
 function waitEvent(target: HTMLVideoElement, ev: string, timeoutMs: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const to = setTimeout(() => {
@@ -78,6 +95,8 @@ export async function prepareChzzkMedia(
   video.playsInline = true;
   video.preload = 'auto';
   video.muted = opts?.muted ?? false;
+  // 준비 동안 문서에 연결해 정상 우선순위로 버퍼링 (재생 시 호출자가 플레이어로 이동)
+  getBufferHost().appendChild(video);
 
   const mp4 = stream.streamType === 'mp4' ? stream.streamUrl : stream.mp4Url ?? null;
   let hls: Hls | null = null;
