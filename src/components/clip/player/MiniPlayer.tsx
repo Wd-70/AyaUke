@@ -13,7 +13,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { useClipPlayer } from './ClipPlayerProvider';
 import { clipArtwork } from './types';
-import { prefetchChzzkStream } from '../chzzk-stream-cache';
+import { prebufferChzzk, discardPrebuffered } from '../chzzk-prebuffer';
 
 // ClipPlayer(및 hls.js)는 무겁다. 레이아웃 상주 컴포넌트라 모든 페이지 공용 번들에
 // 들어가지 않도록, 실제 재생이 시작될 때만 지연 로드한다.
@@ -127,6 +127,12 @@ export default function MiniPlayer() {
   const bgSupported = current.platform === 'chzzk';
   const bgArtwork = clipArtwork(current);
 
+  // 닫을 때 대기 중인 프리버퍼도 폐기해 숨은 <video> 버퍼링을 멈춘다.
+  const handleClose = () => {
+    discardPrebuffered();
+    close();
+  };
+
   // 종료 임박 시 다음 곡 리소스를 미리 워밍 (프리커넥트 + 썸네일 + 치지직 HLS 해석).
   // 유튜브 iframe 특성상 완전한 gapless는 어렵지만 전환 지연을 줄인다. 현재 곡당 1회.
   const warmNext = () => {
@@ -146,9 +152,9 @@ export default function MiniPlayer() {
         preconnect('https://i.ytimg.com');
         preconnect('https://googlevideo.com');
       } else {
-        // 치지직: 스트림 정보(+vod면 MP4 URL)를 미리 받아 캐시에 넣어둔다.
-        // 실제 플레이어 마운트 시 이 캐시를 재사용해 조회 라운드트립을 건너뛴다.
-        prefetchChzzkStream(clip.videoId);
+        // 치지직: 다음 곡을 숨은 <video>로 미리 버퍼링(무음). 실제 전환 시 이 요소를
+        // 그대로 넘겨받아 startTime부터 바로 이어 재생 → 매끄러운(gapless) 전환.
+        prebufferChzzk(clip.videoId, clip.startTime);
       }
     } catch {
       /* 무시 */
@@ -190,7 +196,7 @@ export default function MiniPlayer() {
               지금 재생 중
             </span>
             <button
-              onClick={close}
+              onClick={handleClose}
               className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
               aria-label="플레이어 닫기"
             >
@@ -382,7 +388,7 @@ export default function MiniPlayer() {
           <button onClick={() => setExpanded(true)} aria-label="펼치기" className="p-1.5 text-light-text/60 dark:text-dark-text/60">
             <ChevronUpIcon className="h-5 w-5" />
           </button>
-          <button onClick={close} aria-label="닫기" className="p-1.5 text-light-text/60 dark:text-dark-text/60">
+          <button onClick={handleClose} aria-label="닫기" className="p-1.5 text-light-text/60 dark:text-dark-text/60">
             <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
