@@ -10,6 +10,7 @@ import { ToastProvider } from "@/components/Toast";
 import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
 import { ClipPlayerProvider } from "@/components/clip/player/ClipPlayerProvider";
 import MiniPlayer from "@/components/clip/player/MiniPlayer";
+import PlayerQueueSync from "@/components/clip/player/PlayerQueueSync";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -84,6 +85,7 @@ export default function RootLayout({
               <ClipPlayerProvider>
                 {children}
                 <MiniPlayer />
+                <PlayerQueueSync />
               </ClipPlayerProvider>
             </ToastProvider>
           </QueryProvider>

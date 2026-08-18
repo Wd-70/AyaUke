@@ -30,8 +30,15 @@ interface ClipPlayerContextValue {
   hasPrev: boolean;
   /** 같은 곡을 강제로 다시 마운트/재생하기 위한 nonce (한곡반복용). ClipPlayer key에 포함 */
   playNonce: number;
-  playQueue: (clips: PlayerClip[], startIndex?: number, opts?: { shuffle?: boolean }) => void;
+  playQueue: (clips: PlayerClip[], startIndex?: number, opts?: { shuffle?: boolean; sourceId?: string }) => void;
   playAt: (queueIndex: number) => void;
+  /** 현재 재생 중인 큐의 출처(플레이리스트) id. 라이브 반영 대상 판별용 */
+  currentSourceId: string | null;
+  /**
+   * 재생 중인 큐를 새 클립 목록으로 즉시 갱신 (관리/추가 반영). sourceId가 현재 출처와 같을 때만 적용.
+   * 현재 재생 중 clipId를 유지하므로 ClipPlayer가 remount되지 않아 재생이 끊기지 않는다.
+   */
+  syncQueue: (sourceId: string, clips: PlayerClip[]) => void;
   next: () => void;
   prev: () => void;
   handleEnded: () => void;
@@ -70,8 +77,15 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
   const [repeat, setRepeat] = useState<RepeatMode>('off');
   const [playNonce, setPlayNonce] = useState(0);
   const playerRef = useRef<ClipPlayerHandle | null>(null);
-  // handleEnded가 stale 없이 현재 위치를 읽도록 매 렌더 갱신하는 ref (deps 최소화)
+  const [sourceId, setSourceId] = useState<string | null>(null);
+  // handleEnded/syncQueue가 stale 없이 현재 상태를 읽도록 매 렌더 갱신하는 ref (deps 최소화)
   const clampedPosRef = useRef(0);
+  const queueRef = useRef<PlayerClip[]>([]);
+  const orderRef = useRef<number[]>([]);
+  const shuffleRef = useRef(false);
+  const sourceRef = useRef<string | null>(null);
+  shuffleRef.current = shuffle;
+  sourceRef.current = sourceId;
 
   // 셔플/반복 설정을 로컬에 저장·복원 (하이드레이션 불일치 방지 위해 마운트 후 로드)
   useEffect(() => {
@@ -95,12 +109,13 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
   }, [repeat]);
 
   const playQueue = useCallback(
-    (clips: PlayerClip[], startIndex = 0, opts?: { shuffle?: boolean }) => {
+    (clips: PlayerClip[], startIndex = 0, opts?: { shuffle?: boolean; sourceId?: string }) => {
       if (clips.length === 0) return;
       const start = Math.max(0, Math.min(startIndex, clips.length - 1));
       const useShuffle = opts?.shuffle ?? shuffle;
       if (opts?.shuffle !== undefined && opts.shuffle !== shuffle) setShuffle(opts.shuffle);
       setHasInteracted(true);
+      setSourceId(opts?.sourceId ?? null);
       setQueue(clips);
       setOrder(useShuffle ? shuffledOrder(clips.length, start) : identityOrder(clips.length));
       setPos(useShuffle ? 0 : start);
@@ -108,6 +123,36 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
     },
     [shuffle],
   );
+
+  // 재생 중인 큐를 즉시 갱신 (관리/추가 반영). 현재 재생 곡 clipId를 유지 → remount 없음.
+  const syncQueue = useCallback((sid: string, newClips: PlayerClip[]) => {
+    if (!sourceRef.current || sid !== sourceRef.current) return;
+    const curOrder = orderRef.current;
+    const curPos = curOrder.length > 0 ? Math.min(clampedPosRef.current, curOrder.length - 1) : 0;
+    const curId = queueRef.current[curOrder[curPos]]?.clipId;
+
+    let finalClips = newClips;
+    // 현재 재생 곡이 새 목록에 없으면(현재 곡 제거) 재생 끊김 방지 위해 유지
+    if (curId && !newClips.some((c) => c.clipId === curId)) {
+      const cur = queueRef.current.find((c) => c.clipId === curId);
+      if (cur) finalClips = [...newClips, cur];
+    }
+    if (finalClips.length === 0) {
+      close();
+      return;
+    }
+    const curIdx = curId ? Math.max(0, finalClips.findIndex((c) => c.clipId === curId)) : 0;
+    setQueue(finalClips);
+    if (shuffleRef.current) {
+      setOrder(shuffledOrder(finalClips.length, curIdx));
+      setPos(0);
+    } else {
+      setOrder(identityOrder(finalClips.length));
+      setPos(curIdx);
+    }
+    // playNonce는 건드리지 않음 — 현재 곡 clipId가 같으면 ClipPlayer key 불변 → 재생 유지
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const playAt = useCallback(
     (queueIndex: number) => {
@@ -183,10 +228,13 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
     setPos(0);
     setExpanded(false);
     setPlaying(false);
+    setSourceId(null);
   }, []);
 
   const clampedPos = order.length > 0 ? Math.min(pos, order.length - 1) : 0;
   clampedPosRef.current = clampedPos;
+  queueRef.current = queue;
+  orderRef.current = order;
   const currentIndex = order[clampedPos] ?? 0;
   const current = queue[currentIndex] ?? null;
   const hasNext = clampedPos < order.length - 1 || repeat === 'all';
@@ -216,6 +264,8 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
       playNonce,
       playQueue,
       playAt,
+      currentSourceId: sourceId,
+      syncQueue,
       next,
       prev,
       handleEnded,
@@ -229,8 +279,8 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
     }),
     [
       queue, currentIndex, current, nextClip, isExpanded, playing, hasInteracted, shuffle, repeat,
-      hasNext, hasPrev, playNonce, playQueue, playAt, next, prev, handleEnded, toggle,
-      toggleShuffle, cycleRepeat, close,
+      hasNext, hasPrev, playNonce, playQueue, playAt, sourceId, syncQueue, next, prev, handleEnded,
+      toggle, toggleShuffle, cycleRepeat, close,
     ],
   );
 

@@ -19,6 +19,11 @@ import {
   ArrowsUpDownIcon,
   InformationCircleIcon,
   ArrowsRightLeftIcon,
+  PencilIcon,
+  CheckIcon,
+  XMarkIcon,
+  ArrowUturnLeftIcon,
+  ArrowUturnRightIcon,
 } from '@heroicons/react/24/outline'
 
 interface ClipItem {
@@ -70,18 +75,24 @@ const fmtDur = (start?: number, end?: number) => {
 
 export default function ClipPlaylistDetailView({ data, shareId }: Props) {
   const { showSuccess, showError } = useToast()
-  const { playQueue, current } = useClipPlayer()
+  const { playQueue, syncQueue, current } = useClipPlayer()
   const { playlist, isOwner } = data
 
+  const clipKey = (c: ClipItem) => c.id || c._id || ''
+  const initialClips = () => playlist.clips.map((c) => c.clipId).filter((c): c is ClipItem => !!c)
+
   // 클립 목록(소유자 편집 반영용 로컬 상태). clipId가 null(삭제된 클립)인 항목은 제외.
-  const [clips, setClips] = useState<ClipItem[]>(
-    () => playlist.clips.map((c) => c.clipId).filter((c): c is ClipItem => !!c),
-  )
+  const [clips, setClips] = useState<ClipItem[]>(initialClips)
   const [isPublic, setIsPublic] = useState(!!playlist.isPublic)
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
-
-  const clipKey = (c: ClipItem) => c.id || c._id || ''
+  // 이름 편집
+  const [name, setName] = useState(playlist.name)
+  const [editingName, setEditingName] = useState(false)
+  const [draftName, setDraftName] = useState(playlist.name)
+  // 되돌리기/다시실행 (클립 목록 상태 스냅샷 스택 — 삭제·순서변경·추가 모두 목록 교체로 통일)
+  const [history, setHistory] = useState<ClipItem[][]>(() => [initialClips()])
+  const [histPtr, setHistPtr] = useState(0)
 
   // 재생 큐(PlayerClip) — null(재생불가/필드누락)은 제외. 행→큐 인덱스 매핑용으로 병렬 배열 유지.
   const playerClips = useMemo(() => clips.map((c) => toPlayerClip(c)), [clips])
@@ -93,27 +104,60 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
       return
     }
     const qIndex = playerClips.slice(0, rowIndex).filter(Boolean).length
-    playQueue(queue, qIndex, opts)
+    playQueue(queue, qIndex, { ...opts, sourceId: playlist._id })
   }
 
-  // ── 소유자 작업 ──────────────────────────────────────────────
-  const removeClip = async (clipId: string) => {
-    const res = await fetch(`/api/clip-playlists/${playlist._id}/clips?clipId=${clipId}`, { method: 'DELETE' })
-    if (!res.ok) {
-      showError('제거 실패', '클립을 제거하지 못했습니다.')
-      return
-    }
-    setClips((prev) => prev.filter((c) => clipKey(c) !== clipId))
-    showSuccess('제거됨', '클립을 플레이리스트에서 제거했습니다.')
-  }
-
-  const persistOrder = async (next: ClipItem[]) => {
+  // ── 서버 반영: 목록 전체를 PUT(추가·제거·정렬을 한 번에) ──
+  const persist = async (next: ClipItem[]) => {
     const res = await fetch(`/api/clip-playlists/${playlist._id}/clips`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ clips: next.map((c) => ({ clipId: clipKey(c) })) }),
     })
-    if (!res.ok) showError('순서 변경 실패', '잠시 후 다시 시도해주세요.')
+    if (!res.ok) showError('반영 실패', '변경을 저장하지 못했습니다. 잠시 후 다시 시도해주세요.')
+  }
+
+  // 재생 중인 플레이어에 즉시 반영 (현재 곡 유지 → 재생 안 끊김)
+  const syncPlayer = (next: ClipItem[]) => {
+    syncQueue(
+      playlist._id,
+      next.map((c) => toPlayerClip(c)).filter((c): c is PlayerClip => !!c),
+    )
+  }
+
+  // 모든 편집(삭제/순서변경/추가복원)을 목록 상태 교체로 통일 — 낙관적 + 히스토리 기록 + 서버·플레이어 반영
+  const commit = (next: ClipItem[]) => {
+    setClips(next)
+    setHistory((h) => [...h.slice(0, histPtr + 1), next])
+    setHistPtr((p) => p + 1)
+    void persist(next)
+    syncPlayer(next)
+  }
+
+  const applySnapshot = (snap: ClipItem[]) => {
+    setClips(snap)
+    void persist(snap)
+    syncPlayer(snap)
+  }
+
+  const canUndo = histPtr > 0
+  const canRedo = histPtr < history.length - 1
+  const undo = () => {
+    if (!canUndo) return
+    const target = history[histPtr - 1]
+    setHistPtr(histPtr - 1)
+    applySnapshot(target)
+  }
+  const redo = () => {
+    if (!canRedo) return
+    const target = history[histPtr + 1]
+    setHistPtr(histPtr + 1)
+    applySnapshot(target)
+  }
+
+  // ── 소유자 작업 (낙관적 — 즉시 반영, 서버는 뒤에서) ──
+  const removeClip = (clipId: string) => {
+    commit(clips.filter((c) => clipKey(c) !== clipId))
   }
 
   const moveClip = (from: number, to: number) => {
@@ -121,8 +165,33 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
     const next = [...clips]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-    setClips(next)
-    void persistOrder(next)
+    commit(next)
+  }
+
+  // ── 이름 편집 ──
+  const saveName = async () => {
+    const trimmed = draftName.trim()
+    if (!trimmed || trimmed === name) {
+      setEditingName(false)
+      setDraftName(name)
+      return
+    }
+    const prev = name
+    setName(trimmed)
+    setEditingName(false)
+    const res = await fetch(`/api/clip-playlists/${playlist._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmed }),
+    })
+    if (!res.ok) {
+      const j = await res.json().catch(() => null)
+      showError('이름 변경 실패', j?.error?.message || '같은 이름이 이미 있거나 저장에 실패했습니다.')
+      setName(prev)
+      setDraftName(prev)
+    } else {
+      showSuccess('이름 변경됨', `"${trimmed}"으로 변경했습니다.`)
+    }
   }
 
   // ── 드래그 순서 변경 ─────────────────────────────────────────
@@ -164,8 +233,42 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
         {/* 헤더 */}
         <div className="mb-6">
           <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="truncate text-2xl font-bold">{playlist.name}</h1>
+            <div className="min-w-0 flex-1">
+              {editingName ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    autoFocus
+                    value={draftName}
+                    onChange={(e) => setDraftName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveName()
+                      else if (e.key === 'Escape') { setEditingName(false); setDraftName(name) }
+                    }}
+                    maxLength={100}
+                    className="min-w-0 flex-1 rounded-lg border border-light-primary/30 bg-white px-2 py-1 text-xl font-bold text-light-text focus:border-light-accent focus:outline-none dark:border-dark-primary/30 dark:bg-gray-800 dark:text-dark-text"
+                  />
+                  <button onClick={saveName} aria-label="이름 저장" className="rounded p-1.5 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400">
+                    <CheckIcon className="h-5 w-5" />
+                  </button>
+                  <button onClick={() => { setEditingName(false); setDraftName(name) }} aria-label="취소" className="rounded p-1.5 text-light-text/50 hover:bg-light-primary/10 dark:text-dark-text/50">
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h1 className="truncate text-2xl font-bold">{name}</h1>
+                  {isOwner && (
+                    <button
+                      onClick={() => { setDraftName(name); setEditingName(true) }}
+                      aria-label="이름 수정"
+                      title="이름 수정"
+                      className="shrink-0 rounded p-1 text-light-text/40 transition-colors hover:text-light-accent dark:text-dark-text/40 dark:hover:text-dark-accent"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              )}
               {playlist.description && (
                 <p className="mt-1 whitespace-pre-line text-sm text-light-text/60 dark:text-dark-text/60">{playlist.description}</p>
               )}
@@ -173,6 +276,26 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
             </div>
             {isOwner && (
               <div className="flex shrink-0 items-center gap-2">
+                <div className="flex items-center rounded-lg border border-light-primary/20 dark:border-dark-primary/20">
+                  <button
+                    onClick={undo}
+                    disabled={!canUndo}
+                    aria-label="되돌리기"
+                    title="되돌리기"
+                    className="p-2 text-light-text/60 transition-colors hover:text-light-accent disabled:opacity-30 dark:text-dark-text/60 dark:hover:text-dark-accent"
+                  >
+                    <ArrowUturnLeftIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={redo}
+                    disabled={!canRedo}
+                    aria-label="다시 실행"
+                    title="다시 실행"
+                    className="border-l border-light-primary/20 p-2 text-light-text/60 transition-colors hover:text-light-accent disabled:opacity-30 dark:border-dark-primary/20 dark:text-dark-text/60 dark:hover:text-dark-accent"
+                  >
+                    <ArrowUturnRightIcon className="h-4 w-4" />
+                  </button>
+                </div>
                 <button
                   onClick={togglePublic}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-light-primary/20 px-3 py-1.5 text-sm transition-colors hover:border-light-accent/40 dark:border-dark-primary/20"
