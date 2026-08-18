@@ -192,6 +192,8 @@ export async function POST(request: NextRequest) {
           songId,
           title: song.title,
           artist: song.artist,
+          titleAlias: song.titleAlias || undefined,
+          artistAlias: song.artistAlias || undefined,
           platform: videoData.platform,
           videoUrl,
           videoId: videoData.videoId,

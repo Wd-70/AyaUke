@@ -6,8 +6,10 @@ export interface ISongVideo extends Document {
   /** 공개 URL용 불투명 식별자(/clip/[shareId]) — 내부 _id 노출 방지 */
   shareId?: string;
   songId: string; // SongDetail의 _id와 연결
-  title: string; // 곡 제목 (검색용)
-  artist: string; // 아티스트 (검색용)
+  title: string; // 곡 제목 (검색용/원본)
+  artist: string; // 아티스트 (검색용/원본)
+  titleAlias?: string; // 표시용 별칭 (SongDetail에서 비정규화, 있으면 우선 표시)
+  artistAlias?: string; // 표시용 별칭 (SongDetail에서 비정규화, 있으면 우선 표시)
   platform: VideoPlatform; // 'youtube' | 'chzzk' (기존 데이터는 default youtube)
   videoUrl: string; // 유튜브 URL 또는 치지직 다시보기 URL
   videoId: string; // 플랫폼별 영상 ID (치지직은 String(videoNo))
@@ -56,6 +58,14 @@ const SongVideoSchema: Schema = new Schema({
     required: true,
     trim: true,
     index: true,
+  },
+  titleAlias: {
+    type: String,
+    trim: true,
+  },
+  artistAlias: {
+    type: String,
+    trim: true,
   },
   platform: {
     type: String,

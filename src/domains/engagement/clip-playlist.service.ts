@@ -12,7 +12,7 @@ import { AppError, NotFoundError, ConflictError, ValidationError } from '@/share
 
 // 표시용으로 노출할 클립(SongVideo) 필드
 const CLIP_FIELDS =
-  'songId title artist platform videoUrl videoId sungDate startTime endTime thumbnailUrl description sourceUnavailable likeCount'
+  'songId title artist titleAlias artistAlias platform videoUrl videoId sungDate startTime endTime thumbnailUrl description sourceUnavailable likeCount'
 
 export interface ClipPlaylistInput {
   name: string
@@ -242,12 +242,18 @@ export async function getSharedClipPlaylist(shareId: string, viewerChannelId: st
           toObject: () => object
           clipId: { toObject: () => object; _id: unknown } | null
         }
-        return {
-          ...item.toObject(),
-          clipId: item.clipId
-            ? { ...item.clipId.toObject(), id: String(item.clipId._id) }
-            : null,
+        let clip: Record<string, unknown> | null = null
+        if (item.clipId) {
+          const obj = item.clipId.toObject() as Record<string, unknown>
+          // 표시용: 별칭 우선 (노래책과 일관). title/artist를 표시 이름으로 치환.
+          clip = {
+            ...obj,
+            id: String(item.clipId._id),
+            title: (obj.titleAlias as string) || (obj.title as string) || '',
+            artist: (obj.artistAlias as string) || (obj.artist as string) || '',
+          }
         }
+        return { ...item.toObject(), clipId: clip }
       }),
       clipCount: playlist.clips.length,
       createdAt: playlist.createdAt,

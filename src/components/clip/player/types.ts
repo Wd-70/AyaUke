@@ -25,8 +25,9 @@ export function toPlayerClip(raw: unknown): PlayerClip | null {
   if (c.sourceUnavailable) return null;
   return {
     clipId: String(id),
-    title: (c.title as string) || '제목 없음',
-    artist: (c.artist as string) || '',
+    // 표시용: 별칭(titleAlias/artistAlias) 우선 — 노래책과 일관
+    title: (c.titleAlias as string) || (c.title as string) || '제목 없음',
+    artist: (c.artistAlias as string) || (c.artist as string) || '',
     platform,
     videoId,
     startTime: typeof c.startTime === 'number' ? c.startTime : 0,

@@ -71,7 +71,7 @@ export interface PublicClipSummary {
   playCount: number;
 }
 
-const SUMMARY_FIELDS = 'shareId songId title artist platform sungDate thumbnailUrl isVerified likeCount playCount';
+const SUMMARY_FIELDS = 'shareId songId title artist titleAlias artistAlias platform sungDate thumbnailUrl isVerified likeCount playCount';
 
 /** 표시용 날짜 라벨 (KST YYYY.MM.DD) */
 function toDateLabel(d: Date | string | undefined): string | null {
@@ -94,8 +94,9 @@ function toClipSummary(c: Record<string, unknown>): PublicClipSummary {
     id: String(c._id),
     shareId: String(c.shareId ?? c._id),
     songId: String(c.songId ?? ''),
-    title: String(c.title ?? ''),
-    artist: String(c.artist ?? ''),
+    // 표시용: 별칭(titleAlias/artistAlias) 우선 — 노래책과 일관 (검색은 원본 title/artist 유지)
+    title: String(c.titleAlias || c.title || ''),
+    artist: String(c.artistAlias || c.artist || ''),
     platform: (c.platform as 'youtube' | 'chzzk') || 'youtube',
     sungDate: sungDate ? new Date(sungDate).toISOString() : null,
     sungDateLabel: toDateLabel(sungDate),
@@ -184,7 +185,7 @@ export async function listPublicClips({
   if (verified) match.isVerified = true;
   if (q && q.trim()) {
     const re = new RegExp(escapeRe(q.trim()), 'i');
-    match.$or = [{ title: re }, { artist: re }];
+    match.$or = [{ title: re }, { artist: re }, { titleAlias: re }, { artistAlias: re }];
   }
 
   const safeLimit = Math.min(Math.max(limit, 1), 48);
@@ -243,8 +244,9 @@ export async function getPublicClip(idOrShareId: string): Promise<PublicClipDTO 
     id: String(clip._id),
     shareId: String(clip.shareId ?? clip._id),
     songId: String(clip.songId),
-    title: String(clip.title ?? ''),
-    artist: String(clip.artist ?? ''),
+    // 표시용: 별칭 우선 (노래책과 일관)
+    title: String(clip.titleAlias || clip.title || ''),
+    artist: String(clip.artistAlias || clip.artist || ''),
     platform: (clip.platform as 'youtube' | 'chzzk') || 'youtube',
     videoId: String(clip.videoId),
     startTime: (clip.startTime as number) || 0,
@@ -354,7 +356,7 @@ export async function listSongsWithClips({ page, limit, search, sortBy = 'recent
   const match: Record<string, unknown> = {};
   if (search) {
     const regex = new RegExp(escapeRegex(search.trim()), 'i');
-    match.$or = [{ title: regex }, { artist: regex }];
+    match.$or = [{ title: regex }, { artist: regex }, { titleAlias: regex }, { artistAlias: regex }];
   }
 
   const sortStage: Record<string, 1 | -1> =
@@ -465,7 +467,7 @@ export async function listClips(query: ClipsQuery) {
   if (addedBy) match.addedByName = new RegExp(`^${escapeRegex(addedBy)}$`, 'i');
   if (search) {
     const regex = new RegExp(escapeRegex(search.trim()), 'i');
-    match.$or = [{ title: regex }, { artist: regex }, { addedByName: regex }, { description: regex }];
+    match.$or = [{ title: regex }, { artist: regex }, { titleAlias: regex }, { artistAlias: regex }, { addedByName: regex }, { description: regex }];
   }
 
   const [result] = await SongVideo.aggregate([
