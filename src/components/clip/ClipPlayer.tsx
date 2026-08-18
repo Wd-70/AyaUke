@@ -22,6 +22,7 @@ import {
 import { CalendarDaysIcon, UserIcon } from "@heroicons/react/24/outline";
 import type { VideoPlatform } from "@/shared/utils/video-url";
 import { loadChzzkStream } from "./chzzk-stream-cache";
+import type { Mp4Rendition } from "@/shared/utils/chzzk-vod";
 import { loadStoredVolume, saveStoredVolume } from "./volume-storage";
 import { useClipTitle } from "@/hooks/useClipTitle";
 import { formatClipTime } from "@/shared/utils/clip-time";
@@ -233,14 +234,19 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   const [volume, setVolume] = useState(() => loadStoredVolume().volume);
   const [isFullscreen, setIsFullscreen] = useState(false);
   // ── 화질(치지직 HLS) / 라디오 모드 ──
+  // 화질 레벨(통합): HLS는 hls.levels, MP4(vod)는 화질별 렌디션을 같은 형태로 다룬다.
   const [hlsLevels, setHlsLevels] = useState<QualityLevel[]>([]);
-  const [hlsLevel, setHlsLevel] = useState<number>(-1); // -1 = 자동
+  const [hlsLevel, setHlsLevel] = useState<number>(-1); // -1 = 자동(HLS) / MP4는 실제 인덱스
+  const [qualityMode, setQualityMode] = useState<"hls" | "mp4" | "none">("none");
   const [showQuality, setShowQuality] = useState(false);
   const [radioMode, setRadioMode] = useState(false); // 하이드레이션 안전: 마운트 후 로드
   // 선호값을 스트림 로드 핸들러(effect 내)에서 최신값으로 읽기 위한 ref
   const qualityPrefRef = useRef<"auto" | number>("auto");
   const radioModeRef = useRef(false);
   radioModeRef.current = radioMode;
+  const qualityModeRef = useRef<"hls" | "mp4" | "none">("none");
+  qualityModeRef.current = qualityMode;
+  const mp4RenditionsRef = useRef<Mp4Rendition[]>([]); // MP4 화질별 URL (hlsLevels와 인덱스 정렬)
   const [clipPosition, setClipPosition] = useState(0); // 구간 상대 시간
   const [clipDuration, setClipDuration] = useState(
     validEndTime != null ? Math.max(0, validEndTime - startTime) : 0,
@@ -283,50 +289,74 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     setRadioMode(loadRadioPref());
   }, []);
 
-  // 레벨 목록이 준비되면 선호(라디오>저장화질>자동)를 hls에 적용
-  const applyPreferredLevel = useCallback((hls: Hls, levels: QualityLevel[]) => {
-    if (levels.length === 0) return;
-    let idx: number;
-    if (radioModeRef.current) idx = lowestLevelIndex(levels);
-    else if (qualityPrefRef.current !== "auto") idx = nearestLevelIndex(levels, qualityPrefRef.current);
-    else idx = -1;
-    hls.currentLevel = idx;
-    setHlsLevel(idx);
+  // 화질 인덱스 적용 (-1=자동). HLS는 hls.currentLevel, MP4는 화질별 URL로 src 교체(위치 유지).
+  const applyQualityIndex = useCallback((idx: number) => {
+    if (qualityModeRef.current === "hls") {
+      const hls = hlsRef.current;
+      if (hls) hls.currentLevel = idx; // -1 = 자동(ABR)
+      setHlsLevel(idx);
+      return;
+    }
+    if (qualityModeRef.current === "mp4") {
+      const rends = mp4RenditionsRef.current;
+      const realIdx = idx < 0 ? 0 : Math.min(idx, rends.length - 1); // MP4엔 자동 없음 → 최고화질
+      const rend = rends[realIdx];
+      const v = videoRef.current;
+      if (rend && v && !v.src.startsWith(rend.url.split("?")[0])) {
+        // 현재 위치·재생상태 보존하며 화질 URL 교체
+        const t = v.currentTime;
+        const wasPlaying = !v.paused && !v.ended;
+        v.src = rend.url;
+        const onMeta = () => {
+          v.currentTime = t;
+          if (wasPlaying) void v.play();
+        };
+        v.addEventListener("loadedmetadata", onMeta, { once: true });
+      }
+      setHlsLevel(realIdx);
+    }
   }, []);
+
+  // 레벨 준비 시 선호(라디오>저장화질>자동)를 적용
+  const applyPreferredLevel = useCallback(
+    (levels: QualityLevel[]) => {
+      if (levels.length === 0) return;
+      let idx: number;
+      if (radioModeRef.current) idx = lowestLevelIndex(levels);
+      else if (qualityPrefRef.current !== "auto") idx = nearestLevelIndex(levels, qualityPrefRef.current);
+      else idx = -1;
+      applyQualityIndex(idx);
+    },
+    [applyQualityIndex],
+  );
 
   // 사용자가 화질 선택 (index 또는 'auto')
   const changeQuality = useCallback(
     (choice: number | "auto") => {
-      const hls = hlsRef.current;
       const idx = choice === "auto" ? -1 : choice;
-      if (hls) hls.currentLevel = idx;
-      setHlsLevel(idx);
+      applyQualityIndex(idx);
       const pref = choice === "auto" ? "auto" : hlsLevels[choice]?.height ?? "auto";
       qualityPrefRef.current = pref;
       saveQualityPref(pref);
       setShowQuality(false);
     },
-    [hlsLevels],
+    [hlsLevels, applyQualityIndex],
   );
 
-  // 라디오 모드 토글 — 영상 UI 숨김 + (HLS)최저 화질로 데이터/디코드 최소화
+  // 라디오 모드 토글 — 영상 UI 숨김 + 최저 화질로 데이터/디코드 최소화(HLS·MP4 공통)
   const toggleRadio = useCallback(() => {
     const next = !radioModeRef.current;
     setRadioMode(next);
     saveRadioPref(next);
-    const hls = hlsRef.current;
-    if (hls && hlsLevels.length > 0) {
-      if (next) {
-        const idx = lowestLevelIndex(hlsLevels);
-        hls.currentLevel = idx;
-        setHlsLevel(idx);
-      } else {
-        const idx = qualityPrefRef.current !== "auto" ? nearestLevelIndex(hlsLevels, qualityPrefRef.current) : -1;
-        hls.currentLevel = idx;
-        setHlsLevel(idx);
-      }
+    if (hlsLevels.length > 0) {
+      const idx = next
+        ? lowestLevelIndex(hlsLevels)
+        : qualityPrefRef.current !== "auto"
+          ? nearestLevelIndex(hlsLevels, qualityPrefRef.current)
+          : -1;
+      applyQualityIndex(idx);
     }
-  }, [hlsLevels]);
+  }, [hlsLevels, applyQualityIndex]);
 
   // ── 플레이어 초기화 ──────────────────────────────────────────────
   useEffect(() => {
@@ -339,6 +369,8 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     setClipPosition(0);
     setHlsLevels([]);
     setShowQuality(false);
+    setQualityMode("none");
+    mp4RenditionsRef.current = [];
     // startTime/endTime이 (편집 등으로) 바뀌면 구간 길이도 재계산한다.
     // endTime이 없으면 0으로 두고 onReady/onLoaded에서 영상 길이 기준으로 채운다.
     // (이 줄이 없으면 같은 클립을 편집해 시간만 바꿀 때 진행바·시간표시가 옛값으로 남음)
@@ -477,21 +509,36 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
 
     // 캐시 우선 로더 사용 — 다음 곡 prefetch가 채운 스트림 정보를 재사용해 전환 지연을 줄인다.
     loadChzzkStream(videoNo)
-      .then(({ streamUrl, streamType, videoTitle, mp4Url: resolvedMp4 }) => {
+      .then(({ streamUrl, streamType, videoTitle, mp4Url: resolvedMp4, renditions }) => {
         if (cancelled) return;
         if (videoTitle) setVodTitle(videoTitle);
 
         // 영구 보존 VOD: vodplay 토큰이 호출 IP에 묶이므로 브라우저가 직접 MP4 URL을 받는다.
-        // (loadChzzkStream이 vod의 mp4Url을 미리 해석해둔다)
+        // (loadChzzkStream이 vod의 화질별 렌디션을 미리 해석해둔다)
         const mp4Url: string | null = streamType === 'mp4' ? streamUrl : resolvedMp4 ?? null;
         if (streamType === 'vod' && !mp4Url) {
           setError("재생할 수 있는 영상이 아닙니다.");
           return;
         }
 
-        // progressive MP4 — 네이티브 재생 (Range 시킹 지원)
+        // progressive MP4 — 네이티브 재생 (Range 시킹 지원). vod면 화질별 렌디션 노출.
         if (mp4Url) {
-          video.src = mp4Url;
+          const rends = renditions ?? [];
+          let srcUrl = mp4Url;
+          if (rends.length > 1) {
+            mp4RenditionsRef.current = rends;
+            const levels = rends.map((r) => ({ height: r.height, bitrate: r.bandwidth }));
+            setHlsLevels(levels);
+            setQualityMode("mp4");
+            qualityModeRef.current = "mp4";
+            // 선호 화질로 시작 URL 결정 (라디오>저장화질>최고). 처음부터 해당 화질로 로드해 재교체 회피.
+            let idx = 0;
+            if (radioModeRef.current) idx = lowestLevelIndex(levels);
+            else if (qualityPrefRef.current !== "auto") idx = nearestLevelIndex(levels, qualityPrefRef.current);
+            setHlsLevel(idx);
+            srcUrl = rends[idx].url;
+          }
+          video.src = srcUrl;
           video.addEventListener("loadedmetadata", onLoaded, { once: true });
           return;
         }
@@ -505,7 +552,9 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
             // 화질 레벨 노출 + 선호(라디오/저장화질/자동) 적용
             const levels = hls.levels.map((l) => ({ height: l.height, bitrate: l.bitrate }));
             setHlsLevels(levels);
-            applyPreferredLevel(hls, levels);
+            setQualityMode("hls");
+            qualityModeRef.current = "hls";
+            applyPreferredLevel(levels);
           });
           hls.on(Hls.Events.ERROR, (_e, data) => {
             if (!data.fatal) return;
@@ -1090,12 +1139,15 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
               </button>
               {showQuality && (
                 <div className="absolute bottom-full right-0 mb-2 min-w-[92px] max-h-48 overflow-y-auto rounded-lg bg-black/90 py-1 shadow-lg">
-                  <button
-                    onClick={() => changeQuality("auto")}
-                    className={`block w-full px-3 py-1.5 text-left text-xs hover:bg-white/10 ${hlsLevel === -1 ? "text-light-accent dark:text-dark-accent font-semibold" : "text-white/80"}`}
-                  >
-                    자동
-                  </button>
+                  {/* '자동'(ABR)은 HLS에서만 의미 있음. MP4는 화질별 URL 교체라 자동 없음 */}
+                  {qualityMode === "hls" && (
+                    <button
+                      onClick={() => changeQuality("auto")}
+                      className={`block w-full px-3 py-1.5 text-left text-xs hover:bg-white/10 ${hlsLevel === -1 ? "text-light-accent dark:text-dark-accent font-semibold" : "text-white/80"}`}
+                    >
+                      자동
+                    </button>
+                  )}
                   {hlsLevels.map((l, i) => (
                     <button
                       key={i}

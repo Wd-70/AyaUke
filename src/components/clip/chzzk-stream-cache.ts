@@ -1,4 +1,4 @@
-import { resolveVodMp4Url } from '@/shared/utils/chzzk-vod';
+import { resolveVodRenditions, type Mp4Rendition } from '@/shared/utils/chzzk-vod';
 
 /**
  * 치지직 다시보기 스트림 정보의 짧은 수명 클라이언트 캐시.
@@ -14,8 +14,10 @@ export interface ChzzkStream {
   videoTitle?: string;
   vodVideoId?: string;
   vodInKey?: string;
-  /** vod 타입일 때 해석된 진행형 MP4 URL (호출 IP에 묶임) */
+  /** vod 타입일 때 해석된 진행형 MP4 URL (최고 화질, 호출 IP에 묶임) */
   mp4Url?: string | null;
+  /** vod 타입일 때 화질별 렌디션 (화질 선택용, 높이 내림차순) */
+  renditions?: Mp4Rendition[];
 }
 
 const TTL_MS = 90_000;
@@ -29,11 +31,14 @@ async function fetchStream(videoNo: string): Promise<ChzzkStream> {
     throw new Error(result.error?.message || '영상 정보를 불러올 수 없습니다.');
   }
   const data = result.data as ChzzkStream;
-  // vod는 브라우저가 직접 받는 MP4 URL을 미리 해석해 함께 캐시 (전환 지연 축소)
+  // vod는 브라우저가 직접 화질별 MP4 렌디션을 해석해 함께 캐시 (전환 지연 축소 + 화질 선택)
   if (data.streamType === 'vod' && data.vodVideoId && data.vodInKey) {
     try {
-      data.mp4Url = await resolveVodMp4Url(data.vodVideoId, data.vodInKey);
+      const renditions = await resolveVodRenditions(data.vodVideoId, data.vodInKey);
+      data.renditions = renditions;
+      data.mp4Url = renditions[0]?.url ?? null; // 최고 화질 기본
     } catch {
+      data.renditions = [];
       data.mp4Url = null;
     }
   }
