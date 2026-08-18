@@ -17,6 +17,7 @@ import {
   SpeakerXMarkIcon,
   ArrowsPointingOutIcon,
   ArrowsPointingInIcon,
+  MusicalNoteIcon,
 } from "@heroicons/react/24/solid";
 import { CalendarDaysIcon, UserIcon } from "@heroicons/react/24/outline";
 import type { VideoPlatform } from "@/shared/utils/video-url";
@@ -68,6 +69,72 @@ interface ClipPlayerProps {
 
 /** onNearEnd를 발화할 잔여시간 임계값(초) */
 const NEAR_END_SEC = 12;
+
+/** HLS 화질 레벨 표시용 최소 정보 */
+interface QualityLevel {
+  height: number;
+  bitrate: number;
+}
+
+/** 비트레이트가 가장 낮은(=데이터 최소) 레벨의 인덱스 (라디오 모드용) */
+function lowestLevelIndex(levels: QualityLevel[]): number {
+  let idx = 0;
+  let min = Infinity;
+  levels.forEach((l, i) => {
+    if (l.bitrate < min) {
+      min = l.bitrate;
+      idx = i;
+    }
+  });
+  return idx;
+}
+
+/** 저장된 화질 선호(height)에 가장 가까운 레벨 인덱스 (없으면 -1=자동) */
+function nearestLevelIndex(levels: QualityLevel[], height: number): number {
+  let best = -1;
+  let bestDiff = Infinity;
+  levels.forEach((l, i) => {
+    const d = Math.abs(l.height - height);
+    if (d < bestDiff) {
+      bestDiff = d;
+      best = i;
+    }
+  });
+  return best;
+}
+
+// 화질/라디오 선호는 localStorage에 전역 저장 (음량과 동일 패턴)
+const QUALITY_KEY = "clipPlayer.quality"; // 'auto' | height(number 문자열)
+const RADIO_KEY = "clipPlayer.radio"; // '1' | '0'
+function loadQualityPref(): "auto" | number {
+  try {
+    const v = localStorage.getItem(QUALITY_KEY);
+    return v && v !== "auto" ? Number(v) : "auto";
+  } catch {
+    return "auto";
+  }
+}
+function saveQualityPref(v: "auto" | number) {
+  try {
+    localStorage.setItem(QUALITY_KEY, v === "auto" ? "auto" : String(v));
+  } catch {
+    /* 무시 */
+  }
+}
+function loadRadioPref(): boolean {
+  try {
+    return localStorage.getItem(RADIO_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function saveRadioPref(v: boolean) {
+  try {
+    localStorage.setItem(RADIO_KEY, v ? "1" : "0");
+  } catch {
+    /* 무시 */
+  }
+}
 
 /** 미니플레이어 등 외부에서 재생을 제어하기 위한 명령형 핸들 */
 export interface ClipPlayerHandle {
@@ -165,6 +232,15 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   const [muted, setMuted] = useState(() => loadStoredVolume().muted);
   const [volume, setVolume] = useState(() => loadStoredVolume().volume);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // ── 화질(치지직 HLS) / 라디오 모드 ──
+  const [hlsLevels, setHlsLevels] = useState<QualityLevel[]>([]);
+  const [hlsLevel, setHlsLevel] = useState<number>(-1); // -1 = 자동
+  const [showQuality, setShowQuality] = useState(false);
+  const [radioMode, setRadioMode] = useState(false); // 하이드레이션 안전: 마운트 후 로드
+  // 선호값을 스트림 로드 핸들러(effect 내)에서 최신값으로 읽기 위한 ref
+  const qualityPrefRef = useRef<"auto" | number>("auto");
+  const radioModeRef = useRef(false);
+  radioModeRef.current = radioMode;
   const [clipPosition, setClipPosition] = useState(0); // 구간 상대 시간
   const [clipDuration, setClipDuration] = useState(
     validEndTime != null ? Math.max(0, validEndTime - startTime) : 0,
@@ -201,6 +277,57 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     }
   }, [activated, trackPlayClipId]);
 
+  // 화질/라디오 선호 로드 (하이드레이션 불일치 방지 위해 마운트 후)
+  useEffect(() => {
+    qualityPrefRef.current = loadQualityPref();
+    setRadioMode(loadRadioPref());
+  }, []);
+
+  // 레벨 목록이 준비되면 선호(라디오>저장화질>자동)를 hls에 적용
+  const applyPreferredLevel = useCallback((hls: Hls, levels: QualityLevel[]) => {
+    if (levels.length === 0) return;
+    let idx: number;
+    if (radioModeRef.current) idx = lowestLevelIndex(levels);
+    else if (qualityPrefRef.current !== "auto") idx = nearestLevelIndex(levels, qualityPrefRef.current);
+    else idx = -1;
+    hls.currentLevel = idx;
+    setHlsLevel(idx);
+  }, []);
+
+  // 사용자가 화질 선택 (index 또는 'auto')
+  const changeQuality = useCallback(
+    (choice: number | "auto") => {
+      const hls = hlsRef.current;
+      const idx = choice === "auto" ? -1 : choice;
+      if (hls) hls.currentLevel = idx;
+      setHlsLevel(idx);
+      const pref = choice === "auto" ? "auto" : hlsLevels[choice]?.height ?? "auto";
+      qualityPrefRef.current = pref;
+      saveQualityPref(pref);
+      setShowQuality(false);
+    },
+    [hlsLevels],
+  );
+
+  // 라디오 모드 토글 — 영상 UI 숨김 + (HLS)최저 화질로 데이터/디코드 최소화
+  const toggleRadio = useCallback(() => {
+    const next = !radioModeRef.current;
+    setRadioMode(next);
+    saveRadioPref(next);
+    const hls = hlsRef.current;
+    if (hls && hlsLevels.length > 0) {
+      if (next) {
+        const idx = lowestLevelIndex(hlsLevels);
+        hls.currentLevel = idx;
+        setHlsLevel(idx);
+      } else {
+        const idx = qualityPrefRef.current !== "auto" ? nearestLevelIndex(hlsLevels, qualityPrefRef.current) : -1;
+        hls.currentLevel = idx;
+        setHlsLevel(idx);
+      }
+    }
+  }, [hlsLevels]);
+
   // ── 플레이어 초기화 ──────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
@@ -210,6 +337,8 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     setStarted(false);
     setVodTitle(null);
     setClipPosition(0);
+    setHlsLevels([]);
+    setShowQuality(false);
     // startTime/endTime이 (편집 등으로) 바뀌면 구간 길이도 재계산한다.
     // endTime이 없으면 0으로 두고 onReady/onLoaded에서 영상 길이 기준으로 채운다.
     // (이 줄이 없으면 같은 클립을 편집해 시간만 바꿀 때 진행바·시간표시가 옛값으로 남음)
@@ -371,7 +500,13 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
           const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
           hls.loadSource(streamUrl);
           hls.attachMedia(video);
-          hls.on(Hls.Events.MANIFEST_PARSED, onLoaded);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            onLoaded();
+            // 화질 레벨 노출 + 선호(라디오/저장화질/자동) 적용
+            const levels = hls.levels.map((l) => ({ height: l.height, bitrate: l.bitrate }));
+            setHlsLevels(levels);
+            applyPreferredLevel(hls, levels);
+          });
           hls.on(Hls.Events.ERROR, (_e, data) => {
             if (!data.fatal) return;
             if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
@@ -763,6 +898,25 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
         />
       )}
 
+      {/* 라디오 모드 오버레이 (치지직) — 영상을 가리고 음성 중심 표시. 클릭은 통과. */}
+      {activated && radioMode && platform === "chzzk" && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {posterThumbnail && (
+            <img
+              src={posterThumbnail}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover scale-110 opacity-30 blur-xl"
+              decoding="async"
+            />
+          )}
+          <div className="absolute inset-0 bg-black/70" />
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-white/80">
+            <MusicalNoteIcon className="w-9 h-9" />
+            <span className="text-xs font-medium tracking-wide">라디오 모드 · 음성 중심</span>
+          </div>
+        </div>
+      )}
+
       {/* 재생 전 포스터 (치지직 전용 — 유튜브는 자체 썸네일·제목이 표시됨).
           스트림 로드 중 검은 화면 대신 썸네일을 유지해 facade와 연속성을 준다. */}
       {activated && platform === "chzzk" && !started && (vodTitle || posterDate) && (
@@ -921,6 +1075,54 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
               className="w-16 h-1 accent-light-accent dark:accent-dark-accent cursor-pointer hidden sm:block"
             />
           </div>
+
+          {/* 화질 (치지직 HLS 전용) */}
+          {platform === "chzzk" && hlsLevels.length > 1 && !radioMode && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowQuality((v) => !v)}
+                aria-label="화질 선택"
+                title="화질"
+                className="px-1.5 py-0.5 rounded text-xs font-semibold tabular-nums hover:text-light-accent dark:hover:text-dark-accent transition-colors"
+              >
+                {hlsLevel === -1 ? "자동" : `${hlsLevels[hlsLevel]?.height}p`}
+              </button>
+              {showQuality && (
+                <div className="absolute bottom-full right-0 mb-2 min-w-[92px] max-h-48 overflow-y-auto rounded-lg bg-black/90 py-1 shadow-lg">
+                  <button
+                    onClick={() => changeQuality("auto")}
+                    className={`block w-full px-3 py-1.5 text-left text-xs hover:bg-white/10 ${hlsLevel === -1 ? "text-light-accent dark:text-dark-accent font-semibold" : "text-white/80"}`}
+                  >
+                    자동
+                  </button>
+                  {hlsLevels.map((l, i) => (
+                    <button
+                      key={i}
+                      onClick={() => changeQuality(i)}
+                      className={`block w-full px-3 py-1.5 text-left text-xs hover:bg-white/10 ${hlsLevel === i ? "text-light-accent dark:text-dark-accent font-semibold" : "text-white/80"}`}
+                    >
+                      {l.height}p
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 라디오 모드 토글 (치지직 전용 — 영상 숨김 + 최저 화질로 데이터 절약) */}
+          {platform === "chzzk" && (
+            <button
+              type="button"
+              onClick={toggleRadio}
+              aria-pressed={radioMode}
+              aria-label={radioMode ? "라디오 모드 끄기" : "라디오 모드 켜기"}
+              title={radioMode ? "라디오 모드 끄기 (영상 표시)" : "라디오 모드 (영상 숨김·데이터 절약)"}
+              className={`transition-colors ${radioMode ? "text-light-accent dark:text-dark-accent" : "hover:text-light-accent dark:hover:text-dark-accent"}`}
+            >
+              <MusicalNoteIcon className="w-5 h-5" />
+            </button>
+          )}
 
           <button
             type="button"
