@@ -344,6 +344,7 @@ export default function MiniPlayer() {
             posterDate={fmtDate(current.sungDate)}
             posterDescription={current.description ?? undefined}
             trackPlayClipId={current.clipId}
+            hideChrome={!isExpanded}
             className="w-full shadow-lg"
           />
         </Suspense>

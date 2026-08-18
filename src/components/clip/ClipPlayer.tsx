@@ -66,6 +66,8 @@ interface ClipPlayerProps {
   mediaMeta?: { title: string; artist?: string; album?: string; artwork?: string };
   /** 구간 종료가 임박(기본 12초 전)했을 때 1회 호출 — 다음 곡 프리로드/워밍용 */
   onNearEnd?: () => void;
+  /** 자체 컨트롤 바·중앙버튼 숨김 (접힌 미니플레이어처럼 아주 작게 표시할 때) */
+  hideChrome?: boolean;
 }
 
 /** onNearEnd를 발화할 잔여시간 임계값(초) */
@@ -203,6 +205,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   onPrev,
   mediaMeta,
   onNearEnd,
+  hideChrome = false,
 }: ClipPlayerProps, ref) {
   // endTime이 없거나 startTime 이하(잘못된 구간)면 "끝까지"로 취급한다.
   // (이 값이 0/음수가 되면 clipDuration이 0이 되어 진행바가 멈추거나, VOD 전체를
@@ -600,6 +603,15 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       video.removeEventListener("ended", onVideoEnded);
       hlsRef.current?.destroy();
       hlsRef.current = null;
+      mp4RenditionsRef.current = [];
+      // 미디어 리소스/디코더를 즉시 해제 (곡 전환 시 이전 버퍼가 남아 새 곡과 경쟁하지 않도록)
+      try {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      } catch {
+        /* 이미 제거됨 */
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform, videoId, startTime, endTime, activated]);
@@ -959,10 +971,12 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
             />
           )}
           <div className="absolute inset-0 bg-black/70" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-white/80">
-            <MusicalNoteIcon className="w-9 h-9" />
-            <span className="text-xs font-medium tracking-wide">라디오 모드 · 음성 중심</span>
-          </div>
+          {!hideChrome && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-white/80">
+              <MusicalNoteIcon className="w-9 h-9" />
+              <span className="text-xs font-medium tracking-wide">라디오 모드 · 음성 중심</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -1014,7 +1028,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       )}
 
       {/* 중앙 재생/다시보기 버튼 (정지 상태) */}
-      {ready && (!playing || ended) && (
+      {!hideChrome && ready && (!playing || ended) && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple flex items-center justify-center shadow-lg shadow-black/40">
             {ended ? (
@@ -1026,10 +1040,10 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
         </div>
       )}
 
-      {/* 커스텀 컨트롤 바 (활성화 후에만 노출) */}
+      {/* 커스텀 컨트롤 바 (활성화 후에만 노출. hideChrome이면 접힌 미니바용으로 숨김) */}
       <div
         className={`absolute bottom-0 left-0 right-0 px-3 pb-2 pt-8 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 ${
-          !activated
+          hideChrome || !activated
             ? "opacity-0 pointer-events-none"
             : controlsVisible || !playing
             ? "opacity-100"

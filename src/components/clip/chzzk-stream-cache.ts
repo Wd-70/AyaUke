@@ -21,8 +21,22 @@ export interface ChzzkStream {
 }
 
 const TTL_MS = 90_000;
+const MAX_ENTRIES = 20; // 재생 이력만큼 무한 증가 방지 (LRU + 만료 정리)
 const cache = new Map<string, { data: ChzzkStream; ts: number }>();
 const inflight = new Map<string, Promise<ChzzkStream>>();
+
+/** 만료 항목 제거 + LRU로 상한 유지 (Map은 삽입순 → 앞쪽이 오래된 것) */
+function evict() {
+  const now = Date.now();
+  for (const [k, v] of cache) {
+    if (now - v.ts >= TTL_MS) cache.delete(k);
+  }
+  while (cache.size > MAX_ENTRIES) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+}
 
 async function fetchStream(videoNo: string): Promise<ChzzkStream> {
   const res = await fetch(`/api/clips/chzzk-hls?videoNo=${videoNo}`);
@@ -56,6 +70,7 @@ export async function loadChzzkStream(videoNo: string): Promise<ChzzkStream> {
   const p = fetchStream(videoNo)
     .then((data) => {
       cache.set(videoNo, { data, ts: Date.now() });
+      evict();
       inflight.delete(videoNo);
       return data;
     })
