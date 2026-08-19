@@ -22,6 +22,7 @@ import {
 import { CalendarDaysIcon, UserIcon } from "@heroicons/react/24/outline";
 import type { VideoPlatform } from "@/shared/utils/video-url";
 import { loadChzzkStream } from "./chzzk-stream-cache";
+import { markClipCounted } from "./play-track-storage";
 import type { Mp4Rendition } from "@/shared/utils/chzzk-vod";
 import { loadStoredVolume, saveStoredVolume } from "./volume-storage";
 import { useClipTitle } from "@/hooks/useClipTitle";
@@ -277,14 +278,12 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     [validEndTime, startTime, clipDuration],
   );
 
-  // 재생 수 집계 — 최초 활성화 시 1회 (fire-and-forget)
-  const playTrackedRef = useRef(false);
-  useEffect(() => {
-    if (activated && trackPlayClipId && !playTrackedRef.current) {
-      playTrackedRef.current = true;
-      fetch(`/api/clips/${trackPlayClipId}/play`, { method: 'POST' }).catch(() => {});
-    }
-  }, [activated, trackPlayClipId]);
+  // 재생 수 집계 — "의미 있는 청취"에 도달했을 때 1회 (fire-and-forget).
+  // 즉시 스킵은 세지 않고, 브라우저별 6시간 쿨다운으로 반복 재생 중복을 막는다.
+  // 실제 발화는 진행 추적 tick 안에서 위치가 임계값을 넘을 때 이뤄진다.
+  const playCountFiredRef = useRef(false);
+  const trackClipRef = useRef(trackPlayClipId);
+  trackClipRef.current = trackPlayClipId;
 
   // 화질/라디오 선호 로드 (하이드레이션 불일치 방지 위해 마운트 후)
   useEffect(() => {
@@ -622,6 +621,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   useEffect(() => {
     if (!ready) return;
     nearEndFiredRef.current = false; // 새 구간(클립)마다 프리로드 트리거 재무장
+    playCountFiredRef.current = false; // 새 구간마다 재생 수 집계 재무장
 
     const runTick = () => {
       const adapter = adapterRef.current;
@@ -660,7 +660,21 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
               absDisplay = abs + (now - sync.wall) / 1000;
             }
             const capped = end !== Infinity ? Math.min(absDisplay, end) : absDisplay;
-            setClipPosition(Math.max(0, capped - startTime));
+            const pos = Math.max(0, capped - startTime);
+            setClipPosition(pos);
+            // 재생 수 집계 — 의미 있는 청취(≥ min(30s, 구간의 40%))에 도달 시 1회.
+            // 쿨다운은 markClipCounted가 판단(브라우저별 6시간). 즉시 스킵은 미집계.
+            if (!playCountFiredRef.current && trackClipRef.current) {
+              const len = end !== Infinity ? end - startTime : Infinity;
+              const threshold = Math.min(30, len === Infinity ? 30 : len * 0.4);
+              if (pos >= threshold) {
+                playCountFiredRef.current = true;
+                const id = trackClipRef.current;
+                if (markClipCounted(id)) {
+                  fetch(`/api/clips/${id}/play`, { method: 'POST' }).catch(() => {});
+                }
+              }
+            }
             // 종료 임박 → 다음 곡 프리로드 트리거 (1회)
             if (end !== Infinity && !nearEndFiredRef.current && end - abs <= NEAR_END_SEC) {
               nearEndFiredRef.current = true;

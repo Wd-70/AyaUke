@@ -21,6 +21,8 @@ interface ClipPlayerContextValue {
   current: PlayerClip | null;
   /** 다음에 재생될 클립 (프리로드/워밍용). 한곡반복이면 null */
   nextClip: PlayerClip | null;
+  /** 재생 순서상 곧 나올 클립들(현재 제외, 최대 2개) — 근접 프리로드용. 한곡반복이면 빈 배열 */
+  upcomingClips: PlayerClip[];
   isExpanded: boolean;
   playing: boolean;
   hasInteracted: boolean;
@@ -248,12 +250,31 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
   }
   const nextClip = nextIndex != null ? queue[nextIndex] ?? null : null;
 
+  // 곧 나올 클립 최대 2개 (현재 제외, 순서 순회 — 전곡반복이면 wrap). 한곡반복이면 프리로드 불필요.
+  const upcomingClips = useMemo<PlayerClip[]>(() => {
+    const list: PlayerClip[] = [];
+    if (repeat !== 'one' && order.length > 1) {
+      const span = Math.min(2, order.length - 1);
+      for (let k = 1; k <= span; k++) {
+        let p = clampedPos + k;
+        if (p >= order.length) {
+          if (repeat !== 'all') break;
+          p -= order.length; // 전곡반복: 앞으로 되돌아 순회
+        }
+        const clip = queue[order[p]];
+        if (clip) list.push(clip);
+      }
+    }
+    return list;
+  }, [queue, order, clampedPos, repeat]);
+
   const value = useMemo<ClipPlayerContextValue>(
     () => ({
       queue,
       currentIndex,
       current,
       nextClip,
+      upcomingClips,
       isExpanded,
       playing,
       hasInteracted,
@@ -278,7 +299,7 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
       reportPlaying: setPlaying,
     }),
     [
-      queue, currentIndex, current, nextClip, isExpanded, playing, hasInteracted, shuffle, repeat,
+      queue, currentIndex, current, nextClip, upcomingClips, isExpanded, playing, hasInteracted, shuffle, repeat,
       hasNext, hasPrev, playNonce, playQueue, playAt, sourceId, syncQueue, next, prev, handleEnded,
       toggle, toggleShuffle, cycleRepeat, close,
     ],

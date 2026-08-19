@@ -10,6 +10,8 @@ import {
   ChevronDownIcon,
   XMarkIcon,
   MusicalNoteIcon,
+  ArrowsPointingInIcon,
+  ArrowsPointingOutIcon,
 } from '@heroicons/react/24/solid';
 import { useClipPlayer } from './ClipPlayerProvider';
 import { clipArtwork } from './types';
@@ -75,7 +77,7 @@ export default function MiniPlayer() {
     queue,
     currentIndex,
     current,
-    nextClip,
+    upcomingClips,
     isExpanded,
     playing,
     hasInteracted,
@@ -98,21 +100,63 @@ export default function MiniPlayer() {
   } = useClipPlayer();
 
   const stageRef = useRef<HTMLDivElement>(null);
-  const [stageHeight, setStageHeight] = useState(0);
-  // 이미 워밍한 다음 클립 id (현재 곡당 1회만 프리로드)
-  const warmedRef = useRef<string | null>(null);
+  // 이미 워밍한 클립 id 집합 (중복 프리로드 방지 — 캐시 TTL 안에서만 의미)
+  const warmedRef = useRef<Set<string>>(new Set());
+  // 펼침 영상 크기(뷰포트 기준 16:9) + 컴팩트(영상 높이 절반) 토글
+  const [stage, setStage] = useState({ w: 0, h: 0 });
+  const [videoCompact, setVideoCompact] = useState(false);
 
-  // 펼침 시 큐 시트가 대형 영상 아래에서 시작하도록 스테이지 높이를 측정한다(16:9 고정).
+  // 컴팩트 선호 로드/저장 (셔플·반복과 동일한 로컬 저장 패턴)
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('clipPlayer.videoCompact') === '1') setVideoCompact(true);
+    } catch { /* 무시 */ }
+  }, []);
+  const toggleCompact = () => {
+    setVideoCompact((v) => {
+      const next = !v;
+      try { localStorage.setItem('clipPlayer.videoCompact', next ? '1' : '0'); } catch { /* 무시 */ }
+      return next;
+    });
+  };
+
+  // 곡이 바뀌면 프리로드 워밍 집합을 리셋 (다음 곡군을 다시 워밍)
+  useEffect(() => {
+    warmedRef.current = new Set();
+  }, [currentIndex]);
+
+  // 펼침 영상 크기를 뷰포트 폭·높이 모두로 산정(16:9). 높이 예산을 두어 아래 재생목록이
+  // 항상 자리를 갖도록 하고, 컴팩트면 높이 예산을 절반으로 줄인다.
   useEffect(() => {
     if (!isExpanded) return;
     const measure = () => {
-      const w = stageRef.current?.clientWidth ?? 0;
-      setStageHeight(Math.round((w * 9) / 16));
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const maxW = Math.min(vw * 0.94, 760);
+      const heightBudget = vh * (videoCompact ? 0.24 : 0.46);
+      const w = Math.min(maxW, (heightBudget * 16) / 9);
+      setStage({ w: Math.round(w), h: Math.round((w * 9) / 16) });
     };
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [isExpanded, currentIndex]);
+  }, [isExpanded, videoCompact]);
+
+  // 펼침 중 배경 페이지 스크롤 잠금 — 오버레이 위 스크롤이 뒤 페이지로 전파되어
+  // 접었을 때 엉뚱한 위치로 이동하는 문제 방지. 스크롤바 폭만큼 패딩 보정으로 레이아웃 흔들림 억제.
+  useEffect(() => {
+    if (!isExpanded) return;
+    const body = document.body;
+    const prevOverflow = body.style.overflow;
+    const prevPadRight = body.style.paddingRight;
+    const sbw = window.innerWidth - document.documentElement.clientWidth;
+    body.style.overflow = 'hidden';
+    if (sbw > 0) body.style.paddingRight = `${sbw}px`;
+    return () => {
+      body.style.overflow = prevOverflow;
+      body.style.paddingRight = prevPadRight;
+    };
+  }, [isExpanded]);
 
   const mediaMeta = useMemo(
     () =>
@@ -127,36 +171,39 @@ export default function MiniPlayer() {
   const bgSupported = current.platform === 'chzzk';
   const bgArtwork = clipArtwork(current);
 
-  // 종료 임박 시 다음 곡 리소스를 미리 워밍 (프리커넥트 + 썸네일 + 치지직 HLS 해석).
-  // 유튜브 iframe 특성상 완전한 gapless는 어렵지만 전환 지연을 줄인다. 현재 곡당 1회.
-  const warmNext = () => {
-    const clip = nextClip;
-    if (!clip || warmedRef.current === clip.clipId) return;
-    warmedRef.current = clip.clipId;
-    try {
-      const thumb =
-        clip.thumbnailUrl ||
-        (clip.platform === 'youtube' ? `https://i.ytimg.com/vi/${clip.videoId}/hqdefault.jpg` : undefined);
-      if (thumb) {
-        const img = new Image();
-        img.src = thumb;
+  // 종료 임박 시 곧 나올 클립(최대 2개) 리소스를 미리 워밍 (프리커넥트 + 썸네일 + 치지직 스트림 해석).
+  // 프리로드하는 건 "가벼운 메타데이터"(스트림/MP4 URL·inKey)일 뿐 영상 바이트가 아니다.
+  // 치지직 스트림 URL은 IP에 묶이고 수명이 짧아(캐시 TTL 90초) 리스트 전체를 미리 받아둬도
+  // 도달 전에 만료되어 낭비 → 재생 직전(종료 임박)에 근접 윈도우만 워밍한다.
+  const warmUpcoming = () => {
+    for (const clip of upcomingClips) {
+      if (!clip || warmedRef.current.has(clip.clipId)) continue;
+      warmedRef.current.add(clip.clipId);
+      try {
+        const thumb =
+          clip.thumbnailUrl ||
+          (clip.platform === 'youtube' ? `https://i.ytimg.com/vi/${clip.videoId}/hqdefault.jpg` : undefined);
+        if (thumb) {
+          const img = new Image();
+          img.src = thumb;
+        }
+        if (clip.platform === 'youtube') {
+          preconnect('https://www.youtube.com');
+          preconnect('https://i.ytimg.com');
+          preconnect('https://googlevideo.com');
+        } else {
+          // 치지직: 스트림 정보(+vod면 MP4 URL)를 미리 받아 캐시에 넣어둔다.
+          // 실제 플레이어 마운트 시 이 캐시를 재사용해 조회 라운드트립을 건너뛴다.
+          prefetchChzzkStream(clip.videoId);
+        }
+      } catch {
+        /* 무시 */
       }
-      if (clip.platform === 'youtube') {
-        preconnect('https://www.youtube.com');
-        preconnect('https://i.ytimg.com');
-        preconnect('https://googlevideo.com');
-      } else {
-        // 치지직: 스트림 정보(+vod면 MP4 URL)를 미리 받아 캐시에 넣어둔다.
-        // 실제 플레이어 마운트 시 이 캐시를 재사용해 조회 라운드트립을 건너뛴다.
-        prefetchChzzkStream(clip.videoId);
-      }
-    } catch {
-      /* 무시 */
     }
   };
 
   const stageClass = isExpanded
-    ? 'fixed z-[70] top-12 left-1/2 -translate-x-1/2 w-[min(94vw,760px)]'
+    ? 'fixed z-[70] top-12 left-1/2 -translate-x-1/2'
     : 'fixed z-[70] bottom-[7px] left-2 w-[88px]';
 
   const ctrlBtn =
@@ -189,17 +236,28 @@ export default function MiniPlayer() {
             <span className="text-xs font-semibold uppercase tracking-wider text-light-text/40 dark:text-dark-text/40">
               지금 재생 중
             </span>
-            <button
-              onClick={close}
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
-              aria-label="플레이어 닫기"
-            >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleCompact}
+                aria-label={videoCompact ? '영상 크게' : '영상 작게'}
+                aria-pressed={videoCompact}
+                title={videoCompact ? '영상 크게' : '영상 작게(재생목록 넓게)'}
+                className="inline-flex items-center rounded-full p-2 text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
+              >
+                {videoCompact ? <ArrowsPointingOutIcon className="h-5 w-5" /> : <ArrowsPointingInIcon className="h-5 w-5" />}
+              </button>
+              <button
+                onClick={close}
+                className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
+                aria-label="플레이어 닫기"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           {/* 대형 영상 자리 확보용 스페이서 (실제 영상은 스테이지가 그림) */}
-          <div className="mx-auto w-[min(94vw,760px)] shrink-0" style={{ height: stageHeight }} />
+          <div className="mx-auto shrink-0" style={{ width: stage.w, height: stage.h }} />
 
           {/* 현재 곡 정보 */}
           <div className="mx-auto mt-4 w-[min(94vw,760px)] shrink-0 px-1 text-center">
@@ -322,7 +380,7 @@ export default function MiniPlayer() {
       )}
 
       {/* 영속 플레이어 스테이지 — 한 번만 마운트, 위치/크기만 토글. 곡/재생 nonce 변경 시에만 remount */}
-      <div ref={stageRef} className={stageClass}>
+      <div ref={stageRef} className={stageClass} style={isExpanded ? { width: stage.w } : undefined}>
         <Suspense fallback={<div className="aspect-video w-full rounded-xl bg-black/80" />}>
           <ClipPlayer
             ref={(h) => {
@@ -336,7 +394,7 @@ export default function MiniPlayer() {
             autoplay={hasInteracted}
             onEnded={handleEnded}
             onPlayingChange={reportPlaying}
-            onNearEnd={warmNext}
+            onNearEnd={warmUpcoming}
             onNext={hasNext ? next : undefined}
             onPrev={hasPrev ? prev : undefined}
             mediaMeta={mediaMeta}
