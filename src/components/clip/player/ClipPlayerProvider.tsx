@@ -182,24 +182,37 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
     });
   }, [order.length, repeat]);
 
-  // 트랙 종료 시 자동 진행 (버튼 next와 달리 반복모드를 반영)
+  // 트랙 종료 시 자동 진행 (버튼 next와 달리 반복모드를 반영).
+  // 백그라운드(화면 꺼짐/탭 숨김)에선 유튜브(iframe)는 재생이 불가하므로 자동 진행 시 건너뛴다
+  // → 치지직 오디오 재생이 유튜브 클립에서 멈추지 않고 계속 이어진다. (포그라운드에선 정상 재생)
   const handleEnded = useCallback(() => {
     if (repeat === 'one') {
       setPlayNonce((n) => n + 1); // 같은 곡 재생 (remount)
       return;
     }
-    const atEnd = clampedPosRef.current + 1 >= order.length;
-    if (!atEnd) {
-      setPos((p) => p + 1); // 다음 곡: clipId가 바뀌어 자연히 remount
+    const ord = orderRef.current;
+    const q = queueRef.current;
+    const hidden = typeof document !== 'undefined' && document.hidden;
+    const playable = (p: number) => !hidden || q[ord[p]]?.platform !== 'youtube';
+
+    // 다음 재생 가능한 위치 탐색 (백그라운드면 유튜브 스킵)
+    let np = clampedPosRef.current + 1;
+    while (np < ord.length && !playable(np)) np++;
+    if (np < ord.length) {
+      setPos(np); // 다음 곡: clipId가 바뀌어 자연히 remount
       return;
     }
     if (repeat === 'all') {
-      // 처음으로. 단일 트랙 등 곡이 그대로면 key가 안 바뀌므로 nonce로 재생 강제
-      setPos(0);
-      setPlayNonce((n) => n + 1);
+      // 처음으로 wrap (백그라운드면 앞쪽 유튜브도 스킵). 곡이 그대로면 nonce로 재생 강제
+      let wp = 0;
+      while (wp < ord.length && !playable(wp)) wp++;
+      if (wp < ord.length) {
+        setPos(wp);
+        setPlayNonce((n) => n + 1);
+      }
     }
     // repeat === 'off' → 마지막 곡에서 정지
-  }, [order.length, repeat]);
+  }, [repeat]);
 
   const toggle = useCallback(() => {
     setHasInteracted(true);
