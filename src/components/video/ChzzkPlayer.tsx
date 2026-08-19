@@ -12,6 +12,38 @@ interface QualityOption {
   label: string;
 }
 
+// 화질 선호를 localStorage에 전역 저장 (영상이 달라도 유지). 인덱스는 영상마다 달라지므로
+// height(선호 화질)로 저장하고, 각 영상에서 가장 가까운 레벨/렌디션에 매핑한다.
+const QUALITY_KEY = "chzzkPlayer.quality"; // 'auto' | height(number 문자열)
+function loadQualityPref(): "auto" | number {
+  try {
+    const v = localStorage.getItem(QUALITY_KEY);
+    return v && v !== "auto" ? Number(v) : "auto";
+  } catch {
+    return "auto";
+  }
+}
+function saveQualityPref(v: "auto" | number) {
+  try {
+    localStorage.setItem(QUALITY_KEY, v === "auto" ? "auto" : String(v));
+  } catch {
+    /* 무시 */
+  }
+}
+/** heights 배열에서 target(선호 height)에 가장 가까운 인덱스 (heights는 원본 순서). */
+function nearestIndexByHeight(heights: number[], target: number): number {
+  let best = 0;
+  let bestDiff = Infinity;
+  heights.forEach((h, i) => {
+    const d = Math.abs(h - target);
+    if (d < bestDiff) {
+      bestDiff = d;
+      best = i;
+    }
+  });
+  return best;
+}
+
 interface ChzzkPlayerProps {
   videoUrl: string;
   videoNo: number;
@@ -56,6 +88,15 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
   const [qualityOptions, setQualityOptions] = useState<QualityOption[]>([]);
   const [quality, setQuality] = useState<number>(-1);
   const mp4RenditionsRef = useRef<Mp4Rendition[]>([]);
+  // 저장된 화질 선호(height). 마운트 후 로드 (하이드레이션 불일치 방지).
+  const qualityPrefRef = useRef<"auto" | number>("auto");
+  // startTime을 소스 재로딩 없이 시킹에만 쓰기 위한 최신값 참조
+  const startTimeRef = useRef(startTime);
+  startTimeRef.current = startTime;
+
+  useEffect(() => {
+    qualityPrefRef.current = loadQualityPref();
+  }, []);
 
   // Fetch HLS URL from Chzzk API
   useEffect(() => {
@@ -87,8 +128,11 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
           if (renditions.length === 0) throw new Error("재생할 수 있는 영상이 아닙니다.");
           mp4RenditionsRef.current = renditions;
           setQualityOptions(renditions.map((r, i) => ({ value: i, label: `${r.height}p` })));
-          setQuality(0); // 기본: 최고 화질 (편집용 — 프레임 식별)
-          setHlsUrl(renditions[0].url);
+          // 저장된 선호 화질로 초기 로드 (없으면 최고화질). 인덱스는 height로 매핑.
+          const pref = qualityPrefRef.current;
+          const idx = pref === "auto" ? 0 : nearestIndexByHeight(renditions.map((r) => r.height), pref);
+          setQuality(idx);
+          setHlsUrl(renditions[idx].url);
           setStreamType('mp4');
         } else {
           if (!data.streamUrl) {
@@ -122,9 +166,8 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
       const onLoadedMeta = () => {
         setIsReady(true);
         setError(null);
-        if (startTime && startTime > 0) {
-          video.currentTime = startTime;
-        }
+        const s = startTimeRef.current;
+        if (s && s > 0) video.currentTime = s;
       };
       video.addEventListener("loadedmetadata", onLoadedMeta, { once: true });
       return () => {
@@ -151,16 +194,15 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
         // 화질 레벨 목록 구성 (높이 내림차순) + '자동'(ABR). 레벨이 여러 개일 때만 노출.
         const levels = hls.levels
           .map((l, i) => ({ value: i, label: l.height ? `${l.height}p` : `${Math.round((l.bitrate || 0) / 1000)}k` }))
-          .sort((a, b) => {
-            const ha = hls.levels[a.value].height || 0;
-            const hb = hls.levels[b.value].height || 0;
-            return hb - ha;
-          });
+          .sort((a, b) => (hls.levels[b.value].height || 0) - (hls.levels[a.value].height || 0));
         setQualityOptions(levels.length > 1 ? [{ value: -1, label: '자동' }, ...levels] : []);
-        setQuality(-1); // 자동(ABR)
-        if (startTime && startTime > 0) {
-          video.currentTime = startTime;
-        }
+        // 저장된 선호 화질 적용 (없으면 자동/ABR). height로 가장 가까운 레벨 선택.
+        const pref = qualityPrefRef.current;
+        const sel = pref === "auto" ? -1 : nearestIndexByHeight(hls.levels.map((l) => l.height || 0), pref);
+        hls.currentLevel = sel;
+        setQuality(sel);
+        const s = startTimeRef.current;
+        if (s && s > 0) video.currentTime = s;
       });
 
       hls.on(Hls.Events.ERROR, (event, data) => {
@@ -191,17 +233,31 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       // Safari native HLS support
       video.src = hlsUrl;
-      video.addEventListener("loadedmetadata", () => {
-        setIsReady(true);
-        setError(null);
-        if (startTime && startTime > 0) {
-          video.currentTime = startTime;
-        }
-      });
+      video.addEventListener(
+        "loadedmetadata",
+        () => {
+          setIsReady(true);
+          setError(null);
+          const s = startTimeRef.current;
+          if (s && s > 0) video.currentTime = s;
+        },
+        { once: true },
+      );
     } else {
       setError("이 브라우저는 HLS를 지원하지 않습니다.");
     }
-  }, [hlsUrl, streamType, startTime]);
+    // startTime은 deps에서 제외 — 타임라인 이동은 아래 시킹 effect가 소스 재로딩 없이 처리
+    // (재로딩하면 MP4가 다시 최고화질로 리셋됨). 초기 시킹은 startTimeRef로 반영.
+  }, [hlsUrl, streamType]);
+
+  // 타임라인 이동: 소스 재로딩 없이 위치만 이동 → 선택 화질 유지
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !isReady) return;
+    if (typeof startTime === "number" && startTime > 0 && Math.abs(video.currentTime - startTime) > 0.5) {
+      video.currentTime = startTime;
+    }
+  }, [startTime, isReady]);
 
   // 외부 제어 핸들 (시간 편집 화면의 '현재 시간 가져오기', 시킹 등)
   useImperativeHandle(ref, () => ({
@@ -277,6 +333,20 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
   // 화질 변경. HLS는 currentLevel(-1=자동), MP4는 화질별 URL로 src 교체(위치·재생상태 유지).
   const changeQuality = (value: number) => {
     setQuality(value);
+    // 선호를 height로 저장 (영상이 달라도 유지). -1(HLS 자동) → 'auto'.
+    if (value === -1) {
+      qualityPrefRef.current = "auto";
+      saveQualityPref("auto");
+    } else {
+      const h =
+        streamType === "hls"
+          ? hlsRef.current?.levels[value]?.height ?? 0
+          : mp4RenditionsRef.current[value]?.height ?? 0;
+      if (h > 0) {
+        qualityPrefRef.current = h;
+        saveQualityPref(h);
+      }
+    }
     if (streamType === 'hls') {
       if (hlsRef.current) hlsRef.current.currentLevel = value;
       return;
