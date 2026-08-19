@@ -266,6 +266,10 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   const onEndedRef = useRef(onEnded);
   const onNearEndRef = useRef(onNearEnd);
   const nearEndFiredRef = useRef(false);
+  // 재생 의도: 사용자가 재생을 원하는 상태인가. 백그라운드에서 브라우저가 강제로 일시정지시킨
+  // 경우(사용자 의도 아님)를 사용자의 명시적 일시정지와 구분해 재생을 복원하기 위한 플래그.
+  const playIntentRef = useRef(false);
+  const lastResumeRef = useRef(0);
   playingRef.current = playing;
   onEndedRef.current = onEnded;
   onNearEndRef.current = onNearEnd;
@@ -580,8 +584,24 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       setPlaying(true);
       setEnded(false);
       setStarted(true);
+      playIntentRef.current = true; // 재생 중 = 재생 의도 있음
     };
-    const onPause = () => setPlaying(false);
+    const onPause = () => {
+      setPlaying(false);
+      // 백그라운드(화면 꺼짐/앱 최소화)에서 브라우저가 강제로 일시정지시킨 경우 재생 복원.
+      // 사용자가 명시적으로 정지한 경우엔 playIntentRef가 false라 복원하지 않는다.
+      // 폭주 방지로 최소 1초 간격으로만 재시도.
+      if (
+        playIntentRef.current &&
+        typeof document !== "undefined" &&
+        document.hidden &&
+        !video.ended &&
+        Date.now() - lastResumeRef.current > 1000
+      ) {
+        lastResumeRef.current = Date.now();
+        void video.play().catch(() => {});
+      }
+    };
     const onVideoEnded = () => {
       setPlaying(false);
       setEnded(true);
@@ -639,6 +659,8 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
             adapter.seekTo(startTime);
             syncRef.current = { media: -1, wall: 0 };
           } else if (end !== Infinity && abs >= end) {
+            // 구간 종료로 인한 정지 → 다음 곡으로 넘어갈 것이므로 이 클립을 복원하지 않음
+            playIntentRef.current = false;
             adapter.pause();
             adapter.seekTo(end);
             setClipPosition(Math.max(0, end - startTime));
@@ -736,8 +758,10 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       endedRef.current = false;
       adapter.play();
     } else if (playing) {
+      playIntentRef.current = false; // 사용자 명시적 정지 → 백그라운드 복원 안 함
       adapter.pause();
     } else {
+      playIntentRef.current = true;
       adapter.play();
     }
   };
@@ -747,9 +771,13 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   useImperativeHandle(ref, () => ({
     play: () => {
       if (!activated) { setActivated(true); return; }
+      playIntentRef.current = true;
       adapterRef.current?.play();
     },
-    pause: () => adapterRef.current?.pause(),
+    pause: () => {
+      playIntentRef.current = false; // 외부 명시적 정지 → 백그라운드 복원 안 함
+      adapterRef.current?.pause();
+    },
     toggle: () => {
       if (!activated) { setActivated(true); return; }
       togglePlay();
@@ -794,8 +822,8 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
         /* 미지원 액션 무시 */
       }
     };
-    setAction("play", () => adapterRef.current?.play());
-    setAction("pause", () => adapterRef.current?.pause());
+    setAction("play", () => { playIntentRef.current = true; adapterRef.current?.play(); });
+    setAction("pause", () => { playIntentRef.current = false; adapterRef.current?.pause(); });
     setAction("previoustrack", navHandlersRef.current.onPrev ? () => navHandlersRef.current.onPrev?.() : null);
     setAction("nexttrack", navHandlersRef.current.onNext ? () => navHandlersRef.current.onNext?.() : null);
 
