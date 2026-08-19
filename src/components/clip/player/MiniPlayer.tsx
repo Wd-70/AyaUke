@@ -14,8 +14,9 @@ import {
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/solid';
 import { useClipPlayer } from './ClipPlayerProvider';
-import { clipArtwork } from './types';
+import { clipArtwork, clipDurationSec } from './types';
 import { prefetchChzzkStream } from '../chzzk-stream-cache';
+import { formatClipTime } from '@/shared/utils/clip-time';
 
 // ClipPlayer(및 hls.js)는 무겁다. 레이아웃 상주 컴포넌트라 모든 페이지 공용 번들에
 // 들어가지 않도록, 실제 재생이 시작될 때만 지연 로드한다.
@@ -224,103 +225,114 @@ export default function MiniPlayer() {
             <div className="absolute inset-0 bg-light-background/55 dark:bg-dark-background/65" />
           </div>
 
-          {/* 상단 바: 접기/닫기 */}
-          <div className="flex h-12 shrink-0 items-center justify-between px-4">
-            <button
-              onClick={() => setExpanded(false)}
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
-              aria-label="플레이어 접기"
-            >
-              <ChevronDownIcon className="h-5 w-5" /> 접기
-            </button>
-            <span className="text-xs font-semibold uppercase tracking-wider text-light-text/40 dark:text-dark-text/40">
-              지금 재생 중
-            </span>
+          {/* 상단 바: (좌) 접기 · 영상크기  —  (우) 닫기.
+              영상 크기 토글은 '보기' 조작이라 접기와 묶고, 닫기와는 떨어뜨려 혼동을 줄인다. */}
+          <div className="flex h-12 shrink-0 items-center justify-between px-3">
             <div className="flex items-center gap-1">
               <button
-                onClick={toggleCompact}
-                aria-label={videoCompact ? '영상 크게' : '영상 작게'}
-                aria-pressed={videoCompact}
-                title={videoCompact ? '영상 크게' : '영상 작게(재생목록 넓게)'}
-                className="inline-flex items-center rounded-full p-2 text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
+                onClick={() => setExpanded(false)}
+                className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
+                aria-label="플레이어 접기"
               >
-                {videoCompact ? <ArrowsPointingOutIcon className="h-5 w-5" /> : <ArrowsPointingInIcon className="h-5 w-5" />}
+                <ChevronDownIcon className="h-5 w-5" /> 접기
               </button>
               <button
-                onClick={close}
-                className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
-                aria-label="플레이어 닫기"
+                onClick={toggleCompact}
+                aria-pressed={videoCompact}
+                title={videoCompact ? '영상 크게' : '영상 작게(재생목록 넓게)'}
+                className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/60 hover:bg-light-primary/10 dark:text-dark-text/60 dark:hover:bg-dark-primary/10"
               >
-                <XMarkIcon className="h-5 w-5" />
+                {videoCompact ? <ArrowsPointingOutIcon className="h-4 w-4" /> : <ArrowsPointingInIcon className="h-4 w-4" />}
+                <span className="hidden sm:inline">{videoCompact ? '영상 크게' : '영상 작게'}</span>
               </button>
             </div>
+            <button
+              onClick={close}
+              className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
+              aria-label="플레이어 닫기"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
           </div>
 
           {/* 대형 영상 자리 확보용 스페이서 (실제 영상은 스테이지가 그림) */}
           <div className="mx-auto shrink-0" style={{ width: stage.w, height: stage.h }} />
 
-          {/* 현재 곡 정보 */}
-          <div className="mx-auto mt-4 w-[min(94vw,760px)] shrink-0 px-1 text-center">
-            <h2 className="truncate text-xl font-bold text-light-text dark:text-dark-text">{current.title}</h2>
-            <p className="mt-0.5 text-sm text-light-text/60 dark:text-dark-text/60">
-              {current.artist}
-              {current.sungDate && <span> · {fmtDate(current.sungDate)}</span>}
-            </p>
+          {/* 현재 곡 정보 — 제목 · 아티스트 · 날짜를 한 줄로 통합 (작고 세련되게) */}
+          <div className="mx-auto mt-3 w-[min(94vw,760px)] shrink-0 px-4 text-center">
+            <div className="flex items-center justify-center gap-1.5">
+              <h2 className="min-w-0 truncate text-[15px] font-bold text-light-text dark:text-dark-text">
+                {current.title}
+              </h2>
+              {current.artist && (
+                <>
+                  <span className="shrink-0 text-light-text/25 dark:text-dark-text/25">·</span>
+                  <span className="min-w-0 truncate text-[13px] text-light-text/55 dark:text-dark-text/55">
+                    {current.artist}
+                  </span>
+                </>
+              )}
+              {current.sungDate && (
+                <span className="shrink-0 text-[11px] tabular-nums text-light-text/35 dark:text-dark-text/35">
+                  {fmtDate(current.sungDate)}
+                </span>
+              )}
+            </div>
             {!bgSupported && (
-              <p className="mt-2 inline-block rounded-full bg-amber-400/15 px-3 py-1 text-xs text-amber-600 dark:text-amber-400">
+              <p className="mt-1.5 inline-block rounded-full bg-amber-400/15 px-2.5 py-0.5 text-[11px] text-amber-600 dark:text-amber-400">
                 유튜브 클립은 화면을 끄면 재생이 멈춰요
               </p>
             )}
           </div>
 
           {/* 컨트롤 로우: 셔플 · 이전 · 재생/정지 · 다음 · 반복 */}
-          <div className="mx-auto mt-5 flex w-[min(94vw,760px)] shrink-0 items-center justify-center gap-4 px-1 sm:gap-6">
+          <div className="mx-auto mt-4 flex w-[min(94vw,760px)] shrink-0 items-center justify-center gap-4 px-1 sm:gap-6">
             <button
               onClick={toggleShuffle}
               aria-label="셔플"
               aria-pressed={shuffle}
-              className={`${ctrlBtn} h-11 w-11 ${
+              className={`${ctrlBtn} h-10 w-10 ${
                 shuffle
                   ? 'text-light-accent dark:text-dark-accent'
                   : 'text-light-text/50 hover:text-light-text dark:text-dark-text/50 dark:hover:text-dark-text'
               }`}
             >
-              <ShuffleIcon className="h-5 w-5" />
+              <ShuffleIcon className="h-[18px] w-[18px]" />
             </button>
             <button
               onClick={prev}
               disabled={!hasPrev}
               aria-label="이전 곡"
-              className={`${ctrlBtn} h-12 w-12 text-light-text/80 hover:text-light-text dark:text-dark-text/80 dark:hover:text-dark-text`}
+              className={`${ctrlBtn} h-11 w-11 text-light-text/80 hover:text-light-text dark:text-dark-text/80 dark:hover:text-dark-text`}
             >
-              <BackwardIcon className="h-7 w-7" />
+              <BackwardIcon className="h-6 w-6" />
             </button>
             <button
               onClick={toggle}
               aria-label={playing ? '일시정지' : '재생'}
-              className={`${ctrlBtn} h-16 w-16 bg-gradient-to-br from-light-accent to-light-purple text-white shadow-lg shadow-light-accent/30 hover:scale-105 dark:from-dark-accent dark:to-dark-purple dark:shadow-dark-accent/30`}
+              className={`${ctrlBtn} h-14 w-14 bg-gradient-to-br from-light-accent to-light-purple text-white shadow-lg shadow-light-accent/30 hover:scale-105 dark:from-dark-accent dark:to-dark-purple dark:shadow-dark-accent/30`}
             >
-              {playing ? <PauseIcon className="h-8 w-8" /> : <PlayIcon className="h-8 w-8 translate-x-0.5" />}
+              {playing ? <PauseIcon className="h-7 w-7" /> : <PlayIcon className="h-7 w-7 translate-x-0.5" />}
             </button>
             <button
               onClick={next}
               disabled={!hasNext}
               aria-label="다음 곡"
-              className={`${ctrlBtn} h-12 w-12 text-light-text/80 hover:text-light-text dark:text-dark-text/80 dark:hover:text-dark-text`}
+              className={`${ctrlBtn} h-11 w-11 text-light-text/80 hover:text-light-text dark:text-dark-text/80 dark:hover:text-dark-text`}
             >
-              <ForwardIcon className="h-7 w-7" />
+              <ForwardIcon className="h-6 w-6" />
             </button>
             <button
               onClick={cycleRepeat}
               aria-label={repeat === 'one' ? '한 곡 반복' : repeat === 'all' ? '전곡 반복' : '반복 없음'}
               aria-pressed={repeat !== 'off'}
-              className={`${ctrlBtn} h-11 w-11 ${
+              className={`${ctrlBtn} h-10 w-10 ${
                 repeat !== 'off'
                   ? 'text-light-accent dark:text-dark-accent'
                   : 'text-light-text/50 hover:text-light-text dark:text-dark-text/50 dark:hover:text-dark-text'
               }`}
             >
-              <RepeatIcon className="h-5 w-5" one={repeat === 'one'} />
+              <RepeatIcon className="h-[18px] w-[18px]" one={repeat === 'one'} />
             </button>
           </div>
 
@@ -335,6 +347,7 @@ export default function MiniPlayer() {
             </div>
             {queue.map((clip, i) => {
               const active = i === currentIndex;
+              const dur = clipDurationSec(clip);
               return (
                 <button
                   key={clip.clipId}
@@ -362,6 +375,11 @@ export default function MiniPlayer() {
                     <div className="truncate text-sm font-medium text-light-text dark:text-dark-text">{clip.title}</div>
                     <div className="truncate text-xs text-light-text/55 dark:text-dark-text/55">{clip.artist}</div>
                   </div>
+                  {dur != null && (
+                    <span className="shrink-0 text-[11px] tabular-nums text-light-text/45 dark:text-dark-text/45">
+                      {formatClipTime(dur)}
+                    </span>
+                  )}
                   <span
                     className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
                       clip.platform === 'chzzk'

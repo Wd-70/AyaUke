@@ -38,6 +38,13 @@ export function toPlayerClip(raw: unknown): PlayerClip | null {
   };
 }
 
+/** 클립 구간 길이(초). endTime이 없거나 startTime 이하이면 null(길이 미상). */
+export function clipDurationSec(clip: PlayerClip): number | null {
+  if (typeof clip.endTime !== 'number') return null;
+  const d = clip.endTime - clip.startTime;
+  return d > 0 ? d : null;
+}
+
 /** 유튜브/치지직 클립의 대표 썸네일 URL (MediaSession artwork 등). */
 export function clipArtwork(clip: PlayerClip): string | undefined {
   if (clip.thumbnailUrl) return clip.thumbnailUrl;

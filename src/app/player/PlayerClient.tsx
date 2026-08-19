@@ -20,6 +20,13 @@ function buildQueue(playlist: PlaylistWithClips): PlayerClip[] {
     .filter((c): c is PlayerClip => !!c);
 }
 
+/** 커버 이미지 → 없으면 순서상 첫 클립(썸네일 있는)의 썸네일 → 없으면 null. */
+function playlistCover(playlist: PlaylistWithClips): string | null {
+  if (playlist.coverImage) return playlist.coverImage;
+  const first = buildQueue(playlist).find((c) => !!c.thumbnailUrl);
+  return first?.thumbnailUrl ?? null;
+}
+
 export default function PlayerClient() {
   const { data: session, status } = useSession();
   const { playlists, isLoading } = useGlobalClipPlaylists();
@@ -88,15 +95,16 @@ export default function PlayerClient() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {playlists.map((playlist) => {
                 const count = playlist.clips?.length ?? 0;
+                const cover = playlistCover(playlist);
                 return (
                   <div
                     key={playlist._id}
                     className="group flex items-center gap-3 rounded-2xl border border-light-primary/15 bg-white/60 p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/15 dark:bg-gray-800/50 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow"
                   >
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-light-accent/25 to-light-purple/20 dark:from-dark-accent/25 dark:to-dark-purple/20">
-                      {playlist.coverImage ? (
+                    <div className="flex aspect-square h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-light-accent/25 to-light-purple/20 dark:from-dark-accent/25 dark:to-dark-purple/20">
+                      {cover ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={playlist.coverImage} alt="" className="h-full w-full object-cover" />
+                        <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover" />
                       ) : (
                         <MusicalNoteIcon className="h-6 w-6 text-light-accent/50 dark:text-dark-accent/50" />
                       )}
