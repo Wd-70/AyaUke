@@ -429,7 +429,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                             : 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300'
                         }`}
                       >
-                        {clip.platform === 'chzzk' ? '치지직' : 'YT'}
+                        {clip.platform === 'chzzk' ? '치지직' : '유튜브'}
                       </span>
                     </div>
                   </div>

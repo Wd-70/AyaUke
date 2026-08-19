@@ -144,18 +144,25 @@ export default function MiniPlayer() {
   }, [isExpanded, videoCompact]);
 
   // 펼침 중 배경 페이지 스크롤 잠금 — 오버레이 위 스크롤이 뒤 페이지로 전파되어
-  // 접었을 때 엉뚱한 위치로 이동하는 문제 방지. 스크롤바 폭만큼 패딩 보정으로 레이아웃 흔들림 억제.
+  // 접었을 때 엉뚱한 위치로 이동하는 문제 방지. 실제 스크롤러는 html(documentElement)이라
+  // body만 잠그면 소용없어 둘 다 잠근다. 스크롤바 폭만큼 패딩 보정으로 레이아웃 흔들림 억제.
   useEffect(() => {
     if (!isExpanded) return;
+    const html = document.documentElement;
     const body = document.body;
-    const prevOverflow = body.style.overflow;
-    const prevPadRight = body.style.paddingRight;
-    const sbw = window.innerWidth - document.documentElement.clientWidth;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyPadRight: body.style.paddingRight,
+    };
+    const sbw = window.innerWidth - html.clientWidth;
+    html.style.overflow = 'hidden';
     body.style.overflow = 'hidden';
     if (sbw > 0) body.style.paddingRight = `${sbw}px`;
     return () => {
-      body.style.overflow = prevOverflow;
-      body.style.paddingRight = prevPadRight;
+      html.style.overflow = prev.htmlOverflow;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.paddingRight = prev.bodyPadRight;
     };
   }, [isExpanded]);
 
@@ -336,8 +343,8 @@ export default function MiniPlayer() {
             </button>
           </div>
 
-          {/* 큐 — 이 영역만 스크롤 */}
-          <div className="mt-6 min-h-0 flex-1 overflow-y-auto">
+          {/* 큐 — 이 영역만 스크롤 (overscroll-contain: 끝에서 배경으로 스크롤 체이닝 방지) */}
+          <div className="mt-6 min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="mx-auto w-[min(94vw,760px)] space-y-1 px-1 pb-10">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-xs font-semibold text-light-text/45 dark:text-dark-text/45">재생목록</span>
@@ -387,7 +394,7 @@ export default function MiniPlayer() {
                         : 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-300'
                     }`}
                   >
-                    {clip.platform === 'chzzk' ? '치지직' : 'YT'}
+                    {clip.platform === 'chzzk' ? '치지직' : '유튜브'}
                   </span>
                 </button>
               );
