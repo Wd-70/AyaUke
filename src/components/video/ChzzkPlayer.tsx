@@ -3,8 +3,14 @@
 import { useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import Hls from "hls.js";
 import { formatSeconds } from "@/lib/timeUtils";
-import { resolveVodMp4Url } from "@/shared/utils/chzzk-vod";
+import { resolveVodRenditions, type Mp4Rendition } from "@/shared/utils/chzzk-vod";
 import { loadStoredVolume, saveStoredVolume } from "@/components/clip/volume-storage";
+
+/** 화질 선택 옵션 (HLS 레벨 또는 MP4 렌디션 공통). value=-1은 HLS 자동(ABR). */
+interface QualityOption {
+  value: number;
+  label: string;
+}
 
 interface ChzzkPlayerProps {
   videoUrl: string;
@@ -46,6 +52,10 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
   const [loading, setLoading] = useState(true);
   const [hlsUrl, setHlsUrl] = useState<string | null>(null);
   const [streamType, setStreamType] = useState<'hls' | 'mp4'>('hls');
+  // 화질 선택: HLS는 레벨 인덱스(-1=자동), MP4는 렌디션 인덱스. 옵션이 2개 이상일 때만 노출.
+  const [qualityOptions, setQualityOptions] = useState<QualityOption[]>([]);
+  const [quality, setQuality] = useState<number>(-1);
+  const mp4RenditionsRef = useRef<Mp4Rendition[]>([]);
 
   // Fetch HLS URL from Chzzk API
   useEffect(() => {
@@ -72,10 +82,13 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
         setDuration(data.duration || 0);
 
         if (data.streamType === 'vod') {
-          // 영구 보존 VOD: vodplay 토큰이 호출 IP에 묶이므로 브라우저가 직접 MP4 URL을 받는다.
-          const mp4Url = await resolveVodMp4Url(data.vodVideoId, data.vodInKey);
-          if (!mp4Url) throw new Error("재생할 수 있는 영상이 아닙니다.");
-          setHlsUrl(mp4Url);
+          // 영구 보존 VOD: vodplay 토큰이 호출 IP에 묶이므로 브라우저가 직접 MP4 URL(화질별)을 받는다.
+          const renditions = await resolveVodRenditions(data.vodVideoId, data.vodInKey);
+          if (renditions.length === 0) throw new Error("재생할 수 있는 영상이 아닙니다.");
+          mp4RenditionsRef.current = renditions;
+          setQualityOptions(renditions.map((r, i) => ({ value: i, label: `${r.height}p` })));
+          setQuality(0); // 기본: 최고 화질 (편집용 — 프레임 식별)
+          setHlsUrl(renditions[0].url);
           setStreamType('mp4');
         } else {
           if (!data.streamUrl) {
@@ -105,6 +118,7 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
     // 영구 보존 VOD: progressive MP4 — 네이티브 재생 (Range 시킹 지원)
     if (streamType === 'mp4') {
       video.src = hlsUrl;
+      // once: 초기 로드에만 시킹. 화질 교체(changeQuality)의 src 재설정과 충돌하지 않도록.
       const onLoadedMeta = () => {
         setIsReady(true);
         setError(null);
@@ -112,7 +126,7 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
           video.currentTime = startTime;
         }
       };
-      video.addEventListener("loadedmetadata", onLoadedMeta);
+      video.addEventListener("loadedmetadata", onLoadedMeta, { once: true });
       return () => {
         video.removeEventListener("loadedmetadata", onLoadedMeta);
         video.removeAttribute("src");
@@ -123,6 +137,9 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
+        // 플레이어 실제 픽셀 크기(DPR 반영)에 맞춰 auto 화질 상한을 캡 —
+        // 작은 편집 플레이어에 불필요한 고화질을 받지 않아 대역폭/디코드 절약.
+        capLevelToPlayerSize: true,
       });
 
       hls.loadSource(hlsUrl);
@@ -131,6 +148,16 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         setIsReady(true);
         setError(null);
+        // 화질 레벨 목록 구성 (높이 내림차순) + '자동'(ABR). 레벨이 여러 개일 때만 노출.
+        const levels = hls.levels
+          .map((l, i) => ({ value: i, label: l.height ? `${l.height}p` : `${Math.round((l.bitrate || 0) / 1000)}k` }))
+          .sort((a, b) => {
+            const ha = hls.levels[a.value].height || 0;
+            const hb = hls.levels[b.value].height || 0;
+            return hb - ha;
+          });
+        setQualityOptions(levels.length > 1 ? [{ value: -1, label: '자동' }, ...levels] : []);
+        setQuality(-1); // 자동(ABR)
         if (startTime && startTime > 0) {
           video.currentTime = startTime;
         }
@@ -247,6 +274,43 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
     };
   }, [isReady, onTimeUpdate, onDurationChange, onPlayStateChange]);
 
+  // 화질 변경. HLS는 currentLevel(-1=자동), MP4는 화질별 URL로 src 교체(위치·재생상태 유지).
+  const changeQuality = (value: number) => {
+    setQuality(value);
+    if (streamType === 'hls') {
+      if (hlsRef.current) hlsRef.current.currentLevel = value;
+      return;
+    }
+    const video = videoRef.current;
+    const rend = mp4RenditionsRef.current[value];
+    if (!video || !rend) return;
+    const t = video.currentTime;
+    const wasPlaying = !video.paused;
+    const onMeta = () => {
+      video.currentTime = t;
+      if (wasPlaying) video.play().catch(() => {});
+      video.removeEventListener("loadedmetadata", onMeta);
+    };
+    video.addEventListener("loadedmetadata", onMeta);
+    video.src = rend.url;
+    video.load();
+  };
+
+  const QualitySelect = qualityOptions.length > 1 ? (
+    <label className="flex items-center gap-1 text-xs text-light-text/60 dark:text-dark-text/60">
+      <span>화질</span>
+      <select
+        value={quality}
+        onChange={(e) => changeQuality(Number(e.target.value))}
+        className="rounded border border-light-primary/25 bg-white px-1.5 py-0.5 text-xs text-light-text dark:border-dark-primary/25 dark:bg-gray-800 dark:text-dark-text"
+      >
+        {qualityOptions.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </label>
+  ) : null;
+
   if (isDeleted || error) {
     return (
       <div className={`flex flex-col ${className}`}>
@@ -325,10 +389,13 @@ const ChzzkPlayer = forwardRef<ChzzkPlayerHandle, ChzzkPlayerProps>(function Chz
         />
       </div>
 
-      {/* Time Display */}
+      {/* Time Display + 화질 선택 */}
       <div className="mt-3 px-2">
-        <div className="text-sm font-mono text-light-text dark:text-dark-text">
-          {formatSeconds(currentTime)} / {formatSeconds(duration)}
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-sm font-mono text-light-text dark:text-dark-text">
+            {formatSeconds(currentTime)} / {formatSeconds(duration)}
+          </div>
+          {QualitySelect}
         </div>
         <p className="text-xs text-light-text/60 dark:text-dark-text/60 mt-1 flex items-center gap-1">
           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
