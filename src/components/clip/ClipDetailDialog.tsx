@@ -18,12 +18,15 @@ import {
   CheckIcon,
   LockClosedIcon,
 } from '@heroicons/react/24/outline';
+import { PlusIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
 import ClipPlayer from './ClipPlayer';
 import ClipLikeButton from './ClipLikeButton';
 import ClipShareButton from './ClipShareButton';
 import AddClipToPlaylistButton from './AddClipToPlaylistButton';
+import { useClipPlayer } from './player/ClipPlayerProvider';
 import { buildSourceUrl } from '@/shared/utils/video-url';
 import { useClipMemo } from '@/hooks/useClipMemos';
+import { useGlobalClipPlaylists } from '@/hooks/useGlobalClipPlaylists';
 import { useToast } from '@/components/Toast';
 import type { PublicClipDTO, PublicClipSummary } from '@/domains/archive/clip.service';
 
@@ -214,6 +217,9 @@ function DialogBody({ clip, onClose }: { clip: ClipDialogTarget; onClose: () => 
               </p>
             )}
 
+            {/* 지금 재생 중인 플레이리스트로 빠르게 담기 */}
+            <QuickAddToCurrentPlaylist clipId={clip.id} />
+
             {/* 액션 */}
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <ClipLikeButton clipId={clip.id} initialCount={clip.likeCount} size="lg" />
@@ -245,6 +251,53 @@ function DialogBody({ clip, onClose }: { clip: ClipDialogTarget; onClose: () => 
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+/**
+ * 지금 재생 중인 플레이리스트로 이 클립을 바로 담기/빼기.
+ * 플레이어의 currentSourceId(재생 중 플레이리스트 id)를 인식해 해당 플레이리스트가 있을 때만 노출.
+ */
+function QuickAddToCurrentPlaylist({ clipId }: { clipId: string }) {
+  const { currentSourceId } = useClipPlayer();
+  const { playlists, getPlaylistsForClip, addClipToPlaylist, removeClipFromPlaylist, isClipOperating } =
+    useGlobalClipPlaylists();
+
+  const target = currentSourceId ? playlists.find((p) => p._id === currentSourceId) : undefined;
+  if (!target) return null;
+
+  const inPlaylist = getPlaylistsForClip(clipId).some((p) => p._id === target._id);
+  const operating = isClipOperating(clipId, target._id);
+
+  const onClick = () => {
+    if (operating) return;
+    if (inPlaylist) void removeClipFromPlaylist(target._id, clipId);
+    else void addClipToPlaylist(target._id, clipId);
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={operating}
+      aria-pressed={inPlaylist}
+      className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all disabled:opacity-60 ${
+        inPlaylist
+          ? 'border border-light-accent/40 bg-light-accent/10 text-light-accent dark:border-dark-accent/40 dark:bg-dark-accent/10 dark:text-dark-accent'
+          : 'bg-gradient-to-r from-light-accent to-light-purple text-white shadow-sm hover:-translate-y-0.5 dark:from-dark-accent dark:to-dark-purple'
+      }`}
+    >
+      {operating ? (
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/40 border-t-current" />
+      ) : inPlaylist ? (
+        <CheckCircleIcon className="h-5 w-5" />
+      ) : (
+        <PlusIcon className="h-5 w-5" />
+      )}
+      <span className="min-w-0 truncate">
+        재생 중 <span className="font-bold">‘{target.name}’</span>
+        {inPlaylist ? '에 담겨 있어요' : '에 담기'}
+      </span>
+    </button>
   );
 }
 
