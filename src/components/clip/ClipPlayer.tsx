@@ -630,7 +630,10 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       mediaPosTsRef.current = now;
       try {
         const rel = Math.min(Math.max(0, video.currentTime - startTime), dur);
-        ms.setPositionState({ duration: dur, position: rel, playbackRate: video.paused ? 0 : 1 });
+        // playbackRate: 0 — 브라우저 자체 외삽을 끄고 우리가 timeupdate마다 실제 위치를 직접 싣는다.
+        // (외삽에 의존하면 삼성 인터넷 등 timeupdate를 강하게 스로틀하는 브라우저에서 앵커가 낡아
+        //  시간이 구간 끝으로 치솟는다. 외삽 없이 단계적 갱신하면 끝으로 튀지 않는다.)
+        ms.setPositionState({ duration: dur, position: rel, playbackRate: 0 });
       } catch {
         /* 무시 */
       }
@@ -890,7 +893,8 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
           typeof abs === "number" && isFinite(abs)
             ? Math.min(Math.max(0, abs - startTime), clipDuration)
             : Math.min(Math.max(0, clipPosition), clipDuration);
-        ms.setPositionState({ duration: clipDuration, position: real, playbackRate: 1 });
+        // playbackRate: 0 — 외삽 끄고 실제 위치를 직접 싣는다 (timeupdate 핸들러와 동일 이유)
+        ms.setPositionState({ duration: clipDuration, position: real, playbackRate: 0 });
       } else {
         ms.setPositionState(); // 길이 미상 → 초기화
       }
