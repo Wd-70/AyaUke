@@ -797,6 +797,11 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   // 유튜브(iframe)는 포그라운드 컨트롤까지만 동작(플랫폼 제약).
   const navHandlersRef = useRef({ onNext, onPrev });
   navHandlersRef.current = { onNext, onPrev };
+  // 잠금화면 시킹 핸들러가 최신 seek 함수를 참조하도록 (아래에서 정의 후 매 렌더 주입)
+  const seekApiRef = useRef<{ toPos: (rel: number) => void; rel: (d: number) => void }>({
+    toPos: () => {},
+    rel: () => {},
+  });
   useEffect(() => {
     if (!activated || !mediaMeta) return;
     if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
@@ -815,9 +820,9 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       /* 일부 브라우저는 MediaMetadata 미지원 */
     }
 
-    const setAction = (action: MediaSessionAction, handler: (() => void) | null) => {
+    const setAction = (action: MediaSessionAction, handler: MediaSessionActionHandler | null) => {
       try {
-        ms.setActionHandler(action, handler as MediaSessionActionHandler | null);
+        ms.setActionHandler(action, handler);
       } catch {
         /* 미지원 액션 무시 */
       }
@@ -826,13 +831,42 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     setAction("pause", () => { playIntentRef.current = false; adapterRef.current?.pause(); });
     setAction("previoustrack", navHandlersRef.current.onPrev ? () => navHandlersRef.current.onPrev?.() : null);
     setAction("nexttrack", navHandlersRef.current.onNext ? () => navHandlersRef.current.onNext?.() : null);
+    // 잠금화면 시킹 — positionState를 구간 기준으로 싣기 때문에 seekTime도 구간 상대값이다.
+    setAction("seekto", (d) => { if (typeof d.seekTime === "number") seekApiRef.current.toPos(d.seekTime); });
+    setAction("seekbackward", (d) => seekApiRef.current.rel(-(d.seekOffset || 10)));
+    setAction("seekforward", (d) => seekApiRef.current.rel(d.seekOffset || 10));
 
     return () => {
-      (["play", "pause", "previoustrack", "nexttrack"] as MediaSessionAction[]).forEach((a) =>
+      (["play", "pause", "previoustrack", "nexttrack", "seekto", "seekbackward", "seekforward"] as MediaSessionAction[]).forEach((a) =>
         setAction(a, null),
       );
     };
   }, [activated, mediaMeta, onNext, onPrev]);
+
+  // 잠금화면/알림의 진행바를 "다시보기 전체"가 아닌 "클립 구간" 기준으로 표시.
+  // setPositionState에 구간 길이/상대 위치를 실어 브라우저 기본(엘리먼트 전체시간)을 덮어쓴다.
+  // ~1초 단위로만 갱신(정수 초가 바뀔 때)해 과도한 호출을 피한다.
+  const posSec = Math.floor(clipPosition);
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    if (!activated || !mediaMeta) return;
+    const ms = navigator.mediaSession;
+    if (typeof ms.setPositionState !== "function") return;
+    try {
+      if (clipDuration > 0 && isFinite(clipDuration)) {
+        ms.setPositionState({
+          duration: clipDuration,
+          position: Math.min(Math.max(0, clipPosition), clipDuration),
+          playbackRate: 1,
+        });
+      } else {
+        ms.setPositionState(); // 길이 미상 → 초기화
+      }
+    } catch {
+      /* 무시 */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posSec, clipDuration, activated, mediaMeta, playing]);
 
   // 재생상태를 OS 미디어 세션에 반영 (잠금화면 재생/정지 표시)
   useEffect(() => {
@@ -844,6 +878,20 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       /* 무시 */
     }
   }, [playing, activated, mediaMeta]);
+
+  // 포그라운드 복귀 시 재생 복원 — 백그라운드에서 브라우저가 강제로 멈춘 경우, 앱으로 돌아오면
+  // 사용자가 상태바에서 재생을 누르지 않아도 자동 재개(재생 의도가 남아있을 때만).
+  useEffect(() => {
+    if (platform !== "chzzk") return;
+    const onVis = () => {
+      if (document.visibilityState !== "visible") return;
+      if (!playIntentRef.current) return;
+      const v = videoRef.current;
+      if (v && v.paused && !v.ended) void v.play().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [platform]);
 
   /** 구간 내 상대 위치로 시킹 (클램프 + ended 해제 공통 처리) */
   const seekToClipPosition = (rel: number) => {
@@ -862,6 +910,8 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
 
   /** 현재 위치에서 delta초 이동 */
   const seekRelative = (delta: number) => seekToClipPosition(clipPosition + delta);
+  // 잠금화면 시킹 액션이 최신 seek 함수를 쓰도록 매 렌더 주입
+  seekApiRef.current = { toPos: seekToClipPosition, rel: seekRelative };
 
   /** 구간 끝에서 offset초 앞 지점으로 이동 (마지막 부분 확인용) */
   const seekFromEnd = (offset: number) => {
