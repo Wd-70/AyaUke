@@ -104,7 +104,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
       return
     }
     const qIndex = playerClips.slice(0, rowIndex).filter(Boolean).length
-    playQueue(queue, qIndex, { ...opts, sourceId: playlist._id })
+    playQueue(queue, qIndex, { ...opts, sourceId: playlist._id, sourceShareId: shareId, sourceOwned: isOwner })
   }
 
   // ── 서버 반영: 목록 전체를 PUT(추가·제거·정렬을 한 번에) ──

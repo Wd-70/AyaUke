@@ -44,7 +44,11 @@ export default function PlayerClient() {
       showInfo('재생할 클립이 없어요', '이 플레이리스트에 재생 가능한 클립이 없습니다.');
       return;
     }
-    playQueue(queue, startIndex, { sourceId: playlist._id });
+    playQueue(queue, startIndex, {
+      sourceId: playlist._id,
+      sourceShareId: playlist.shareId,
+      sourceOwned: true, // 플레이어 페이지 목록은 내 소유 플레이리스트
+    });
     setExpanded(true);
   };
 
