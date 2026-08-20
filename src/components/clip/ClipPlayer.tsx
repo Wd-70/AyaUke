@@ -270,6 +270,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   // 경우(사용자 의도 아님)를 사용자의 명시적 일시정지와 구분해 재생을 복원하기 위한 플래그.
   const playIntentRef = useRef(false);
   const lastResumeRef = useRef(0);
+  const mediaPosTsRef = useRef(0); // MediaSession positionState 스로틀(~1Hz)
   playingRef.current = playing;
   onEndedRef.current = onEnded;
   onNearEndRef.current = onNearEnd;
@@ -610,12 +611,39 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
         onEndedRef.current?.();
       }
     };
+    // MediaSession 진행바를 미디어 클럭(timeupdate)에 맞춰 갱신 — JS 타이머는 백그라운드에서
+    // 얼어붙어 앵커가 낡으면 브라우저 외삽이 끝까지 치솟는다. timeupdate는 미디어가 구동하므로
+    // 백그라운드에서도 앵커가 신선하게 유지돼 잠금화면 시간이 실제와 맞는다. (~1Hz 스로틀)
+    const onTimeUpdateMS = () => {
+      if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+      const ms = navigator.mediaSession;
+      if (typeof ms.setPositionState !== "function") return;
+      const dur =
+        validEndTime != null
+          ? validEndTime - startTime
+          : isFinite(video.duration)
+            ? video.duration - startTime
+            : 0;
+      if (!(dur > 0)) return;
+      const now = Date.now();
+      if (now - mediaPosTsRef.current < 900) return;
+      mediaPosTsRef.current = now;
+      try {
+        const rel = Math.min(Math.max(0, video.currentTime - startTime), dur);
+        ms.setPositionState({ duration: dur, position: rel, playbackRate: video.paused ? 0 : 1 });
+      } catch {
+        /* 무시 */
+      }
+    };
+
     video.addEventListener("play", onPlay);
     video.addEventListener("pause", onPause);
     video.addEventListener("ended", onVideoEnded);
+    video.addEventListener("timeupdate", onTimeUpdateMS);
 
     return () => {
       cancelled = true;
+      video.removeEventListener("timeupdate", onTimeUpdateMS);
       adapterRef.current = null;
       video.removeEventListener("play", onPlay);
       video.removeEventListener("pause", onPause);
