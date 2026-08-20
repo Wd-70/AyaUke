@@ -4,8 +4,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon, FilmIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import ClipGalleryCard from './ClipGalleryCard';
+import ClipDetailDialog, { type ClipDialogTarget } from './ClipDetailDialog';
 import { usePublicClips, useAllClips, type ClipsFilters } from '@/hooks/usePublicClips';
 import { useBulkClipLikes } from '@/hooks/useClipLikes';
+import { useBulkClipMemos } from '@/hooks/useClipMemos';
 import { useReveal } from '@/components/landing/useReveal';
 import { isTextMatch } from '@/lib/searchUtils';
 
@@ -86,11 +88,20 @@ export default function ClipsGallery() {
   // 표시 중인 클립들의 좋아요 여부를 한 번에 로딩 (카드 하트 초기상태 → 취소 동작 정상화).
   // loadClipLikes는 아직 안 불러온 id만 요청하므로 반복 호출해도 저렴하다.
   const { loadClipLikes } = useBulkClipLikes();
+  // 내 메모 보유 여부도 함께 로딩 (카드 인디케이터). 비로그인은 서버에서 무시됨.
+  const { loadClipMemos, memoFlags } = useBulkClipMemos();
   const displayIdsKey = displayClips.map((c) => c.id).join(',');
   useEffect(() => {
-    if (displayClips.length) void loadClipLikes(displayClips.map((c) => c.id));
+    if (displayClips.length) {
+      const ids = displayClips.map((c) => c.id);
+      void loadClipLikes(ids);
+      void loadClipMemos(ids);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayIdsKey, loadClipLikes]);
+  }, [displayIdsKey, loadClipLikes, loadClipMemos]);
+
+  // 상세 다이얼로그 대상 (카드 일반 클릭 시 열림)
+  const [dialogClip, setDialogClip] = useState<ClipDialogTarget | null>(null);
   const total = searching ? searchResults.length : browse.total;
   const isLoading = searching ? allLoading : browse.isLoading;
   const isError = searching ? allError : browse.isError;
@@ -214,7 +225,12 @@ export default function ClipsGallery() {
             )}
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
               {displayClips.map((clip) => (
-                <ClipGalleryCard key={clip.id} clip={clip} />
+                <ClipGalleryCard
+                  key={clip.id}
+                  clip={clip}
+                  onOpen={setDialogClip}
+                  hasMemo={!!memoFlags[clip.id]}
+                />
               ))}
             </div>
             {/* 무한 스크롤 sentinel + 로딩 */}
@@ -232,6 +248,9 @@ export default function ClipsGallery() {
           </>
         )}
       </div>
+
+      {/* 상세 다이얼로그 — 페이지 이동 없이 빠르게 재생·좋아요·플레이리스트·개인 메모 */}
+      <ClipDetailDialog clip={dialogClip} onClose={() => setDialogClip(null)} />
     </main>
   );
 }

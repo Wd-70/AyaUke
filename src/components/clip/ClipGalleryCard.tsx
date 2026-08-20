@@ -6,7 +6,7 @@ import {
   CheckBadgeIcon,
   MusicalNoteIcon,
 } from '@heroicons/react/24/solid';
-import { PlayCircleIcon } from '@heroicons/react/24/outline';
+import { PlayCircleIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
 import type { PublicClipSummary } from '@/domains/archive/clip.service';
 import AddClipToPlaylistButton from './AddClipToPlaylistButton';
 import ClipLikeButton from './ClipLikeButton';
@@ -29,14 +29,30 @@ function gradientFor(seed: string) {
  * absolute 오버레이(z-10)로 깔린다. 좋아요/플레이리스트 버튼은 링크의 형제(z-20)라
  * 클릭이 링크로 전파되지 않아 상세 페이지로 튀지 않는다. (중첩 앵커 HTML 무효도 해소)
  */
-export default function ClipGalleryCard({ clip }: { clip: PublicClipSummary }) {
+export default function ClipGalleryCard({
+  clip,
+  onOpen,
+  hasMemo = false,
+}: {
+  clip: PublicClipSummary;
+  /** 일반 클릭 시 다이얼로그로 열기 (제공 시 페이지 이동 대신 다이얼로그) */
+  onOpen?: (clip: PublicClipSummary) => void;
+  /** 내 메모 보유 여부 — 카드에 인디케이터 표시 */
+  hasMemo?: boolean;
+}) {
   const isChzzk = clip.platform === 'chzzk';
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-light-primary/15 bg-white/60 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/15 dark:bg-gray-800/50 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow">
-      {/* 카드 전체 이동 링크 (오버레이) */}
+      {/* 카드 전체 링크 (오버레이). 일반 클릭은 다이얼로그로, 새 탭/수정키 클릭은 페이지 이동 유지(SEO/크롤). */}
       <Link
         href={`/clip/${clip.shareId || clip.id}`}
         aria-label={`${clip.title} - ${clip.artist}`}
+        onClick={(e) => {
+          if (!onOpen) return;
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+          e.preventDefault();
+          onOpen(clip);
+        }}
         className="absolute inset-0 z-10 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-light-accent dark:focus-visible:ring-dark-accent"
       />
 
@@ -65,6 +81,14 @@ export default function ClipGalleryCard({ clip }: { clip: PublicClipSummary }) {
         </span>
         {clip.isVerified && (
           <CheckBadgeIcon className="absolute right-2 top-2 z-20 h-5 w-5 text-emerald-400 drop-shadow" />
+        )}
+        {hasMemo && (
+          <span
+            title="내 메모 있음"
+            className="absolute left-2 top-9 z-20 inline-flex items-center gap-0.5 rounded-full bg-light-accent/85 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm dark:bg-dark-accent/85"
+          >
+            <PencilSquareIcon className="h-3 w-3" /> 메모
+          </span>
         )}
 
         {/* 호버 재생 오버레이 — 장식용(클릭 통과) */}
