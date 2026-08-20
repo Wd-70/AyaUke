@@ -151,7 +151,7 @@ function ClipPlaylistMenu({ clipId, position, onClose }: MenuProps) {
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
         transition={{ duration: 0.15 }}
-        className="fixed z-[60] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-light-primary/20 dark:border-dark-primary/20"
+        className="fixed z-[90] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-light-primary/20 dark:border-dark-primary/20"
         style={{ left: x, top: y, width: menuWidth, maxHeight: 400 }}
         onClick={(e) => e.stopPropagation()}
       >
