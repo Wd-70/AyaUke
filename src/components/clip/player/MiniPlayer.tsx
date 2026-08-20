@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   PlayIcon,
   PauseIcon,
@@ -13,7 +14,7 @@ import {
   ArrowsPointingInIcon,
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/solid';
-import { Cog6ToothIcon, QueueListIcon } from '@heroicons/react/24/outline';
+import { Cog6ToothIcon, QueueListIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useClipPlayer } from './ClipPlayerProvider';
 import { clipArtwork, clipDurationSec } from './types';
@@ -118,6 +119,8 @@ export default function MiniPlayer() {
   // 펼침 영상 크기(뷰포트 기준 16:9) + 컴팩트(영상 높이 절반) 토글
   const [stage, setStage] = useState({ w: 0, h: 0 });
   const [videoCompact, setVideoCompact] = useState(false);
+  // 유튜브 백그라운드 재생 안내 상세 팝업
+  const [ytInfoOpen, setYtInfoOpen] = useState(false);
 
   // 컴팩트 선호 로드/저장 (셔플·반복과 동일한 로컬 저장 패턴)
   useEffect(() => {
@@ -310,9 +313,13 @@ export default function MiniPlayer() {
               )}
             </div>
             {!bgSupported && (
-              <p className="mt-1.5 inline-block rounded-full bg-amber-400/15 px-2.5 py-0.5 text-[11px] text-amber-600 dark:text-amber-400">
+              <button
+                onClick={() => setYtInfoOpen(true)}
+                className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2.5 py-0.5 text-[11px] text-amber-600 transition-colors hover:bg-amber-400/25 dark:text-amber-400"
+              >
                 유튜브 클립은 화면을 끄면 재생이 멈춰요
-              </p>
+                <InformationCircleIcon className="h-3.5 w-3.5" />
+              </button>
             )}
           </div>
 
@@ -494,6 +501,58 @@ export default function MiniPlayer() {
             <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
+      )}
+
+      {/* 유튜브 백그라운드 재생 상세 안내 — 포털로 body에 렌더(스테이지 z-70/영상 합성 레이어 위) */}
+      {ytInfoOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="유튜브 백그라운드 안내">
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setYtInfoOpen(false)} />
+          <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-light-primary/20 bg-light-background shadow-2xl dark:border-dark-primary/20 dark:bg-dark-background">
+            <div className="flex items-center gap-2 border-b border-light-primary/10 px-5 py-4 dark:border-dark-primary/10">
+              <InformationCircleIcon className="h-6 w-6 shrink-0 text-amber-500" />
+              <h3 className="flex-1 text-base font-bold text-light-text dark:text-dark-text">유튜브 클립과 백그라운드 재생</h3>
+              <button
+                onClick={() => setYtInfoOpen(false)}
+                aria-label="닫기"
+                className="rounded-full p-1 text-light-text/50 hover:bg-light-primary/10 dark:text-dark-text/50 dark:hover:bg-dark-primary/10"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3 px-5 py-4 text-sm leading-relaxed text-light-text/75 dark:text-dark-text/75">
+              <p>
+                <b className="text-light-text dark:text-dark-text">왜 멈추나요?</b>
+                <br />
+                유튜브 클립은 유튜브 iframe 플레이어로 재생돼요. 유튜브 정책상 화면을 끄거나 앱을 백그라운드로
+                보내면 iframe 재생이 자동으로 멈춥니다. 이는 플랫폼 제약이라 우회할 수 없어요.
+              </p>
+              <p>
+                <b className="text-light-text dark:text-dark-text">백그라운드에서는 어떻게 되나요?</b>
+                <br />
+                이어듣기가 끊기지 않도록, 백그라운드에서는 유튜브 클립을 <b className="text-light-text dark:text-dark-text">자동으로 건너뛰고</b> 다음
+                치지직 클립부터 이어서 재생해요. 재생목록에서 삭제되는 게 아니라 그 순간만 건너뛰는 거예요.
+              </p>
+              <p>
+                <b className="text-light-text dark:text-dark-text">치지직 클립은요?</b>
+                <br />
+                치지직 클립은 브라우저 기본 영상으로 재생돼서 화면을 꺼도 소리가 이어지고, 잠금화면·알림에서
+                재생/정지·다음곡 컨트롤도 됩니다.
+              </p>
+              <p className="rounded-xl bg-amber-400/10 px-3 py-2 text-[13px] text-amber-700 dark:text-amber-300">
+                유튜브 클립을 처음부터 끝까지 보려면 앱을 켠 채로 화면을 유지하세요. 앱으로 돌아오면 다시 정상 재생돼요.
+              </p>
+            </div>
+            <div className="px-5 pb-5">
+              <button
+                onClick={() => setYtInfoOpen(false)}
+                className="w-full rounded-xl bg-gradient-to-r from-light-accent to-light-purple py-2.5 text-sm font-semibold text-white dark:from-dark-accent dark:to-dark-purple"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </>
   );
