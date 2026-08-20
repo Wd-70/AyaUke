@@ -74,7 +74,7 @@ export default function PlayerClient() {
               노래책으로
             </Link>
           </div>
-        ) : isLoading ? (
+        ) : status === 'loading' || isLoading ? (
           <div className="py-20 text-center text-light-text/50 dark:text-dark-text/50">불러오는 중...</div>
         ) : playlists.length === 0 ? (
           <div className="rounded-xl border border-light-primary/15 p-10 text-center dark:border-dark-primary/15">
