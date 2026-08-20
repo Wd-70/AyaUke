@@ -846,6 +846,9 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   // 잠금화면/알림의 진행바를 "다시보기 전체"가 아닌 "클립 구간" 기준으로 표시.
   // setPositionState에 구간 길이/상대 위치를 실어 브라우저 기본(엘리먼트 전체시간)을 덮어쓴다.
   // ~1초 단위로만 갱신(정수 초가 바뀔 때)해 과도한 호출을 피한다.
+  // 중요: position은 화면용 보간값(clipPosition)이 아니라 "실제 미디어 시간"을 싣는다.
+  // 백그라운드에서 clipPosition은 벽시계 보간으로 구간 끝까지 치솟을 수 있어(게이지 부드럽게용),
+  // 그대로 실으면 잠금화면 시간이 끝으로 고정된다. 실제 시간을 앵커로 주고 브라우저가 외삽하게 한다.
   const posSec = Math.floor(clipPosition);
   useEffect(() => {
     if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
@@ -854,11 +857,12 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     if (typeof ms.setPositionState !== "function") return;
     try {
       if (clipDuration > 0 && isFinite(clipDuration)) {
-        ms.setPositionState({
-          duration: clipDuration,
-          position: Math.min(Math.max(0, clipPosition), clipDuration),
-          playbackRate: 1,
-        });
+        const abs = adapterRef.current?.getCurrentTime();
+        const real =
+          typeof abs === "number" && isFinite(abs)
+            ? Math.min(Math.max(0, abs - startTime), clipDuration)
+            : Math.min(Math.max(0, clipPosition), clipDuration);
+        ms.setPositionState({ duration: clipDuration, position: real, playbackRate: 1 });
       } else {
         ms.setPositionState(); // 길이 미상 → 초기화
       }
@@ -866,7 +870,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       /* 무시 */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posSec, clipDuration, activated, mediaMeta, playing]);
+  }, [posSec, clipDuration, activated, mediaMeta, playing, startTime]);
 
   // 재생상태를 OS 미디어 세션에 반영 (잠금화면 재생/정지 표시)
   useEffect(() => {
