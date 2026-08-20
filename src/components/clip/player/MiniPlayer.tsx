@@ -13,10 +13,13 @@ import {
   ArrowsPointingInIcon,
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/solid';
+import { Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
 import { useClipPlayer } from './ClipPlayerProvider';
 import { clipArtwork, clipDurationSec } from './types';
 import { prefetchChzzkStream } from '../chzzk-stream-cache';
 import { formatClipTime } from '@/shared/utils/clip-time';
+import { useGlobalClipPlaylists } from '@/hooks/useGlobalClipPlaylists';
 
 // ClipPlayer(및 hls.js)는 무겁다. 레이아웃 상주 컴포넌트라 모든 페이지 공용 번들에
 // 들어가지 않도록, 실제 재생이 시작될 때만 지연 로드한다.
@@ -96,9 +99,22 @@ export default function MiniPlayer() {
     cycleRepeat,
     close,
     setExpanded,
+    currentSourceId,
     playerRef,
     reportPlaying,
   } = useClipPlayer();
+
+  const router = useRouter();
+  const { playlists } = useGlobalClipPlaylists();
+  // 현재 재생 중인 플레이리스트의 관리 페이지(shareId) — 있으면 상단에 관리 버튼 노출
+  const manageShareId = currentSourceId
+    ? playlists.find((p) => p._id === currentSourceId)?.shareId
+    : undefined;
+  const goManage = () => {
+    if (!manageShareId) return;
+    setExpanded(false); // 아래로 최소화 (재생은 루트 레이아웃 상주라 안 끊김)
+    router.push(`/clip-playlist/${manageShareId}`);
+  };
 
   const stageRef = useRef<HTMLDivElement>(null);
   // 이미 워밍한 클립 id 집합 (중복 프리로드 방지 — 캐시 TTL 안에서만 의미)
@@ -253,13 +269,25 @@ export default function MiniPlayer() {
                 <span className="hidden sm:inline">{videoCompact ? '영상 크게' : '영상 작게'}</span>
               </button>
             </div>
-            <button
-              onClick={close}
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
-              aria-label="플레이어 닫기"
-            >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {manageShareId && (
+                <button
+                  onClick={goManage}
+                  title="이 재생목록 관리"
+                  className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/60 hover:bg-light-primary/10 dark:text-dark-text/60 dark:hover:bg-dark-primary/10"
+                >
+                  <Cog6ToothIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">관리</span>
+                </button>
+              )}
+              <button
+                onClick={close}
+                className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
+                aria-label="플레이어 닫기"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           {/* 대형 영상 자리 확보용 스페이서 (실제 영상은 스테이지가 그림) */}
