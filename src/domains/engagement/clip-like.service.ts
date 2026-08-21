@@ -53,6 +53,12 @@ export async function removeClipLike(channelId: string, clipId: string): Promise
   return (updated as { likeCount?: number } | null)?.likeCount ?? 0;
 }
 
+/** 사용자가 좋아요한 모든 클립의 id 목록 (좋아요 필터용) */
+export async function listLikedClipIds(channelId: string): Promise<string[]> {
+  const likes = await ClipLike.find({ channelId }).select('clipId').lean();
+  return likes.map((l) => String((l as { clipId: unknown }).clipId));
+}
+
 /** 여러 클립의 좋아요 여부를 한 번에 조회 */
 export async function bulkClipLikeStatus(channelId: string, clipIds: string[]) {
   const valid = clipIds.filter((id) => mongoose.Types.ObjectId.isValid(id));

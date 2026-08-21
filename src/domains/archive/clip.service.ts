@@ -135,6 +135,8 @@ export interface PublicClipsQuery {
   q?: string;
   page?: number;
   limit?: number;
+  /** 지정 시 이 _id 집합으로 제한(좋아요 필터 등). 빈 배열이면 결과 없음. */
+  ids?: string[];
 }
 
 // _id를 마지막 정렬키로 둬 동률(likeCount/sungDate 동일) 시에도 순서를 고정한다.
@@ -155,11 +157,14 @@ export async function listAllClipSummaries({
   sort = 'popular',
   platform = 'all',
   verified = false,
+  ids,
 }: Omit<PublicClipsQuery, 'q' | 'page' | 'limit'>): Promise<PublicClipSummary[]> {
+  if (ids && ids.length === 0) return [];
   const match: Record<string, unknown> = { sourceUnavailable: { $ne: true } };
   if (platform === 'chzzk') match.platform = 'chzzk';
   if (platform === 'youtube') match.platform = { $in: ['youtube', null] };
   if (verified) match.isVerified = true;
+  if (ids) match._id = { $in: ids };
 
   const clips = await SongVideo.find(match)
     .sort(PUBLIC_SORTS[sort])
@@ -178,11 +183,17 @@ export async function listPublicClips({
   q,
   page = 1,
   limit = 24,
+  ids,
 }: PublicClipsQuery) {
+  // ids가 빈 배열이면(좋아요 0개) 결과 없음
+  if (ids && ids.length === 0) {
+    return { clips: [], pagination: { page, limit, total: 0, totalPages: 0, hasMore: false } };
+  }
   const match: Record<string, unknown> = { sourceUnavailable: { $ne: true } };
   if (platform === 'chzzk') match.platform = 'chzzk';
   if (platform === 'youtube') match.platform = { $in: ['youtube', null] };
   if (verified) match.isVerified = true;
+  if (ids) match._id = { $in: ids };
   if (q && q.trim()) {
     const re = new RegExp(escapeRe(q.trim()), 'i');
     match.$or = [{ title: re }, { artist: re }, { titleAlias: re }, { artistAlias: re }];

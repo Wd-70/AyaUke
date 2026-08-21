@@ -3,12 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon, FilmIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { HeartIcon } from '@heroicons/react/24/solid';
+import { useSession } from 'next-auth/react';
 import ClipGalleryCard from './ClipGalleryCard';
 import ClipDetailDialog, { type ClipDialogTarget } from './ClipDetailDialog';
 import { usePublicClips, useAllClips, type ClipsFilters } from '@/hooks/usePublicClips';
 import { useBulkClipLikes } from '@/hooks/useClipLikes';
 import { useBulkClipMemos } from '@/hooks/useClipMemos';
 import { useReveal } from '@/components/landing/useReveal';
+import { useToast } from '@/components/Toast';
 import { isTextMatch } from '@/lib/searchUtils';
 
 const SORTS: { key: ClipsFilters['sort']; label: string }[] = [
@@ -52,9 +55,12 @@ function Segmented<T extends string>({
 
 export default function ClipsGallery() {
   const { reveal } = useReveal();
+  const { data: session } = useSession();
+  const { showInfo } = useToast();
   const [sort, setSort] = useState<ClipsFilters['sort']>('popular');
   const [platform, setPlatform] = useState<ClipsFilters['platform']>('all');
   const [verified, setVerified] = useState(false);
+  const [liked, setLiked] = useState(false);
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
 
@@ -67,9 +73,9 @@ export default function ClipsGallery() {
   const searching = q.length > 0;
 
   // 둘러보기: 서버 페이지네이션 무한스크롤
-  const browse = usePublicClips({ sort, platform, verified, q: '' });
+  const browse = usePublicClips({ sort, platform, verified, liked, q: '' });
   // 검색: 전체를 받아 노래책처럼 isTextMatch(초성·한영·띄어쓰기 무시)로 즉시 필터
-  const { allClips, isLoading: allLoading, isError: allError } = useAllClips({ sort, platform, verified }, searching);
+  const { allClips, isLoading: allLoading, isError: allError } = useAllClips({ sort, platform, verified, liked }, searching);
 
   const searchResults = useMemo(() => {
     if (!searching) return [];
@@ -80,7 +86,16 @@ export default function ClipsGallery() {
   const [visibleCount, setVisibleCount] = useState(24);
   useEffect(() => {
     setVisibleCount(24);
-  }, [q, sort, platform, verified]);
+  }, [q, sort, platform, verified, liked]);
+
+  // 좋아요 필터 토글 (로그인 필요)
+  const toggleLiked = () => {
+    if (!liked && !session) {
+      showInfo('로그인이 필요해요', '좋아요한 클립만 보려면 로그인해 주세요.');
+      return;
+    }
+    setLiked((v) => !v);
+  };
 
   // 표시 데이터 통합
   const displayClips = searching ? searchResults.slice(0, visibleCount) : browse.clips;
@@ -183,6 +198,18 @@ export default function ClipsGallery() {
             >
               검증된 클립만
             </button>
+            <button
+              onClick={toggleLiked}
+              aria-pressed={liked}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                liked
+                  ? 'border-rose-400/50 bg-rose-400/10 text-rose-500'
+                  : 'border-light-primary/25 text-light-text/55 hover:text-rose-500 dark:border-dark-primary/25 dark:text-dark-text/55'
+              }`}
+            >
+              <HeartIcon className="h-4 w-4" />
+              좋아요한 클립
+            </button>
           </div>
         </div>
 
@@ -214,7 +241,7 @@ export default function ClipsGallery() {
         ) : displayClips.length === 0 ? (
           <div className="py-20 text-center text-light-text/50 dark:text-dark-text/50">
             <FilmIcon className="mx-auto mb-4 h-12 w-12 opacity-40" />
-            <p>{q ? `'${q}' 검색 결과가 없어요` : '표시할 클립이 없어요'}</p>
+            <p>{q ? `'${q}' 검색 결과가 없어요` : liked ? '좋아요한 클립이 없어요' : '표시할 클립이 없어요'}</p>
           </div>
         ) : (
           <>

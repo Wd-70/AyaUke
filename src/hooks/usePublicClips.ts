@@ -8,6 +8,8 @@ export interface ClipsFilters {
   platform: 'all' | 'youtube' | 'chzzk';
   verified: boolean;
   q: string;
+  /** 내가 좋아요한 클립만 (로그인 필요) */
+  liked: boolean;
 }
 
 interface ClipsPage {
@@ -22,6 +24,7 @@ async function fetchClips(filters: ClipsFilters, page: number): Promise<ClipsPag
     page: String(page),
   });
   if (filters.verified) params.set('verified', 'true');
+  if (filters.liked) params.set('liked', 'true');
   if (filters.q.trim()) params.set('q', filters.q.trim());
 
   const res = await fetch(`/api/clips?${params.toString()}`);
@@ -73,6 +76,7 @@ export function useAllClips(filters: IndexFilters, enabled: boolean) {
     queryFn: async () => {
       const params = new URLSearchParams({ sort: filters.sort, platform: filters.platform });
       if (filters.verified) params.set('verified', 'true');
+      if (filters.liked) params.set('liked', 'true');
       const res = await fetch(`/api/clips/all?${params.toString()}`);
       if (!res.ok) throw new Error('클립 목록을 불러오지 못했습니다');
       const { data } = await res.json();
