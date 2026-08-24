@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { PlayIcon } from '@heroicons/react/24/solid';
 import {
@@ -12,6 +13,38 @@ import {
 } from '@heroicons/react/24/outline';
 import { useRecentVideos, type RecentVideo } from '@/hooks/useRecentVideos';
 import { useReveal } from './useReveal';
+
+/**
+ * 썸네일 — 원격 이미지가 없거나(방송 직후 미생성) 로드 실패(삭제된 영상 등)하면
+ * 깨진 이미지 대신 브랜드 톤의 폴백을 보여준다.
+ * (치지직 공식 폴백으로 바꾸려면 이 컴포넌트만 교체하면 된다)
+ */
+function Thumbnail({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  const showFallback = !src || failed;
+
+  if (showFallback) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-light-primary/20 to-light-secondary/15 dark:from-dark-primary/20 dark:to-dark-secondary/15">
+        <div className="flex flex-col items-center gap-2 text-light-accent-deep/40 dark:text-dark-accent/40">
+          <FilmIcon className="h-10 w-10" />
+          <span className="text-xs font-medium tracking-wide">준비 중</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+    />
+  );
+}
 
 const CHZZK_VIDEOS = 'https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc/videos';
 const YT_ARCHIVE = 'https://www.youtube.com/@AyaUke_Archive/videos';
@@ -27,13 +60,7 @@ function VideoCard({ video, i }: { video: RecentVideo; i: number }) {
       className="group overflow-hidden rounded-2xl border border-light-primary/15 bg-white/60 shadow-sm transition-all duration-300 hover:-translate-y-2 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/15 dark:bg-gray-800/50 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow"
     >
       <div className="relative aspect-video overflow-hidden bg-light-primary/10 dark:bg-dark-primary/10">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={video.thumbnail}
-          alt={video.title}
-          loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+        <Thumbnail src={video.thumbnail} alt={video.title} />
         <div className="absolute inset-0 flex items-center justify-center bg-black/25 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
           <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-light-accent to-light-purple text-white shadow-lg dark:from-dark-primary dark:to-dark-secondary">
             <PlayIcon className="h-7 w-7 translate-x-0.5" />
