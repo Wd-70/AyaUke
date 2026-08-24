@@ -1,4 +1,4 @@
-import { resolveVodRenditions, type Mp4Rendition } from '@/shared/utils/chzzk-vod';
+import { resolveVodMedia, type Mp4Rendition } from '@/shared/utils/chzzk-vod';
 
 /**
  * 치지직 다시보기 스트림 정보의 짧은 수명 클라이언트 캐시.
@@ -18,6 +18,8 @@ export interface ChzzkStream {
   mp4Url?: string | null;
   /** vod 타입일 때 화질별 렌디션 (화질 선택용, 높이 내림차순) */
   renditions?: Mp4Rendition[];
+  /** vod 타입일 때 오디오 전용(.m4a) URL — 라디오 모드 재생용(호출 IP에 묶임) */
+  audioUrl?: string | null;
 }
 
 const TTL_MS = 90_000;
@@ -48,12 +50,14 @@ async function fetchStream(videoNo: string): Promise<ChzzkStream> {
   // vod는 브라우저가 직접 화질별 MP4 렌디션을 해석해 함께 캐시 (전환 지연 축소 + 화질 선택)
   if (data.streamType === 'vod' && data.vodVideoId && data.vodInKey) {
     try {
-      const renditions = await resolveVodRenditions(data.vodVideoId, data.vodInKey);
+      const { renditions, audioUrl } = await resolveVodMedia(data.vodVideoId, data.vodInKey);
       data.renditions = renditions;
       data.mp4Url = renditions[0]?.url ?? null; // 최고 화질 기본
+      data.audioUrl = audioUrl; // 라디오 모드용 오디오 전용 URL
     } catch {
       data.renditions = [];
       data.mp4Url = null;
+      data.audioUrl = null;
     }
   }
   return data;

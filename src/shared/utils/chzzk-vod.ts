@@ -49,6 +49,27 @@ export function pickBestMp4Url(playback: Record<string, unknown>): string | null
   return pickMp4Renditions(playback)[0]?.url ?? null;
 }
 
+/**
+ * 네이버 VOD 재생 JSON(DASH)에서 오디오 전용 통짜 파일(.m4a) URL 추출 (순수).
+ * `audio/mp4` adaptationSet의 representation baseURL이 완전한 AAC 파일(range 재생 가능)이라
+ * MSE 없이 그대로 재생할 수 있다. 치지직 공식 "라디오 모드"의 오디오 소스와 동일.
+ */
+export function pickAudioUrl(playback: Record<string, unknown>): string | null {
+  const periods = (playback?.period as Array<Record<string, unknown>>) ?? [];
+  for (const period of periods) {
+    const sets = (period?.adaptationSet as Array<Record<string, unknown>>) ?? [];
+    for (const set of sets) {
+      if (set?.mimeType !== "audio/mp4") continue;
+      const reps = (set?.representation as Array<Record<string, unknown>>) ?? [];
+      for (const rep of reps) {
+        const url = (rep?.baseURL as Array<{ value?: string }>)?.[0]?.value;
+        if (url) return url;
+      }
+    }
+  }
+  return null;
+}
+
 async function fetchVodPlayback(videoId: string, inKey: string): Promise<Record<string, unknown> | null> {
   try {
     const res = await fetch(
@@ -78,4 +99,14 @@ export async function resolveVodRenditions(videoId: string, inKey: string): Prom
 export async function resolveVodMp4Url(videoId: string, inKey: string): Promise<string | null> {
   const playback = await fetchVodPlayback(videoId, inKey);
   return playback ? pickBestMp4Url(playback) : null;
+}
+
+/** VOD 화질별 MP4 렌디션 + 오디오 전용(.m4a) URL을 한 번의 요청으로 함께 받는다(브라우저 전용). */
+export async function resolveVodMedia(
+  videoId: string,
+  inKey: string,
+): Promise<{ renditions: Mp4Rendition[]; audioUrl: string | null }> {
+  const playback = await fetchVodPlayback(videoId, inKey);
+  if (!playback) return { renditions: [], audioUrl: null };
+  return { renditions: pickMp4Renditions(playback), audioUrl: pickAudioUrl(playback) };
 }

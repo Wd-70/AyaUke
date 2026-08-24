@@ -119,6 +119,8 @@ export default function MiniPlayer() {
   // 펼침 영상 크기(뷰포트 기준 16:9) + 컴팩트(영상 높이 절반) 토글
   const [stage, setStage] = useState({ w: 0, h: 0 });
   const [videoCompact, setVideoCompact] = useState(false);
+  // 라디오(오디오 전용) 활성 — ClipPlayer가 통지. 활성 시 컴팩트 무의미 → 항상 큰 크기 + 토글 숨김
+  const [radioOn, setRadioOn] = useState(false);
   // 유튜브 백그라운드 재생 안내 상세 팝업
   const [ytInfoOpen, setYtInfoOpen] = useState(false);
 
@@ -149,14 +151,29 @@ export default function MiniPlayer() {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
       const maxW = Math.min(vw * 0.94, 760);
-      const heightBudget = vh * (videoCompact ? 0.24 : 0.46);
+      // 라디오 모드는 세로 공간이 이미 충분히 확보되므로 컴팩트(좌우 축소)를 무시하고 큰 폭 유지
+      const heightBudget = vh * (videoCompact && !radioOn ? 0.24 : 0.46);
       const w = Math.min(maxW, (heightBudget * 16) / 9);
       setStage({ w: Math.round(w), h: Math.round((w * 9) / 16) });
     };
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, [isExpanded, videoCompact]);
+  }, [isExpanded, videoCompact, radioOn]);
+
+  // 스테이지(고정 위치)는 내용에 따라 높이가 달라진다(영상 16:9 / 라디오 컴팩트 패널).
+  // 아래 스페이서가 실제 렌더 높이를 예약하도록 ResizeObserver로 측정 → 라디오 전환 시 빈 공간 방지.
+  const [stageH, setStageH] = useState(0);
+  useEffect(() => {
+    if (!isExpanded) return;
+    const el = stageRef.current;
+    if (!el) return;
+    const update = () => setStageH(el.getBoundingClientRect().height);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isExpanded]);
 
   // 펼침 중 배경 페이지 스크롤 잠금 — 오버레이 위 스크롤이 뒤 페이지로 전파되어
   // 접었을 때 엉뚱한 위치로 이동하는 문제 방지. 실제 스크롤러는 html(documentElement)이라
@@ -258,15 +275,18 @@ export default function MiniPlayer() {
               >
                 <ChevronDownIcon className="h-5 w-5" /> 접기
               </button>
-              <button
-                onClick={toggleCompact}
-                aria-pressed={videoCompact}
-                title={videoCompact ? '영상 크게' : '영상 작게(재생목록 넓게)'}
-                className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/60 hover:bg-light-primary/10 dark:text-dark-text/60 dark:hover:bg-dark-primary/10"
-              >
-                {videoCompact ? <ArrowsPointingOutIcon className="h-4 w-4" /> : <ArrowsPointingInIcon className="h-4 w-4" />}
-                <span className="hidden sm:inline">{videoCompact ? '영상 크게' : '영상 작게'}</span>
-              </button>
+              {/* 라디오 모드는 이미 세로 공간이 확보돼 영상 크기 토글이 무의미 → 숨김 */}
+              {!radioOn && (
+                <button
+                  onClick={toggleCompact}
+                  aria-pressed={videoCompact}
+                  title={videoCompact ? '영상 크게' : '영상 작게(재생목록 넓게)'}
+                  className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/60 hover:bg-light-primary/10 dark:text-dark-text/60 dark:hover:bg-dark-primary/10"
+                >
+                  {videoCompact ? <ArrowsPointingOutIcon className="h-4 w-4" /> : <ArrowsPointingInIcon className="h-4 w-4" />}
+                  <span className="hidden sm:inline">{videoCompact ? '영상 크게' : '영상 작게'}</span>
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-1">
               {currentSourceShareId && (
@@ -289,8 +309,9 @@ export default function MiniPlayer() {
             </div>
           </div>
 
-          {/* 대형 영상 자리 확보용 스페이서 (실제 영상은 스테이지가 그림) */}
-          <div className="mx-auto shrink-0" style={{ width: stage.w, height: stage.h }} />
+          {/* 대형 영상 자리 확보용 스페이서 (실제 영상은 고정 스테이지가 그림).
+              라디오 모드 등으로 스테이지가 짧아지면 측정 높이로 예약해 빈 공간을 없앤다. */}
+          <div className="mx-auto shrink-0 transition-[height] duration-200" style={{ width: stage.w, height: stageH || stage.h }} />
 
           {/* 현재 곡 정보 — 제목 · 아티스트 · 날짜를 한 줄로 통합 (작고 세련되게) */}
           <div className="mx-auto mt-3 w-[min(94vw,760px)] shrink-0 px-4 text-center">
@@ -459,7 +480,8 @@ export default function MiniPlayer() {
             posterDescription={current.description ?? undefined}
             trackPlayClipId={current.clipId}
             hideChrome={!isExpanded}
-            compact={isExpanded && videoCompact}
+            compact={isExpanded && videoCompact && !radioOn}
+            onRadioChange={setRadioOn}
             className="w-full shadow-lg"
           />
         </Suspense>

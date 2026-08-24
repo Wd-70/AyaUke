@@ -18,6 +18,7 @@ import {
   ArrowsPointingOutIcon,
   ArrowsPointingInIcon,
   MusicalNoteIcon,
+  VideoCameraIcon,
 } from "@heroicons/react/24/solid";
 import { CalendarDaysIcon, UserIcon } from "@heroicons/react/24/outline";
 import type { VideoPlatform } from "@/shared/utils/video-url";
@@ -71,6 +72,8 @@ interface ClipPlayerProps {
   hideChrome?: boolean;
   /** 컴팩트 표시(영상 작게 모드) — 좁은 폭에 맞춰 컨트롤 밀도를 높인다(간격 축소·음량 슬라이더 숨김) */
   compact?: boolean;
+  /** 라디오(오디오 전용) 활성 여부 통지 — 부모가 레이아웃(크기·토글 노출)을 맞추도록 */
+  onRadioChange?: (radioActive: boolean) => void;
 }
 
 /** onNearEnd를 발화할 잔여시간 임계값(초) */
@@ -210,6 +213,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   onNearEnd,
   hideChrome = false,
   compact = false,
+  onRadioChange,
 }: ClipPlayerProps, ref) {
   // endTime이 없거나 startTime 이하(잘못된 구간)면 "끝까지"로 취급한다.
   // (이 값이 0/음수가 되면 clipDuration이 0이 되어 진행바가 멈추거나, VOD 전체를
@@ -254,6 +258,9 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   const qualityModeRef = useRef<"hls" | "mp4" | "none">("none");
   qualityModeRef.current = qualityMode;
   const mp4RenditionsRef = useRef<Mp4Rendition[]>([]); // MP4 화질별 URL (hlsLevels와 인덱스 정렬)
+  const audioUrlRef = useRef<string | null>(null); // 라디오 모드용 오디오 전용(.m4a) URL
+  const videoSrcRef = useRef<string | null>(null); // 라디오 해제 시 복원할 영상 소스(현재 화질)
+  const [audioAvailable, setAudioAvailable] = useState(false); // 오디오 전용 소스 존재(라디오 가능)
   const [clipPosition, setClipPosition] = useState(0); // 구간 상대 시간
   const [clipDuration, setClipDuration] = useState(
     validEndTime != null ? Math.max(0, validEndTime - startTime) : 0,
@@ -353,12 +360,54 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     [hlsLevels, applyQualityIndex],
   );
 
-  // 라디오 모드 토글 — 영상 UI 숨김 + 최저 화질로 데이터/디코드 최소화(HLS·MP4 공통)
+  // 라디오 모드 소스 전환 — 오디오 전용(.m4a) ↔ 영상 소스. 위치·재생상태 보존.
+  // 치지직 공식 라디오 모드와 동일하게 비디오를 아예 받지 않아 데이터를 크게 아낀다.
+  const applyRadioSource = useCallback((on: boolean) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const swapTo = (url: string, onLevel?: () => void) => {
+      if (v.src.split("?")[0] === url.split("?")[0]) return;
+      const t = v.currentTime;
+      const wasPlaying = !v.paused && !v.ended;
+      v.src = url;
+      onLevel?.();
+      v.addEventListener(
+        "loadedmetadata",
+        () => {
+          v.currentTime = t;
+          if (wasPlaying) void v.play();
+        },
+        { once: true },
+      );
+    };
+    if (on) {
+      const audio = audioUrlRef.current;
+      if (audio) swapTo(audio);
+      return;
+    }
+    // 해제 → 현재 선호 화질의 영상 소스로 복원
+    const rends = mp4RenditionsRef.current;
+    if (rends.length > 0) {
+      let idx = 0;
+      if (qualityPrefRef.current !== "auto") {
+        idx = nearestLevelIndex(rends.map((r) => ({ height: r.height, bitrate: r.bandwidth })), qualityPrefRef.current);
+      }
+      const rend = rends[idx] ?? rends[0];
+      if (rend) swapTo(rend.url, () => setHlsLevel(idx));
+    } else if (videoSrcRef.current) {
+      swapTo(videoSrcRef.current);
+    }
+  }, []);
+
+  // 라디오 모드 토글 — 오디오 전용 소스가 있으면 그것으로 전환(진짜 오디오 전용),
+  // 없으면(HLS 라이브 등) 기존처럼 최저 화질 + 영상 숨김으로 폴백.
   const toggleRadio = useCallback(() => {
     const next = !radioModeRef.current;
     setRadioMode(next);
     saveRadioPref(next);
-    if (hlsLevels.length > 0) {
+    if (audioUrlRef.current) {
+      applyRadioSource(next);
+    } else if (hlsLevels.length > 0) {
       const idx = next
         ? lowestLevelIndex(hlsLevels)
         : qualityPrefRef.current !== "auto"
@@ -366,7 +415,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
           : -1;
       applyQualityIndex(idx);
     }
-  }, [hlsLevels, applyQualityIndex]);
+  }, [hlsLevels, applyQualityIndex, applyRadioSource]);
 
   // ── 플레이어 초기화 ──────────────────────────────────────────────
   useEffect(() => {
@@ -519,9 +568,11 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
 
     // 캐시 우선 로더 사용 — 다음 곡 prefetch가 채운 스트림 정보를 재사용해 전환 지연을 줄인다.
     loadChzzkStream(videoNo)
-      .then(({ streamUrl, streamType, videoTitle, mp4Url: resolvedMp4, renditions }) => {
+      .then(({ streamUrl, streamType, videoTitle, mp4Url: resolvedMp4, renditions, audioUrl }) => {
         if (cancelled) return;
         if (videoTitle) setVodTitle(videoTitle);
+        audioUrlRef.current = audioUrl ?? null;
+        setAudioAvailable(!!audioUrl);
 
         // 영구 보존 VOD: vodplay 토큰이 호출 IP에 묶이므로 브라우저가 직접 MP4 URL을 받는다.
         // (loadChzzkStream이 vod의 화질별 렌디션을 미리 해석해둔다)
@@ -534,21 +585,23 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
         // progressive MP4 — 네이티브 재생 (Range 시킹 지원). vod면 화질별 렌디션 노출.
         if (mp4Url) {
           const rends = renditions ?? [];
-          let srcUrl = mp4Url;
+          let videoSrc = mp4Url;
           if (rends.length > 1) {
             mp4RenditionsRef.current = rends;
             const levels = rends.map((r) => ({ height: r.height, bitrate: r.bandwidth }));
             setHlsLevels(levels);
             setQualityMode("mp4");
             qualityModeRef.current = "mp4";
-            // 선호 화질로 시작 URL 결정 (라디오>저장화질>최고). 처음부터 해당 화질로 로드해 재교체 회피.
+            // 시작 화질 결정: 라디오+오디오없음이면 최저(데이터 절약), 아니면 저장화질>최고.
             let idx = 0;
-            if (radioModeRef.current) idx = lowestLevelIndex(levels);
+            if (radioModeRef.current && !audioUrlRef.current) idx = lowestLevelIndex(levels);
             else if (qualityPrefRef.current !== "auto") idx = nearestLevelIndex(levels, qualityPrefRef.current);
             setHlsLevel(idx);
-            srcUrl = rends[idx].url;
+            videoSrc = rends[idx].url;
           }
-          video.src = srcUrl;
+          videoSrcRef.current = videoSrc;
+          // 라디오 모드로 시작하면 오디오 전용 소스로 로드(비디오 미수신). 없으면 영상 소스.
+          video.src = radioModeRef.current && audioUrlRef.current ? audioUrlRef.current : videoSrc;
           video.addEventListener("loadedmetadata", onLoaded, { once: true });
           return;
         }
@@ -825,6 +878,15 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     onPlayingChangeRef.current?.(playing);
   }, [playing]);
 
+  // 라디오 활성 여부 통지 — 치지직이면 오디오 트랙 유무와 무관하게 컴팩트 패널 UI로 통일한다.
+  // (오디오 있음 → 진짜 오디오 전용 / 없음 → 최저화질 재생, 표기만 다름)
+  const onRadioChangeRef = useRef(onRadioChange);
+  onRadioChangeRef.current = onRadioChange;
+  const radioActive = radioMode && platform === "chzzk";
+  useEffect(() => {
+    onRadioChangeRef.current?.(radioActive);
+  }, [radioActive]);
+
   // ── MediaSession: 잠금화면/알림/미디어키 + 백그라운드 컨트롤 ──────
   // 메타데이터·액션 핸들러를 등록한다. 치지직(video)은 화면을 꺼도 오디오가 이어지고,
   // 유튜브(iframe)는 포그라운드 컨트롤까지만 동작(플랫폼 제약).
@@ -1003,10 +1065,15 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     "px-1.5 py-0.5 rounded text-[11px] font-mono bg-white/15 hover:bg-white/30 " +
     "disabled:opacity-40 disabled:cursor-not-allowed transition-colors";
 
+  // 라디오 활성(치지직): 펼침(!hideChrome)·활성화 후 컴팩트 패널로 대체.
+  // 오디오 트랙이 있으면 진짜 오디오 전용, 없으면 최저화질 재생(둘 다 같은 패널 UI).
+  const compactRadio = radioActive && !hideChrome && activated;
+  const radioTitle = lazyTitle || vodTitle || posterDescription || "";
+
   return (
     <div
       ref={containerRef}
-      className={`relative aspect-video bg-black rounded-xl overflow-hidden group ${className}`}
+      className={`relative ${compactRadio ? "" : "aspect-video"} bg-black rounded-xl overflow-hidden group ${className}`}
       onMouseMove={showControls}
       onTouchStart={showControls}
     >
@@ -1022,6 +1089,106 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
         <video ref={videoRef} className="absolute inset-0 w-full h-full" playsInline />
       )}
 
+      {/* 라디오 썸네일 커버 — 영상 대신 아트를 채운다. 접힌 미니바(hideChrome)에서도 아트 표시. */}
+      {radioActive && activated && posterThumbnail && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={posterThumbnail}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          decoding="async"
+        />
+      )}
+
+      {/* 라디오 컴팩트 패널 — 펼침 상태에서 16:9 영상 영역을 짧은 오디오 카드로 대체(공간 확보).
+          라이트/다크 테마에 맞춰 배경·텍스트 색을 전환. */}
+      {compactRadio && (
+        <div className="relative z-[1] flex min-h-[92px] items-center gap-3 bg-gradient-to-br from-light-primary/25 via-white/70 to-light-secondary/15 px-3 py-2.5 dark:from-gray-900 dark:via-black dark:to-gray-900">
+          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-black/30">
+            {posterThumbnail && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={posterThumbnail} alt="" className="h-full w-full object-cover" decoding="async" />
+            )}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <MusicalNoteIcon className="h-5 w-5 text-white/95" />
+            </div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="mb-0.5 flex items-center gap-1 text-[11px] font-semibold tracking-wide text-light-accent-deep dark:text-dark-accent">
+              {audioAvailable ? "라디오 모드 · 오디오만" : "라디오 모드 · 저화질"}
+            </div>
+            {radioTitle && (
+              <div className="truncate text-sm font-semibold text-light-text dark:text-white">{radioTitle}</div>
+            )}
+            {/* 진행바 */}
+            <div className="group/bar relative mt-1.5 flex h-3 items-center">
+              <div className="absolute inset-x-0 h-1 rounded-full bg-light-primary/30 dark:bg-white/25" />
+              <div
+                className="absolute left-0 h-1 rounded-full bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple"
+                style={{ width: `${progressPercent}%` }}
+              />
+              <input
+                type="range"
+                min={0}
+                max={clipDuration || 0}
+                step={0.1}
+                value={clipPosition}
+                onChange={handleSeek}
+                aria-label="재생 위치"
+                className="absolute inset-x-0 h-3 w-full cursor-pointer opacity-0"
+                disabled={!ready || clipDuration === 0}
+              />
+            </div>
+            {/* 시간 + 음량 */}
+            <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-mono tabular-nums text-light-text/60 dark:text-white/70">
+              <span>{formatClipTime(clipPosition)}</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  aria-label={muted ? "음소거 해제" : "음소거"}
+                  className="text-light-text/70 transition-colors hover:text-light-accent-deep dark:text-white/80 dark:hover:text-dark-accent"
+                >
+                  {muted || volume === 0 ? <SpeakerXMarkIcon className="h-4 w-4" /> : <SpeakerWaveIcon className="h-4 w-4" />}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={muted ? 0 : volume}
+                  onChange={handleVolume}
+                  aria-label="음량"
+                  className="h-1 w-16 cursor-pointer accent-light-accent dark:accent-dark-accent"
+                />
+              </div>
+              <span>{formatClipTime(clipDuration)}</span>
+            </div>
+          </div>
+          {/* 재생/일시정지 */}
+          <button
+            type="button"
+            onClick={togglePlay}
+            aria-label={playing ? "일시정지" : "재생"}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-light-primary/25 text-light-accent-deep transition-colors hover:bg-light-primary/40 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+          >
+            {ended ? <ArrowPathIcon className="h-6 w-6" /> : playing ? <PauseIcon className="h-6 w-6" /> : <PlayIcon className="h-6 w-6 translate-x-0.5" />}
+          </button>
+          {/* 영상 모드로 전환 */}
+          <button
+            type="button"
+            onClick={toggleRadio}
+            aria-label="영상 모드로 전환"
+            title="영상 모드로 전환"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-light-accent-deep transition-colors hover:bg-light-primary/20 dark:text-dark-accent dark:hover:bg-white/10"
+          >
+            <VideoCameraIcon className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+
+      {!compactRadio && (
+        <>
       {/* facade: 활성화 전 — 포스터(유튜브 썸네일 / 치지직 정보) + 재생버튼.
           클릭해야 스트림을 로드한다(다이얼로그는 가볍게 열림, 데이터 낭비 없음). */}
       {!activated && (
@@ -1087,27 +1254,6 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
           onClick={togglePlay}
           className="absolute inset-0 w-full h-full cursor-pointer"
         />
-      )}
-
-      {/* 라디오 모드 오버레이 (치지직) — 영상을 가리고 음성 중심 표시. 클릭은 통과. */}
-      {activated && radioMode && platform === "chzzk" && (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {posterThumbnail && (
-            <img
-              src={posterThumbnail}
-              alt=""
-              className="absolute inset-0 w-full h-full object-cover scale-110 opacity-30 blur-xl"
-              decoding="async"
-            />
-          )}
-          <div className="absolute inset-0 bg-black/70" />
-          {!hideChrome && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-white/80">
-              <MusicalNoteIcon className="w-9 h-9" />
-              <span className="text-xs font-medium tracking-wide">라디오 모드 · 음성 중심</span>
-            </div>
-          )}
-        </div>
       )}
 
       {/* 재생 전 포스터 (치지직 전용 — 유튜브는 자체 썸네일·제목이 표시됨).
@@ -1306,14 +1452,14 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
             </div>
           )}
 
-          {/* 라디오 모드 토글 (치지직 전용 — 영상 숨김 + 최저 화질로 데이터 절약) */}
+          {/* 라디오 모드 토글 (치지직 전용) — 오디오 있으면 진짜 오디오 전용, 없으면 최저화질 폴백 */}
           {platform === "chzzk" && (
             <button
               type="button"
               onClick={toggleRadio}
               aria-pressed={radioMode}
-              aria-label={radioMode ? "라디오 모드 끄기" : "라디오 모드 켜기"}
-              title={radioMode ? "라디오 모드 끄기 (영상 표시)" : "라디오 모드 (영상 숨김·데이터 절약)"}
+              aria-label="라디오 모드 켜기"
+              title={audioAvailable ? "라디오 모드 (오디오만 재생·데이터 절약)" : "라디오 모드 (영상 숨김·데이터 절약)"}
               className={`transition-colors ${radioMode ? "text-light-accent dark:text-dark-accent" : "hover:text-light-accent dark:hover:text-dark-accent"}`}
             >
               <MusicalNoteIcon className="w-5 h-5" />
@@ -1334,6 +1480,8 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
           </button>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 });
