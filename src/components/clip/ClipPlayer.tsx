@@ -69,6 +69,8 @@ interface ClipPlayerProps {
   onNearEnd?: () => void;
   /** 자체 컨트롤 바·중앙버튼 숨김 (접힌 미니플레이어처럼 아주 작게 표시할 때) */
   hideChrome?: boolean;
+  /** 컴팩트 표시(영상 작게 모드) — 좁은 폭에 맞춰 컨트롤 밀도를 높인다(간격 축소·음량 슬라이더 숨김) */
+  compact?: boolean;
 }
 
 /** onNearEnd를 발화할 잔여시간 임계값(초) */
@@ -207,6 +209,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   mediaMeta,
   onNearEnd,
   hideChrome = false,
+  compact = false,
 }: ClipPlayerProps, ref) {
   // endTime이 없거나 startTime 이하(잘못된 구간)면 "끝까지"로 취급한다.
   // (이 값이 0/음수가 되면 clipDuration이 0이 되어 진행바가 멈추거나, VOD 전체를
@@ -1198,7 +1201,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
           />
         </div>
 
-        <div className="flex items-center gap-3 text-white">
+        <div className={`flex items-center text-white ${compact ? "gap-2" : "gap-3"}`}>
           <button type="button" onClick={togglePlay} aria-label={playing ? "일시정지" : "재생"} className="hover:text-light-accent dark:hover:text-dark-accent transition-colors">
             {ended ? (
               <ArrowPathIcon className="w-5 h-5" />
@@ -1262,7 +1265,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
               value={muted ? 0 : volume}
               onChange={handleVolume}
               aria-label="음량"
-              className="w-16 h-1 accent-light-accent dark:accent-dark-accent cursor-pointer hidden sm:block"
+              className={`w-16 h-1 accent-light-accent dark:accent-dark-accent cursor-pointer ${compact ? "hidden" : "hidden sm:block"}`}
             />
           </div>
 

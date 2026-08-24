@@ -459,6 +459,7 @@ export default function MiniPlayer() {
             posterDescription={current.description ?? undefined}
             trackPlayClipId={current.clipId}
             hideChrome={!isExpanded}
+            compact={isExpanded && videoCompact}
             className="w-full shadow-lg"
           />
         </Suspense>
