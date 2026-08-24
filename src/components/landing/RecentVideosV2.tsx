@@ -26,9 +26,12 @@ function Thumbnail({ src, alt }: { src: string; alt: string }) {
   if (showFallback) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-light-primary/20 to-light-secondary/15 dark:from-dark-primary/20 dark:to-dark-secondary/15">
-        <div className="flex flex-col items-center gap-2 text-light-accent-deep/40 dark:text-dark-accent/40">
-          <FilmIcon className="h-10 w-10" />
-          <span className="text-xs font-medium tracking-wide">준비 중</span>
+        <div className="aspect-square h-[62%] overflow-hidden rounded-full border-2 border-white/50 shadow-lg dark:border-white/15">
+          {/* 메인 아바타(로고)로 폴백 — Hero와 동일하게 테마별 이미지 사용 */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/profile1.png" alt="아야 AyaUke" className="h-full w-full object-cover dark:hidden" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/profile2-large.png" alt="아야 AyaUke" className="hidden h-full w-full object-cover dark:block" />
         </div>
       </div>
     );
