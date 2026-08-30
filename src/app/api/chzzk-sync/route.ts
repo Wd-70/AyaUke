@@ -82,8 +82,9 @@ export const GET = withApi({ schema: GetQuery, auth: 'user' }, async ({ input, s
 });
 
 const PostBody = z.object({
-  action: z.enum(['sync-channel', 'update-video', 'check-video-status']),
+  action: z.enum(['sync-channel', 'sync-video-comments', 'update-video', 'check-video-status']),
   force: z.boolean().default(false),
+  newVideosOnly: z.boolean().default(false),
   videoNo: z.number().int().optional(),
   youtubeUrl: z.string().optional(),
   timeOffset: z.number().nullable().optional(),
@@ -94,8 +95,13 @@ export const POST = withApi({ schema: PostBody, auth: 'user' }, async ({ input, 
 
   switch (input.action) {
     case 'sync-channel': {
-      const stats = await syncService.syncChannel({ force: input.force });
+      const stats = await syncService.syncChannel({ force: input.force, newVideosOnly: input.newVideosOnly });
       return ok(stats);
+    }
+
+    case 'sync-video-comments': {
+      if (!input.videoNo) throw new ValidationError('videoNo is required');
+      return ok(await syncService.syncVideoComments(input.videoNo));
     }
 
     case 'update-video': {

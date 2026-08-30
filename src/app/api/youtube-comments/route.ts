@@ -416,7 +416,7 @@ export async function POST(request: NextRequest) {
     await dbConnect();
 
     const body = await request.json();
-    const { action, channelId, videoId, commentId, data } = body;
+    const { action, channelId, videoId, commentId, data, newVideosOnly } = body;
 
     switch (action) {
       case 'sync-channel':
@@ -475,9 +475,17 @@ export async function POST(request: NextRequest) {
         newVideos = videoResults.filter(result => result.isNewVideo).length;
         console.log(`💾 ${videos.length}개 비디오 정보 저장 완료 (새로운 비디오: ${newVideos}개)`);
 
+        // 새 영상만 수집 모드: 댓글 수집 대상을 새 영상으로 한정(기존 영상 댓글 재수집 생략 — 쿼터 절약).
+        // 비디오 메타는 위에서 전체 upsert 완료. 전체 모드는 모든 영상의 댓글을 다시 확인한다.
+        const newVideoIdSet = new Set(videoResults.filter(r => r.isNewVideo).map(r => r.videoId));
+        const videosToProcess = newVideosOnly
+          ? videos.filter(v => newVideoIdSet.has(v.id.videoId))
+          : videos;
+        if (newVideosOnly) console.log(`🆕 새 영상만 수집: ${videosToProcess.length}개 댓글 수집 대상`);
+
         // 댓글 수집을 배치로 병렬 처리
-        for (let i = 0; i < videos.length; i += BATCH_SIZE) {
-          const batch = videos.slice(i, i + BATCH_SIZE);
+        for (let i = 0; i < videosToProcess.length; i += BATCH_SIZE) {
+          const batch = videosToProcess.slice(i, i + BATCH_SIZE);
           
           const batchPromises = batch.map(async (videoItem) => {
             const videoId = videoItem.id.videoId;
@@ -549,11 +557,11 @@ export async function POST(request: NextRequest) {
             processedVideos++;
             
             const newIndicator = result.newComments > 0 ? ` (새로운 댓글: ${result.newComments}개${result.newTimelineComments > 0 ? `, 타임라인: ${result.newTimelineComments}개` : ''})` : '';
-            console.log(`✅ ${processedVideos}/${videos.length} - ${result.title}: ${result.timelineComments}개 타임라인 댓글${newIndicator}`);
+            console.log(`✅ ${processedVideos}/${videosToProcess.length} - ${result.title}: ${result.timelineComments}개 타임라인 댓글${newIndicator}`);
           });
 
           // 배치 간 딜레이 (API 제한 고려)
-          if (i + BATCH_SIZE < videos.length) {
+          if (i + BATCH_SIZE < videosToProcess.length) {
             await new Promise(resolve => setTimeout(resolve, 300));
           }
         }

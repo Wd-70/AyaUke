@@ -106,21 +106,8 @@ export async function exportWorkset(): Promise<{ videos: number; timelines: numb
     publishedAt: (c.publishedAt as Date)?.toISOString?.() || '',
   }));
 
-  // 5) 등록곡 (로컬 매칭용). 대부분 status 미설정(null)이라 'deleted'만 제외한다.
-  const songDocs = await db.collection('songdetails').find({
-    status: { $ne: 'deleted' },
-  }).project({
-    title: 1, artist: 1, titleAlias: 1, artistAlias: 1, searchTags: 1, clipDuration: 1,
-  }).toArray();
-  const songs: WorksetSong[] = songDocs.map((s) => ({
-    id: String(s._id),
-    title: (s.title as string) || '',
-    artist: (s.artist as string) || '',
-    titleAlias: (s.titleAlias as string) || undefined,
-    artistAlias: (s.artistAlias as string) || undefined,
-    searchTags: (s.searchTags as string[]) || [],
-    clipDuration: (s.clipDuration as number | undefined) ?? undefined,
-  }));
+  // 5) 등록곡 (로컬 매칭용).
+  const songs = await readSongsFromDb();
 
   const workset: Workset = {
     generatedAt: new Date().toISOString(),
@@ -130,6 +117,41 @@ export async function exportWorkset(): Promise<{ videos: number; timelines: numb
   await fsp.writeFile(WORKSET_PATH, JSON.stringify(workset), 'utf8');
 
   return { videos: videos.length, timelines: timelines.length, youtubeCandidates: youtubeCandidates.length, songs: songs.length };
+}
+
+/** songdetails 컬렉션에서 등록곡을 읽어 WorksetSong[]로 변환 (곡 매칭/검색용). */
+async function readSongsFromDb(): Promise<WorksetSong[]> {
+  const db = mongoose.connection.db!;
+  // 대부분 status 미설정(null)이라 'deleted'만 제외한다.
+  const songDocs = await db.collection('songdetails').find({
+    status: { $ne: 'deleted' },
+  }).project({
+    title: 1, artist: 1, titleAlias: 1, artistAlias: 1, searchTags: 1, clipDuration: 1,
+  }).toArray();
+  return songDocs.map((s) => ({
+    id: String(s._id),
+    title: (s.title as string) || '',
+    artist: (s.artist as string) || '',
+    titleAlias: (s.titleAlias as string) || undefined,
+    artistAlias: (s.artistAlias as string) || undefined,
+    searchTags: (s.searchTags as string[]) || [],
+    clipDuration: (s.clipDuration as number | undefined) ?? undefined,
+  }));
+}
+
+/**
+ * 곡 목록만 DB에서 다시 읽어 workset.json의 songs만 갱신 (전체 추출보다 훨씬 빠름).
+ * 영상/타임라인/유튜브후보/댓글·진행상태는 건드리지 않는다.
+ */
+export async function refreshWorksetSongs(): Promise<{ songs: number }> {
+  assertLocal();
+  const workset = await readWorkset();
+  if (!workset) {
+    throw new AppError('NO_WORKSET', '먼저 데이터 추출을 해주세요.', 400);
+  }
+  workset.songs = await readSongsFromDb();
+  await fsp.writeFile(WORKSET_PATH, JSON.stringify(workset), 'utf8');
+  return { songs: workset.songs.length };
 }
 
 /** 저장된 workset.json 읽기 (없으면 null) */

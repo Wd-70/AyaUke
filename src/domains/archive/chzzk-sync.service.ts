@@ -96,13 +96,15 @@ async function upsertVideo(videoData: ChzzkVideoData, commentStats: { total: num
 
 /**
  * 채널 전체 동기화. onEvent 콜백으로 진행 상황을 보고한다 (SSE 라우트가 전달).
- * force=false면 댓글 수가 늘어난 영상만 다시 동기화한다.
+ * - newVideosOnly=true: DB에 없는 새 영상만 수집(기존 영상은 댓글 수 확인 없이 건너뜀 — 빠름).
+ * - newVideosOnly=false(기본): 전체 순회. force=false면 댓글 수가 늘어난 영상만 다시 동기화한다.
  */
 export async function syncChannel(options: {
   force?: boolean;
+  newVideosOnly?: boolean;
   onEvent?: (event: SyncEvent) => void;
 }): Promise<SyncStats> {
-  const { force = false, onEvent = () => {} } = options;
+  const { force = false, newVideosOnly = false, onEvent = () => {} } = options;
 
   onEvent({ type: 'progress', stage: 'fetching_videos', message: 'Fetching channel videos...' });
   const videos = await fetchChzzkVideos(AYAUKE_CHANNEL_ID);
@@ -137,6 +139,20 @@ export async function syncChannel(options: {
       });
 
       const existingVideo = await ChzzkVideo.findOne({ videoNo: videoData.videoNo });
+
+      // 새 영상만 수집 모드: 이미 있는 영상은 댓글 수 확인(네트워크 호출) 없이 건너뛴다.
+      if (existingVideo && newVideosOnly) {
+        onEvent({
+          type: 'video_skip',
+          ...progress,
+          videoTitle: videoData.videoTitle,
+          reason: 'existing_skipped',
+          commentCount: existingVideo.totalComments,
+        });
+        stats.processedVideos++;
+        continue;
+      }
+
       let needsCommentSync =
         existingVideo && (existingVideo.totalComments === 0 || !existingVideo.lastCommentSync);
 
@@ -203,6 +219,41 @@ export async function syncChannel(options: {
   }
 
   return stats;
+}
+
+/**
+ * 단일 영상의 댓글만 재수집 (개별 영상 작업 화면용).
+ * 영상 메타는 건드리지 않고 댓글·카운트·동기화시각만 갱신한다.
+ */
+export async function syncVideoComments(videoNo: number): Promise<{
+  totalComments: number;
+  timelineComments: number;
+  newComments: number;
+}> {
+  if (!videoNo) throw new ValidationError('videoNo is required');
+
+  const existing = await ChzzkVideo.findOne({ videoNo });
+  if (!existing) throw new NotFoundError('영상을 찾을 수 없습니다.');
+
+  const before = existing.totalComments ?? 0;
+  const commentStats = await upsertComments(videoNo);
+
+  await ChzzkVideo.updateOne(
+    { videoNo },
+    {
+      $set: {
+        totalComments: commentStats.total,
+        timelineComments: commentStats.timeline,
+        lastCommentSync: new Date(),
+      },
+    },
+  );
+
+  return {
+    totalComments: commentStats.total,
+    timelineComments: commentStats.timeline,
+    newComments: Math.max(0, commentStats.total - before),
+  };
 }
 
 /** 저장된 영상 목록 (제목 검색 + 페이지네이션) */

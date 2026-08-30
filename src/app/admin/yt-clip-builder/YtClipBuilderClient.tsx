@@ -45,6 +45,29 @@ export default function YtClipBuilderClient() {
 
   useEffect(() => { load(); }, [load]);
 
+  const [refreshingSongs, setRefreshingSongs] = useState(false);
+  const [songMsg, setSongMsg] = useState<string | null>(null);
+  const refreshSongs = async () => {
+    setRefreshingSongs(true);
+    setSongMsg(null);
+    try {
+      const res = await fetch("/api/admin/yt-clip-builder/refresh-songs", { method: "POST" });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        // 곡 목록만 갱신된 workset.json을 다시 읽어 songs만 교체 (앵커·진행상태 영향 없음)
+        const wsRes = await fetch("/api/admin/yt-clip-builder/workset").then((r) => r.json());
+        if (wsRes.success && wsRes.data.workset) setWorkset(wsRes.data.workset);
+        setSongMsg(`곡 ${json.data.songs}개 반영`);
+      } else {
+        setSongMsg(json?.error?.message || json?.error || `곡 새로고침 실패 (HTTP ${res.status})`);
+      }
+    } catch (e) {
+      setSongMsg(e instanceof Error ? e.message : "곡 새로고침 중 오류");
+    } finally {
+      setRefreshingSongs(false);
+    }
+  };
+
   const [exportError, setExportError] = useState<string | null>(null);
   const doExport = async () => {
     setExporting(true);
@@ -239,15 +262,29 @@ export default function YtClipBuilderClient() {
             </p>
           )}
         </div>
-        <button
-          onClick={doExport}
-          disabled={exporting}
-          className="shrink-0 inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border-2 border-light-accent/50 dark:border-dark-accent/50 text-light-accent dark:text-dark-accent hover:bg-light-accent/10 dark:hover:bg-dark-accent/10 disabled:opacity-50 transition-colors"
-          title="DB에서 작업 데이터를 다시 추출합니다 (댓글 등 새 필드 반영)"
-        >
-          <span className={exporting ? "animate-spin" : ""}>↻</span>
-          {exporting ? "추출 중..." : needsExport ? "DB에서 데이터 추출" : "데이터 다시 추출"}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {songMsg && <span className="text-xs text-light-text/60 dark:text-dark-text/60">{songMsg}</span>}
+          {workset && !needsExport && (
+            <button
+              onClick={refreshSongs}
+              disabled={refreshingSongs}
+              className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border-2 border-light-primary/40 dark:border-dark-primary/40 text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 disabled:opacity-50 transition-colors"
+              title="곡 목록만 DB에서 빠르게 다시 읽어옵니다 (새로 추가된 곡 반영)"
+            >
+              <span className={refreshingSongs ? "animate-spin" : ""}>♪</span>
+              {refreshingSongs ? "곡 반영 중..." : "곡 새로고침"}
+            </button>
+          )}
+          <button
+            onClick={doExport}
+            disabled={exporting}
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg border-2 border-light-accent/50 dark:border-dark-accent/50 text-light-accent dark:text-dark-accent hover:bg-light-accent/10 dark:hover:bg-dark-accent/10 disabled:opacity-50 transition-colors"
+            title="DB에서 작업 데이터를 다시 추출합니다 (댓글 등 새 필드 반영)"
+          >
+            <span className={exporting ? "animate-spin" : ""}>↻</span>
+            {exporting ? "추출 중..." : needsExport ? "DB에서 데이터 추출" : "데이터 다시 추출"}
+          </button>
+        </div>
       </div>
       {exportError && (
         <p className="mb-3 text-sm text-red-500 break-words">추출 실패: {exportError}</p>

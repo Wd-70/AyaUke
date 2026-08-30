@@ -10,7 +10,7 @@ import { parseYouTubeTimelineComments } from './youtube-timeline.service';
 import { decodeHtmlEntities } from './youtube-timeline.parse';
 import { NotFoundError } from '@/shared/api/errors';
 import { toKstDateString } from '@/shared/utils/stream-date';
-import { matchSongs } from '@/shared/utils/song-match';
+import { matchSongs, normalizeText } from '@/shared/utils/song-match';
 import type {
   Platform, WorkflowVideo, WorkflowComment, WorkflowItem, WorkflowSong, VideoDetail, ExistingClip,
 } from '@/app/admin/tabs/clip-workflow/types';
@@ -332,6 +332,25 @@ export async function getSongCandidates(songId: string): Promise<WorkflowItem[]>
   const unmatched = await listItems({ isRelevant: true, isExcluded: { $ne: true }, matchedSong: { $exists: false } });
   return unmatched
     .filter((it) => matchSongs(it.artist, it.songTitle, matchable, { minConfidence: 0.6, limit: 1 }).length > 0)
+    .sort(byDateDesc)
+    .slice(0, 300);
+}
+
+/**
+ * 자유 텍스트로 미매칭 타임라인을 검색 (미등록 곡 발견·분류용).
+ * 등록곡 여부와 무관하게 파싱된 artist/songTitle에 대해 정규화 토큰 AND-포함으로 찾는다.
+ * (공백으로 토큰 분리 → 각 토큰 정규화 → 모든 토큰이 포함된 항목만)
+ */
+export async function searchUnmatchedTimelines(q: string): Promise<WorkflowItem[]> {
+  const tokens = (q || '').split(/\s+/).map(normalizeText).filter(Boolean);
+  if (tokens.length === 0) return [];
+
+  const unmatched = await listItems({ isRelevant: true, isExcluded: { $ne: true }, matchedSong: { $exists: false } });
+  return unmatched
+    .filter((it) => {
+      const hay = normalizeText(`${it.artist} ${it.songTitle}`);
+      return tokens.every((t) => hay.includes(t));
+    })
     .sort(byDateDesc)
     .slice(0, 300);
 }

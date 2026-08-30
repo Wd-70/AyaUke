@@ -6,9 +6,10 @@
  * clip-workflow 서비스를 사용한다. 화면은 좌측 영상목록 + 우측 작업패널.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import VideoWorkPanel from "./VideoWorkPanel";
 import SongWorkPanel from "./SongWorkPanel";
+import UnmatchedSearchPanel from "./UnmatchedSearchPanel";
 import type { Platform, WorkflowVideo, WorkflowSong } from "./types";
 
 type Mode = "video" | "song";
@@ -19,7 +20,7 @@ export default function ClipWorkflowTab() {
   const [videos, setVideos] = useState<WorkflowVideo[]>([]);
   const [songs, setSongs] = useState<WorkflowSong[]>([]);
   const [loading, setLoading] = useState(true);
-  const [collecting, setCollecting] = useState(false);
+  const [collecting, setCollecting] = useState<null | "new" | "full">(null);
   const [collectMsg, setCollectMsg] = useState<string | null>(null);
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [filterTab, setFilterTab] = useState<"todo" | "done">("todo");
@@ -28,6 +29,8 @@ export default function ClipWorkflowTab() {
   const [songStatuses, setSongStatuses] = useState<Map<string, { occurrences: number; clips: number }>>(new Map());
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
   const [songSearch, setSongSearch] = useState("");
+  // 미등록 곡 발견: 좌측 가상 항목 선택 시 그 검색어를 고정해 우측 패널로 전달(입력 중 변동 방지)
+  const [unmatchedQuery, setUnmatchedQuery] = useState<string | null>(null);
 
   const loadSongStatuses = useCallback(async () => {
     const res = await fetch("/api/admin/clip-workflow/song-statuses").then((r) => r.json());
@@ -45,11 +48,34 @@ export default function ClipWorkflowTab() {
     }
   }, []);
 
-  useEffect(() => {
-    fetch("/api/admin/clip-workflow/songs").then((r) => r.json()).then((res) => {
-      if (res.success) setSongs(res.data.songs);
-    });
+  // 곡 목록 로드. 다른 탭(관리자 곡 화면)에서 곡을 추가한 뒤 이 탭으로 돌아오면
+  // 창 포커스/가시성 복귀 시 자동 재로드해 검색·추천에 즉시 반영한다.
+  const lastSongsLoadRef = useRef(0);
+  const loadSongs = useCallback(async () => {
+    lastSongsLoadRef.current = Date.now();
+    const res = await fetch("/api/admin/clip-workflow/songs").then((r) => r.json());
+    if (res.success) setSongs(res.data.songs);
   }, []);
+
+  useEffect(() => { loadSongs(); }, [loadSongs]);
+
+  // 창으로 돌아올 때 자동 갱신 — 곡 목록(+song 모드면 활동 통계)을 되살린다.
+  // 2초 가드는 복귀 시 focus/visibilitychange가 거의 동시에 두 번 터지는 것만 합치는 용도
+  // (더 길면 곡을 추가하고 곧바로 돌아왔을 때 그 방문의 갱신이 통째로 스킵된다).
+  useEffect(() => {
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastSongsLoadRef.current < 2_000) return;
+      loadSongs();
+      if (mode === "song") loadSongStatuses();
+    };
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
+  }, [loadSongs, loadSongStatuses, mode]);
 
   useEffect(() => { setSelectedVideoId(null); loadVideos(platform); }, [platform, loadVideos]);
 
@@ -60,15 +86,18 @@ export default function ClipWorkflowTab() {
   }, [songs]);
 
   // 수집: 치지직=chzzk-sync(POST, SSE 아님) / 유튜브=youtube-comments
-  const collect = async () => {
-    if (!confirm("채널의 영상과 댓글을 수집합니다. 시간이 걸릴 수 있습니다. 진행할까요?")) return;
-    setCollecting(true);
-    setCollectMsg("수집 중... (수십 초~수 분)");
+  // newVideosOnly=true → 새 영상만 빠르게 수집 / false → 전체 순회(기존 영상 새 댓글까지)
+  const collect = async (newVideosOnly: boolean) => {
+    if (!confirm(newVideosOnly
+      ? "DB에 없는 새 영상만 수집합니다. 진행할까요?"
+      : "전체 영상을 순회하며 기존 영상의 새 댓글까지 수집합니다. 시간이 걸릴 수 있습니다. 진행할까요?")) return;
+    setCollecting(newVideosOnly ? "new" : "full");
+    setCollectMsg(newVideosOnly ? "새 영상 수집 중..." : "전체 수집 중... (수십 초~수 분)");
     try {
       const endpoint = platform === "chzzk" ? "/api/chzzk-sync" : "/api/youtube-comments";
       const res = await fetch(endpoint, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "sync-channel" }),
+        body: JSON.stringify({ action: "sync-channel", newVideosOnly }),
       }).then((r) => r.json());
       if (res.success) {
         setCollectMsg("수집 완료");
@@ -79,7 +108,7 @@ export default function ClipWorkflowTab() {
     } catch {
       setCollectMsg("수집 중 오류");
     } finally {
-      setCollecting(false);
+      setCollecting(null);
     }
   };
 
@@ -139,9 +168,13 @@ export default function ClipWorkflowTab() {
         {mode === "video" && (
           <div className="flex items-center gap-2">
             {collectMsg && <span className="text-xs text-light-text/60 dark:text-dark-text/60">{collectMsg}</span>}
-            <button onClick={collect} disabled={collecting} className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border-2 border-light-accent/50 dark:border-dark-accent/50 text-light-accent dark:text-dark-accent hover:bg-light-accent/10 disabled:opacity-50 transition-colors">
-              {collecting && <span className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />}
-              {collecting ? "수집 중..." : "영상·댓글 수집"}
+            <button onClick={() => collect(true)} disabled={collecting !== null} title="DB에 없는 새 영상만 빠르게 수집" className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border-2 border-light-accent/50 dark:border-dark-accent/50 text-light-accent dark:text-dark-accent hover:bg-light-accent/10 disabled:opacity-50 transition-colors">
+              {collecting === "new" && <span className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />}
+              {collecting === "new" ? "수집 중..." : "새 영상 수집"}
+            </button>
+            <button onClick={() => collect(false)} disabled={collecting !== null} title="전체 영상 순회 — 기존 영상의 새 댓글까지 수집(느림)" className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-light-primary/30 dark:border-dark-primary/30 text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 disabled:opacity-50 transition-colors">
+              {collecting === "full" && <span className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />}
+              {collecting === "full" ? "수집 중..." : "전체 갱신(새 댓글)"}
             </button>
           </div>
         )}
@@ -217,9 +250,9 @@ export default function ClipWorkflowTab() {
             {songList.length === 0 ? (
               <p className="p-4 text-center text-xs text-light-text/50">{songSearch ? "검색 결과 없음" : "활동 있는 곡이 없습니다. 검색해서 곡을 선택하세요."}</p>
             ) : songList.map(({ song: s, st }) => {
-              const sel = s.id === selectedSongId;
+              const sel = s.id === selectedSongId && unmatchedQuery === null;
               return (
-                <button key={s.id} onClick={() => setSelectedSongId(s.id)} className={`w-full text-left px-3 py-2 border-b border-light-primary/10 dark:border-dark-primary/10 ${sel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5"}`}>
+                <button key={s.id} onClick={() => { setUnmatchedQuery(null); setSelectedSongId(s.id); }} className={`w-full text-left px-3 py-2 border-b border-light-primary/10 dark:border-dark-primary/10 ${sel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5"}`}>
                   <div className="truncate text-sm text-light-text dark:text-dark-text">{s.titleAlias || s.title}</div>
                   <div className="flex items-center gap-2 text-[10px] text-light-text/50 dark:text-dark-text/50 mt-0.5">
                     <span className="truncate">{s.artistAlias || s.artist}</span>
@@ -229,12 +262,30 @@ export default function ClipWorkflowTab() {
                 </button>
               );
             })}
+            {/* 미등록 곡 발견: 검색어가 있으면 등록곡 결과와 별개로 미매칭 타임라인 검색 진입점 제공 */}
+            {songSearch.trim() && (
+              <button
+                onClick={() => { setSelectedSongId(null); setUnmatchedQuery(songSearch.trim()); }}
+                className={`w-full text-left px-3 py-2 border-b border-light-primary/10 dark:border-dark-primary/10 ${unmatchedQuery !== null ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5"}`}
+              >
+                <div className="truncate text-sm text-light-accent dark:text-dark-accent">🔍 &ldquo;{songSearch.trim()}&rdquo; 미등록 타임라인 검색</div>
+                <div className="text-[10px] text-light-text/50 dark:text-dark-text/50 mt-0.5">등록곡이 아니어도 파싱된 이름으로 미매칭 출현 찾기</div>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* 우: 곡 작업 패널 */}
+        {/* 우: 곡 작업 패널 / 미등록 검색 패널 */}
         <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg p-4 min-h-[40vh]">
-          {selectedSong ? (
+          {unmatchedQuery !== null ? (
+            <UnmatchedSearchPanel
+              key={`unmatched-${unmatchedQuery}`}
+              query={unmatchedQuery}
+              songs={songs}
+              songsById={songsById}
+              onStatusRefresh={loadSongStatuses}
+            />
+          ) : selectedSong ? (
             <SongWorkPanel
               key={selectedSong.id}
               song={selectedSong}

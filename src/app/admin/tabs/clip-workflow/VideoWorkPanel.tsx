@@ -27,6 +27,7 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
   const [existingClips, setExistingClips] = useState<{ songId: string; startTime: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [parsing, setParsing] = useState(false);
+  const [recollecting, setRecollecting] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -107,6 +108,35 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
     }
   };
 
+
+  // 이 영상의 댓글만 다시 수집 (치지직=chzzk-sync / 유튜브=youtube-comments 단일 영상 액션).
+  // 수집 후 파싱은 별도(새 타임라인 댓글은 '다시 파싱'을 눌러야 항목이 된다).
+  const recollect = async () => {
+    setRecollecting(true);
+    setResult(null);
+    try {
+      const req =
+        platform === "chzzk"
+          ? { endpoint: "/api/chzzk-sync", body: { action: "sync-video-comments", videoNo: Number(video.videoId) } }
+          : { endpoint: "/api/youtube-comments", body: { action: "sync-video", videoId: video.videoId } };
+      const res = await fetch(req.endpoint, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req.body),
+      }).then((r) => r.json());
+      if (res.success) {
+        const nc = res.data?.newComments ?? 0;
+        await loadDetail();
+        onStatusRefresh();
+        setResult(nc > 0 ? `새 댓글 ${nc}개 수집 — 새 타임라인이면 '다시 파싱'하세요.` : "새 댓글이 없습니다.");
+      } else {
+        setResult(res.error?.message || res.error || "댓글 수집 실패");
+      }
+    } catch {
+      setResult("댓글 수집 중 오류");
+    } finally {
+      setRecollecting(false);
+    }
+  };
 
   // 항목별 클립 생성 여부: 같은 곡 + 시작시각 ±30초(bulk 중복 기준) 클립이 있으면 생성됨
   const clippedItemIds = useMemo(() => {
@@ -194,13 +224,24 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
             파싱 {items.length} · 관련 {stats.relevant} · 매칭 {stats.matched} · 검증 {stats.verified} · 생성가능 {stats.generatable} · 기존클립 {video.clipCount}
           </p>
         </div>
-        <button
-          onClick={parse}
-          disabled={parsing}
-          className="text-sm px-3 py-1.5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:border-light-accent/40 disabled:opacity-50"
-        >
-          {parsing ? "파싱 중..." : items.length ? "다시 파싱" : "댓글 파싱"}
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={recollect}
+            disabled={recollecting || parsing}
+            title="이 영상의 댓글만 다시 수집(새 타임라인 댓글 반영 후 '다시 파싱')"
+            className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:border-light-accent/40 disabled:opacity-50"
+          >
+            {recollecting && <span className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />}
+            {recollecting ? "수집 중..." : "댓글 다시 수집"}
+          </button>
+          <button
+            onClick={parse}
+            disabled={parsing || recollecting}
+            className="text-sm px-3 py-1.5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:border-light-accent/40 disabled:opacity-50"
+          >
+            {parsing ? "파싱 중..." : items.length ? "다시 파싱" : "댓글 파싱"}
+          </button>
+        </div>
       </div>
 
       {loading ? (
