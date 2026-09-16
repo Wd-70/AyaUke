@@ -11,8 +11,6 @@ import {
   XMarkIcon,
   PencilIcon,
   TrashIcon,
-  CheckCircleIcon,
-  CheckIcon,
 } from "@heroicons/react/24/outline";
 import { CheckCircleIcon as CheckCircleSolid } from "@heroicons/react/24/solid";
 import ClipPlayer, { loadYouTubeApi } from "@/components/clip/ClipPlayer";
@@ -20,6 +18,7 @@ import ChzzkPlayer, { type ChzzkPlayerHandle } from "@/components/video/ChzzkPla
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import ClipTimeEditor from "./ClipTimeEditor";
+import ClipVerifyButton, { useClipVerify } from "./ClipVerifyButton";
 import {
   type ClipData,
   type EditPlayerAdapter,
@@ -161,21 +160,8 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
     onChanged();
   };
 
-  const verifyMutation = useMutation({
-    mutationFn: async (verify: boolean) => {
-      const res = await fetch("/api/admin/clips", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clipId: clip._id, action: verify ? "verify" : "unverify" }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error || "검증 상태 변경 실패");
-    },
-    onSuccess: (_d, verify) => {
-      showSuccess(verify ? "검증 완료" : "검증 해제", `클립이 ${verify ? "검증" : "미검증"} 상태가 되었습니다.`);
-      invalidate();
-    },
-    onError: (e) => showError("실패", e.message),
-  });
+  // 검증 토글 — 낙관적 로컬 상태(복제 지연 방어)를 배지/버튼이 공유
+  const verify = useClipVerify(clip._id, clip.isVerified, onChanged);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -273,7 +259,7 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
           <span className={`px-2 py-0.5 rounded text-xs flex-shrink-0 ${platformBadgeClass(clip.platform)}`}>
             {platformLabel(clip.platform)}
           </span>
-          {clip.isVerified && (
+          {verify.verified && (
             <span className="px-2 py-0.5 rounded text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 flex items-center gap-1 flex-shrink-0">
               <CheckCircleSolid className="w-3 h-3" />
               검증됨
@@ -338,19 +324,7 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => verifyMutation.mutate(!clip.isVerified)}
-                disabled={verifyMutation.isPending}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors disabled:opacity-50 ${
-                  clip.isVerified
-                    ? "border border-light-primary/30 dark:border-dark-primary/30 text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/20"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
-                title={clip.isVerified ? "검증 상태를 해제합니다" : "확인 완료된 클립으로 표시합니다"}
-              >
-                {clip.isVerified ? <CheckIcon className="w-4 h-4" /> : <CheckCircleIcon className="w-4 h-4" />}
-                {clip.isVerified ? "검증 해제" : "검증 완료"}
-              </button>
+              <ClipVerifyButton verified={verify.verified} onToggle={verify.toggle} isPending={verify.isPending} />
               <button
                 onClick={() => setEditing(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-light-accent dark:bg-dark-accent text-white hover:shadow-md transition-all"
@@ -415,7 +389,9 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
               />
             </div>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <ClipVerifyButton verified={verify.verified} onToggle={verify.toggle} isPending={verify.isPending} />
+              <div className="flex gap-2">
               <button
                 onClick={() => setEditing(false)}
                 className="px-4 py-2 text-sm rounded-lg border border-light-primary/30 dark:border-dark-primary/30 text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/20 transition-colors"
@@ -429,6 +405,7 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
               >
                 {saveMutation.isPending ? "저장 중..." : "저장"}
               </button>
+              </div>
             </div>
           </div>
         )}
