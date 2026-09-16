@@ -15,6 +15,7 @@ interface BulkClipData {
   description?: string;
   startTime?: number;
   endTime?: number;
+  isVerified?: boolean;
 }
 
 // POST: 라이브 클립 일괄 등록
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     for (const [index, clipData] of clips.entries()) {
       try {
         // 기본 데이터 검증
-        const { songId, videoUrl, sungDate, description, startTime, endTime } = clipData;
+        const { songId, videoUrl, sungDate, description, startTime, endTime, isVerified } = clipData;
         
         if (!songId || !videoUrl || !sungDate) {
           results.errors.push(`클립 ${index + 1}: songId, videoUrl, sungDate는 필수입니다.`);
@@ -203,7 +204,9 @@ export async function POST(request: NextRequest) {
           endTime,
           addedBy: session.user.userId,
           addedByName: session.user.displayName || session.user.name || session.user.channelName,
-          isVerified: false,
+          // 클립 만들기에서 '검증 상태'로 둔 항목은 검증된 클립으로 생성
+          isVerified: Boolean(isVerified),
+          ...(isVerified ? { verifiedBy: session.user.id, verifiedAt: new Date() } : {}),
           thumbnailUrl,
         });
 

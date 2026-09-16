@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { EditPlayerAdapter } from "@/app/admin/tabs/live-clips/clip-types";
 import ClipTimeEditor from "@/app/admin/tabs/live-clips/ClipTimeEditor";
+import ClipVerifyButton from "@/app/admin/tabs/live-clips/ClipVerifyButton";
 import EditPlayer from "./EditPlayer";
 import { fmt, assignOptimistic, songSuggestions } from "./itemUtils";
 import type { WorkflowItem, WorkflowSong } from "./types";
@@ -26,9 +27,14 @@ export default function ItemEditor({ item, songs, songsById, originalLine, onPat
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [songQuery, setSongQuery] = useState("");
+  const [savingDefault, setSavingDefault] = useState(false);
+  // PUT 성공 직후 곡 기본길이를 이 화면에 즉시 반영하기 위한 로컬 오버라이드
+  // (부모 songs 갱신은 window-focus 자동갱신에 맡긴다). 항목/매칭곡이 바뀌면 초기화.
+  const [localClipDuration, setLocalClipDuration] = useState<number | null>(null);
 
   // 항목이 바뀌면 검색어 초기화 + 그 시작점으로 시킹
   useEffect(() => { setSongQuery(""); }, [item.id]);
+  useEffect(() => { setLocalClipDuration(null); }, [item.id, item.matchedSongId]);
   // adapter도 의존: 다른 영상으로 바뀌면 EditPlayer가 remount돼 어댑터가 새로 생기는데,
   // 그때 정확한 시작시각으로 seek한다. (옛 어댑터 호출은 EditPlayer가 안전하게 무시)
   useEffect(() => {
@@ -36,10 +42,27 @@ export default function ItemEditor({ item, songs, songsById, originalLine, onPat
   }, [item.id, adapter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const matchedSong = item.matchedSongId ? songsById.get(item.matchedSongId) : undefined;
+  const effectiveClipDuration = localClipDuration ?? matchedSong?.clipDuration ?? null;
 
   const assign = (songId: string | null) => {
     const song = songId ? songsById.get(songId) ?? null : null;
     onPatch(item.id, { matchedSongId: songId }, assignOptimistic(item, song));
+  };
+
+  // #1 이 길이를 곡 기본값으로 — 매칭된 곡(SongDetail)의 clipDuration 저장.
+  const setDefaultDuration = async (duration: number) => {
+    if (!matchedSong) return;
+    setSavingDefault(true);
+    try {
+      const res = await fetch(`/api/songdetails/${matchedSong.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipDuration: duration }),
+      });
+      const result = await res.json().catch(() => null);
+      if (res.ok && result?.success) setLocalClipDuration(duration);
+    } finally {
+      setSavingDefault(false);
+    }
   };
 
   const suggestions = useMemo(
@@ -72,13 +95,27 @@ export default function ItemEditor({ item, songs, songsById, originalLine, onPat
         </div>
       )}
 
+      {/* 검증: 항목을 검증 상태로 두면 클립 생성 시 검증된 클립으로 만들어짐 */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <ClipVerifyButton
+          verified={item.isTimeVerified}
+          onToggle={() => onPatch(item.id, { isTimeVerified: !item.isTimeVerified }, { isTimeVerified: !item.isTimeVerified })}
+          size="sm"
+        />
+        <span className="text-xs text-light-text/50 dark:text-dark-text/50">
+          검증 상태로 두면 클립 생성 시 검증된 클립으로 만들어집니다.
+        </span>
+      </div>
+
       <ClipTimeEditor
         startTime={item.startTimeSeconds}
         endTime={item.endTimeSeconds}
         adapter={adapter}
         currentTime={currentTime}
         isPlaying={isPlaying}
-        songClipDuration={matchedSong?.clipDuration ?? null}
+        songClipDuration={effectiveClipDuration}
+        onSetDefaultDuration={matchedSong ? setDefaultDuration : undefined}
+        savingDefault={savingDefault}
         onChange={(patch) => {
           const start = patch.startTime ?? item.startTimeSeconds;
           const end = patch.endTime !== undefined ? patch.endTime : item.endTimeSeconds ?? null;

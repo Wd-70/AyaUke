@@ -86,6 +86,7 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
       startTime: Math.round(it.startTimeSeconds),
       endTime: it.endTimeSeconds != null ? Math.round(it.endTimeSeconds) : undefined,
       description: it.customDescription || `${it.commentAuthor}님의 댓글로부터 생성되었습니다`,
+      isVerified: it.isTimeVerified, // 검증 상태 항목은 검증된 클립으로 생성
     }));
     setCreating(true); setResult(null);
     try {
