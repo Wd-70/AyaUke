@@ -61,26 +61,29 @@ export default function ClipTimeEditor({
   return (
     <div className="space-y-3">
       {/* 현재 시간 + 재생 컨트롤 */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="text-sm text-light-text/60 dark:text-dark-text/60">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+        <div className="text-sm text-center sm:text-left text-light-text/60 dark:text-dark-text/60">
           현재 위치{" "}
           <span className="font-mono text-base font-semibold text-light-text dark:text-dark-text">
             {formatTime(currentTime)}
           </span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button type="button" onClick={() => seekRelative(-60)} disabled={!adapter} className={seekButton} title="1분 뒤로">
-            <ChevronDoubleLeftIcon className="w-3.5 h-3.5" />1m
-          </button>
-          <button type="button" onClick={() => seekRelative(-10)} disabled={!adapter} className={seekButton} title="10초 뒤로">
-            <ChevronLeftIcon className="w-3.5 h-3.5" />10s
-          </button>
-          <button type="button" onClick={() => seekRelative(-1)} disabled={!adapter} className={seekButton} title="1초 뒤로">
-            <BackwardIcon className="w-3.5 h-3.5" />1s
-          </button>
-          <button type="button" onClick={() => seekRelative(-0.1)} disabled={!adapter} className={seekButton} title="0.1초 뒤로">
-            <BackwardIcon className="w-3.5 h-3.5" />0.1s
-          </button>
+        {/* 모바일: 뒤로 그룹 / 재생 / 앞으로 그룹을 3줄로(대칭). 데스크톱: 한 줄. */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5">
+          <div className="flex items-center justify-center gap-1.5">
+            <button type="button" onClick={() => seekRelative(-60)} disabled={!adapter} className={seekButton} title="1분 뒤로">
+              <ChevronDoubleLeftIcon className="w-3.5 h-3.5" />1m
+            </button>
+            <button type="button" onClick={() => seekRelative(-10)} disabled={!adapter} className={seekButton} title="10초 뒤로">
+              <ChevronLeftIcon className="w-3.5 h-3.5" />10s
+            </button>
+            <button type="button" onClick={() => seekRelative(-1)} disabled={!adapter} className={seekButton} title="1초 뒤로">
+              <BackwardIcon className="w-3.5 h-3.5" />1s
+            </button>
+            <button type="button" onClick={() => seekRelative(-0.1)} disabled={!adapter} className={seekButton} title="0.1초 뒤로">
+              <BackwardIcon className="w-3.5 h-3.5" />0.1s
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => (isPlaying ? adapter?.pause() : adapter?.play())}
@@ -90,18 +93,20 @@ export default function ClipTimeEditor({
           >
             {isPlaying ? <PauseIcon className="w-4 h-4" /> : <PlayIcon className="w-4 h-4" />}
           </button>
-          <button type="button" onClick={() => seekRelative(0.1)} disabled={!adapter} className={seekButton} title="0.1초 앞으로">
-            <ForwardIcon className="w-3.5 h-3.5" />0.1s
-          </button>
-          <button type="button" onClick={() => seekRelative(1)} disabled={!adapter} className={seekButton} title="1초 앞으로">
-            <ForwardIcon className="w-3.5 h-3.5" />1s
-          </button>
-          <button type="button" onClick={() => seekRelative(10)} disabled={!adapter} className={seekButton} title="10초 앞으로">
-            <ChevronRightIcon className="w-3.5 h-3.5" />10s
-          </button>
-          <button type="button" onClick={() => seekRelative(60)} disabled={!adapter} className={seekButton} title="1분 앞으로">
-            <ChevronDoubleRightIcon className="w-3.5 h-3.5" />1m
-          </button>
+          <div className="flex items-center justify-center gap-1.5">
+            <button type="button" onClick={() => seekRelative(0.1)} disabled={!adapter} className={seekButton} title="0.1초 앞으로">
+              <ForwardIcon className="w-3.5 h-3.5" />0.1s
+            </button>
+            <button type="button" onClick={() => seekRelative(1)} disabled={!adapter} className={seekButton} title="1초 앞으로">
+              <ForwardIcon className="w-3.5 h-3.5" />1s
+            </button>
+            <button type="button" onClick={() => seekRelative(10)} disabled={!adapter} className={seekButton} title="10초 앞으로">
+              <ChevronRightIcon className="w-3.5 h-3.5" />10s
+            </button>
+            <button type="button" onClick={() => seekRelative(60)} disabled={!adapter} className={seekButton} title="1분 앞으로">
+              <ChevronDoubleRightIcon className="w-3.5 h-3.5" />1m
+            </button>
+          </div>
         </div>
       </div>
 
