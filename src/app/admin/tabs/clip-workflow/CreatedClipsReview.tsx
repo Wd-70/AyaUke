@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import ClipTimeEditor from "@/app/admin/tabs/live-clips/ClipTimeEditor";
+import ClipVerifyButton from "@/app/admin/tabs/live-clips/ClipVerifyButton";
 import type { EditPlayerAdapter, ClipData } from "@/app/admin/tabs/live-clips/clip-types";
 import { formatTime } from "@/app/admin/tabs/live-clips/clip-types";
 import EditPlayer from "./EditPlayer";
@@ -30,6 +31,8 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editData, setEditData] = useState<{ startTime: number; endTime: number | null; description: string }>({ startTime: 0, endTime: null, description: "" });
   const [saving, setSaving] = useState(false);
+  const [savingDefault, setSavingDefault] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   // 편집 플레이어 상태
@@ -103,12 +106,45 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
 
   const verify = async (v: boolean) => {
     if (!selected) return;
-    await fetch("/api/admin/clips", {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clipId: selected._id, action: v ? "verify" : "unverify" }),
-    }).catch(() => {});
-    setClips((prev) => prev.map((c) => (c._id === selected._id ? { ...c, isVerified: v } : c)));
-    onChanged?.();
+    setVerifying(true);
+    try {
+      await fetch("/api/admin/clips", {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipId: selected._id, action: v ? "verify" : "unverify" }),
+      });
+      // 로컬 즉시 반영 (list row · 배지 · 버튼이 공유) → refetch 복제지연에도 안 되돌아감
+      setClips((prev) => prev.map((c) => (c._id === selected._id ? { ...c, isVerified: v } : c)));
+      onChanged?.();
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  // #1 이 길이를 곡 기본값으로 — SongDetail.clipDuration 저장. 같은 곡의 모든 클립
+  // songDetail을 로컬 갱신해 '기본길이 적용' 버튼·기본값 표시가 즉시 반영되게 한다.
+  const setDefaultDuration = async (duration: number) => {
+    if (!selected?.songId) return;
+    setSavingDefault(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/songdetails/${selected.songId}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipDuration: duration }),
+      });
+      const result = await res.json().catch(() => null);
+      if (!res.ok || !result?.success) throw new Error(result?.error?.message || "기본 길이 저장 실패");
+      setClips((prev) => prev.map((c) =>
+        c.songId === selected.songId && c.songDetail
+          ? { ...c, songDetail: { ...c.songDetail, clipDuration: duration } }
+          : c,
+      ));
+      setMsg(`곡 기본 길이 ${formatTime(duration)} 저장됨`);
+      onChanged?.();
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "기본 길이 저장 실패");
+    } finally {
+      setSavingDefault(false);
+    }
   };
 
   const remove = async () => {
@@ -188,6 +224,8 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
                   currentTime={currentTime}
                   isPlaying={isPlaying}
                   songClipDuration={selected.songDetail?.clipDuration ?? null}
+                  onSetDefaultDuration={setDefaultDuration}
+                  savingDefault={savingDefault}
                   onChange={(patch) => setEditData((p) => ({ ...p, startTime: patch.startTime ?? p.startTime, endTime: patch.endTime !== undefined ? patch.endTime : p.endTime }))}
                 />
                 <input
@@ -198,9 +236,7 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
                 />
                 <div className="flex items-center gap-2 flex-wrap">
                   <button onClick={save} disabled={saving} className="px-4 py-1.5 text-sm rounded-lg bg-light-accent dark:bg-dark-accent text-white disabled:opacity-50">{saving ? "저장 중..." : "저장"}</button>
-                  <button onClick={() => verify(!selected.isVerified)} className="px-3 py-1.5 text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70">
-                    {selected.isVerified ? "검증 해제" : "검증 완료"}
-                  </button>
+                  <ClipVerifyButton verified={selected.isVerified} onToggle={() => verify(!selected.isVerified)} isPending={verifying} />
                   <button onClick={remove} className="px-3 py-1.5 text-sm rounded-lg border border-red-300 dark:border-red-800 text-red-600 dark:text-red-400 ml-auto">삭제</button>
                 </div>
               </div>
