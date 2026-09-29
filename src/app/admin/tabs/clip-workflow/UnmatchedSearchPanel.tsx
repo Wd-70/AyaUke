@@ -65,7 +65,7 @@ export default function UnmatchedSearchPanel({ query, songs, songsById, onStatus
       {loading ? (
         <div className="p-8 text-center text-sm text-light-text/50">검색 중...</div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[20rem_1fr] gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[20rem_minmax(0,1fr)] gap-4">
           {/* 좌: 미매칭 출현 목록 */}
           <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col lg:order-1 max-h-[78vh]">
             <div className="overflow-y-auto">
@@ -88,7 +88,7 @@ export default function UnmatchedSearchPanel({ query, songs, songsById, onStatus
           </div>
 
           {/* 우: 편집 알맹이 (공용) */}
-          <div className="lg:order-2">
+          <div className="min-w-0 lg:order-2">
             {selected ? (
               <ItemEditor item={selected} songs={songs} songsById={songsById} onPatch={patchItem} />
             ) : (

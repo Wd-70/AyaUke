@@ -61,15 +61,15 @@ export default function ClipTimeEditor({
   return (
     <div className="space-y-3">
       {/* 현재 시간 + 재생 컨트롤 */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-        <div className="text-sm text-center sm:text-left text-light-text/60 dark:text-dark-text/60">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-3">
+        <div className="shrink-0 whitespace-nowrap text-sm text-center sm:text-left text-light-text/60 dark:text-dark-text/60">
           현재 위치{" "}
-          <span className="font-mono text-base font-semibold text-light-text dark:text-dark-text">
-            {formatTime(currentTime)}
+          <span className="inline-block w-[11ch] text-right font-mono tabular-nums text-base font-semibold text-light-text dark:text-dark-text">
+            {formatTime(currentTime, true)}
           </span>
         </div>
         {/* 모바일: 뒤로 그룹 / 재생 / 앞으로 그룹을 3줄로(대칭). 데스크톱: 한 줄. */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5">
+        <div className="flex min-w-0 flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-1.5">
           <div className="flex items-center justify-center gap-1.5">
             <button type="button" onClick={() => seekRelative(-60)} disabled={!adapter} className={seekButton} title="1분 뒤로">
               <ChevronDoubleLeftIcon className="w-3.5 h-3.5" />1m

@@ -87,14 +87,19 @@ export interface EditPlayerAdapter {
 
 // ── 시간 포맷/파싱 ────────────────────────────────────────────────
 
-/** 초 → "H:MM:SS" | "M:SS" (소수가 있으면 .d 한 자리 표시) */
-export function formatTime(seconds: number | null | undefined): string {
-  if (seconds == null || isNaN(seconds)) return '-';
-  const total = Math.floor(seconds);
-  const frac = Math.round((seconds - total) * 10);
+/** 초 → "H:MM:SS" | "M:SS". fixedWidth이면 "HH:MM:SS.d"로 항상 표시한다. */
+export function formatTime(seconds: number | null | undefined, fixedWidth = false): string {
+  if (seconds == null || !Number.isFinite(seconds)) return fixedWidth ? '--:--:--.-' : '-';
+  // 전체 시간을 먼저 반올림해야 .10 대신 다음 초·분·시간으로 올림된다.
+  const tenths = Math.round(Math.max(0, seconds) * 10);
+  const total = Math.floor(tenths / 10);
+  const frac = tenths % 10;
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
   const s = total % 60;
+  if (fixedWidth) {
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${frac}`;
+  }
   const base =
     h > 0
       ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`

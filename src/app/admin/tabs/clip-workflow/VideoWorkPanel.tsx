@@ -250,9 +250,9 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
       ) : items.length === 0 ? (
         <div className="p-8 text-center text-sm text-light-text/50">파싱된 타임라인이 없습니다. &lsquo;댓글 파싱&rsquo;을 눌러주세요.</div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-[19rem_1fr] gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[19rem_minmax(0,1fr)] gap-4">
           {/* 우(시각): 플레이어 + 시간편집 + 선택 매칭 (공용 ItemEditor) */}
-          <div className="lg:order-2">
+          <div className="min-w-0 lg:order-2">
             {selected ? (
               <ItemEditor
                 item={selected}

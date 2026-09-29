@@ -181,7 +181,7 @@ export default function ClipWorkflowTab() {
       </div>
 
       {mode === "video" && (
-      <div className="grid grid-cols-1 lg:grid-cols-[22rem_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] gap-4">
         {/* 좌: 영상 목록 */}
         <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col max-h-[80vh]">
           <div className="flex border-b border-light-primary/15 dark:border-dark-primary/15 text-sm">
@@ -217,7 +217,7 @@ export default function ClipWorkflowTab() {
         </div>
 
         {/* 우: 작업 패널 */}
-        <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg p-4 min-h-[40vh]">
+        <div className="min-w-0 border border-light-primary/20 dark:border-dark-primary/20 rounded-lg p-4 min-h-[40vh]">
           {selectedVideo ? (
             <VideoWorkPanel
               key={`${platform}-${selectedVideo.videoId}`}
@@ -235,7 +235,7 @@ export default function ClipWorkflowTab() {
       )}
 
       {mode === "song" && (
-      <div className="grid grid-cols-1 lg:grid-cols-[22rem_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] gap-4">
         {/* 좌: 곡 목록 (검색 + 활동곡) */}
         <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col max-h-[80vh]">
           <div className="p-2 border-b border-light-primary/15 dark:border-dark-primary/15">
@@ -276,7 +276,7 @@ export default function ClipWorkflowTab() {
         </div>
 
         {/* 우: 곡 작업 패널 / 미등록 검색 패널 */}
-        <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg p-4 min-h-[40vh]">
+        <div className="min-w-0 border border-light-primary/20 dark:border-dark-primary/20 rounded-lg p-4 min-h-[40vh]">
           {unmatchedQuery !== null ? (
             <UnmatchedSearchPanel
               key={`unmatched-${unmatchedQuery}`}
