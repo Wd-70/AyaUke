@@ -10,13 +10,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import ItemEditor from "./ItemEditor";
 import CreatedClipsReview from "./CreatedClipsReview";
 import { fmt } from "./itemUtils";
+import { saveWorkflowItem, workflowRequest } from './workflow-client';
 import type { WorkflowItem, WorkflowSong } from "./types";
 
 interface Props {
   song: WorkflowSong;
   songs: WorkflowSong[];
   songsById: Map<string, WorkflowSong>;
-  onStatusRefresh: () => void;
+  onStatusRefresh: () => void | Promise<void>;
 }
 
 export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh }: Props) {
@@ -33,19 +34,18 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
   const loadWork = useCallback(async (withCandidates: boolean) => {
     if (withCandidates) setSearchingCand(true); else setLoading(true);
     try {
-      const res = await fetch(`/api/admin/clip-workflow/song-work?songId=${song.id}&candidates=${withCandidates}`).then((r) => r.json());
-      if (res.success) {
-        setOccurrences(res.data.occurrences);
-        setClips(res.data.clips || []);
-        if (withCandidates) setCandidates(res.data.candidates || []);
-        setSelectedId((prev) => prev ?? res.data.occurrences[0]?.id ?? null);
-      }
+      const res = await workflowRequest<{ data: { occurrences: WorkflowItem[]; clips: { videoId: string; startTime: number }[]; candidates?: WorkflowItem[] } }>(`/api/admin/clip-workflow/song-work?songId=${song.id}&candidates=${withCandidates}`);
+      setOccurrences(res.data.occurrences);
+      setClips(res.data.clips || []);
+      if (withCandidates) setCandidates(res.data.candidates || []);
+      const selectable = [...res.data.occurrences, ...(withCandidates ? res.data.candidates || [] : [])];
+      setSelectedId((prev) => selectable.some((it) => it.id === prev) ? prev : selectable[0]?.id ?? null);
     } finally {
       setLoading(false); setSearchingCand(false);
     }
   }, [song.id]);
 
-  useEffect(() => { setCandidates(null); setSelectedId(null); setResult(null); loadWork(false); }, [loadWork]);
+  useEffect(() => { setCandidates(null); setSelectedId(null); setResult(null); void loadWork(false).catch((error) => setResult(error.message)); }, [loadWork]);
 
   // 항목 PATCH. matchedSongId가 바뀌면(매칭/해제/등록) 목록 구성이 달라지므로 재로드
   const patchItem = useCallback(async (id: string, body: Record<string, unknown>, optimistic?: Partial<WorkflowItem>) => {
@@ -54,22 +54,27 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
       setOccurrences((prev) => prev.map((it) => (it.id === id ? { ...it, ...optimistic } : it)));
       setCandidates((prev) => prev && prev.map((it) => (it.id === id ? { ...it, ...optimistic } : it)));
     }
-    await fetch(`/api/admin/clip-workflow/item/${encodeURIComponent(id)}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    }).catch(() => {});
-    if (reload) { await loadWork(candidates !== null); onStatusRefresh(); }
+    try {
+      const { item, latest } = await saveWorkflowItem(id, body);
+      if (latest) {
+        setOccurrences((prev) => prev.map((it) => it.id === id ? item : it));
+        setCandidates((prev) => prev && prev.map((it) => it.id === id ? item : it));
+      }
+      if (reload) await loadWork(candidates !== null);
+      await onStatusRefresh();
+    } catch (error) {
+      setResult(error instanceof Error ? error.message : '저장 실패');
+      await loadWork(candidates !== null).catch(() => {});
+    }
   }, [loadWork, candidates, onStatusRefresh]);
 
   const registerAll = async () => {
     if (!candidates || candidates.length === 0) return;
-    for (const c of candidates) {
-      await fetch(`/api/admin/clip-workflow/item/${encodeURIComponent(c.id)}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ matchedSongId: song.id }),
-      }).catch(() => {});
-    }
-    await loadWork(true); onStatusRefresh();
-    setResult(`${candidates.length}건 등록`);
+    const outcomes = await Promise.allSettled(candidates.map((c) => saveWorkflowItem(c.id, { matchedSongId: song.id })));
+    const failed = outcomes.filter((r) => r.status === 'rejected').length;
+    setResult(`${outcomes.length - failed}건 등록 · 실패 ${failed}건`);
+    try { await loadWork(true); await onStatusRefresh(); }
+    catch { setResult('등록 후 목록 갱신 실패. 다시 불러와주세요.'); }
   };
 
   const clipped = (occ: WorkflowItem) =>
@@ -90,12 +95,12 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
     }));
     setCreating(true); setResult(null);
     try {
-      const res = await fetch("/api/admin/clips/bulk", {
+      const res = await workflowRequest<{ results?: { success?: number; duplicates?: number; failed?: number } }>("/api/admin/clips/bulk", {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clips: payload }),
-      }).then((r) => r.json());
+      });
       const r = res.results || {};
       setResult(`생성 성공 ${r.success ?? 0} · 중복 ${r.duplicates ?? 0} · 실패 ${r.failed ?? 0}`);
-      await loadWork(candidates !== null); onStatusRefresh();
+      await loadWork(candidates !== null); await onStatusRefresh();
     } catch { setResult("생성 중 오류"); }
     finally { setCreating(false); }
   };
@@ -129,7 +134,7 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
           <h2 className="text-lg font-bold text-light-text dark:text-dark-text">{song.titleAlias || song.title}</h2>
           <p className="text-xs text-light-text/60 dark:text-dark-text/60">{song.artistAlias || song.artist} · 출현 {occurrences.length} · 미생성 {generatable.length}</p>
         </div>
-        <button onClick={() => loadWork(true)} disabled={searchingCand} className="text-sm px-3 py-1.5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:border-light-accent/40 disabled:opacity-50">
+        <button onClick={() => { void loadWork(true).catch((error) => setResult(error.message)); }} disabled={searchingCand} className="text-sm px-3 py-1.5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 text-light-text/70 dark:text-dark-text/70 hover:border-light-accent/40 disabled:opacity-50">
           {searchingCand ? "찾는 중..." : "미등록 출현 찾기"}
         </button>
       </div>
@@ -186,7 +191,7 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
           query={`songId=${encodeURIComponent(song.id)}`}
           title={`${song.titleAlias || song.title} — 생성된 클립`}
           onClose={() => setShowReview(false)}
-          onChanged={() => { loadWork(candidates !== null); onStatusRefresh(); }}
+          onChanged={async () => { await loadWork(candidates !== null); await onStatusRefresh(); }}
         />
       )}
     </div>

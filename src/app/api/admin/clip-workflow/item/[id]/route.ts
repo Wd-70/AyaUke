@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { withApi, ok } from '@/shared/api/handler';
 import {
-  setItemMatch, setItemTime, setItemExcluded, setItemVerified, editItem,
+  setItemMatch, setItemTime, setItemExcluded, setItemVerified, editItem, getWorkflowItem,
 } from '@/domains/archive/clip-workflow.service';
 import { assertAdmin } from '../../_guard';
 
@@ -31,5 +31,5 @@ export const PATCH = withApi({ schema: Body, auth: 'user' }, async ({ input, ses
   if (input.artist !== undefined || input.songTitle !== undefined || input.customDescription !== undefined) {
     await editItem(id, { artist: input.artist, songTitle: input.songTitle, customDescription: input.customDescription });
   }
-  return ok({ updated: true });
+  return ok({ updated: true, item: await getWorkflowItem(id) });
 });

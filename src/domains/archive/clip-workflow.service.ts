@@ -225,6 +225,13 @@ async function listItems(filter: Record<string, unknown>): Promise<WorkflowItem[
   }));
 }
 
+/** 저장 후 화면에 반영할 최신 항목. */
+export async function getWorkflowItem(id: string): Promise<WorkflowItem> {
+  const [item] = await listItems({ id });
+  if (!item) throw new NotFoundError('타임라인을 찾을 수 없습니다.');
+  return item;
+}
+
 /** 곡 매칭/해제. 매칭 시 종료시각=시작+clipDuration 자동(검증분 보존) */
 export async function setItemMatch(id: string, songId: string | null) {
   if (!songId) {

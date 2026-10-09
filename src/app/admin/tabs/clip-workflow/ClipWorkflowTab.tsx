@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import VideoWorkPanel from "./VideoWorkPanel";
 import SongWorkPanel from "./SongWorkPanel";
 import UnmatchedSearchPanel from "./UnmatchedSearchPanel";
+import { SongDurationContext } from "./SongDurationContext";
 import type { Platform, WorkflowVideo, WorkflowSong } from "./types";
 
 type Mode = "video" | "song";
@@ -31,30 +32,43 @@ export default function ClipWorkflowTab() {
   const [songSearch, setSongSearch] = useState("");
   // 미등록 곡 발견: 좌측 가상 항목 선택 시 그 검색어를 고정해 우측 패널로 전달(입력 중 변동 방지)
   const [unmatchedQuery, setUnmatchedQuery] = useState<string | null>(null);
+  const videoRequest = useRef(0);
+  const statusRequest = useRef(0);
+  const activePlatform = useRef(platform);
 
   const loadSongStatuses = useCallback(async () => {
+    const request = ++statusRequest.current;
     const res = await fetch("/api/admin/clip-workflow/song-statuses").then((r) => r.json());
-    if (res.success) setSongStatuses(new Map(res.data.statuses.map((s: { songId: string; occurrences: number; clips: number }) => [s.songId, { occurrences: s.occurrences, clips: s.clips }])));
+    if (res.success && request === statusRequest.current) setSongStatuses(new Map(res.data.statuses.map((s: { songId: string; occurrences: number; clips: number }) => [s.songId, { occurrences: s.occurrences, clips: s.clips }])));
   }, []);
   useEffect(() => { if (mode === "song") loadSongStatuses(); }, [mode, loadSongStatuses]);
 
   const loadVideos = useCallback(async (p: Platform) => {
+    // 이전 플랫폼의 저장이 늦게 끝나도 현재 목록을 덮어쓰지 않는다.
+    if (p !== activePlatform.current) return;
+    const request = ++videoRequest.current;
     setLoading(true);
     try {
       const res = await fetch(`/api/admin/clip-workflow/videos?platform=${p}`).then((r) => r.json());
-      if (res.success) setVideos(res.data.videos);
+      if (res.success && request === videoRequest.current && p === activePlatform.current) setVideos(res.data.videos);
     } finally {
-      setLoading(false);
+      if (request === videoRequest.current) setLoading(false);
     }
   }, []);
 
   // 곡 목록 로드. 다른 탭(관리자 곡 화면)에서 곡을 추가한 뒤 이 탭으로 돌아오면
   // 창 포커스/가시성 복귀 시 자동 재로드해 검색·추천에 즉시 반영한다.
   const lastSongsLoadRef = useRef(0);
+  const songRevision = useRef(0);
+  const onSongDurationSaved = useCallback((songId: string, duration: number) => {
+    songRevision.current += 1;
+    setSongs((prev) => prev.map((song) => song.id === songId ? { ...song, clipDuration: duration } : song));
+  }, []);
   const loadSongs = useCallback(async () => {
+    const revision = songRevision.current;
     lastSongsLoadRef.current = Date.now();
     const res = await fetch("/api/admin/clip-workflow/songs").then((r) => r.json());
-    if (res.success) setSongs(res.data.songs);
+    if (res.success && revision === songRevision.current) setSongs(res.data.songs);
   }, []);
 
   useEffect(() => { loadSongs(); }, [loadSongs]);
@@ -77,7 +91,7 @@ export default function ClipWorkflowTab() {
     };
   }, [loadSongs, loadSongStatuses, mode]);
 
-  useEffect(() => { setSelectedVideoId(null); loadVideos(platform); }, [platform, loadVideos]);
+  useEffect(() => { activePlatform.current = platform; setSelectedVideoId(null); loadVideos(platform); }, [platform, loadVideos]);
 
   const songsById = useMemo(() => {
     const m = new Map<string, WorkflowSong>();
@@ -144,6 +158,7 @@ export default function ClipWorkflowTab() {
   }, [songs, songStatuses, songSearch]);
 
   return (
+    <SongDurationContext.Provider value={onSongDurationSaved}>
     <div className="space-y-4">
       {/* 상단: 보기 모드 + (영상모드) 플랫폼 토글 / 수집 */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -300,5 +315,6 @@ export default function ClipWorkflowTab() {
       </div>
       )}
     </div>
+    </SongDurationContext.Provider>
   );
 }

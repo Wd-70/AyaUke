@@ -10,19 +10,21 @@
 import { useCallback, useEffect, useState } from "react";
 import ItemEditor from "./ItemEditor";
 import { fmt } from "./itemUtils";
+import { saveWorkflowItem } from './workflow-client';
 import type { WorkflowItem, WorkflowSong } from "./types";
 
 interface Props {
   query: string;
   songs: WorkflowSong[];
   songsById: Map<string, WorkflowSong>;
-  onStatusRefresh: () => void;
+  onStatusRefresh: () => void | Promise<void>;
 }
 
 export default function UnmatchedSearchPanel({ query, songs, songsById, onStatusRefresh }: Props) {
   const [items, setItems] = useState<WorkflowItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,16 +46,23 @@ export default function UnmatchedSearchPanel({ query, songs, songsById, onStatus
   const patchItem = useCallback(async (id: string, body: Record<string, unknown>, optimistic?: Partial<WorkflowItem>) => {
     const reload = "matchedSongId" in body;
     if (optimistic && !reload) setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...optimistic } : it)));
-    await fetch(`/api/admin/clip-workflow/item/${encodeURIComponent(id)}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-    }).catch(() => {});
-    if (reload) { await load(); onStatusRefresh(); }
+    setSaveError(null);
+    try {
+      const { item, latest } = await saveWorkflowItem(id, body);
+      if (latest) setItems((prev) => prev.map((it) => it.id === id ? item : it));
+      if (reload) await load();
+      await onStatusRefresh();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : '저장 실패');
+      await load().catch(() => {});
+    }
   }, [load, onStatusRefresh]);
 
   const selected = items.find((it) => it.id === selectedId) || null;
 
   return (
     <div className="flex flex-col gap-4">
+      {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
       <div>
         <h2 className="text-lg font-bold text-light-text dark:text-dark-text">미등록 검색: &ldquo;{query}&rdquo;</h2>
         <p className="text-xs text-light-text/60 dark:text-dark-text/60">

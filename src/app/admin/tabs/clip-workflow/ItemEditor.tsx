@@ -6,7 +6,9 @@
  * 변경은 onPatch(id, body, optimistic)로 상위에 위임(ParsedTimeline에 반영).
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
+import { SongDurationContext } from './SongDurationContext';
+import { workflowRequest } from './workflow-client';
 import type { EditPlayerAdapter } from "@/app/admin/tabs/live-clips/clip-types";
 import ClipTimeEditor from "@/app/admin/tabs/live-clips/ClipTimeEditor";
 import ClipVerifyButton from "@/app/admin/tabs/live-clips/ClipVerifyButton";
@@ -28,13 +30,11 @@ export default function ItemEditor({ item, songs, songsById, originalLine, onPat
   const [isPlaying, setIsPlaying] = useState(false);
   const [songQuery, setSongQuery] = useState("");
   const [savingDefault, setSavingDefault] = useState(false);
-  // PUT 성공 직후 곡 기본길이를 이 화면에 즉시 반영하기 위한 로컬 오버라이드
-  // (부모 songs 갱신은 window-focus 자동갱신에 맡긴다). 항목/매칭곡이 바뀌면 초기화.
-  const [localClipDuration, setLocalClipDuration] = useState<number | null>(null);
+  const onSongDurationSaved = useContext(SongDurationContext);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // 항목이 바뀌면 검색어 초기화 + 그 시작점으로 시킹
   useEffect(() => { setSongQuery(""); }, [item.id]);
-  useEffect(() => { setLocalClipDuration(null); }, [item.id, item.matchedSongId]);
   // adapter도 의존: 다른 영상으로 바뀌면 EditPlayer가 remount돼 어댑터가 새로 생기는데,
   // 그때 정확한 시작시각으로 seek한다. (옛 어댑터 호출은 EditPlayer가 안전하게 무시)
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function ItemEditor({ item, songs, songsById, originalLine, onPat
   }, [item.id, adapter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const matchedSong = item.matchedSongId ? songsById.get(item.matchedSongId) : undefined;
-  const effectiveClipDuration = localClipDuration ?? matchedSong?.clipDuration ?? null;
+  const effectiveClipDuration = matchedSong?.clipDuration ?? null;
 
   const assign = (songId: string | null) => {
     const song = songId ? songsById.get(songId) ?? null : null;
@@ -53,13 +53,15 @@ export default function ItemEditor({ item, songs, songsById, originalLine, onPat
   const setDefaultDuration = async (duration: number) => {
     if (!matchedSong) return;
     setSavingDefault(true);
+    setSaveError(null);
     try {
-      const res = await fetch(`/api/songdetails/${matchedSong.id}`, {
+      await workflowRequest(`/api/songdetails/${matchedSong.id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clipDuration: duration }),
       });
-      const result = await res.json().catch(() => null);
-      if (res.ok && result?.success) setLocalClipDuration(duration);
+      onSongDurationSaved(matchedSong.id, duration);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : '기본 길이 저장 실패');
     } finally {
       setSavingDefault(false);
     }
@@ -123,6 +125,7 @@ export default function ItemEditor({ item, songs, songsById, originalLine, onPat
         }}
       />
 
+      {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
       {/* 곡 매칭 + 메모 */}
       <div className="rounded-lg border border-light-primary/20 dark:border-dark-primary/20 p-3">
         {matchedSong ? (

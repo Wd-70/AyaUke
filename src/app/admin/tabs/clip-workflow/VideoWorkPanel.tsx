@@ -10,15 +10,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { matchSongs } from "@/shared/utils/song-match";
 import ItemEditor from "./ItemEditor";
 import CreatedClipsReview from "./CreatedClipsReview";
-import { fmt, assignOptimistic } from "./itemUtils";
-import type { Platform, WorkflowVideo, WorkflowItem, WorkflowSong, WorkflowComment } from "./types";
+import { fmt } from "./itemUtils";
+import { saveWorkflowItem, workflowRequest } from './workflow-client';
+import type { Platform, WorkflowVideo, WorkflowItem, WorkflowSong, WorkflowComment, VideoDetail } from "./types";
 
 interface Props {
   platform: Platform;
   video: WorkflowVideo;
   songs: WorkflowSong[];
   songsById: Map<string, WorkflowSong>;
-  onStatusRefresh: () => void;
+  onStatusRefresh: () => void | Promise<void>;
 }
 
 export default function VideoWorkPanel({ platform, video, songs, songsById, onStatusRefresh }: Props) {
@@ -38,36 +39,30 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
   const loadDetail = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/clip-workflow/video?platform=${platform}&videoId=${encodeURIComponent(video.videoId)}`).then((r) => r.json());
-      if (res.success) {
-        setComments(res.data.comments);
-        setItems(res.data.items);
-        setExistingClips(res.data.existingClips || []);
-        setSelectedId(res.data.items[0]?.id ?? null);
-      }
+      const res = await workflowRequest<{ data: VideoDetail }>(`/api/admin/clip-workflow/video?platform=${platform}&videoId=${encodeURIComponent(video.videoId)}`);
+      setComments(res.data.comments);
+      setItems(res.data.items);
+      setExistingClips(res.data.existingClips || []);
+      setSelectedId((prev) => res.data.items.some((it) => it.id === prev) ? prev : res.data.items[0]?.id ?? null);
     } finally {
       setLoading(false);
     }
   }, [platform, video.videoId]);
 
-  useEffect(() => { loadDetail(); }, [loadDetail]);
+  useEffect(() => { void loadDetail().catch((error) => setResult(error.message)); }, [loadDetail]);
 
   // 항목 단건 PATCH + 로컬 반영
   const patchItem = useCallback(async (id: string, body: Record<string, unknown>, optimistic?: Partial<WorkflowItem>) => {
     if (optimistic) setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...optimistic } : it)));
-    await fetch(`/api/admin/clip-workflow/item/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }).catch(() => {});
-  }, []);
-
-  const assignSong = useCallback((id: string, songId: string | null) => {
-    const item = items.find((it) => it.id === id);
-    if (!item) return;
-    const song = songId ? songsById.get(songId) ?? null : null;
-    patchItem(id, { matchedSongId: songId }, assignOptimistic(item, song));
-  }, [patchItem, songsById, items]);
+    try {
+      const { item, latest } = await saveWorkflowItem(id, body);
+      if (latest) setItems((prev) => prev.map((it) => it.id === id ? item : it));
+      await onStatusRefresh();
+    } catch (error) {
+      setResult(error instanceof Error ? error.message : '저장 실패');
+      await loadDetail().catch(() => {});
+    }
+  }, [loadDetail, onStatusRefresh]);
 
   // ── 자동 매칭 (영상 로드 후 1회, 고신뢰도만) ──
   useEffect(() => {
@@ -82,10 +77,18 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
       if (best) toAssign.push({ id: it.id, songId: best.songId });
     }
     if (toAssign.length === 0) return;
-    // 로컬 즉시 반영 + 서버 반영
-    for (const a of toAssign) assignSong(a.id, a.songId);
-    setResult(`자동 매칭 ${toAssign.length}곡`);
-  }, [loading, items, songs, video.videoId, assignSong]);
+    // 모든 저장이 끝난 후 한 번만 통계를 갱신한다. 실패를 성공 건수에 넣지 않는다.
+    void (async () => {
+      const outcomes = await Promise.allSettled(toAssign.map(async (a) => {
+        const { item, latest } = await saveWorkflowItem(a.id, { matchedSongId: a.songId });
+        if (latest) setItems((prev) => prev.map((it) => it.id === item.id ? item : it));
+      }));
+      const failed = outcomes.filter((r) => r.status === 'rejected').length;
+      setResult(`자동 매칭 ${outcomes.length - failed}곡${failed ? ` · 저장 실패 ${failed}곡 (다시 파싱으로 재시도)` : ''}`);
+      try { await onStatusRefresh(); }
+      catch { setResult('자동 매칭 후 목록 갱신 실패. 다시 불러와주세요.'); }
+    })();
+  }, [loading, items, songs, video.videoId, onStatusRefresh]);
 
   const selected = items.find((it) => it.id === selectedId) || null;
 
@@ -100,9 +103,11 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
       if (res.success) {
         autoMatchedRef.current.delete(video.videoId); // 재파싱 후 자동매칭 다시 허용
         await loadDetail();
-        onStatusRefresh();
+        await onStatusRefresh();
         setResult(`파싱: 새 항목 ${res.data.createdItems}개 (중복 ${res.data.skippedExisting})`);
       } else setResult(res.error?.message || "파싱 실패");
+    } catch (error) {
+      setResult(error instanceof Error ? error.message : '파싱 실패');
     } finally {
       setParsing(false);
     }
@@ -126,7 +131,7 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
       if (res.success) {
         const nc = res.data?.newComments ?? 0;
         await loadDetail();
-        onStatusRefresh();
+        await onStatusRefresh();
         setResult(nc > 0 ? `새 댓글 ${nc}개 수집 — 새 타임라인이면 '다시 파싱'하세요.` : "새 댓글이 없습니다.");
       } else {
         setResult(res.error?.message || res.error || "댓글 수집 실패");
@@ -198,13 +203,14 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
     setCreating(true);
     setResult(null);
     try {
-      const res = await fetch("/api/admin/clips/bulk", {
+      const res = await workflowRequest<{ results?: { success?: number; duplicates?: number; failed?: number } }>("/api/admin/clips/bulk", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clips }),
-      }).then((r) => r.json());
+      });
       const r = res.results || {};
       setResult(`생성 성공 ${r.success ?? 0} · 중복 ${r.duplicates ?? 0} · 실패 ${r.failed ?? 0}`);
-      onStatusRefresh();
+      await loadDetail();
+      await onStatusRefresh();
     } catch {
       setResult("생성 중 오류가 발생했습니다.");
     } finally {
@@ -320,7 +326,7 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
           query={`videoId=${encodeURIComponent(video.videoId)}`}
           title={`${video.title} — 생성된 클립`}
           onClose={() => setShowReview(false)}
-          onChanged={onStatusRefresh}
+          onChanged={async () => { await loadDetail(); await onStatusRefresh(); }}
         />
       )}
 

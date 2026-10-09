@@ -7,7 +7,9 @@
  * react-query/토스트 의존 없이 plain fetch + 로컬 상태로 동작.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
+import { SongDurationContext } from './SongDurationContext';
+import { workflowRequest } from './workflow-client';
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import ClipTimeEditor from "@/app/admin/tabs/live-clips/ClipTimeEditor";
 import ClipVerifyButton from "@/app/admin/tabs/live-clips/ClipVerifyButton";
@@ -22,10 +24,11 @@ interface Props {
   title?: string;
   onClose: () => void;
   /** 변경(편집/삭제) 발생 시 상위 갱신용 */
-  onChanged?: () => void;
+  onChanged?: () => void | Promise<void>;
 }
 
 export default function CreatedClipsReview({ query, title = "생성된 클립", onClose, onChanged }: Props) {
+  const onSongDurationSaved = useContext(SongDurationContext);
   const [clips, setClips] = useState<ClipData[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -88,15 +91,14 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
     setSaving(true);
     setMsg(null);
     try {
-      const res = await fetch("/api/admin/clips", {
+      const result = await workflowRequest<{ clip: ClipData }>("/api/admin/clips", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clipId: selected._id, action: "updateClip", data: { startTime: editData.startTime, endTime: editData.endTime ?? undefined, description: editData.description } }),
+        body: JSON.stringify({ clipId: selected._id, action: "updateClip", data: { startTime: editData.startTime, endTime: editData.endTime, description: editData.description } }),
       });
-      if (!res.ok) throw new Error((await res.json()).error || "저장 실패");
       // 로컬 즉시 반영 + 목록 갱신
-      setClips((prev) => prev.map((c) => (c._id === selected._id ? { ...c, startTime: editData.startTime, endTime: editData.endTime ?? undefined, description: editData.description } : c)));
+      setClips((prev) => prev.map((c) => (c._id === selected._id ? { ...c, ...result.clip } : c)));
       setMsg("저장됨");
-      onChanged?.();
+      await onChanged?.();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "저장 실패");
     } finally {
@@ -108,13 +110,15 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
     if (!selected) return;
     setVerifying(true);
     try {
-      await fetch("/api/admin/clips", {
+      await workflowRequest("/api/admin/clips", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clipId: selected._id, action: v ? "verify" : "unverify" }),
       });
       // 로컬 즉시 반영 (list row · 배지 · 버튼이 공유) → refetch 복제지연에도 안 되돌아감
       setClips((prev) => prev.map((c) => (c._id === selected._id ? { ...c, isVerified: v } : c)));
-      onChanged?.();
+      await onChanged?.();
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : '검증 상태 저장 실패');
     } finally {
       setVerifying(false);
     }
@@ -133,13 +137,13 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
       });
       const result = await res.json().catch(() => null);
       if (!res.ok || !result?.success) throw new Error(result?.error?.message || "기본 길이 저장 실패");
+      onSongDurationSaved(selected.songId, duration);
       setClips((prev) => prev.map((c) =>
         c.songId === selected.songId && c.songDetail
           ? { ...c, songDetail: { ...c.songDetail, clipDuration: duration } }
           : c,
       ));
       setMsg(`곡 기본 길이 ${formatTime(duration)} 저장됨`);
-      onChanged?.();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "기본 길이 저장 실패");
     } finally {
@@ -149,10 +153,14 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
 
   const remove = async () => {
     if (!selected || !confirm("이 클립을 삭제하시겠습니까?")) return;
-    await fetch(`/api/admin/clips?clipId=${selected._id}`, { method: "DELETE" }).catch(() => {});
-    setClips((prev) => prev.filter((c) => c._id !== selected._id));
-    setSelectedId(null);
-    onChanged?.();
+    try {
+      await workflowRequest(`/api/admin/clips?clipId=${selected._id}`, { method: "DELETE" });
+      setClips((prev) => prev.filter((c) => c._id !== selected._id));
+      setSelectedId((current) => current === selected._id ? null : current);
+      await onChanged?.();
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : '클립 삭제 실패');
+    }
   };
 
   const platform = (selected?.platform || "youtube") as Platform;
