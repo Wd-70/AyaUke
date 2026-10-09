@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import ItemEditor from "./ItemEditor";
+import MobileItemNavigation, { useItemNavigation } from './MobileItemNavigation';
 import { fmt } from "./itemUtils";
 import { saveWorkflowItem } from './workflow-client';
 import type { WorkflowItem, WorkflowSong } from "./types";
@@ -25,6 +26,7 @@ export default function UnmatchedSearchPanel({ query, songs, songsById, onStatus
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const navigation = useItemNavigation(items, selectedId, setSelectedId);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -51,10 +53,10 @@ export default function UnmatchedSearchPanel({ query, songs, songsById, onStatus
       const { item, latest } = await saveWorkflowItem(id, body);
       if (latest) setItems((prev) => prev.map((it) => it.id === id ? item : it));
       if (reload) await load();
-      await onStatusRefresh();
+      try { await onStatusRefresh(); } catch { setSaveError('저장됨 · 목록 갱신 실패'); }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : '저장 실패');
-      await load().catch(() => {});
+      throw error;
     }
   }, [load, onStatusRefresh]);
 
@@ -63,7 +65,7 @@ export default function UnmatchedSearchPanel({ query, songs, songsById, onStatus
   return (
     <div className="flex flex-col gap-4">
       {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
-      <div>
+      <div className={navigation.listClass}>
         <h2 className="text-lg font-bold text-light-text dark:text-dark-text">미등록 검색: &ldquo;{query}&rdquo;</h2>
         <p className="text-xs text-light-text/60 dark:text-dark-text/60">
           이름이 일치하는 미매칭 타임라인 {items.length}건. 클립을 만들려면 먼저 곡을 등록하세요 —
@@ -71,18 +73,19 @@ export default function UnmatchedSearchPanel({ query, songs, songsById, onStatus
         </p>
       </div>
 
-      {loading ? (
+      <MobileItemNavigation navigation={navigation} />
+      {loading && items.length === 0 ? (
         <div className="p-8 text-center text-sm text-light-text/50">검색 중...</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[20rem_minmax(0,1fr)] gap-4">
           {/* 좌: 미매칭 출현 목록 */}
-          <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col lg:order-1 max-h-[78vh]">
-            <div className="overflow-y-auto">
+          <div className={`${navigation.listClass} border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col lg:order-1 lg:max-h-[78vh]`}>
+            <div className="lg:overflow-y-auto">
               {items.length === 0 && <p className="px-3 py-2 text-xs text-light-text/40">일치하는 미매칭 타임라인이 없습니다.</p>}
               {items.map((it) => {
                 const isSel = it.id === selectedId;
                 return (
-                  <div key={it.id} onClick={() => setSelectedId(it.id)} className={`px-2.5 py-1.5 text-sm cursor-pointer border-b border-light-primary/10 dark:border-dark-primary/10 ${isSel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"} ${it.isExcluded ? "opacity-40" : ""}`}>
+                  <div key={it.id} onClick={() => navigation.open(it.id)} className={`px-2.5 py-1.5 text-sm cursor-pointer border-b border-light-primary/10 dark:border-dark-primary/10 ${isSel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"} ${it.isExcluded ? "opacity-40" : ""}`}>
                     <div className="flex items-center gap-1.5">
                       <span className="text-[11px] font-mono text-light-text/60 dark:text-dark-text/60 shrink-0">{it.date?.slice(2) || "?"}</span>
                       <span className={`text-[10px] px-1 rounded shrink-0 ${it.platform === "chzzk" ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" : "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300"}`}>{it.platform === "chzzk" ? "CH" : "YT"}</span>
@@ -90,6 +93,7 @@ export default function UnmatchedSearchPanel({ query, songs, songsById, onStatus
                       <span className="flex-1 min-w-0 truncate text-light-text/70 dark:text-dark-text/70">{it.videoTitle || it.videoId}</span>
                     </div>
                     <div className="text-[11px] text-light-text/50 dark:text-dark-text/50 truncate">파싱: {it.artist} - {it.songTitle}</div>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); navigation.open(it.id); }} className="lg:hidden min-h-11 w-full text-left text-sm text-light-text dark:text-dark-text" aria-label={`${it.artist} - ${it.songTitle} 편집`}>편집 →</button>
                   </div>
                 );
               })}
@@ -97,15 +101,16 @@ export default function UnmatchedSearchPanel({ query, songs, songsById, onStatus
           </div>
 
           {/* 우: 편집 알맹이 (공용) */}
-          <div className="min-w-0 lg:order-2">
+          <div className={`${navigation.editorClass} min-w-0 lg:order-2`}>
             {selected ? (
-              <ItemEditor item={selected} songs={songs} songsById={songsById} onPatch={patchItem} />
+              <ItemEditor ref={navigation.editor} active={navigation.active} item={selected} songs={songs} songsById={songsById} onPatch={patchItem} />
             ) : (
               <p className="text-sm text-light-text/50 p-8 text-center">항목을 선택하세요.</p>
             )}
           </div>
         </div>
       )}
+      <MobileItemNavigation navigation={navigation} footer />
     </div>
   );
 }

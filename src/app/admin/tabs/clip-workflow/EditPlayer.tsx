@@ -38,10 +38,15 @@ export default function EditPlayer({
     if (platform !== "youtube") return;
     let cancelled = false;
     let interval: ReturnType<typeof setInterval> | null = null;
+    let mountedContainer: HTMLDivElement | null = null;
 
     loadYouTubeApi().then(() => {
       if (cancelled || !ytMountRef.current) return;
-      new window.YT.Player(ytMountRef.current, {
+      // YouTube는 전달된 노드를 iframe으로 교체한다. React 소유 컨테이너는 보존한다.
+      mountedContainer = ytMountRef.current;
+      const mount = document.createElement('div');
+      mountedContainer.appendChild(mount);
+      ytPlayerRef.current = new window.YT.Player(mount, {
         videoId,
         playerVars: { controls: 1, rel: 0, modestbranding: 1, playsinline: 1, start: Math.floor(startRef.current || 0) },
         events: {
@@ -72,6 +77,7 @@ export default function EditPlayer({
       if (interval) clearInterval(interval);
       try { ytPlayerRef.current?.destroy?.(); } catch { /* 이미 제거됨 */ }
       ytPlayerRef.current = null;
+      mountedContainer?.replaceChildren();
       cbRef.current.onAdapter(null);
     };
   }, [platform, videoId]);

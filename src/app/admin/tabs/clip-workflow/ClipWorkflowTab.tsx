@@ -11,6 +11,7 @@ import VideoWorkPanel from "./VideoWorkPanel";
 import SongWorkPanel from "./SongWorkPanel";
 import UnmatchedSearchPanel from "./UnmatchedSearchPanel";
 import { SongDurationContext } from "./SongDurationContext";
+import WorkflowWorkspace from './WorkflowWorkspace';
 import type { Platform, WorkflowVideo, WorkflowSong } from "./types";
 
 type Mode = "video" | "song";
@@ -32,6 +33,8 @@ export default function ClipWorkflowTab() {
   const [songSearch, setSongSearch] = useState("");
   // 미등록 곡 발견: 좌측 가상 항목 선택 시 그 검색어를 고정해 우측 패널로 전달(입력 중 변동 방지)
   const [unmatchedQuery, setUnmatchedQuery] = useState<string | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => { setMobileOpen(false); }, [mode, platform]);
   const videoRequest = useRef(0);
   const statusRequest = useRef(0);
   const activePlatform = useRef(platform);
@@ -159,7 +162,7 @@ export default function ClipWorkflowTab() {
 
   return (
     <SongDurationContext.Provider value={onSongDurationSaved}>
-    <div className="space-y-4">
+    <div className="space-y-4 [&_button]:min-h-11 lg:[&_button]:min-h-0 [&_input]:min-h-11 lg:[&_input]:min-h-0">
       {/* 상단: 보기 모드 + (영상모드) 플랫폼 토글 / 수집 */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
@@ -198,7 +201,7 @@ export default function ClipWorkflowTab() {
       {mode === "video" && (
       <div className="grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] gap-4">
         {/* 좌: 영상 목록 */}
-        <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col max-h-[80vh]">
+        <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col lg:max-h-[80vh]">
           <div className="flex border-b border-light-primary/15 dark:border-dark-primary/15 text-sm">
             {([["todo", "작업 대상", counts.todo], ["done", "완료", counts.done]] as const).map(([k, label, n]) => (
               <button key={k} onClick={() => setFilterTab(k)} className={`flex-1 px-2 py-2 transition-colors ${filterTab === k ? "text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent font-medium" : "text-light-text/60 dark:text-dark-text/60"}`} title={k === "todo" ? "댓글이 있고 아직 모든 매칭 곡이 클립으로 생성되지 않은 영상" : "매칭된 곡이 모두 클립으로 생성된 영상"}>
@@ -206,7 +209,7 @@ export default function ClipWorkflowTab() {
               </button>
             ))}
           </div>
-          <div className="overflow-y-auto">
+          <div className="lg:overflow-y-auto">
             {loading ? (
               <p className="p-4 text-center text-xs text-light-text/50">불러오는 중...</p>
             ) : visibleVideos.length === 0 ? (
@@ -214,7 +217,7 @@ export default function ClipWorkflowTab() {
             ) : visibleVideos.map((v) => {
               const sel = v.videoId === selectedVideoId;
               return (
-                <button key={v.videoId} onClick={() => setSelectedVideoId(v.videoId)} className={`w-full text-left px-3 py-2 border-b border-light-primary/10 dark:border-dark-primary/10 ${sel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5"}`}>
+                <button id={`workflow-video-${platform}-${v.videoId}`} key={v.videoId} onClick={() => { setSelectedVideoId(v.videoId); setMobileOpen(true); }} className={`min-h-11 w-full text-left px-3 py-2 border-b border-light-primary/10 dark:border-dark-primary/10 ${sel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5"}`}>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-mono text-light-text/60 shrink-0">{v.date.slice(5)}</span>
                     <span className="flex-1 min-w-0 truncate text-sm text-light-text dark:text-dark-text">{v.title}</span>
@@ -232,7 +235,8 @@ export default function ClipWorkflowTab() {
         </div>
 
         {/* 우: 작업 패널 */}
-        <div className="min-w-0 border border-light-primary/20 dark:border-dark-primary/20 rounded-lg p-4 min-h-[40vh]">
+        <div className="hidden lg:block min-w-0 border border-light-primary/20 dark:border-dark-primary/20 rounded-lg p-4 min-h-[40vh]">
+          <WorkflowWorkspace open={mobileOpen && !!selectedVideo} onClose={() => setMobileOpen(false)} title={selectedVideo?.title || '영상 작업'} backLabel="영상 목록">
           {selectedVideo ? (
             <VideoWorkPanel
               key={`${platform}-${selectedVideo.videoId}`}
@@ -245,6 +249,7 @@ export default function ClipWorkflowTab() {
           ) : (
             <p className="text-sm text-light-text/60 dark:text-dark-text/60 p-8 text-center">왼쪽에서 영상을 선택하세요. 새 영상이 없으면 &lsquo;영상·댓글 수집&rsquo;을 먼저 실행하세요.</p>
           )}
+          </WorkflowWorkspace>
         </div>
       </div>
       )}
@@ -252,22 +257,22 @@ export default function ClipWorkflowTab() {
       {mode === "song" && (
       <div className="grid grid-cols-1 lg:grid-cols-[22rem_minmax(0,1fr)] gap-4">
         {/* 좌: 곡 목록 (검색 + 활동곡) */}
-        <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col max-h-[80vh]">
+        <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col lg:max-h-[80vh]">
           <div className="p-2 border-b border-light-primary/15 dark:border-dark-primary/15">
             <input
               value={songSearch}
               onChange={(e) => setSongSearch(e.target.value)}
               placeholder="곡 검색 (비우면 출현·클립 있는 곡)"
-              className="w-full text-sm rounded border border-light-primary/20 dark:border-dark-primary/20 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text px-2 py-1"
+              className="w-full text-base lg:text-sm rounded border border-light-primary/20 dark:border-dark-primary/20 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text px-2 py-1"
             />
           </div>
-          <div className="overflow-y-auto">
+          <div className="lg:overflow-y-auto">
             {songList.length === 0 ? (
               <p className="p-4 text-center text-xs text-light-text/50">{songSearch ? "검색 결과 없음" : "활동 있는 곡이 없습니다. 검색해서 곡을 선택하세요."}</p>
             ) : songList.map(({ song: s, st }) => {
               const sel = s.id === selectedSongId && unmatchedQuery === null;
               return (
-                <button key={s.id} onClick={() => { setUnmatchedQuery(null); setSelectedSongId(s.id); }} className={`w-full text-left px-3 py-2 border-b border-light-primary/10 dark:border-dark-primary/10 ${sel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5"}`}>
+                <button id={`workflow-song-${s.id}`} key={s.id} onClick={() => { setUnmatchedQuery(null); setSelectedSongId(s.id); setMobileOpen(true); }} className={`min-h-11 w-full text-left px-3 py-2 border-b border-light-primary/10 dark:border-dark-primary/10 ${sel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5"}`}>
                   <div className="truncate text-sm text-light-text dark:text-dark-text">{s.titleAlias || s.title}</div>
                   <div className="flex items-center gap-2 text-[10px] text-light-text/50 dark:text-dark-text/50 mt-0.5">
                     <span className="truncate">{s.artistAlias || s.artist}</span>
@@ -280,7 +285,8 @@ export default function ClipWorkflowTab() {
             {/* 미등록 곡 발견: 검색어가 있으면 등록곡 결과와 별개로 미매칭 타임라인 검색 진입점 제공 */}
             {songSearch.trim() && (
               <button
-                onClick={() => { setSelectedSongId(null); setUnmatchedQuery(songSearch.trim()); }}
+                id="workflow-unmatched-search"
+                onClick={() => { setSelectedSongId(null); setUnmatchedQuery(songSearch.trim()); setMobileOpen(true); }}
                 className={`w-full text-left px-3 py-2 border-b border-light-primary/10 dark:border-dark-primary/10 ${unmatchedQuery !== null ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5"}`}
               >
                 <div className="truncate text-sm text-light-accent dark:text-dark-accent">🔍 &ldquo;{songSearch.trim()}&rdquo; 미등록 타임라인 검색</div>
@@ -291,7 +297,8 @@ export default function ClipWorkflowTab() {
         </div>
 
         {/* 우: 곡 작업 패널 / 미등록 검색 패널 */}
-        <div className="min-w-0 border border-light-primary/20 dark:border-dark-primary/20 rounded-lg p-4 min-h-[40vh]">
+        <div className="hidden lg:block min-w-0 border border-light-primary/20 dark:border-dark-primary/20 rounded-lg p-4 min-h-[40vh]">
+          <WorkflowWorkspace open={mobileOpen && (!!selectedSong || unmatchedQuery !== null)} onClose={() => setMobileOpen(false)} title={unmatchedQuery !== null ? `미등록 검색: ${unmatchedQuery}` : selectedSong?.titleAlias || selectedSong?.title || '곡 작업'} backLabel="곡 목록">
           {unmatchedQuery !== null ? (
             <UnmatchedSearchPanel
               key={`unmatched-${unmatchedQuery}`}
@@ -311,6 +318,7 @@ export default function ClipWorkflowTab() {
           ) : (
             <p className="text-sm text-light-text/60 dark:text-dark-text/60 p-8 text-center">왼쪽에서 곡을 선택하세요. 새로 추가한 곡은 검색으로 찾아 &lsquo;미등록 출현 찾기&rsquo;로 일괄 등록할 수 있습니다.</p>
           )}
+          </WorkflowWorkspace>
         </div>
       </div>
       )}

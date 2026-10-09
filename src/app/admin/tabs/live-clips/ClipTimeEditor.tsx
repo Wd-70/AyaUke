@@ -19,6 +19,25 @@ import {
   BookmarkIcon,
 } from "@heroicons/react/24/outline";
 import { type EditPlayerAdapter, formatTime, captureTime } from "./clip-types";
+import { useEffect, useState } from "react";
+
+function MobileTimeInput({ value, nullable = false, onCommit, label, className }: { value: number | null; nullable?: boolean; onCommit: (value: number | null) => void; label: string; className: string }) {
+  const [draft, setDraft] = useState(value == null ? '' : String(value));
+  const [focused, setFocused] = useState(false);
+  useEffect(() => { if (!focused) setDraft(value == null ? '' : String(value)); }, [value, focused]);
+  return <input type="number" inputMode="decimal" step="0.1" min="0" aria-label={label} value={draft} className={className}
+    placeholder={nullable ? '비우면 영상 끝까지' : '초 (소수점 가능)'}
+    onFocus={() => setFocused(true)} onChange={(event) => setDraft(event.target.value)}
+    onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
+    onBlur={() => {
+      setFocused(false);
+      const next = draft === '' ? (nullable ? null : value) : Number(draft);
+      if (next === null || (Number.isFinite(next) && next! >= 0)) {
+        setDraft(next == null ? '' : String(next));
+        if (next !== value) onCommit(next);
+      } else setDraft(value == null ? '' : String(value));
+    }} />;
+}
 
 interface ClipTimeEditorProps {
   startTime: number;
@@ -32,6 +51,8 @@ interface ClipTimeEditorProps {
   /** "이 길이를 곡 기본값으로" 클릭 시 (관리자) */
   onSetDefaultDuration?: (duration: number) => void;
   savingDefault?: boolean;
+  /** 클립 작업 화면에서만 사용하는 모바일 조작 배치 */
+  mobileControls?: boolean;
 }
 
 export default function ClipTimeEditor({
@@ -44,7 +65,9 @@ export default function ClipTimeEditor({
   songClipDuration,
   onSetDefaultDuration,
   savingDefault = false,
+  mobileControls = false,
 }: ClipTimeEditorProps) {
+  const [seekStep, setSeekStep] = useState(1);
   const duration = endTime != null && endTime > startTime ? endTime - startTime : null;
 
   const seekRelative = (delta: number) => {
@@ -59,7 +82,7 @@ export default function ClipTimeEditor({
     "disabled:opacity-40 disabled:cursor-not-allowed";
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${mobileControls ? '[&_button]:min-h-11 [&_input]:min-h-11 [&_select]:min-h-11' : ''}`}>
       {/* 현재 시간 + 재생 컨트롤 */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-3">
         <div className="shrink-0 whitespace-nowrap text-sm text-center sm:text-left text-light-text/60 dark:text-dark-text/60">
@@ -69,7 +92,19 @@ export default function ClipTimeEditor({
           </span>
         </div>
         {/* 모바일: 뒤로 그룹 / 재생 / 앞으로 그룹을 3줄로(대칭). 데스크톱: 한 줄. */}
-        <div className="flex min-w-0 flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-1.5">
+        {mobileControls && <div className="w-full space-y-2">
+          <div className="grid grid-cols-3 gap-2">
+            <button type="button" className={seekButton} disabled={!adapter} onClick={() => seekRelative(-seekStep)} aria-label={`${seekStep}초 뒤로`}>− {seekStep}초</button>
+            <button type="button" disabled={!adapter} onClick={() => isPlaying ? adapter?.pause() : adapter?.play()} className="rounded-lg bg-light-accent dark:bg-dark-accent text-white disabled:opacity-40" aria-label={isPlaying ? '일시정지' : '재생'}>{isPlaying ? '일시정지' : '재생'}</button>
+            <button type="button" className={seekButton} disabled={!adapter} onClick={() => seekRelative(seekStep)} aria-label={`${seekStep}초 앞으로`}>+ {seekStep}초</button>
+          </div>
+          <label className="flex items-center justify-between gap-2 text-sm text-light-text dark:text-dark-text">이동 간격
+            <select value={seekStep} onChange={(event) => setSeekStep(Number(event.target.value))} className="rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white dark:bg-gray-800 px-3">
+              <option value={0.1}>0.1초</option><option value={1}>1초</option><option value={10}>10초</option><option value={60}>1분</option>
+            </select>
+          </label>
+        </div>}
+        <div className={mobileControls ? 'hidden' : "flex min-w-0 flex-col sm:flex-row sm:flex-wrap items-center justify-center gap-1.5"}>
           <div className="flex items-center justify-center gap-1.5">
             <button type="button" onClick={() => seekRelative(-60)} disabled={!adapter} className={seekButton} title="1분 뒤로">
               <ChevronDoubleLeftIcon className="w-3.5 h-3.5" />1m
@@ -113,7 +148,7 @@ export default function ClipTimeEditor({
       {/* 시작/종료 시간 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-900/20 p-3">
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-1.5">
             <label className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
               시작 시간 <span className="font-mono">({formatTime(startTime)})</span>
             </label>
@@ -125,7 +160,7 @@ export default function ClipTimeEditor({
                 className="px-2 py-0.5 text-xs rounded bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 transition-colors"
                 title="플레이어의 현재 위치를 시작 시간으로 캡처"
               >
-                IN
+                {mobileControls ? '시작으로 설정' : 'IN'}
               </button>
               <button
                 type="button"
@@ -138,7 +173,7 @@ export default function ClipTimeEditor({
               </button>
             </div>
           </div>
-          <input
+          {mobileControls ? <MobileTimeInput value={startTime} label="시작 시간 (초)" onCommit={(value) => { if (value != null) onChange({ startTime: value }); }} className="w-full px-2 py-1.5 text-base rounded border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text font-mono" /> : <input
             type="number"
             step="0.1"
             min="0"
@@ -146,15 +181,15 @@ export default function ClipTimeEditor({
             onChange={(e) => onChange({ startTime: parseFloat(e.target.value) || 0 })}
             className="w-full px-2 py-1.5 text-sm rounded border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text font-mono"
             placeholder="초 (소수점 가능)"
-          />
+          />}
         </div>
 
         <div className="rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50/60 dark:bg-purple-900/20 p-3">
-          <div className="flex items-center justify-between mb-1.5">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-1.5">
             <label className="text-xs font-medium text-purple-700 dark:text-purple-300">
               종료 시간 {endTime != null && <span className="font-mono">({formatTime(endTime)})</span>}
             </label>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               {songClipDuration != null && songClipDuration > 0 && (
                 <button
                   type="button"
@@ -172,7 +207,7 @@ export default function ClipTimeEditor({
                 className="px-2 py-0.5 text-xs rounded bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-40 transition-colors"
                 title="플레이어의 현재 위치를 종료 시간으로 캡처"
               >
-                OUT
+                {mobileControls ? '종료로 설정' : 'OUT'}
               </button>
               <button
                 type="button"
@@ -185,7 +220,7 @@ export default function ClipTimeEditor({
               </button>
             </div>
           </div>
-          <input
+          {mobileControls ? <MobileTimeInput nullable value={endTime ?? null} label="종료 시간 (초)" onCommit={(value) => onChange({ endTime: value })} className="w-full px-2 py-1.5 text-base rounded border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text font-mono" /> : <input
             type="number"
             step="0.1"
             min="0"
@@ -195,7 +230,7 @@ export default function ClipTimeEditor({
             }
             className="w-full px-2 py-1.5 text-sm rounded border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text font-mono"
             placeholder="비우면 영상 끝까지"
-          />
+          />}
         </div>
       </div>
 

@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { matchSongs } from "@/shared/utils/song-match";
 import ItemEditor from "./ItemEditor";
+import MobileItemNavigation, { useItemNavigation } from './MobileItemNavigation';
+import { WorkspaceActions } from './WorkflowWorkspace';
 import CreatedClipsReview from "./CreatedClipsReview";
 import { fmt } from "./itemUtils";
 import { saveWorkflowItem, workflowRequest } from './workflow-client';
@@ -35,6 +37,7 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
   const [result, setResult] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
   const autoMatchedRef = useRef<Set<string>>(new Set()); // 영상별 자동매칭 1회 가드
+  const navigation = useItemNavigation(items, selectedId, setSelectedId);
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -57,10 +60,10 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
     try {
       const { item, latest } = await saveWorkflowItem(id, body);
       if (latest) setItems((prev) => prev.map((it) => it.id === id ? item : it));
-      await onStatusRefresh();
+      try { await onStatusRefresh(); } catch { setResult('저장됨 · 목록 갱신 실패'); }
     } catch (error) {
       setResult(error instanceof Error ? error.message : '저장 실패');
-      await loadDetail().catch(() => {});
+      throw error;
     }
   }, [loadDetail, onStatusRefresh]);
 
@@ -221,7 +224,7 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
   return (
     <div className="flex flex-col gap-4">
       {/* 헤더 + 통계 + 파싱 */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
+      <div className={`${navigation.listClass} flex items-start justify-between gap-3 flex-wrap`}>
         <div>
           <h2 className="text-lg font-bold text-light-text dark:text-dark-text">{video.title}</h2>
           <p className="text-xs text-light-text/60 dark:text-dark-text/60">
@@ -251,16 +254,19 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
         </div>
       </div>
 
-      {loading ? (
+      <MobileItemNavigation navigation={navigation} />
+      {loading && items.length === 0 ? (
         <div className="p-8 text-center text-sm text-light-text/50">불러오는 중...</div>
       ) : items.length === 0 ? (
         <div className="p-8 text-center text-sm text-light-text/50">파싱된 타임라인이 없습니다. &lsquo;댓글 파싱&rsquo;을 눌러주세요.</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[19rem_minmax(0,1fr)] gap-4">
           {/* 우(시각): 플레이어 + 시간편집 + 선택 매칭 (공용 ItemEditor) */}
-          <div className="min-w-0 lg:order-2">
+          <div className={`${navigation.editorClass} min-w-0 lg:order-2`}>
             {selected ? (
               <ItemEditor
+                ref={navigation.editor}
+                active={navigation.active && !showReview}
                 item={selected}
                 songs={songs}
                 songsById={songsById}
@@ -273,14 +279,14 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
           </div>
 
           {/* 좌(목록): 타임라인 — 좁게 */}
-          <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col lg:order-1 max-h-[78vh]">
-            <div className="overflow-y-auto">
+          <div className={`${navigation.listClass} border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col lg:order-1 lg:max-h-[78vh]`}>
+            <div className="lg:overflow-y-auto">
               {items.map((it) => {
                 const isSel = it.id === selectedId;
                 const m = it.matchedSongId ? songsById.get(it.matchedSongId) : undefined;
                 const clipped = clippedItemIds.has(it.id);
                 return (
-                  <div key={it.id} onClick={() => setSelectedId(it.id)} className={`px-2.5 py-1.5 text-sm cursor-pointer border-b border-light-primary/10 dark:border-dark-primary/10 ${isSel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"} ${it.isExcluded ? "opacity-40" : ""}`}>
+                  <div key={it.id} onClick={() => navigation.open(it.id)} className={`px-2.5 py-1.5 text-sm cursor-pointer border-b border-light-primary/10 dark:border-dark-primary/10 ${isSel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"} ${it.isExcluded ? "opacity-40" : ""}`}>
                     {/* 1줄: 시간 + 상태 뱃지/토글 */}
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono text-[11px] text-light-text/55 dark:text-dark-text/55 shrink-0">{fmt(it.startTimeSeconds)}~{fmt(it.endTimeSeconds)}</span>
@@ -289,15 +295,16 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
                       {m ? <span className="text-[11px] text-green-600 dark:text-green-400 shrink-0" title={`${m.artist} - ${m.title}`}>✓곡</span>
                         : it.isRelevant ? <span className="text-[11px] text-amber-600 dark:text-amber-400 shrink-0">미매칭</span>
                         : <span className="text-[11px] text-light-text/30 shrink-0">비곡</span>}
-                      <button onClick={(e) => { e.stopPropagation(); patchItem(it.id, { isTimeVerified: !it.isTimeVerified }, { isTimeVerified: !it.isTimeVerified }); }} className={`text-[11px] shrink-0 ${it.isTimeVerified ? "text-blue-500" : "text-light-text/30 hover:text-blue-500"}`} title="시간 검증 토글">✔</button>
-                      <button onClick={(e) => { e.stopPropagation(); patchItem(it.id, { isExcluded: !it.isExcluded }, { isExcluded: !it.isExcluded }); }} className="text-[11px] text-light-text/40 hover:text-red-500 shrink-0" title={it.isExcluded ? "포함" : "제외"}>{it.isExcluded ? "↩" : "✕"}</button>
+                      <button onClick={(e) => { e.stopPropagation(); void patchItem(it.id, { isTimeVerified: !it.isTimeVerified }, { isTimeVerified: !it.isTimeVerified }).catch(() => {}); }} className={`min-h-11 min-w-11 lg:min-h-0 lg:min-w-0 text-[11px] shrink-0 ${it.isTimeVerified ? "text-blue-500" : "text-light-text/30 hover:text-blue-500"}`} title="시간 검증 토글">✔</button>
+                      <button onClick={(e) => { e.stopPropagation(); void patchItem(it.id, { isExcluded: !it.isExcluded }, { isExcluded: !it.isExcluded }).catch(() => {}); }} className="min-h-11 min-w-11 lg:min-h-0 lg:min-w-0 text-[11px] text-light-text/40 hover:text-red-500 shrink-0" title={it.isExcluded ? "포함" : "제외"}>{it.isExcluded ? "↩" : "✕"}</button>
                     </div>
                     {/* 2줄: 가수 - 곡명 */}
                     <div className="truncate text-light-text dark:text-dark-text leading-snug">{it.artist} - {it.songTitle}</div>
-                    {isSel && (
+                    <button type="button" onClick={(event) => { event.stopPropagation(); navigation.open(it.id); }} className="lg:hidden min-h-11 w-full text-left text-sm text-light-text dark:text-dark-text" aria-label={`${it.artist} - ${it.songTitle} 편집`}>편집 →</button>
+                    {isSel && !navigation.mobile && (
                       <div className="flex gap-1.5 mt-1" onClick={(e) => e.stopPropagation()}>
-                        <input defaultValue={it.artist} onBlur={(e) => { const v = e.target.value.trim(); if (v !== it.artist) patchItem(it.id, { artist: v }, { artist: v }); }} className="flex-1 min-w-0 text-xs rounded border border-light-primary/20 dark:border-dark-primary/20 bg-white dark:bg-gray-800 px-1.5 py-0.5" placeholder="가수" />
-                        <input defaultValue={it.songTitle} onBlur={(e) => { const v = e.target.value.trim(); if (v !== it.songTitle) patchItem(it.id, { songTitle: v }, { songTitle: v }); }} className="flex-1 min-w-0 text-xs rounded border border-light-primary/20 dark:border-dark-primary/20 bg-white dark:bg-gray-800 px-1.5 py-0.5" placeholder="곡명" />
+                        <input defaultValue={it.artist} onBlur={(e) => { const v = e.target.value.trim(); if (v !== it.artist) void patchItem(it.id, { artist: v }, { artist: v }).catch(() => {}); }} className="flex-1 min-w-0 text-xs rounded border border-light-primary/20 dark:border-dark-primary/20 bg-white dark:bg-gray-800 px-1.5 py-0.5" placeholder="가수" />
+                        <input defaultValue={it.songTitle} onBlur={(e) => { const v = e.target.value.trim(); if (v !== it.songTitle) void patchItem(it.id, { songTitle: v }, { songTitle: v }).catch(() => {}); }} className="flex-1 min-w-0 text-xs rounded border border-light-primary/20 dark:border-dark-primary/20 bg-white dark:bg-gray-800 px-1.5 py-0.5" placeholder="곡명" />
                       </div>
                     )}
                   </div>
@@ -307,9 +314,11 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
           </div>
         </div>
       )}
+      <MobileItemNavigation navigation={navigation} footer />
 
       {/* 생성 */}
-      <div className="flex items-center gap-3">
+      <WorkspaceActions hidden={navigation.editing}>
+      <div className={`${navigation.listClass} flex flex-wrap items-center gap-3 [&_button]:min-h-11`}>
         <button onClick={createClips} disabled={creating || stats.generatable === 0} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple text-white font-medium hover:shadow-lg disabled:opacity-50 transition-all">
           {creating ? "생성 중..." : `클립 생성 (${stats.generatable}곡)`}
         </button>
@@ -320,6 +329,7 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
         )}
         {result && <span className="text-sm text-light-text/70 dark:text-dark-text/70">{result}</span>}
       </div>
+      </WorkspaceActions>
 
       {showReview && (
         <CreatedClipsReview
@@ -331,13 +341,13 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
       )}
 
       {/* 원본 타임라인 댓글 (맨 아래, 기본 닫힘) */}
-      <div className="rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/40 dark:bg-gray-900/40">
+      <div className={`${navigation.listClass} rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/40 dark:bg-gray-900/40`}>
         <button onClick={() => setShowComments((v) => !v)} className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-text dark:text-dark-text">
           <span>원본 타임라인 댓글 ({comments.length})</span>
           <span className="text-light-text/50">{showComments ? "▲" : "▼"}</span>
         </button>
         {showComments && (
-          <div className="px-3 pb-3 space-y-3 max-h-72 overflow-y-auto">
+          <div className="px-3 pb-3 space-y-3 lg:max-h-72 lg:overflow-y-auto">
             {comments.length === 0 && <p className="text-xs text-light-text/50">댓글이 없습니다.</p>}
             {comments.map((c, i) => (
               <div key={i}>

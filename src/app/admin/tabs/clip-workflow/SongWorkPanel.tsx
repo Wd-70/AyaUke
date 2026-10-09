@@ -8,6 +8,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ItemEditor from "./ItemEditor";
+import MobileItemNavigation, { useItemNavigation } from './MobileItemNavigation';
+import { WorkspaceActions } from './WorkflowWorkspace';
 import CreatedClipsReview from "./CreatedClipsReview";
 import { fmt } from "./itemUtils";
 import { saveWorkflowItem, workflowRequest } from './workflow-client';
@@ -30,6 +32,7 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
   const [creating, setCreating] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
+  const navigation = useItemNavigation([...occurrences, ...(candidates || [])], selectedId, setSelectedId);
 
   const loadWork = useCallback(async (withCandidates: boolean) => {
     if (withCandidates) setSearchingCand(true); else setLoading(true);
@@ -61,10 +64,10 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
         setCandidates((prev) => prev && prev.map((it) => it.id === id ? item : it));
       }
       if (reload) await loadWork(candidates !== null);
-      await onStatusRefresh();
+      try { await onStatusRefresh(); } catch { setResult('저장됨 · 목록 갱신 실패'); }
     } catch (error) {
       setResult(error instanceof Error ? error.message : '저장 실패');
-      await loadWork(candidates !== null).catch(() => {});
+      throw error;
     }
   }, [loadWork, candidates, onStatusRefresh]);
 
@@ -111,7 +114,7 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
     const isSel = it.id === selectedId;
     const done = clipped(it);
     return (
-      <div key={it.id} onClick={() => setSelectedId(it.id)} className={`px-2.5 py-1.5 text-sm cursor-pointer border-b border-light-primary/10 dark:border-dark-primary/10 ${isSel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"} ${it.isExcluded ? "opacity-40" : ""}`}>
+      <div key={it.id} onClick={() => navigation.open(it.id)} className={`px-2.5 py-1.5 text-sm cursor-pointer border-b border-light-primary/10 dark:border-dark-primary/10 ${isSel ? "bg-light-accent/10 dark:bg-dark-accent/10" : "hover:bg-light-primary/5 dark:hover:bg-dark-primary/5"} ${it.isExcluded ? "opacity-40" : ""}`}>
         <div className="flex items-center gap-1.5">
           <span className="text-[11px] font-mono text-light-text/60 dark:text-dark-text/60 shrink-0">{it.date?.slice(2) || "?"}</span>
           <span className={`text-[10px] px-1 rounded shrink-0 ${it.platform === "chzzk" ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" : "bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-300"}`}>{it.platform === "chzzk" ? "CH" : "YT"}</span>
@@ -119,17 +122,18 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
           <span className="flex-1 min-w-0 truncate text-light-text/70 dark:text-dark-text/70">{it.videoTitle || it.videoId}</span>
           {done && <span className="text-[10px] px-1 rounded bg-green-500/15 text-green-600 dark:text-green-400 shrink-0">클립됨</span>}
           {isCandidate && (
-            <button onClick={(e) => { e.stopPropagation(); patchItem(it.id, { matchedSongId: song.id }); }} className="text-[10px] px-1.5 py-0.5 rounded bg-light-accent dark:bg-dark-accent text-white shrink-0">이 곡으로 등록</button>
+            <button onClick={(e) => { e.stopPropagation(); void patchItem(it.id, { matchedSongId: song.id }).catch(() => {}); }} className="min-h-11 lg:min-h-0 text-[10px] px-1.5 py-0.5 rounded bg-light-accent dark:bg-dark-accent text-white shrink-0">이 곡으로 등록</button>
           )}
         </div>
         <div className="text-[11px] text-light-text/50 dark:text-dark-text/50 truncate">파싱: {it.artist} - {it.songTitle}</div>
+        <button type="button" onClick={(event) => { event.stopPropagation(); navigation.open(it.id); }} className="lg:hidden min-h-11 w-full text-left text-sm text-light-text dark:text-dark-text" aria-label={`${it.videoTitle || it.videoId} 출현 편집`}>편집 →</button>
       </div>
     );
   };
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
+      <div className={`${navigation.listClass} flex items-start justify-between gap-3 flex-wrap [&_button]:min-h-11`}>
         <div>
           <h2 className="text-lg font-bold text-light-text dark:text-dark-text">{song.titleAlias || song.title}</h2>
           <p className="text-xs text-light-text/60 dark:text-dark-text/60">{song.artistAlias || song.artist} · 출현 {occurrences.length} · 미생성 {generatable.length}</p>
@@ -139,13 +143,14 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
         </button>
       </div>
 
-      {loading ? (
+      <MobileItemNavigation navigation={navigation} />
+      {loading && occurrences.length === 0 && !candidates?.length ? (
         <div className="p-8 text-center text-sm text-light-text/50">불러오는 중...</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[20rem_minmax(0,1fr)] gap-4">
           {/* 좌: 출현 + 후보 목록 */}
-          <div className="border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col lg:order-1 max-h-[78vh]">
-            <div className="overflow-y-auto">
+          <div className={`${navigation.listClass} border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col lg:order-1 lg:max-h-[78vh]`}>
+            <div className="lg:overflow-y-auto">
               <div className="px-3 py-1.5 text-xs font-medium text-light-text/60 dark:text-dark-text/60 bg-light-primary/5 dark:bg-dark-primary/10">매칭된 출현 ({occurrences.length})</div>
               {occurrences.length === 0 && <p className="px-3 py-2 text-xs text-light-text/40">아직 매칭된 출현이 없습니다.</p>}
               {occurrences.map((it) => renderRow(it, false))}
@@ -154,7 +159,7 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
                 <>
                   <div className="px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 flex items-center justify-between">
                     <span>미등록 후보 ({candidates.length})</span>
-                    {candidates.length > 0 && <button onClick={registerAll} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-600 text-white">전체 등록</button>}
+                    {candidates.length > 0 && <button onClick={registerAll} className="min-h-11 lg:min-h-0 text-[10px] px-1.5 py-0.5 rounded bg-amber-600 text-white">전체 등록</button>}
                   </div>
                   {candidates.length === 0 && <p className="px-3 py-2 text-xs text-light-text/40">이름이 일치하는 미매칭 타임라인이 없습니다.</p>}
                   {candidates.map((it) => renderRow(it, true))}
@@ -164,17 +169,19 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
           </div>
 
           {/* 우: 편집 알맹이 (공용) */}
-          <div className="min-w-0 lg:order-2">
+          <div className={`${navigation.editorClass} min-w-0 lg:order-2`}>
             {selected ? (
-              <ItemEditor item={selected} songs={songs} songsById={songsById} onPatch={patchItem} />
+              <ItemEditor ref={navigation.editor} active={navigation.active && !showReview} item={selected} songs={songs} songsById={songsById} onPatch={patchItem} />
             ) : (
               <p className="text-sm text-light-text/50 p-8 text-center">출현을 선택하세요.</p>
             )}
           </div>
         </div>
       )}
+      <MobileItemNavigation navigation={navigation} footer />
 
-      <div className="flex items-center gap-3">
+      <WorkspaceActions hidden={navigation.editing}>
+      <div className={`${navigation.listClass} flex flex-wrap items-center gap-3 [&_button]:min-h-11`}>
         <button onClick={createClips} disabled={creating || generatable.length === 0} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple text-white font-medium hover:shadow-lg disabled:opacity-50 transition-all">
           {creating ? "생성 중..." : `클립 생성 (${generatable.length})`}
         </button>
@@ -185,6 +192,7 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
         )}
         {result && <span className="text-sm text-light-text/70 dark:text-dark-text/70">{result}</span>}
       </div>
+      </WorkspaceActions>
 
       {showReview && (
         <CreatedClipsReview
