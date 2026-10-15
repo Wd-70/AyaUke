@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useId } from 'react';
 import { motion } from 'framer-motion';
 import {
   CalendarDaysIcon,
@@ -12,7 +13,8 @@ import {
   MusicalNoteIcon,
 } from '@heroicons/react/24/outline';
 import { buildSourceUrl } from '@/shared/utils/video-url';
-import ClipPlayer from './ClipPlayer';
+import ClipPlayer from './range/ResolvedClipPlayer';
+import ClipRangeButton from './range/ClipRangeButton';
 import ClipLikeButton from './ClipLikeButton';
 import ClipShareButton from './ClipShareButton';
 import ClipReportButton from './ClipReportButton';
@@ -48,6 +50,7 @@ export default function ClipShareView({
   related: PublicClipSummary[];
 }) {
   const { reveal } = useReveal();
+  const rangeSessionId = useId();
   const isChzzk = clip.platform === 'chzzk';
   const sourceUrl = buildSourceUrl(clip.platform, clip.videoId, clip.startTime);
 
@@ -75,7 +78,7 @@ export default function ClipShareView({
         <motion.div {...reveal({ y: 20, duration: 0.5 })} className="relative">
           <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-light-accent/30 to-light-purple/30 opacity-60 blur-xl dark:from-dark-accent/30 dark:to-dark-secondary/30" />
           <div className="relative overflow-hidden rounded-2xl border border-light-primary/20 shadow-2xl dark:border-dark-primary/20">
-            <ClipPlayer
+            <ClipPlayer rangeSessionId={rangeSessionId}
               platform={clip.platform}
               videoId={clip.videoId}
               startTime={clip.startTime}
@@ -133,6 +136,7 @@ export default function ClipShareView({
             <ClipLikeButton clipId={clip.id} initialCount={clip.likeCount} size="lg" />
             <AddClipToPlaylistButton clipId={clip.id} variant="button" />
             <ClipShareButton clipId={clip.id} shareId={clip.shareId} title={clip.title} size="lg" />
+            <ClipRangeButton clipId={clip.id} sessionId={rangeSessionId} variant="pill" />
             <ClipReportButton clipId={clip.id} size="lg" />
             <Link
               href="/songbook"

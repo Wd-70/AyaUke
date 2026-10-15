@@ -34,6 +34,8 @@ interface ClipRowProps {
   actions?: React.ReactNode;
   /** 선택된 행에서만 보이는 액션(원본·공유·신고 등) */
   selectedActions?: React.ReactNode;
+  /** Secondary tools below the selected row, separate from the crowded icon cluster. */
+  selectedFooter?: React.ReactNode;
 }
 
 /**
@@ -55,6 +57,7 @@ export default function ClipRow({
   onToggleOverlap,
   actions,
   selectedActions,
+  selectedFooter,
 }: ClipRowProps) {
   const hasOverlap = showOverlap && overlapInfo.hasOverlap;
   const hasAlwaysVisibleActions = Boolean(actions);
@@ -180,6 +183,8 @@ export default function ClipRow({
           )}
         </div>
       </div>
+
+      {isSelected && selectedFooter}
 
       {/* 중복 상세 (권한자) */}
       {overlapExpanded && hasOverlap && (

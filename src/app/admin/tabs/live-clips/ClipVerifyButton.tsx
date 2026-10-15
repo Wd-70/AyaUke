@@ -41,12 +41,14 @@ export function useClipVerify(clipId: string, initialVerified: boolean, onChange
       setVerified(verify);
       showSuccess(verify ? "검증 완료" : "검증 해제", `클립이 ${verify ? "검증" : "미검증"} 상태가 되었습니다.`);
       queryClient.invalidateQueries({ queryKey: ["admin-clips"] });
+      queryClient.invalidateQueries({ queryKey: ['admin-clip-range', clipId] });
+      queryClient.invalidateQueries({ queryKey: ['clip-range'] });
       onChanged?.();
     },
     onError: (e: Error) => showError("실패", e.message),
   });
 
-  return { verified, toggle: () => mutation.mutate(!verified), isPending: mutation.isPending };
+  return { verified, setVerified, toggle: () => mutation.mutate(!verified), isPending: mutation.isPending };
 }
 
 interface ButtonProps {

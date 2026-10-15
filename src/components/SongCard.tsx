@@ -16,6 +16,7 @@ import { useSongPlaylists } from "@/hooks/useGlobalPlaylists";
 import { useSongVideos, prefetchSongVideos } from "@/hooks/useSongVideos";
 import PlaylistContextMenu from "./PlaylistContextMenu";
 import SongDetailModal from "./SongDetailModal";
+import { useClipRangeEditor } from './clip/range/ClipRangeProvider';
 import OfficialCornerFold from "./OfficialCornerFold";
 import { isOfficialSong } from "@/shared/utils/song-source";
 
@@ -36,6 +37,7 @@ export default function SongCard({
   onDialogStateChange,
 }: SongCardProps) {
   const queryClient = useQueryClient();
+  const rangeEditor = useClipRangeEditor();
   const { liked, isLoading: likeLoading, toggleLike } = useLike(song.id);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -60,7 +62,7 @@ export default function SongCard({
 
   // ESC 키로 닫기
   useEffect(() => {
-    if (!isExpanded) return;
+    if (!isExpanded || rangeEditor.isOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -69,7 +71,7 @@ export default function SongCard({
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isExpanded, handleCloseDialog]);
+  }, [isExpanded, handleCloseDialog, rangeEditor.isOpen]);
 
   const languageColors = {
     Korean: "bg-blue-500",

@@ -27,9 +27,13 @@ import { markClipCounted } from "./play-track-storage";
 import type { Mp4Rendition } from "@/shared/utils/chzzk-vod";
 import { loadStoredVolume, saveStoredVolume } from "./volume-storage";
 import { useClipTitle } from "@/hooks/useClipTitle";
-import { formatClipTime } from "@/shared/utils/clip-time";
+import { formatClipTime, formatRelativeClipTime } from "@/shared/utils/clip-time";
 
-interface ClipPlayerProps {
+export interface ClipPlayerProps {
+  /** Editor-only fixed zero; changes display labels, never source seeking/bounds. */
+  displayTimeOrigin?: number;
+  /** Restore after range editing. Position is absolute source seconds. */
+  initialPlayback?: { position: number; play: boolean } | null;
   platform: VideoPlatform;
   /** youtube: 11자 비디오 ID / chzzk: String(videoNo) */
   videoId: string;
@@ -39,6 +43,7 @@ interface ClipPlayerProps {
   autoplay?: boolean;
   /** 구간 재생이 끝났을 때 (연속 재생 등에 사용) */
   onEnded?: () => void;
+  onPlaybackError?: () => void;
   /** 검수용 확장 컨트롤: ±1s/±10s 이동, 끝-3s/끝-6s 바로가기 (관리자 화면용) */
   extendedControls?: boolean;
   className?: string;
@@ -151,6 +156,10 @@ export interface ClipPlayerHandle {
   pause: () => void;
   toggle: () => void;
   isPlaying: () => boolean;
+  /** Optional for non-video (audio) adapters; absolute source seconds. */
+  getCurrentTime?: () => number;
+  getDuration?: () => number;
+  seekTo?: (seconds: number) => void;
 }
 
 /** 내부 플레이어 추상화: 두 플랫폼을 같은 인터페이스로 다룬다 */
@@ -193,12 +202,15 @@ export function loadYouTubeApi(): Promise<void> {
 }
 
 const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPlayer({
+  displayTimeOrigin,
+  initialPlayback,
   platform,
   videoId,
   startTime,
   endTime,
   autoplay = false,
   onEnded,
+  onPlaybackError,
   extendedControls = false,
   className = "",
   posterDate,
@@ -230,11 +242,19 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
 
   // 클릭(또는 autoplay) 전까지 스트림을 만들지 않는다(facade). 다이얼로그를 열어도
   // 영상 버퍼링 0 → 가볍고 즉각, 모바일 데이터 낭비 없음. 클릭 시 그때 플레이어 생성.
-  const [activated, setActivated] = useState(autoplay);
+  const [activated, setActivated] = useState(autoplay || !!initialPlayback);
+  const initialPlaybackRef = useRef(initialPlayback);
+  initialPlaybackRef.current = initialPlayback;
   // facade에 보여줄 실제 영상 제목을 가볍게 lazy-load(스트림 없이). 받기 전엔 메모로 폴백.
   const lazyTitle = useClipTitle(platform, videoId, !activated);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const playbackErrorRef = useRef(onPlaybackError);
+  playbackErrorRef.current = onPlaybackError;
+  const reportedError = useRef(false);
+  useEffect(() => {
+    if (error && !reportedError.current) { reportedError.current = true; playbackErrorRef.current?.(); }
+  }, [error]);
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
   // 한 번이라도 재생되면 포스터(재생 전 화면)를 더 띄우지 않는다
@@ -438,6 +458,12 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     // facade: 활성화(클릭/autoplay) 전엔 플레이어를 만들지 않는다.
     if (!activated) return;
 
+    const restore = initialPlaybackRef.current;
+    const initialPosition = restore && restore.position >= startTime && (validEndTime === null || restore.position < validEndTime)
+      ? restore.position : startTime;
+    const shouldPlay = restore?.play ?? true;
+    playIntentRef.current = shouldPlay;
+
     if (platform === "youtube") {
       let player: any = null;
       let host: HTMLDivElement | null = null;
@@ -462,9 +488,9 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
             rel: 0,
             modestbranding: 1,
             playsinline: 1,
-            start: Math.floor(startTime),
+            start: Math.floor(initialPosition),
             ...(validEndTime != null ? { end: Math.ceil(validEndTime) } : {}),
-            autoplay: 1, // 이 effect는 activated일 때만 도므로 항상 재생
+            autoplay: shouldPlay ? 1 : 0,
           },
           events: {
             onReady: (e: any) => {
@@ -485,6 +511,9 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
               // 저장된 음량 설정 적용 (영상 전환 시에도 유지)
               adapterRef.current.setVolume(volumeRef.current.volume);
               adapterRef.current.setMuted(volumeRef.current.muted);
+              // Iframe start accepts whole seconds; seek explicitly for 0.1s edits.
+              adapterRef.current.seekTo(initialPosition);
+              if (!shouldPlay) { adapterRef.current.pause(); setStarted(true); }
               setReady(true);
             },
             onStateChange: (e: any) => {
@@ -555,7 +584,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
     const onLoaded = () => {
       if (cancelled) return;
       setupAdapter();
-      video.currentTime = startTime;
+      video.currentTime = initialPosition;
       if (validEndTime == null && video.duration) {
         setClipDuration(Math.max(0, video.duration - startTime));
       }
@@ -563,7 +592,8 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       video.volume = volumeRef.current.volume;
       video.muted = volumeRef.current.muted;
       setReady(true);
-      void video.play(); // activated일 때만 도는 effect → 항상 재생
+      if (shouldPlay) void video.play();
+      else { video.pause(); setStarted(true); }
     };
 
     // 캐시 우선 로더 사용 — 다음 곡 prefetch가 채운 스트림 정보를 재사용해 전환 지연을 줄인다.
@@ -869,6 +899,9 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
       togglePlay();
     },
     isPlaying: () => playingRef.current,
+    getCurrentTime: () => adapterRef.current?.getCurrentTime() ?? startTime,
+    getDuration: () => adapterRef.current?.getDuration() ?? 0,
+    seekTo: (seconds) => seekToClipPosition(seconds - startTime),
   }));
 
   // 재생상태 변화 통지
@@ -1060,6 +1093,10 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
   }
 
   const progressPercent = clipDuration > 0 ? (clipPosition / clipDuration) * 100 : 0;
+  const positionLabel = displayTimeOrigin === undefined ? formatClipTime(clipPosition)
+    : formatRelativeClipTime(startTime + clipPosition, displayTimeOrigin);
+  const endLabel = displayTimeOrigin === undefined ? formatClipTime(clipDuration)
+    : formatRelativeClipTime(startTime + clipDuration, displayTimeOrigin);
 
   const seekChipClass =
     "px-1.5 py-0.5 rounded text-[11px] font-mono bg-white/15 hover:bg-white/30 " +
@@ -1135,13 +1172,14 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
                 value={clipPosition}
                 onChange={handleSeek}
                 aria-label="재생 위치"
+                aria-valuetext={positionLabel}
                 className="absolute inset-x-0 h-3 w-full cursor-pointer opacity-0"
                 disabled={!ready || clipDuration === 0}
               />
             </div>
             {/* 시간 + 음량 */}
             <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-mono tabular-nums text-light-text/60 dark:text-white/70">
-              <span>{formatClipTime(clipPosition)}</span>
+              <span>{positionLabel}</span>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
@@ -1162,7 +1200,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
                   className="h-1 w-16 cursor-pointer accent-light-accent dark:accent-dark-accent"
                 />
               </div>
-              <span>{formatClipTime(clipDuration)}</span>
+              <span>{endLabel}</span>
             </div>
           </div>
           {/* 재생/일시정지 */}
@@ -1342,6 +1380,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
             value={clipPosition}
             onChange={handleSeek}
             aria-label="재생 위치"
+            aria-valuetext={positionLabel}
             className="absolute inset-x-0 w-full h-4 opacity-0 cursor-pointer"
             disabled={!ready || clipDuration === 0}
           />
@@ -1378,7 +1417,7 @@ const ClipPlayer = forwardRef<ClipPlayerHandle, ClipPlayerProps>(function ClipPl
 
           {/* 구간 상대 시간: 클립이 전체 영상인 것처럼 표시 */}
           <span className="text-xs font-mono tabular-nums">
-            {formatClipTime(clipPosition)} / {formatClipTime(clipDuration)}
+            {positionLabel} / {endLabel}
           </span>
 
           <div className="flex-1" />

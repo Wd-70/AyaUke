@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, type Dispatch, type SetStateAction } from 'react';
+import { useState, useEffect, useCallback, useId, useMemo, type Dispatch, type SetStateAction } from 'react';
 import { motion } from 'framer-motion';
 import { SongVideo } from '@/types';
 import {
@@ -14,7 +14,8 @@ import {
   ArrowLeftIcon
 } from '@heroicons/react/24/outline';
 import YouTube, { type YouTubeEvent } from 'react-youtube';
-import ClipPlayer from './clip/ClipPlayer';
+import ClipPlayer from './clip/range/ResolvedClipPlayer';
+import ClipRangeButton from './clip/range/ClipRangeButton';
 import ClipRow from './clip/ClipRow';
 import ClipLikeButton from './clip/ClipLikeButton';
 import ClipShareButton from './clip/ClipShareButton';
@@ -61,6 +62,7 @@ export default function LiveClipManager({
   onEditingStateChange
 }: LiveClipManagerProps) {
   const { data: session } = useSession();
+  const rangeSessionId = useId();
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
   const { loadClipLikes } = useBulkClipLikes();
@@ -865,6 +867,7 @@ export default function LiveClipManager({
                 {/* 시청 모드: 구간 전용 플레이어 (유튜브/치지직 공통) */}
                 {selectedVideo && !editingVideoId && (
                   <ClipPlayer
+                    rangeSessionId={rangeSessionId}
                     // 편집으로 시간이 바뀌면 key가 달라져 플레이어가 새 값으로 재마운트된다
                     key={`clip-player-${selectedVideo._id}-${selectedVideo.startTime ?? 0}-${selectedVideo.endTime ?? 'end'}`}
                     platform={selectedVideo.platform || 'youtube'}
@@ -1581,6 +1584,9 @@ export default function LiveClipManager({
                           </>
                         ) : null
                       }
+                      selectedFooter={video._id && !editingVideoId ? <div className="mt-2 flex justify-end border-t border-current/10 pt-1">
+                        <ClipRangeButton clipId={video._id} sessionId={rangeSessionId} variant="compact" />
+                      </div> : null}
                     />
                   );
                 })}

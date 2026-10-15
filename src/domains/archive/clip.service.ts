@@ -447,8 +447,8 @@ export async function listSongsWithClips({ page, limit, search, sortBy = 'recent
 export interface ClipsQuery {
   page: number;
   limit: number;
-  sortBy?: 'recent' | 'addedBy' | 'songTitle' | 'verified' | 'sungDate';
-  filterBy?: 'all' | 'verified' | 'unverified' | 'unavailable';
+  sortBy?: 'recent' | 'addedBy' | 'songTitle' | 'verified' | 'sungDate' | 'rangeSupport' | 'rangeTrim';
+  filterBy?: 'all' | 'verified' | 'unverified' | 'unavailable' | 'recommended';
   platform?: 'all' | 'youtube' | 'chzzk';
   search?: string;
   addedBy?: string;
@@ -462,6 +462,8 @@ const SORTS: Record<NonNullable<ClipsQuery['sortBy']>, Record<string, 1 | -1>> =
   songTitle: { title: 1, artist: 1 },
   verified: { isVerified: -1, createdAt: -1 },
   sungDate: { sungDate: -1 },
+  rangeSupport: { 'communityRange.support': -1, _id: 1 },
+  rangeTrim: { 'communityRange.trimSeconds': -1, _id: 1 },
 };
 
 export async function listClips(query: ClipsQuery) {
@@ -471,6 +473,11 @@ export async function listClips(query: ClipsQuery) {
   if (filterBy === 'verified') match.isVerified = true;
   if (filterBy === 'unverified') match.isVerified = false;
   if (filterBy === 'unavailable') match.sourceUnavailable = true;
+  if (filterBy === 'recommended') {
+    match.isVerified = { $ne: true };
+    match.sourceUnavailable = { $ne: true };
+    match['communityRange.proposalId'] = { $exists: true };
+  }
   if (platform === 'chzzk') match.platform = 'chzzk';
   if (platform === 'youtube') match.platform = { $in: ['youtube', null] };
   if (songId) match.songId = songId;
@@ -593,22 +600,20 @@ export async function applyDefaultDurationToClips(
       // 검증 완료 클립은 사람이 구간을 확정한 것이므로 일괄 적용에서 보존(스킵)
       !(clip as { isVerified?: boolean }).isVerified &&
       shouldApplyDefaultDuration(clip.startTime || 0, clip.endTime, clipDuration, thresholdSeconds),
-    )
-    .map((clip) => ({
-      updateOne: {
-        filter: { _id: clip._id },
-        update: { $set: { endTime: (clip.startTime || 0) + clipDuration } },
-      },
-    }));
+    );
 
-  if (updates.length > 0) {
-    await SongVideo.bulkWrite(updates);
+  let updatedCount = 0;
+  for (const clip of updates) {
+    const updated = await SongVideo.findOneAndUpdate(
+      { _id: clip._id, startTime: clip.startTime, endTime: clip.endTime ?? null, isVerified: { $ne: true } },
+      { $set: { endTime: (clip.startTime || 0) + clipDuration } }, { new: true, runValidators: true });
+    if (updated) updatedCount++;
   }
 
   return {
     clipDuration,
     total: clips.length,
-    updated: updates.length,
-    skipped: clips.length - updates.length,
+    updated: updatedCount,
+    skipped: clips.length - updatedCount,
   };
 }

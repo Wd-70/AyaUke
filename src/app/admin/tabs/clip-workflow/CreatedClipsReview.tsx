@@ -14,6 +14,8 @@ import { SongDurationContext } from './SongDurationContext';
 import { workflowRequest } from './workflow-client';
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import ClipTimeEditor from "@/app/admin/tabs/live-clips/ClipTimeEditor";
+import AdminRangePanel from '@/components/clip/range/AdminRangePanel';
+import { useQueryClient } from '@tanstack/react-query';
 import ClipVerifyButton from "@/app/admin/tabs/live-clips/ClipVerifyButton";
 import type { EditPlayerAdapter, ClipData } from "@/app/admin/tabs/live-clips/clip-types";
 import { formatTime } from "@/app/admin/tabs/live-clips/clip-types";
@@ -31,6 +33,12 @@ interface Props {
 
 export default function CreatedClipsReview({ query, title = "생성된 클립", onClose, onChanged }: Props) {
   const mobile = useWorkflowMobile();
+  const queryClient = useQueryClient();
+  const [publishing, setPublishing] = useState(false);
+  const refreshRanges = (id: string) => {
+    void queryClient.invalidateQueries({ queryKey: ['admin-clip-range', id] });
+    void queryClient.invalidateQueries({ queryKey: ['clip-range'] });
+  };
   const host = usePortalHost();
   const dialog = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
@@ -89,7 +97,7 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
   }, [adapter, isPlaying]);
 
   const selected = clips.find((c) => c._id === selectedId) || null;
-  const busy = saving || savingDefault || verifying || deleting;
+  const busy = saving || savingDefault || verifying || deleting || publishing;
   const dirty = !!selected && (editData.startTime !== (selected.startTime ?? 0) || editData.endTime !== (selected.endTime ?? null) || editData.description !== (selected.description ?? ''));
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
@@ -136,6 +144,7 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
       // 로컬 즉시 반영 + 목록 갱신
       setClips((prev) => prev.map((c) => (c._id === selected._id ? { ...c, ...result.clip } : c)));
       setMsg("저장됨");
+      refreshRanges(selected._id);
       try { await onChanged?.(); } catch { setMsg('저장됨 · 목록 갱신 실패'); }
       return true;
     } catch (e) {
@@ -156,6 +165,7 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
       });
       // 로컬 즉시 반영 (list row · 배지 · 버튼이 공유) → refetch 복제지연에도 안 되돌아감
       setClips((prev) => prev.map((c) => (c._id === selected._id ? { ...c, isVerified: v } : c)));
+      refreshRanges(selected._id);
       await onChanged?.();
     } catch (error) {
       setMsg(error instanceof Error ? error.message : '검증 상태 저장 실패');
@@ -275,6 +285,13 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
                   onPlayStateChange={setIsPlaying}
                   className="max-w-2xl mx-auto"
                 />
+                <AdminRangePanel key={selected._id} clipId={selected._id} draft={editData} disabled={busy}
+                  onBusy={setPublishing} onImport={value => setEditData(prev => ({ ...prev, ...value }))}
+                  preview={adapter ? time => { adapter.seekTo(time); adapter.play(); } : undefined}
+                  onSaved={saved => {
+                    setClips(prev => prev.map(c => c._id === selected._id ? { ...c, ...saved } as ClipData : c));
+                    void onChanged?.();
+                  }} />
                 <ClipTimeEditor
                   mobileControls={mobile}
                   startTime={editData.startTime}

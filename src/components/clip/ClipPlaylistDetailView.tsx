@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
 import ClipSourceLink from './ClipSourceLink'
+import ClipRangeButton from './range/ClipRangeButton'
 import { useClipPlayer } from './player/ClipPlayerProvider'
 import { toPlayerClip, type PlayerClip } from './player/types'
 import { useToast } from '@/components/Toast'
@@ -436,6 +437,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
 
                   {/* 액션: 상세페이지 · 원본 다시보기 · (소유자)제거 */}
                   <div className="flex shrink-0 items-center gap-0.5">
+                    {canPlay && <ClipRangeButton clipId={key} title={clip.title} variant="icon" />}
                     <Link
                       href={`/clip/${key}`}
                       title="클립 상세 페이지"

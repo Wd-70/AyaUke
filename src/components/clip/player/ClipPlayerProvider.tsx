@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClipPlayerHandle } from '../ClipPlayer';
 import type { PlayerClip } from './types';
+import { ClipRangeProvider } from '../range/ClipRangeProvider';
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -338,7 +339,7 @@ export function ClipPlayerProvider({ children }: { children: React.ReactNode }) 
     ],
   );
 
-  return <ClipPlayerContext.Provider value={value}>{children}</ClipPlayerContext.Provider>;
+  return <ClipPlayerContext.Provider value={value}><ClipRangeProvider>{children}</ClipRangeProvider></ClipPlayerContext.Provider>;
 }
 
 export function useClipPlayer(): ClipPlayerContextValue {

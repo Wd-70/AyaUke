@@ -54,11 +54,11 @@ export async function PUT(
     };
 
     if (isVerified) {
-      updateData.verifiedBy = session.user.channelId;
+      updateData.verifiedBy = session.user.userId;
       updateData.verifiedAt = new Date();
     } else {
-      updateData.verifiedBy = undefined;
-      updateData.verifiedAt = undefined;
+      updateData.verifiedBy = null;
+      updateData.verifiedAt = null;
     }
 
     const updatedVideo = await SongVideo.findByIdAndUpdate(

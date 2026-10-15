@@ -24,8 +24,8 @@ const GetQuery = z.object({
   view: z.enum(['stats', 'songs', 'clips', 'song-clips']).default('clips'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  sortBy: z.enum(['recent', 'addedBy', 'songTitle', 'verified', 'sungDate', 'clipCount', 'title']).default('recent'),
-  filterBy: z.enum(['all', 'verified', 'unverified', 'unavailable']).default('all'),
+  sortBy: z.enum(['recent', 'addedBy', 'songTitle', 'verified', 'sungDate', 'clipCount', 'title', 'rangeSupport', 'rangeTrim']).default('recent'),
+  filterBy: z.enum(['all', 'verified', 'unverified', 'unavailable', 'recommended']).default('all'),
   platform: z.enum(['all', 'youtube', 'chzzk']).default('all'),
   search: z.string().default(''),
   addedBy: z.string().default(''),
@@ -105,7 +105,7 @@ export async function PATCH(request: Request) {
       case 'verify':
         updateData = {
           isVerified: true,
-          verifiedBy: session.user.id,
+          verifiedBy: session.user.userId,
           verifiedAt: new Date()
         }
         break
@@ -161,6 +161,7 @@ export async function PATCH(request: Request) {
 
         const clipsToUpdate = await SongVideo.find({
           songId,
+          isVerified: { $ne: true },
           ...(excludeVideoId && { _id: { $ne: excludeVideoId } })
         }).select('startTime').lean()
 
@@ -168,19 +169,18 @@ export async function PATCH(request: Request) {
           return NextResponse.json({ success: true, message: '업데이트할 클립이 없습니다.', updatedCount: 0 })
         }
 
-        await SongVideo.bulkWrite(
-          clipsToUpdate.map((clip) => ({
-            updateOne: {
-              filter: { _id: clip._id },
-              update: { $set: { endTime: (clip.startTime || 0) + duration } },
-            },
-          }))
-        )
+        let updatedCount = 0
+        for (const clip of clipsToUpdate) {
+          const updated = await SongVideo.findOneAndUpdate(
+            { _id: clip._id, startTime: clip.startTime, isVerified: { $ne: true } },
+            { $set: { endTime: (clip.startTime || 0) + duration } }, { new: true, runValidators: true })
+          if (updated) updatedCount++
+        }
 
         return NextResponse.json({
           success: true,
-          message: `${clipsToUpdate.length}개의 클립에 길이가 적용되었습니다.`,
-          updatedCount: clipsToUpdate.length
+          message: `${updatedCount}개의 클립에 길이가 적용되었습니다.`,
+          updatedCount
         })
       }
       default:

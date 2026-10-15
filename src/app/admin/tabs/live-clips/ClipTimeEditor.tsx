@@ -20,24 +20,8 @@ import {
 } from "@heroicons/react/24/outline";
 import { type EditPlayerAdapter, formatTime, captureTime } from "./clip-types";
 import { useEffect, useState } from "react";
+import RangeControls from '@/components/clip/range/RangeControls';
 
-function MobileTimeInput({ value, nullable = false, onCommit, label, className }: { value: number | null; nullable?: boolean; onCommit: (value: number | null) => void; label: string; className: string }) {
-  const [draft, setDraft] = useState(value == null ? '' : String(value));
-  const [focused, setFocused] = useState(false);
-  useEffect(() => { if (!focused) setDraft(value == null ? '' : String(value)); }, [value, focused]);
-  return <input type="number" inputMode="decimal" step="0.1" min="0" aria-label={label} value={draft} className={className}
-    placeholder={nullable ? '비우면 영상 끝까지' : '초 (소수점 가능)'}
-    onFocus={() => setFocused(true)} onChange={(event) => setDraft(event.target.value)}
-    onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur(); }}
-    onBlur={() => {
-      setFocused(false);
-      const next = draft === '' ? (nullable ? null : value) : Number(draft);
-      if (next === null || (Number.isFinite(next) && next! >= 0)) {
-        setDraft(next == null ? '' : String(next));
-        if (next !== value) onCommit(next);
-      } else setDraft(value == null ? '' : String(value));
-    }} />;
-}
 
 interface ClipTimeEditorProps {
   startTime: number;
@@ -68,9 +52,14 @@ export default function ClipTimeEditor({
   mobileControls = false,
 }: ClipTimeEditorProps) {
   const [seekStep, setSeekStep] = useState(1);
+  const [previewEnd, setPreviewEnd] = useState<number | null>(null);
+  useEffect(() => {
+    if (previewEnd !== null && currentTime >= previewEnd) { adapter?.pause(); setPreviewEnd(null); }
+  }, [currentTime, previewEnd, adapter]);
   const duration = endTime != null && endTime > startTime ? endTime - startTime : null;
 
   const seekRelative = (delta: number) => {
+    setPreviewEnd(null);
     if (!adapter) return;
     adapter.seekTo(Math.max(0, adapter.getCurrentTime() + delta));
   };
@@ -83,6 +72,12 @@ export default function ClipTimeEditor({
 
   return (
     <div className={`space-y-3 ${mobileControls ? '[&_button]:min-h-11 [&_input]:min-h-11 [&_select]:min-h-11' : ''}`}>
+      <RangeControls value={{ startTime, endTime: endTime ?? null }} onChange={onChange}
+        capture={adapter ? () => captureTime(adapter.getCurrentTime()) : undefined}
+        preview={adapter ? edge => {
+          const from = edge === 'start' ? startTime : Math.max(startTime, (endTime ?? startTime) - 10);
+          setPreviewEnd(Math.min(endTime ?? from + 10, from + 10)); adapter.seekTo(from); adapter.play();
+        } : undefined} />
       {/* 현재 시간 + 재생 컨트롤 */}
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-3">
         <div className="shrink-0 whitespace-nowrap text-sm text-center sm:text-left text-light-text/60 dark:text-dark-text/60">
@@ -145,94 +140,8 @@ export default function ClipTimeEditor({
         </div>
       </div>
 
-      {/* 시작/종료 시간 */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-900/20 p-3">
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-1.5">
-            <label className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
-              시작 시간 <span className="font-mono">({formatTime(startTime)})</span>
-            </label>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                onClick={() => adapter && onChange({ startTime: captureTime(adapter.getCurrentTime()) })}
-                disabled={!adapter}
-                className="px-2 py-0.5 text-xs rounded bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 transition-colors"
-                title="플레이어의 현재 위치를 시작 시간으로 캡처"
-              >
-                {mobileControls ? '시작으로 설정' : 'IN'}
-              </button>
-              <button
-                type="button"
-                onClick={() => adapter?.seekTo(startTime)}
-                disabled={!adapter}
-                className="px-2 py-0.5 text-xs rounded border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-40 transition-colors"
-                title="시작 시간 위치로 이동"
-              >
-                이동
-              </button>
-            </div>
-          </div>
-          {mobileControls ? <MobileTimeInput value={startTime} label="시작 시간 (초)" onCommit={(value) => { if (value != null) onChange({ startTime: value }); }} className="w-full px-2 py-1.5 text-base rounded border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text font-mono" /> : <input
-            type="number"
-            step="0.1"
-            min="0"
-            value={startTime}
-            onChange={(e) => onChange({ startTime: parseFloat(e.target.value) || 0 })}
-            className="w-full px-2 py-1.5 text-sm rounded border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text font-mono"
-            placeholder="초 (소수점 가능)"
-          />}
-        </div>
-
-        <div className="rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50/60 dark:bg-purple-900/20 p-3">
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-1.5">
-            <label className="text-xs font-medium text-purple-700 dark:text-purple-300">
-              종료 시간 {endTime != null && <span className="font-mono">({formatTime(endTime)})</span>}
-            </label>
-            <div className="flex flex-wrap gap-1">
-              {songClipDuration != null && songClipDuration > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onChange({ endTime: Math.round((startTime + songClipDuration) * 10) / 10 })}
-                  className="px-2 py-0.5 text-xs rounded bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-700 hover:bg-violet-200 dark:hover:bg-violet-900/60 transition-colors"
-                  title={`종료 시간을 '시작 + 곡 기본 길이(${formatTime(songClipDuration)})'로 설정합니다`}
-                >
-                  기본길이 적용
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => adapter && onChange({ endTime: captureTime(adapter.getCurrentTime()) })}
-                disabled={!adapter}
-                className="px-2 py-0.5 text-xs rounded bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-40 transition-colors"
-                title="플레이어의 현재 위치를 종료 시간으로 캡처"
-              >
-                {mobileControls ? '종료로 설정' : 'OUT'}
-              </button>
-              <button
-                type="button"
-                onClick={() => endTime != null && adapter?.seekTo(Math.max(0, endTime - 3))}
-                disabled={!adapter || endTime == null}
-                className="px-2 py-0.5 text-xs rounded border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 disabled:opacity-40 transition-colors"
-                title="종료 3초 전으로 이동 (끝부분 확인)"
-              >
-                끝-3s
-              </button>
-            </div>
-          </div>
-          {mobileControls ? <MobileTimeInput nullable value={endTime ?? null} label="종료 시간 (초)" onCommit={(value) => onChange({ endTime: value })} className="w-full px-2 py-1.5 text-base rounded border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text font-mono" /> : <input
-            type="number"
-            step="0.1"
-            min="0"
-            value={endTime ?? ""}
-            onChange={(e) =>
-              onChange({ endTime: e.target.value === "" ? null : parseFloat(e.target.value) || 0 })
-            }
-            className="w-full px-2 py-1.5 text-sm rounded border border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text font-mono"
-            placeholder="비우면 영상 끝까지"
-          />}
-        </div>
-      </div>
+      {songClipDuration != null && songClipDuration > 0 && <button type="button" className={seekButton}
+        onClick={() => onChange({ endTime: Math.round((startTime + songClipDuration) * 10) / 10 })}>곡 기본길이 적용</button>}
 
       {/* 클립 길이 + 곡 기본값 등록 */}
       <div className="flex items-center justify-between gap-3 flex-wrap rounded-lg bg-light-primary/5 dark:bg-dark-primary/10 px-3 py-2">

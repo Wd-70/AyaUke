@@ -23,6 +23,7 @@ import { useLike } from "@/hooks/useLikes";
 import { useSongPlaylists } from "@/hooks/useGlobalPlaylists";
 import PlaylistContextMenu from "./PlaylistContextMenu";
 import LiveClipManager from "./LiveClipManager";
+import { useClipRangeEditor } from './clip/range/ClipRangeProvider';
 import SongEditForm from "./SongEditForm";
 import OfficialBadge from "./OfficialBadge";
 import { isOfficialSong } from "@/shared/utils/song-source";
@@ -58,6 +59,7 @@ export default function SongDetailModal({
   loadSongVideos,
 }: SongDetailModalProps) {
   const { data: session } = useSession();
+  const rangeEditor = useClipRangeEditor();
   const { showSuccess, showError } = useToast();
   const { liked, isLoading: likeLoading, toggleLike } = useLike(song.id);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
@@ -145,7 +147,7 @@ export default function SongDetailModal({
   // (부모 SongCard에도 document Escape 리스너가 있어, capture 단계에서 먼저
   //  가로채 전파를 막지 않으면 팝오버를 닫으려는 Escape에 모달이 통째로 닫힌다.)
   useEffect(() => {
-    if (!isExpanded) return;
+    if (!isExpanded || rangeEditor.isOpen) return;
     const onKeyDownCapture = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       if (showPlaylistMenu || showLyricsMenu) {
@@ -162,7 +164,7 @@ export default function SongDetailModal({
     };
     document.addEventListener("keydown", onKeyDownCapture, true);
     return () => document.removeEventListener("keydown", onKeyDownCapture, true);
-  }, [isExpanded, showPlaylistMenu, showLyricsMenu, isEditMode]);
+  }, [isExpanded, showPlaylistMenu, showLyricsMenu, isEditMode, rangeEditor.isOpen]);
 
   // YouTube 플레이어 이벤트 핸들러
   const onYouTubeReady = useCallback((event: any) => {

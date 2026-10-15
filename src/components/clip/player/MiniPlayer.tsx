@@ -20,10 +20,14 @@ import { useClipPlayer } from './ClipPlayerProvider';
 import { clipArtwork, clipDurationSec } from './types';
 import { prefetchChzzkStream } from '../chzzk-stream-cache';
 import { formatClipTime } from '@/shared/utils/clip-time';
+import ClipRangeButton from '../range/ClipRangeButton';
+import { useSession } from 'next-auth/react';
+import { useQueryClient } from '@tanstack/react-query';
+import { prefetchRanges } from '../range/range-client';
 
 // ClipPlayer(및 hls.js)는 무겁다. 레이아웃 상주 컴포넌트라 모든 페이지 공용 번들에
 // 들어가지 않도록, 실제 재생이 시작될 때만 지연 로드한다.
-const ClipPlayer = lazy(() => import('../ClipPlayer'));
+const ClipPlayer = lazy(() => import('../range/ResolvedClipPlayer'));
 
 const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString('ko-KR') : '');
 
@@ -106,6 +110,15 @@ export default function MiniPlayer() {
   } = useClipPlayer();
 
   const router = useRouter();
+  const { data: session, status: authStatus } = useSession();
+  const rangeClient = useQueryClient();
+  const rangeOwner = session?.user.userId || 'guest';
+  useEffect(() => {
+    if (authStatus === 'loading') return;
+    const controller = new AbortController();
+    void prefetchRanges(rangeClient, rangeOwner, upcomingClips.map(c => c.clipId), controller.signal).catch(() => {});
+    return () => controller.abort();
+  }, [rangeClient, rangeOwner, authStatus, upcomingClips]);
   // 현재 재생 중인 플레이리스트 페이지로 이동 (소유=관리 / 비소유=보기). 공유ID 없으면 버튼 숨김.
   const goToPlaylistPage = () => {
     if (!currentSourceShareId) return;
@@ -299,6 +312,7 @@ export default function MiniPlayer() {
                   <span className="hidden sm:inline">{currentSourceOwned ? '관리' : '재생목록'}</span>
                 </button>
               )}
+              <ClipRangeButton clipId={current.clipId} sessionId="global-player" variant="toolbar" />
               <button
                 onClick={close}
                 className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm text-light-text/70 hover:bg-light-primary/10 dark:text-dark-text/70 dark:hover:bg-dark-primary/10"
@@ -408,10 +422,10 @@ export default function MiniPlayer() {
               const active = i === currentIndex;
               const dur = clipDurationSec(clip);
               return (
+                <div key={clip.clipId} className="flex items-center gap-1">
                 <button
-                  key={clip.clipId}
                   onClick={() => playAt(i)}
-                  className={`flex w-full items-center gap-3 rounded-lg border p-2 text-left transition-colors ${
+                  className={`flex min-w-0 flex-1 items-center gap-3 rounded-lg border p-2 text-left transition-colors ${
                     active
                       ? 'border-light-accent/50 bg-light-accent/10 dark:border-dark-accent/50 dark:bg-dark-accent/10'
                       : 'border-transparent hover:bg-light-primary/5 dark:hover:bg-dark-primary/5'
@@ -449,6 +463,8 @@ export default function MiniPlayer() {
                     {clip.platform === 'chzzk' ? '치지직' : '유튜브'}
                   </span>
                 </button>
+                <ClipRangeButton clipId={clip.clipId} title={clip.title} variant="icon" />
+                </div>
               );
             })}
             </div>
@@ -460,6 +476,7 @@ export default function MiniPlayer() {
       <div ref={stageRef} className={stageClass} style={isExpanded ? { width: stage.w } : undefined}>
         <Suspense fallback={<div className="aspect-video w-full rounded-xl bg-black/80" />}>
           <ClipPlayer
+            rangeSessionId="global-player"
             ref={(h) => {
               playerRef.current = h;
             }}

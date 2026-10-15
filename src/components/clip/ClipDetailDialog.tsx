@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,7 +19,9 @@ import {
   LockClosedIcon,
 } from '@heroicons/react/24/outline';
 import { PlusIcon, CheckCircleIcon } from '@heroicons/react/24/solid';
-import ClipPlayer from './ClipPlayer';
+import ClipPlayer from './range/ResolvedClipPlayer';
+import ClipRangeButton from './range/ClipRangeButton';
+import { useClipRangeEditor } from './range/ClipRangeProvider';
 import ClipLikeButton from './ClipLikeButton';
 import ClipShareButton from './ClipShareButton';
 import AddClipToPlaylistButton from './AddClipToPlaylistButton';
@@ -53,6 +55,7 @@ export default function ClipDetailDialog({
   onClose: () => void;
 }) {
   const open = !!clip;
+  const rangeEditor = useClipRangeEditor();
 
   // 배경 스크롤 잠금 (플레이어 전체화면과 동일한 방식 — html·body 둘 다)
   useEffect(() => {
@@ -73,13 +76,13 @@ export default function ClipDetailDialog({
 
   // Esc로 닫기
   useEffect(() => {
-    if (!open) return;
+    if (!open || rangeEditor.isOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [open, onClose, rangeEditor.isOpen]);
 
   if (typeof document === 'undefined') return null;
 
@@ -93,6 +96,7 @@ export default function ClipDetailDialog({
 
 function DialogBody({ clip, onClose }: { clip: ClipDialogTarget; onClose: () => void }) {
   const isChzzk = clip.platform === 'chzzk';
+  const rangeSessionId = useId();
 
   const { data: detail, isError } = useQuery({
     queryKey: ['clipDetail', clip.id],
@@ -142,9 +146,10 @@ function DialogBody({ clip, onClose }: { clip: ClipDialogTarget; onClose: () => 
         {/* 스크롤 본문 */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {/* 플레이어 */}
-          <div className="relative aspect-video w-full bg-black">
+          <div className={`relative w-full bg-black ${detail ? '' : 'aspect-video'}`}>
             {detail ? (
               <ClipPlayer
+                rangeSessionId={rangeSessionId}
                 platform={detail.platform}
                 videoId={detail.videoId}
                 startTime={detail.startTime}
@@ -225,6 +230,7 @@ function DialogBody({ clip, onClose }: { clip: ClipDialogTarget; onClose: () => 
               <ClipLikeButton clipId={clip.id} initialCount={clip.likeCount} size="lg" />
               <AddClipToPlaylistButton clipId={clip.id} variant="button" />
               <ClipShareButton clipId={clip.id} shareId={clip.shareId} title={clip.title} size="lg" />
+              <ClipRangeButton clipId={clip.id} sessionId={rangeSessionId} disabled={!detail} />
               {sourceUrl && (
                 <a
                   href={sourceUrl}

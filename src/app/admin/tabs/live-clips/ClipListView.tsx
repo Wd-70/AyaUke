@@ -27,9 +27,9 @@ const selectClass =
 export default function ClipListView() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [filterBy, setFilterBy] = useState<"all" | "verified" | "unverified" | "unavailable">("all");
+  const [filterBy, setFilterBy] = useState<"all" | "verified" | "unverified" | "unavailable" | "recommended">("all");
   const [platform, setPlatform] = useState<"all" | "youtube" | "chzzk">("all");
-  const [sortBy, setSortBy] = useState<"recent" | "sungDate" | "songTitle" | "addedBy" | "verified">("recent");
+  const [sortBy, setSortBy] = useState<"recent" | "sungDate" | "songTitle" | "addedBy" | "verified" | "rangeSupport" | "rangeTrim">("recent");
   // 선택 클립은 id만 보관하고 실제 데이터는 쿼리 결과에서 파생한다.
   // (객체를 복사해 두면 편집 저장 후 목록만 refetch되어 선택 클립이 옛 값으로 남음)
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
@@ -91,6 +91,7 @@ export default function ClipListView() {
           <option value="all">전체 상태</option>
           <option value="verified">검증됨</option>
           <option value="unverified">미검증</option>
+          <option value="recommended">커뮤니티 추천 있음</option>
           <option value="unavailable">재생불가(소스없음)</option>
         </select>
         <select value={platform} onChange={(e) => { setPlatform(e.target.value as typeof platform); resetPage(); }} className={selectClass}>
@@ -104,6 +105,8 @@ export default function ClipListView() {
           <option value="songTitle">곡명순</option>
           <option value="addedBy">등록자순</option>
           <option value="verified">검증 우선</option>
+          <option value="rangeSupport">추천 확인 수순</option>
+          <option value="rangeTrim">불필요한 끝부분 축소순</option>
         </select>
       </div>
 

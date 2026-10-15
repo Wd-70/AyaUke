@@ -17,16 +17,32 @@ export function formatClipTime(seconds: number): string {
 
 /** 초 → "m:ss.d" / "h:mm:ss.d" (0.1초 단위, 클립 길이·구간 정밀 표시용) */
 export function formatPreciseTime(seconds: number): string {
-  const total = Math.max(0, seconds);
+  const ticks = Math.round(Math.max(0, seconds) * 10);
+  const total = Math.floor(ticks / 10);
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
   const sec = Math.floor(total % 60);
-  const decimal = Math.floor((total % 1) * 10);
+  const decimal = ticks % 10;
   const base =
     h > 0
       ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
       : `${m}:${String(sec).padStart(2, '0')}`;
   return `${base}.${decimal}`;
+}
+
+/** Editor coordinate conversion. The origin stays fixed while the editor is open. */
+export function toClipRelativeTime(sourceSeconds: number, origin: number): number {
+  return Math.round((sourceSeconds - origin) * 10) / 10;
+}
+
+export function toClipSourceTime(relativeSeconds: number, origin: number): number {
+  return Math.round((relativeSeconds + origin) * 10) / 10;
+}
+
+/** Unlike duration formatting, positions before the clip must retain their sign. */
+export function formatRelativeClipTime(sourceSeconds: number, origin: number): string {
+  const relative = toClipRelativeTime(sourceSeconds, origin);
+  return `${relative < 0 ? '-' : ''}${formatPreciseTime(Math.abs(relative))}`;
 }
 
 /** "mm:ss.d" / "h:mm:ss.d" / 정수초 문자열 → 초. 파싱 실패 시 0 */

@@ -18,6 +18,7 @@ import ChzzkPlayer, { type ChzzkPlayerHandle } from "@/components/video/ChzzkPla
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/ConfirmDialog";
 import ClipTimeEditor from "./ClipTimeEditor";
+import AdminRangePanel from '@/components/clip/range/AdminRangePanel';
 import ClipVerifyButton, { useClipVerify } from "./ClipVerifyButton";
 import {
   type ClipData,
@@ -50,6 +51,7 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
   const queryClient = useQueryClient();
 
   const [editing, setEditing] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [editData, setEditData] = useState<EditData>(() => ({
     videoUrl: clip.videoUrl,
     sungDate: clip.sungDate?.slice(0, 10) || "",
@@ -157,6 +159,8 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["admin-clips"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-clip-range", clip._id] });
+    queryClient.invalidateQueries({ queryKey: ['clip-range'] });
     onChanged();
   };
 
@@ -174,12 +178,13 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
           data: {
             ...(editData.videoUrl !== clip.videoUrl && { videoUrl: editData.videoUrl }),
             startTime: editData.startTime,
-            endTime: editData.endTime ?? undefined,
+            endTime: editData.endTime,
             description: editData.description,
           },
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "저장 실패");
+      const result = await res.json();
 
       // 날짜 변경은 별도 라우트(PATCH admin/clips는 sungDate 미지원)
       if (editData.sungDate && editData.sungDate !== clip.sungDate?.slice(0, 10)) {
@@ -190,18 +195,17 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
         });
         if (!dateRes.ok) throw new Error("날짜 저장 실패");
       }
+      return result.clip as ClipData;
     },
-    onSuccess: () => {
+    onSuccess: (updated) => {
       showSuccess("저장 완료", "클립 정보가 수정되었습니다.");
       setEditing(false);
       // 패널/플레이어가 즉시 새 값으로 보이도록 로컬 표시 상태를 직접 갱신
       setDisplayClip((prev) => ({
         ...prev,
-        startTime: editData.startTime,
-        endTime: editData.endTime ?? undefined,
-        description: editData.description,
-        ...(editData.videoUrl !== clip.videoUrl ? { videoUrl: editData.videoUrl } : {}),
+        ...updated,
       }));
+      verify.setVerified(updated.isVerified);
       // 목록은 기존대로 invalidate→refetch로 갱신(원래 정상 동작했음).
       // 패널은 위 displayClip이 즉시 새 값을 유지하므로 refetch가 옛 값을 줘도 무방.
       invalidate();
@@ -269,7 +273,7 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
             {clip.title} <span className="font-normal text-light-text/60 dark:text-dark-text/60">— {clip.artist}</span>
           </h4>
         </div>
-        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-light-primary/10 dark:hover:bg-dark-primary/20 text-light-text/60 dark:text-dark-text/60 transition-colors flex-shrink-0">
+        <button onClick={onClose} disabled={publishing} className="p-1.5 rounded-lg hover:bg-light-primary/10 dark:hover:bg-dark-primary/20 text-light-text/60 dark:text-dark-text/60 transition-colors flex-shrink-0">
           <XMarkIcon className="w-5 h-5" />
         </button>
       </div>
@@ -324,7 +328,7 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <ClipVerifyButton verified={verify.verified} onToggle={verify.toggle} isPending={verify.isPending} />
+              <ClipVerifyButton verified={verify.verified} onToggle={verify.toggle} isPending={verify.isPending || publishing} />
               <button
                 onClick={() => setEditing(true)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-light-accent dark:bg-dark-accent text-white hover:shadow-md transition-all"
@@ -345,6 +349,11 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
         ) : (
           /* ── 편집 폼 ── */
           <div className="space-y-4 max-w-2xl mx-auto">
+            <AdminRangePanel key={clip._id} clipId={clip._id} draft={editData}
+              onBusy={setPublishing} disabled={publishing || saveMutation.isPending || verify.isPending || editData.videoUrl !== displayClip.videoUrl}
+              onImport={range => setEditData(prev => ({ ...prev, ...range }))}
+              preview={adapter ? time => { adapter.seekTo(time); adapter.play(); } : undefined}
+              onSaved={saved => { const next = { ...displayClip, ...saved } as ClipData; setDisplayClip(next); verify.setVerified(true); onChanged(); }} />
             <ClipTimeEditor
               startTime={editData.startTime}
               endTime={editData.endTime}
@@ -390,17 +399,18 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
             </div>
 
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <ClipVerifyButton verified={verify.verified} onToggle={verify.toggle} isPending={verify.isPending} />
+              <ClipVerifyButton verified={verify.verified} onToggle={verify.toggle} isPending={verify.isPending || publishing} />
               <div className="flex gap-2">
               <button
                 onClick={() => setEditing(false)}
+                disabled={publishing}
                 className="px-4 py-2 text-sm rounded-lg border border-light-primary/30 dark:border-dark-primary/30 text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/10 dark:hover:bg-dark-primary/20 transition-colors"
               >
                 취소
               </button>
               <button
                 onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending}
+                disabled={saveMutation.isPending || publishing}
                 className="px-4 py-2 text-sm rounded-lg bg-light-accent dark:bg-dark-accent text-white hover:shadow-md disabled:opacity-50 transition-all"
               >
                 {saveMutation.isPending ? "저장 중..." : "저장"}
