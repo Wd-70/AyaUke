@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ItemEditor from "./ItemEditor";
+import AiTimingBadge from './AiTimingBadge';
 import MobileItemNavigation, { useItemNavigation } from './MobileItemNavigation';
 import { WorkspaceActions } from './WorkflowWorkspace';
 import CreatedClipsReview from "./CreatedClipsReview";
@@ -125,6 +126,7 @@ export default function SongWorkPanel({ song, songs, songsById, onStatusRefresh 
             <button onClick={(e) => { e.stopPropagation(); void patchItem(it.id, { matchedSongId: song.id }).catch(() => {}); }} className="min-h-11 lg:min-h-0 text-[10px] px-1.5 py-0.5 rounded bg-light-accent dark:bg-dark-accent text-white shrink-0">이 곡으로 등록</button>
           )}
         </div>
+        <AiTimingBadge item={it} />
         <div className="text-[11px] text-light-text/50 dark:text-dark-text/50 truncate">파싱: {it.artist} - {it.songTitle}</div>
         <button type="button" onClick={(event) => { event.stopPropagation(); navigation.open(it.id); }} className="lg:hidden min-h-11 w-full text-left text-sm text-light-text dark:text-dark-text" aria-label={`${it.videoTitle || it.videoId} 출현 편집`}>편집 →</button>
       </div>

@@ -1,4 +1,5 @@
 /** clip-workflow 탭의 DTO 타입 (클라이언트·서버 공용, 순수) */
+import type { AiTimingAdjustment } from '@/domains/archive/ai-timing';
 
 export type Platform = 'chzzk' | 'youtube';
 
@@ -42,6 +43,7 @@ export interface WorkflowItem {
   isRelevant: boolean;
   isExcluded: boolean;
   isTimeVerified: boolean;
+  aiTiming?: AiTimingAdjustment;
   matchedSongId?: string;
   customDescription?: string;
   commentAuthor: string;

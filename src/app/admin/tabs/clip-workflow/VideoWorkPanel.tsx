@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { matchSongs } from "@/shared/utils/song-match";
 import ItemEditor from "./ItemEditor";
+import AiTimingBadge from './AiTimingBadge';
 import MobileItemNavigation, { useItemNavigation } from './MobileItemNavigation';
 import { WorkspaceActions } from './WorkflowWorkspace';
 import CreatedClipsReview from "./CreatedClipsReview";
@@ -299,6 +300,7 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
                       <button onClick={(e) => { e.stopPropagation(); void patchItem(it.id, { isExcluded: !it.isExcluded }, { isExcluded: !it.isExcluded }).catch(() => {}); }} className="min-h-11 min-w-11 lg:min-h-0 lg:min-w-0 text-[11px] text-light-text/40 hover:text-red-500 shrink-0" title={it.isExcluded ? "포함" : "제외"}>{it.isExcluded ? "↩" : "✕"}</button>
                     </div>
                     {/* 2줄: 가수 - 곡명 */}
+                    <AiTimingBadge item={it} />
                     <div className="truncate text-light-text dark:text-dark-text leading-snug">{it.artist} - {it.songTitle}</div>
                     <button type="button" onClick={(event) => { event.stopPropagation(); navigation.open(it.id); }} className="lg:hidden min-h-11 w-full text-left text-sm text-light-text dark:text-dark-text" aria-label={`${it.artist} - ${it.songTitle} 편집`}>편집 →</button>
                     {isSel && !navigation.mobile && (

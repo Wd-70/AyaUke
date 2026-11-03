@@ -14,6 +14,7 @@ import type { EditPlayerAdapter } from "@/app/admin/tabs/live-clips/clip-types";
 import ClipTimeEditor from "@/app/admin/tabs/live-clips/ClipTimeEditor";
 import ClipVerifyButton from "@/app/admin/tabs/live-clips/ClipVerifyButton";
 import EditPlayer from "./EditPlayer";
+import AiTimingBadge from './AiTimingBadge';
 import { fmt, assignOptimistic, songSuggestions } from "./itemUtils";
 import type { WorkflowItem, WorkflowSong } from "./types";
 
@@ -134,6 +135,7 @@ const ItemEditor = forwardRef<ItemEditorHandle, Props>(function ItemEditor({ ite
 
       {/* 검증: 항목을 검증 상태로 두면 클립 생성 시 검증된 클립으로 만들어짐 */}
       <div className="flex items-center gap-2 flex-wrap">
+        <AiTimingBadge item={item} detail />
         <ClipVerifyButton
           verified={item.isTimeVerified}
           onToggle={() => savePatch({ isTimeVerified: !item.isTimeVerified }, { isTimeVerified: !item.isTimeVerified })}

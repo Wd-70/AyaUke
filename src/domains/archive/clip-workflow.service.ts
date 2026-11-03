@@ -201,7 +201,7 @@ async function listItems(filter: Record<string, unknown>): Promise<WorkflowItem[
   const items = await ParsedTimeline.find(filter, {
     id: 1, platform: 1, videoId: 1, videoTitle: 1, originalDateString: 1, uploadedDate: 1,
     startTimeSeconds: 1, endTimeSeconds: 1, duration: 1, artist: 1, songTitle: 1,
-    isRelevant: 1, isExcluded: 1, isTimeVerified: 1, matchedSong: 1, customDescription: 1, commentAuthor: 1, videoUrl: 1,
+    isRelevant: 1, isExcluded: 1, isTimeVerified: 1, aiTiming: 1, matchedSong: 1, customDescription: 1, commentAuthor: 1, videoUrl: 1,
   }).sort({ startTimeSeconds: 1 }).lean();
 
   return items.map((it) => ({
@@ -218,6 +218,7 @@ async function listItems(filter: Record<string, unknown>): Promise<WorkflowItem[
     isRelevant: it.isRelevant !== false,
     isExcluded: it.isExcluded === true,
     isTimeVerified: it.isTimeVerified === true,
+    aiTiming: (it.aiTiming as WorkflowItem['aiTiming']) || undefined,
     matchedSongId: (it.matchedSong as { songId?: string } | undefined)?.songId || undefined,
     customDescription: (it.customDescription as string) || undefined,
     commentAuthor: (it.commentAuthor as string) || '',

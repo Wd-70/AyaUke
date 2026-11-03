@@ -1,4 +1,5 @@
 import mongoose, { Schema, Model } from 'mongoose';
+import type { AiTimingAdjustment } from '../ai-timing';
 
 /**
  * 유튜브 댓글에서 파싱된 노래 타임라인 항목.
@@ -36,6 +37,8 @@ export interface IParsedTimeline {
   commentPublishedAt?: Date;
   // 수동 검증 관련
   isTimeVerified: boolean;
+  /** AI 조정 이력. 사람의 검증 완료와 별개이며 수동 수정 후에도 보존한다. */
+  aiTiming?: AiTimingAdjustment;
   verifiedBy?: string;
   verifiedAt?: Date;
   verificationNotes?: string;
@@ -75,6 +78,30 @@ const ParsedTimelineSchema = new Schema<IParsedTimeline>(
     commentId: { type: String, required: true },
     commentPublishedAt: { type: Date },
     isTimeVerified: { type: Boolean, default: false },
+    aiTiming: {
+      type: new Schema<AiTimingAdjustment>({
+        version: { type: Number, enum: [1], required: true },
+        runId: { type: String, required: true },
+        method: { type: String, required: true },
+        model: { type: String, required: true },
+        adjustedAt: { type: String, required: true },
+        songId: { type: String, required: true },
+        startTimeSeconds: { type: Number, required: true },
+        endTimeSeconds: { type: Number, required: true },
+        previousStartTimeSeconds: { type: Number, required: true },
+        previousEndTimeSeconds: { type: Number, default: null },
+        note: { type: String, required: true },
+        evidencePercent: { type: Number, min: 0, max: 100 },
+        evidenceKind: { type: String, enum: ['cens-similarity', 'fingerprint-coverage'] },
+        reviewTier: { type: String, enum: ['audio-supported', 'duration-supported-provisional', 'review-only-provisional'] },
+        referenceYoutubeId: { type: String, match: /^[\w-]{11}$/ },
+        referenceKind: { type: String, enum: ['mr', 'cover'] },
+        endPolicy: { type: String, enum: ['song-default-duration', 'detected-ending-plus-padding'] },
+        defaultClipDuration: { type: Number, min: 0 },
+        reviewRequired: { type: Boolean, required: true, validate: (value: boolean) => value === true },
+      }, { _id: false }),
+      default: undefined,
+    },
     verifiedBy: { type: String },
     verifiedAt: { type: Date },
     verificationNotes: { type: String },
