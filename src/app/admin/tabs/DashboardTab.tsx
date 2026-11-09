@@ -1,360 +1,403 @@
 "use client";
-
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import {
+  ArrowPathIcon,
   MusicalNoteIcon,
-  UsersIcon,
-  ListBulletIcon,
   PlayIcon,
-  ShieldCheckIcon,
-  ClockIcon,
-  EyeIcon,
-  ChartBarIcon,
+  UsersIcon,
   HeartIcon,
-  ArrowTrendingUpIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
+  QueueListIcon,
+  ArrowUpRightIcon,
 } from "@heroicons/react/24/outline";
-
-interface DashboardStats {
-  overview: {
-    totalUsers: number;
-    totalSongs: number;
-    totalClips: number;
-    totalPlaylists: number;
-    verificationRate: number;
-    recentClipsWeek: number;
-  };
-  clips: {
-    total: number;
-    verified: number;
-    unverified: number;
-    recentWeek: number;
-    topContributors: Array<{ name: string; count: number }>;
-    clipsPerSong: Array<{ songId: string; title: string; artist: string; count: number }>;
-  };
-  users: {
-    total: number;
-    active: number;
-    recent: number;
-    byRole: Record<string, number>;
-  };
-  playlists: {
-    total: number;
-    public: number;
-    private: number;
-    averageSize: number;
-    topTags: Array<{ tag: string; count: number }>;
-  };
-  songs: {
-    total: number;
-    byLanguage: Record<string, number>;
-    topSung: Array<{ title: string; artist: string; sungCount: number }>;
-    withMR: number;
-    byStatus: Record<string, number>;
-  };
-  trends: {
-    clips: Array<{ month: string; count: number }>;
-    users: Array<{ month: string; count: number }>;
-    playlists: Array<{ month: string; count: number }>;
-  };
-}
-
-export default function DashboardTab() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
+import {
+  adminDate,
+  type AdminOverview,
+} from "@/domains/operations/admin-overview";
+import {
+  AdminRecords,
+  AdminSection,
+  adminControl,
+  adminMuted,
+  adminPanel,
+} from "@/components/admin/AdminPrimitives";
+type Destination = "clip-workflow" | "clips" | "clip-reports" | "users";
+export default function DashboardTab({
+  onNavigate,
+}: {
+  onNavigate?: (tab: Destination) => void;
+}) {
+  const [data, setData] = useState<AdminOverview | null>(null),
+    [error, setError] = useState(""),
+    [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState("all"),
+    [start, setStart] = useState(""),
+    [end, setEnd] = useState(""),
+    [custom, setCustom] = useState(""),
+    [refresh, setRefresh] = useState(0);
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await fetch('/api/admin/dashboard-stats');
-        if (!response.ok) {
-          throw new Error('Failed to fetch dashboard statistics');
-        }
-        const data = await response.json();
-        setStats(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-12">
-        <div className="w-8 h-8 border-2 border-light-accent/30 dark:border-dark-accent/30 border-t-light-accent dark:border-t-dark-accent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (error || !stats) {
-    return (
-      <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-8 border border-red-200 dark:border-red-800">
-        <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
-          <ExclamationTriangleIcon className="w-6 h-6" />
-          <span className="font-semibold">데이터를 불러올 수 없습니다</span>
-        </div>
-        <p className="mt-2 text-red-500 dark:text-red-300 text-sm">
-          {error || '알 수 없는 오류가 발생했습니다'}
-        </p>
-      </div>
-    );
-  }
-
-  const quickStats = [
-    {
-      title: "총 노래 수",
-      value: stats.overview.totalSongs.toLocaleString(),
-      icon: MusicalNoteIcon,
-      change: `MR: ${stats.songs.withMR}곡`,
-      changeType: "neutral" as "increase" | "decrease" | "neutral",
-      color: "from-light-accent to-light-purple dark:from-dark-accent dark:to-dark-purple",
-    },
-    {
-      title: "등록 사용자",
-      value: stats.overview.totalUsers.toLocaleString(),
-      icon: UsersIcon,
-      change: `활성: ${stats.users.active}`,
-      changeType: "neutral" as "increase" | "decrease" | "neutral",
-      color: "from-light-secondary to-light-accent dark:from-dark-secondary dark:to-dark-accent",
-    },
-    {
-      title: "라이브 클립",
-      value: stats.overview.totalClips.toLocaleString(),
-      icon: PlayIcon,
-      change: `최근 7일: ${stats.overview.recentClipsWeek}개`,
-      changeType: "neutral" as "increase" | "decrease" | "neutral",
-      color: "from-blue-400 to-indigo-500 dark:from-blue-500 dark:to-indigo-600",
-    },
-    {
-      title: "플레이리스트",
-      value: stats.overview.totalPlaylists.toLocaleString(),
-      icon: ListBulletIcon,
-      change: `공개: ${stats.playlists.public}개`,
-      changeType: "neutral" as "increase" | "decrease" | "neutral",
-      color: "from-light-purple to-light-secondary dark:from-dark-purple dark:to-dark-secondary",
-    },
-  ];
-
-  return (
-    <div className="space-y-8">
-      {/* Quick Stats */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.1 }}
-        className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-6"
+    if (period === "custom" && !custom) {
+      setLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    const query = period === "custom" ? custom : `period=${period}`;
+    fetch(`/api/admin/dashboard-stats?${query}`, {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error || "현황을 불러오지 못했습니다.");
+        return json;
+      })
+      .then((json) => {
+        if (!controller.signal.aborted) setData(json);
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [period, custom, refresh]);
+  const go = (tab: Destination, label: string) =>
+    onNavigate ? (
+      <button
+        className={`${adminControl} inline-flex items-center gap-2`}
+        onClick={() => onNavigate(tab)}
       >
-        {quickStats.map((stat, index) => (
-          <motion.div
-            key={stat.title}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4, delay: index * 0.1 }}
-            whileHover={{ scale: 1.02 }}
-            className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-4 xl:p-6 
-                       border border-light-primary/20 dark:border-dark-primary/20 
-                       hover:border-light-accent/40 dark:hover:border-dark-accent/40 
-                       transition-all duration-300"
+        {label}
+        <ArrowUpRightIcon className="h-4 w-4" />
+      </button>
+    ) : null;
+  const t = data?.totals;
+  const cards = t
+    ? [
+        {
+          label: "등록 곡",
+          value: t.songs,
+          detail: `MR ${t.mr.toLocaleString()}곡 · 기본 길이 ${t.duration}곡`,
+          icon: MusicalNoteIcon,
+        },
+        {
+          label: "라이브 클립",
+          value: t.clips,
+          detail: `재생 가능 ${t.playable.toLocaleString()} · 검증 완료 ${t.verified.toLocaleString()}`,
+          icon: PlayIcon,
+        },
+        {
+          label: "사용자",
+          value: t.users,
+          detail: "가입한 전체 사용자",
+          icon: UsersIcon,
+        },
+        {
+          label: "좋아요",
+          value: t.songLikes + t.clipLikes,
+          detail: `곡 ${t.songLikes} · 클립 ${t.clipLikes}`,
+          icon: HeartIcon,
+        },
+        {
+          label: "플레이리스트",
+          value: t.songPlaylists + t.clipPlaylists,
+          detail: `곡 ${t.songPlaylists} · 클립 ${t.clipPlaylists}`,
+          icon: QueueListIcon,
+        },
+      ]
+    : [];
+  return (
+    <div className="space-y-6 text-light-text dark:text-dark-text">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold tracking-[.18em] text-purple-700 dark:text-purple-300">
+            WORKSPACE / OVERVIEW
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+            운영 대시보드
+          </h2>
+          <p className={`${adminMuted} mt-2`}>
+            쌓인 콘텐츠와 최근 기록, 이어서 할 작업을 한눈에.
+          </p>
+        </div>
+        <button
+          className={`${adminControl} inline-flex items-center gap-2`}
+          disabled={loading}
+          onClick={() => setRefresh((x) => x + 1)}
+          aria-label="대시보드 새로고침"
+        >
+          <ArrowPathIcon
+            className={`h-4 w-4 ${loading ? "animate-spin motion-reduce:animate-none" : ""}`}
+          />
+          새로고침
+        </button>
+      </header>
+      {error && (
+        <div
+          role="alert"
+          className="rounded-xl border border-red-300 p-4 text-sm text-red-700 dark:text-red-300"
+        >
+          {error}{" "}
+          <button
+            className="min-h-11 underline"
+            onClick={() => setRefresh((x) => x + 1)}
           >
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className={`w-10 xl:w-12 h-10 xl:h-12 bg-gradient-to-r ${stat.color} rounded-lg flex items-center justify-center`}
+            다시 시도
+          </button>
+        </div>
+      )}
+      {!data && loading ? (
+        <div role="status" className={`${adminPanel} p-10 text-center`}>
+          운영 현황을 불러오는 중…
+        </div>
+      ) : (
+        data && (
+          <>
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
+              {cards.map(({ label, value, detail, icon: Icon }) => (
+                <section
+                  key={label}
+                  className={`${adminPanel} relative overflow-hidden p-4 last:col-span-2 sm:p-5 xl:last:col-span-1`}
+                >
+                  <div className="mb-5 flex items-center justify-between">
+                    <span className={adminMuted}>{label}</span>
+                    <Icon className="h-5 w-5 text-purple-600 dark:text-purple-300" />
+                  </div>
+                  <p className="text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">
+                    {value.toLocaleString()}
+                  </p>
+                  <p className={`${adminMuted} mt-2 text-xs`}>{detail}</p>
+                </section>
+              ))}
+            </div>
+            <section
+              className={`${adminPanel} p-4`}
+              aria-label="기간별 신규 기록"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold">기간별 신규 기록</h3>
+                  <p className={`${adminMuted} mt-1 text-xs`}>
+                    상단 보유 현황과 아래 최근 기록은 항상 전체 기간입니다.
+                  </p>
+                </div>
+                <select
+                  aria-label="신규 기록 집계 기간"
+                  className={adminControl}
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value)}
+                >
+                  <option value="all">전체 기간</option>
+                  <option value="90">최근 90일</option>
+                  <option value="30">최근 30일</option>
+                  <option value="custom">직접 지정</option>
+                </select>
+              </div>
+              {period === "custom" && (
+                <form
+                  className="mt-3 flex flex-wrap items-end gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (start && end && start <= end) {
+                      setError("");
+                      setCustom(`period=custom&start=${start}&end=${end}`);
+                    } else setError("시작일과 종료일을 확인해주세요.");
+                  }}
+                >
+                  <label className={adminMuted}>
+                    시작일
+                    <input
+                      required
+                      type="date"
+                      value={start}
+                      onChange={(e) => setStart(e.target.value)}
+                      className={`${adminControl} mt-1 block`}
+                    />
+                  </label>
+                  <label className={adminMuted}>
+                    종료일
+                    <input
+                      required
+                      type="date"
+                      value={end}
+                      min={start}
+                      onChange={(e) => setEnd(e.target.value)}
+                      className={`${adminControl} mt-1 block`}
+                    />
+                  </label>
+                  <button className={adminControl}>기간 적용</button>
+                </form>
+              )}
+              <p
+                role="status"
+                aria-live="polite"
+                className={`${adminMuted} mt-4 flex flex-wrap gap-x-5 gap-y-2`}
               >
-                <stat.icon className="w-5 xl:w-6 h-5 xl:h-6 text-white" />
+                {loading ? (
+                  "집계 중…"
+                ) : error ? (
+                  "집계를 완료하지 못했습니다. 다시 시도해주세요."
+                ) : period === "custom" && !custom ? (
+                  "기간을 지정하고 적용해주세요."
+                ) : (
+                  <>
+                    <span>
+                      가입 <strong>{data.period.users}</strong>명
+                    </span>
+                    <span>
+                      클립 추가{" "}
+                      <strong>{data.period.clips.toLocaleString()}</strong>개
+                    </span>
+                    <span>
+                      곡 좋아요 <strong>{data.period.songLikes}</strong>건
+                    </span>
+                    <span>
+                      클립 좋아요 <strong>{data.period.clipLikes}</strong>건
+                    </span>
+                    <span>
+                      플레이리스트 생성 <strong>{data.period.playlists}</strong>
+                      개
+                    </span>
+                  </>
+                )}
+              </p>
+            </section>
+            <div className="grid items-start gap-5 xl:grid-cols-3">
+              <div className="space-y-5 xl:col-span-2">
+                {data.work.timelines && (
+                  <AdminSection
+                    title="이어서 할 작업"
+                    description="최근 수정된 영상 중 시간 검증이 남은 항목입니다."
+                    action={go("clip-workflow", "클립 만들기")}
+                  >
+                    <div className="mb-5 grid grid-cols-3 gap-2">
+                      {[
+                        ["미매칭", data.work.timelines.unmatched],
+                        [
+                          "매칭 · 미검증",
+                          data.work.timelines.matchedUnverified,
+                        ],
+                        ["AI 조정 · 미검증", data.work.timelines.aiUnverified],
+                      ].map(([label, value]) => (
+                        <div
+                          key={label}
+                          className="rounded-xl bg-purple-50 p-3 dark:bg-purple-950/30"
+                        >
+                          <p className="text-xs text-light-text/70 dark:text-dark-text/70">
+                            {label}
+                          </p>
+                          <p className="mt-2 text-xl font-semibold tabular-nums">
+                            {Number(value).toLocaleString()}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <ul className="space-y-4">
+                      {data.work.videos.map((v) => (
+                        <li key={v.id}>
+                          <div className="flex flex-wrap justify-between gap-2 text-sm">
+                            <p className="min-w-0 flex-1 break-words font-medium">
+                              {v.title}
+                            </p>
+                            <span className={adminMuted}>
+                              {v.verified} / {v.total} 검증
+                            </span>
+                          </div>
+                          <div
+                            role="progressbar"
+                            aria-label={`${v.title} 시간 검증`}
+                            aria-valuenow={v.verified}
+                            aria-valuemin={0}
+                            aria-valuemax={v.total}
+                            className="mt-2 h-1.5 overflow-hidden rounded-full bg-purple-100 dark:bg-purple-950"
+                          >
+                            <div
+                              className="h-full rounded-full bg-purple-500"
+                              style={{
+                                width: `${v.total ? (v.verified / v.total) * 100 : 0}%`,
+                              }}
+                            />
+                          </div>
+                          <p className={`${adminMuted} mt-1 text-xs`}>
+                            미매칭 {v.unmatched}개 · 최근 수정 {adminDate(v.at)}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                    {!data.work.videos.length && (
+                      <p className={adminMuted}>
+                        시간 검증이 남은 영상이 없습니다.
+                      </p>
+                    )}
+                    <p className={`${adminMuted} mt-5 text-xs`}>
+                      AI 조정은 사람의 검증과 별개입니다. 타임라인 검증과 생성된
+                      클립 검증도 구분합니다.
+                    </p>
+                  </AdminSection>
+                )}
+                <AdminSection
+                  title="최근 추가한 클립"
+                  description="기간 제한 없이 가장 최근 5개"
+                  action={go("clips", "클립 관리")}
+                >
+                  <AdminRecords items={data.recent.clips} />
+                </AdminSection>
+                <AdminSection
+                  title="최근 좋아요"
+                  description="현재 남아 있는 곡·클립 좋아요 기록"
+                >
+                  <AdminRecords items={data.recent.likes} />
+                </AdminSection>
               </div>
-              <div
-                className={`px-2 py-1 rounded-full text-xs font-medium
-                ${
-                  stat.changeType === "increase"
-                    ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                    : stat.changeType === "decrease"
-                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                    : "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400"
-                }`}
-              >
-                {stat.change}
+              <div className="space-y-5">
+                <AdminSection
+                  title="운영 점검"
+                  description="문제가 있는 항목만 모아 확인하세요."
+                >
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-amber-50 p-3 text-sm dark:bg-amber-950/20">
+                    <span>재생 불가 클립</span>
+                    <strong>{data.work.unavailable}개</strong>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {go("clips", "원본 점검")}
+                    {go("clip-reports", `신고 ${data.work.reports}건`)}
+                  </div>
+                  <p className={`${adminMuted} mt-4`}>
+                    {data.work.reports === 0 && data.work.proposals === 0
+                      ? "신고·구간 제안 처리 대기 없음"
+                      : `미처리 신고 ${data.work.reports}건 · 활성 구간 제안 ${data.work.proposals}건`}
+                  </p>
+                  {data.work.proposals > 0 && go("clips", "구간 제안 확인")}
+                </AdminSection>
+                {data.canManageUsers && (
+                  <AdminSection
+                    title="최근 가입"
+                    description="전체 기간에서 최근 5명"
+                    action={go("users", "사용자 관리")}
+                  >
+                    <AdminRecords items={data.recent.users} />
+                  </AdminSection>
+                )}
+                <AdminSection
+                  title="공개 플레이리스트"
+                  description="곡·클립 플레이리스트의 최근 수정 기록"
+                >
+                  <AdminRecords items={data.recent.playlists} />
+                </AdminSection>
               </div>
             </div>
-            <div className="text-xl xl:text-2xl font-bold text-light-text dark:text-dark-text mb-1">
-              {stat.value}
-            </div>
-            <div className="text-xs xl:text-sm text-light-text/60 dark:text-dark-text/60">
-              {stat.title}
-            </div>
-          </motion.div>
-        ))}
-      </motion.div>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Most Sung Songs */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20"
-        >
-          <h3 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4 flex items-center gap-2">
-            <HeartIcon className="w-5 h-5" />
-            가장 많이 부른 곡 Top 10
-          </h3>
-          <div className="space-y-3">
-            {stats.songs.topSung.slice(0, 10).map((song, index) => (
-              <div key={`${song.title}-${song.artist}`} className="flex items-center justify-between">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                    index === 0 ? 'bg-yellow-500' : 
-                    index === 1 ? 'bg-gray-400' :
-                    index === 2 ? 'bg-amber-600' : 'bg-gray-300'
-                  }`}>
-                    {index + 1}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-light-text dark:text-dark-text font-medium truncate">
-                      {song.title}
-                    </div>
-                    <div className="text-light-text/60 dark:text-dark-text/60 text-xs truncate">
-                      {song.artist}
-                    </div>
-                  </div>
-                </div>
-                <span className="text-light-text/70 dark:text-dark-text/70 text-sm ml-2">
-                  {song.sungCount}회
-                </span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Popular Playlist Tags */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20"
-        >
-          <h3 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4 flex items-center gap-2">
-            <ListBulletIcon className="w-5 h-5" />
-            인기 플레이리스트 태그 Top 10
-          </h3>
-          <div className="space-y-3">
-            {stats.playlists.topTags.slice(0, 10).map((tag, index) => (
-              <div key={tag.tag} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
-                    index < 3 ? 'bg-light-accent dark:bg-dark-accent' : 'bg-gray-400'
-                  }`}>
-                    {index + 1}
-                  </div>
-                  <span className="text-light-text dark:text-dark-text font-medium">
-                    {tag.tag}
-                  </span>
-                </div>
-                <span className="text-light-text/70 dark:text-dark-text/70 text-sm">
-                  {tag.count}개
-                </span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Language Distribution */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.5 }}
-          className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20"
-        >
-          <h3 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4 flex items-center gap-2">
-            <ChartBarIcon className="w-5 h-5" />
-            언어별 곡 분포
-          </h3>
-          <div className="space-y-3">
-            {Object.entries(stats.songs.byLanguage)
-              .sort((a, b) => b[1] - a[1])
-              .map(([language, count]) => {
-                const percentage = ((count / stats.songs.total) * 100).toFixed(1);
-                return (
-                  <div key={language} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-light-text dark:text-dark-text font-medium">
-                        {language || '기타'}
-                      </span>
-                      <span className="text-light-text/70 dark:text-dark-text/70 text-sm">
-                        {count}곡 ({percentage}%)
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div
-                        className="bg-light-accent dark:bg-dark-accent h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        </motion.div>
-
-        {/* System Status & Recent Activity */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
-          className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20"
-        >
-          <h3 className="text-lg font-semibold text-light-text dark:text-dark-text mb-4 flex items-center gap-2">
-            <ShieldCheckIcon className="w-5 h-5" />
-            시스템 현황
-          </h3>
-          <div className="space-y-4">
-            {/* Status Indicators */}
-            <div className="grid grid-cols-1 gap-3 text-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span className="text-light-text/70 dark:text-dark-text/70">시스템 정상</span>
-                </div>
-                <CheckCircleIcon className="w-4 h-4 text-green-500" />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <ClockIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60" />
-                  <span className="text-light-text/70 dark:text-dark-text/70">최근 일주일 클립</span>
-                </div>
-                <span className="text-light-accent dark:text-dark-accent font-semibold">
-                  {stats.overview.recentClipsWeek}개
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <UsersIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60" />
-                  <span className="text-light-text/70 dark:text-dark-text/70">새 사용자 (30일)</span>
-                </div>
-                <span className="text-light-accent dark:text-dark-accent font-semibold">
-                  {stats.users.recent}명
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <MusicalNoteIcon className="w-4 h-4 text-light-text/60 dark:text-dark-text/60" />
-                  <span className="text-light-text/70 dark:text-dark-text/70">MR 보유 곡</span>
-                </div>
-                <span className="text-light-text dark:text-dark-text font-semibold">
-                  {stats.songs.withMR}곡
-                </span>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-      </div>
+            <footer className={`${adminMuted} text-xs`}>
+              조회 기준{" "}
+              {new Date(data.generatedAt).toLocaleString("ko-KR", {
+                timeZone: "Asia/Seoul",
+              })}{" "}
+              · 좋아요·플레이리스트 수는 현재 보유 데이터 기준입니다.
+            </footer>
+          </>
+        )
+      )}
     </div>
   );
 }

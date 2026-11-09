@@ -195,7 +195,7 @@ export default function AdminClient() {
   const renderTabContent = () => {
     switch (effectiveActiveTab) {
       case "dashboard":
-        return <DashboardTab />;
+        return <DashboardTab onNavigate={setActiveTab} />;
 
       case "clips":
         return <LiveClipManagementTab />;

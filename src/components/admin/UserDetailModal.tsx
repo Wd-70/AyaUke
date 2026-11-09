@@ -1,7 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
+import UserActivityDetails from './UserActivityDetails'
+import { usePortalHost, useWorkflowOverlay } from '@/app/admin/tabs/clip-workflow/WorkflowWorkspace'
 import {
   XMarkIcon,
   UserIcon,
@@ -161,7 +164,11 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
   const [detailLoading, setDetailLoading] = useState(false)
   
   // 탭 상태
-  const [activeTab, setActiveTab] = useState<'info' | 'likes' | 'playlists'>('info')
+  const [activeTab, setActiveTab] = useState<'info' | 'likes' | 'playlists' | 'activity'>('info')
+  const portalHost = usePortalHost()
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const reducedMotion = useReducedMotion()
+  useWorkflowOverlay(isOpen, portalHost, dialogRef, onClose)
   
   // 타이틀 관리 상태
   const [showTitleForm, setShowTitleForm] = useState(false)
@@ -342,19 +349,20 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
     return Icon
   }
 
-  if (!isOpen) return null
+  if (!isOpen || !portalHost) return null
 
   const RoleIcon = getRoleIcon(user.role as keyof typeof roleIcons)
 
-  return (
+  return createPortal(
     <AnimatePresence>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
+          ref={dialogRef} role="dialog" aria-modal="true" aria-label={`${user.displayName || user.channelName} 사용자 상세`} tabIndex={-1}
+          initial={{ opacity: 0, scale: reducedMotion ? 1 : 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.9 }}
+          exit={{ opacity: 0, scale: reducedMotion ? 1 : 0.98 }}
           transition={{ duration: 0.2 }}
-          className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+          className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90dvh] overflow-y-auto outline-none text-light-text dark:text-dark-text [&_button]:min-h-11 [&_input]:min-h-11 [&_select]:min-h-11"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
@@ -379,6 +387,7 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
             </div>
             <button
               onClick={onClose}
+              aria-label="사용자 상세 닫기"
               className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
             >
               <XMarkIcon className="w-6 h-6 text-light-text dark:text-dark-text" />
@@ -404,9 +413,10 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
           <div className="p-6 space-y-6">
             {/* Tab Navigation */}
             <div className="border-b border-light-primary/20 dark:border-dark-primary/20">
-              <nav className="flex space-x-8" aria-label="탭">
+              <nav className="flex flex-wrap gap-x-5 gap-y-1" aria-label="사용자 상세 보기">
                 <button
                   onClick={() => setActiveTab('info')}
+                  aria-pressed={activeTab === 'info'}
                   className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === 'info'
                       ? 'border-light-accent dark:border-dark-accent text-light-accent dark:text-dark-accent'
@@ -420,6 +430,7 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
                 </button>
                 <button
                   onClick={() => setActiveTab('likes')}
+                  aria-pressed={activeTab === 'likes'}
                   className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === 'likes'
                       ? 'border-light-accent dark:border-dark-accent text-light-accent dark:text-dark-accent'
@@ -428,11 +439,12 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
                 >
                   <div className="flex items-center gap-2">
                     <HeartIcon className="w-4 h-4" />
-                    좋아요 곡 ({userDetail?.user.likesCount || user.likesCount || 0})
+                    좋아요 곡 ({userDetail?.user.likesCount ?? user.likesCount ?? 0})
                   </div>
                 </button>
                 <button
                   onClick={() => setActiveTab('playlists')}
+                  aria-pressed={activeTab === 'playlists'}
                   className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === 'playlists'
                       ? 'border-light-accent dark:border-dark-accent text-light-accent dark:text-dark-accent'
@@ -441,13 +453,15 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
                 >
                   <div className="flex items-center gap-2">
                     <QueueListIcon className="w-4 h-4" />
-                    플레이리스트 ({userDetail?.user.playlistsCount || user.playlistsCount || 0})
+                    곡 플레이리스트 ({userDetail?.user.playlistsCount ?? user.playlistsCount ?? 0})
                   </div>
                 </button>
+                <button onClick={() => setActiveTab('activity')} aria-pressed={activeTab === 'activity'} className={`min-h-11 border-b-2 px-1 text-sm font-medium ${activeTab === 'activity' ? 'border-purple-500 text-purple-700 dark:text-purple-300' : 'border-transparent text-light-text/70 dark:text-dark-text/70'}`}>클립·활동 기록</button>
               </nav>
             </div>
 
             {/* Tab Content */}
+            {activeTab === 'activity' && <UserActivityDetails userId={user._id} />}
             {activeTab === 'info' && (
               <div className="space-y-8">
                 {/* Basic Info */}
@@ -1029,6 +1043,6 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
           </div>
         </motion.div>
       </div>
-    </AnimatePresence>
+    </AnimatePresence>, portalHost
   )
 }

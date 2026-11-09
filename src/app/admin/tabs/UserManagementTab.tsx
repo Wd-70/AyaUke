@@ -1,407 +1,367 @@
-'use client'
-
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+"use client";
+import { useEffect, useState } from "react";
 import {
+  ArrowPathIcon,
   MagnifyingGlassIcon,
-  AdjustmentsHorizontalIcon,
-  ChevronUpDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  UserIcon,
-  StarIcon,
+  UsersIcon,
   ShieldCheckIcon,
-  PencilIcon,
-  EyeIcon,
-  CalendarIcon,
-  ClockIcon,
-  HeartIcon,
-  QueueListIcon
-} from '@heroicons/react/24/outline'
-import type { AdminUserView } from '@/domains/identity/user.view'
-import UserDetailModal from '@/components/admin/UserDetailModal'
-
-type UserWithCounts = AdminUserView & {
-  likesCount: number
-  playlistsCount: number
-}
-
-interface UserListResponse {
-  users: UserWithCounts[]
+} from "@heroicons/react/24/outline";
+import UserDetailModal from "@/components/admin/UserDetailModal";
+import {
+  adminControl,
+  adminMuted,
+  adminPanel,
+} from "@/components/admin/AdminPrimitives";
+import { adminAgo, adminDate } from "@/domains/operations/admin-overview";
+import type { AdminUserListItem } from "@/domains/identity/admin-user.service";
+import type { AdminUserView } from "@/domains/identity/user.view";
+const roles: Record<string, string> = {
+  super_admin: "최고 관리자",
+  ayauke_admin: "아야우케 관리자",
+  song_admin: "노래 관리자",
+  song_editor: "노래 편집자",
+  user: "일반 사용자",
+};
+interface UserResponse {
+  users: AdminUserListItem[];
+  overview: { total: number; admins: number };
   pagination: {
-    currentPage: number
-    totalPages: number
-    totalUsers: number
-    hasNextPage: boolean
-    hasPreviousPage: boolean
-    limit: number
-  }
+    currentPage: number;
+    totalPages: number;
+    totalUsers: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+    limit: number;
+  };
 }
-
-const roleLabels = {
-  super_admin: '최고 관리자',
-  ayauke_admin: '아야우케 관리자',
-  song_admin: '노래 관리자',
-  song_editor: '노래 편집자',
-  user: '일반 사용자'
-}
-
-const roleColors = {
-  super_admin: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  ayauke_admin: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  song_admin: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  song_editor: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  user: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
-}
-
-const roleIcons = {
-  super_admin: StarIcon,
-  ayauke_admin: ShieldCheckIcon,
-  song_admin: ShieldCheckIcon,
-  song_editor: PencilIcon,
-  user: UserIcon
-}
-
 export default function UserManagementTab() {
-  const [users, setUsers] = useState<UserWithCounts[]>([])
-  const [loading, setLoading] = useState(true)
-  const [pagination, setPagination] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    totalUsers: 0,
-    hasNextPage: false,
-    hasPreviousPage: false,
-    limit: 20
-  })
-
-  // 필터 및 검색 상태
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedRole, setSelectedRole] = useState('all')
-  const [sortBy, setSortBy] = useState('createdAt')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [currentPage, setCurrentPage] = useState(1)
-
-  // 모달 상태
-  const [selectedUser, setSelectedUser] = useState<UserWithCounts | null>(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true)
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: '20',
-        search: searchTerm,
-        role: selectedRole,
-        sortBy,
-        sortOrder
-      })
-
-      const response = await fetch(`/api/admin/users?${params}`)
-      if (!response.ok) throw new Error('사용자 목록을 불러올 수 없습니다.')
-
-      const data: UserListResponse = await response.json()
-      setUsers(data.users)
-      setPagination(data.pagination)
-    } catch (error) {
-      console.error('사용자 목록 조회 오류:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  const [data, setData] = useState<UserResponse | null>(null),
+    [search, setSearch] = useState(""),
+    [debounced, setDebounced] = useState(""),
+    [role, setRole] = useState("all"),
+    [sort, setSort] = useState("lastActivityAt"),
+    [order, setOrder] = useState("desc"),
+    [page, setPage] = useState(1),
+    [refresh, setRefresh] = useState(0);
+  const [loading, setLoading] = useState(true),
+    [error, setError] = useState(""),
+    [selected, setSelected] = useState<AdminUserListItem | null>(null);
   useEffect(() => {
-    fetchUsers()
-  }, [currentPage, searchTerm, selectedRole, sortBy, sortOrder])
-
-  const handleSort = (field: string) => {
-    if (sortBy === field) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(field)
-      setSortOrder('desc')
-    }
-  }
-
-  const openUserModal = (user: UserWithCounts) => {
-    setSelectedUser(user)
-    setIsModalOpen(true)
-  }
-
-  const closeUserModal = () => {
-    setSelectedUser(null)
-    setIsModalOpen(false)
-  }
-
-  const handleUserUpdate = (updatedUser: AdminUserView) => {
-    setUsers(users.map(user =>
-      user._id === updatedUser._id ? { ...user, ...updatedUser } : user
-    ))
-    closeUserModal()
-  }
-
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    const timer = setTimeout(() => {
+      setDebounced(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError("");
+    const query = new URLSearchParams({
+      search: debounced,
+      role,
+      sortBy: sort,
+      sortOrder: order,
+      page: String(page),
+      limit: "20",
+    });
+    fetch(`/api/admin/users?${query}`, {
+      signal: controller.signal,
+      cache: "no-store",
     })
-  }
-
-  const getRoleIcon = (role: keyof typeof roleIcons) => {
-    const Icon = roleIcons[role] || UserIcon
-    return Icon
-  }
-
+      .then(async (r) => {
+        const json = await r.json();
+        if (!r.ok) throw new Error(json.error || "조회 실패");
+        return json;
+      })
+      .then((json) => {
+        if (!controller.signal.aborted) setData(json);
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted) setError(e.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [debounced, role, sort, order, page, refresh]);
+  const changed = (user: AdminUserView) => {
+    setData((current) =>
+      current
+        ? {
+            ...current,
+            users: current.users.map((u) =>
+              u._id === user._id ? { ...u, ...user } : u,
+            ),
+          }
+        : current,
+    );
+    setSelected(null);
+    setRefresh((x) => x + 1);
+  };
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="space-y-5 text-light-text dark:text-dark-text">
+      <header className="flex flex-wrap justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold tracking-[.18em] text-purple-700 dark:text-purple-300">
+            WORKSPACE / PEOPLE
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+            사용자 관리
+          </h2>
+          <p className={`${adminMuted} mt-2`}>
+            기간에 가두지 않고, 각 사용자의 전체 활동을 살펴보세요.
+          </p>
+        </div>
+        <button
+          aria-label="사용자 목록 새로고침"
+          disabled={loading}
+          onClick={() => setRefresh((x) => x + 1)}
+          className={`${adminControl} inline-flex items-center gap-2 self-start`}
+        >
+          <ArrowPathIcon className="h-4 w-4" />
+          새로고침
+        </button>
+      </header>
+      <div className="grid grid-cols-2 gap-3">
+        <div className={`${adminPanel} flex items-center gap-4 p-5`}>
+          <UsersIcon className="h-6 w-6 text-purple-600 dark:text-purple-300" />
           <div>
-            <h2 className="text-xl font-semibold text-light-text dark:text-dark-text">사용자 관리</h2>
-            <p className="text-sm text-light-text/60 dark:text-dark-text/60 mt-1">
-              총 {pagination.totalUsers}명의 사용자
+            <p className={adminMuted}>전체 사용자</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">
+              {data?.overview.total ?? "—"}
+              <span className="ml-1 text-sm font-normal">명</span>
+            </p>
+          </div>
+        </div>
+        <div className={`${adminPanel} flex items-center gap-4 p-5`}>
+          <ShieldCheckIcon className="h-6 w-6 text-purple-600 dark:text-purple-300" />
+          <div>
+            <p className={adminMuted}>관리 권한</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">
+              {data?.overview.admins ?? "—"}
+              <span className="ml-1 text-sm font-normal">명</span>
             </p>
           </div>
         </div>
       </div>
-
-      {/* Filters */}
-      <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl p-6 border border-light-primary/20 dark:border-dark-primary/20">
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-light-text/40 dark:text-dark-text/40" />
-              <input
-                type="text"
-                placeholder="채널명, 표시명, 채널ID로 검색..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 
-                           bg-white/50 dark:bg-gray-900/50 text-light-text dark:text-dark-text
-                           focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent"
-              />
-            </div>
-          </div>
-
-          {/* Role Filter */}
-          <div className="flex gap-2">
-            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value)}
-              className="px-4 py-2 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 
-                         bg-white/50 dark:bg-gray-900/50 text-light-text dark:text-dark-text
-                         focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent"
-            >
-              <option value="all">모든 권한</option>
-              <option value="super_admin">최고 관리자</option>
-              <option value="ayauke_admin">아야우케 관리자</option>
-              <option value="song_admin">노래 관리자</option>
-              <option value="song_editor">노래 편집자</option>
-              <option value="user">일반 사용자</option>
-            </select>
-          </div>
+      <section
+        className={`${adminPanel} overflow-hidden`}
+        aria-label="사용자 목록"
+      >
+        <div className="flex flex-wrap gap-3 border-b border-light-primary/15 p-4 dark:border-dark-primary/15">
+          <label className="relative min-w-0 flex-1 basis-60">
+            <span className="sr-only">사용자 검색</span>
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-3 h-5 w-5 text-light-text/70 dark:text-dark-text/70" />
+            <input
+              value={search}
+              maxLength={100}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="이름 또는 채널 ID 검색"
+              className={`${adminControl} w-full pl-10`}
+            />
+          </label>
+          <select
+            aria-label="권한 필터"
+            value={role}
+            onChange={(e) => {
+              setRole(e.target.value);
+              setPage(1);
+            }}
+            className={adminControl}
+          >
+            <option value="all">모든 권한</option>
+            {Object.entries(roles).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="사용자 정렬 기준"
+            value={sort}
+            onChange={(e) => {
+              setSort(e.target.value);
+              setPage(1);
+            }}
+            className={adminControl}
+          >
+            <option value="lastActivityAt">최근 활동순</option>
+            <option value="createdAt">가입일순</option>
+            <option value="channelName">채널 이름순</option>
+            <option value="lastLoginAt">로그인순</option>
+          </select>
+          <button
+            onClick={() => {
+              setOrder((x) => (x === "desc" ? "asc" : "desc"));
+              setPage(1);
+            }}
+            className={adminControl}
+          >
+            {order === "desc" ? "내림차순 ↓" : "오름차순 ↑"}
+          </button>
         </div>
-      </div>
-
-      {/* User List */}
-      <div className="bg-white/30 dark:bg-gray-900/30 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-8 h-8 border-2 border-light-accent/30 dark:border-dark-accent/30 border-t-light-accent dark:border-t-dark-accent rounded-full animate-spin" />
+        {error ? (
+          <div
+            role="alert"
+            className="p-6 text-sm text-red-700 dark:text-red-300"
+          >
+            {error}{" "}
+            <button
+              className={`${adminControl} ml-2`}
+              onClick={() => setRefresh((x) => x + 1)}
+            >
+              다시 시도
+            </button>
           </div>
+        ) : loading ? (
+          <p role="status" className={`${adminMuted} p-8 text-center`}>
+            사용자 기록을 불러오는 중…
+          </p>
         ) : (
           <>
-            {/* Table Header */}
-            <div className="grid grid-cols-12 gap-4 p-4 border-b border-light-primary/20 dark:border-dark-primary/20 bg-light-primary/5 dark:bg-dark-primary/5">
-              <div className="col-span-3">
-                <button
-                  onClick={() => handleSort('channelName')}
-                  className="flex items-center gap-2 text-sm font-medium text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text"
-                >
-                  사용자 정보
-                  <ChevronUpDownIcon className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="col-span-2">
-                <button
-                  onClick={() => handleSort('role')}
-                  className="flex items-center gap-2 text-sm font-medium text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text"
-                >
-                  권한
-                  <ChevronUpDownIcon className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="col-span-2">
-                <button
-                  onClick={() => handleSort('lastLoginAt')}
-                  className="flex items-center gap-2 text-sm font-medium text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text"
-                >
-                  최근 로그인
-                  <ChevronUpDownIcon className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="col-span-2">
-                <button
-                  onClick={() => handleSort('createdAt')}
-                  className="flex items-center gap-2 text-sm font-medium text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text"
-                >
-                  가입일
-                  <ChevronUpDownIcon className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="col-span-2">
-                <span className="text-sm font-medium text-light-text/70 dark:text-dark-text/70">좋아요/플레이리스트</span>
-              </div>
-              <div className="col-span-1">
-                <span className="text-sm font-medium text-light-text/70 dark:text-dark-text/70">액션</span>
-              </div>
+            <div className="hidden grid-cols-[minmax(0,1.5fr)_1fr_1fr_1fr_auto] gap-4 bg-light-primary/5 px-5 py-3 text-xs font-medium text-light-text/70 dark:bg-dark-primary/5 dark:text-dark-text/70 lg:grid">
+              <span>사용자 / 권한</span>
+              <span>최근 기록된 활동</span>
+              <span>가입일</span>
+              <span>누적 좋아요 / 목록</span>
+              <span>상세</span>
             </div>
-
-            {/* Table Body */}
-            <div className="divide-y divide-light-primary/10 dark:divide-dark-primary/10">
-              <AnimatePresence>
-                {users.map((user, index) => {
-                  const RoleIcon = getRoleIcon(user.role as keyof typeof roleIcons)
-                  return (
-                    <motion.div
-                      key={user._id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                      className="grid grid-cols-12 gap-4 p-4 hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 transition-colors"
+            <ul className="divide-y divide-light-primary/10 dark:divide-dark-primary/10">
+              {data?.users.map((user) => (
+                <li
+                  key={user._id}
+                  className="grid items-center gap-4 p-5 transition-colors hover:bg-light-primary/5 dark:hover:bg-dark-primary/5 lg:grid-cols-[minmax(0,1.5fr)_1fr_1fr_1fr_auto]"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div
+                      aria-hidden="true"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-purple-100 font-semibold text-purple-800 dark:bg-purple-950 dark:text-purple-200"
                     >
-                      {/* 사용자 정보 */}
-                      <div className="col-span-3">
-                        <div className="flex items-center gap-3">
-                          {user.profileImageUrl ? (
-                            <img
-                              src={user.profileImageUrl}
-                              alt={user.channelName}
-                              className="w-10 h-10 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 bg-light-accent/10 dark:bg-dark-accent/10 rounded-full flex items-center justify-center">
-                              <UserIcon className="w-5 h-5 text-light-accent dark:text-dark-accent" />
-                            </div>
-                          )}
-                          <div className="min-w-0">
-                            <div className="font-medium text-light-text dark:text-dark-text truncate">
-                              {user.displayName || user.channelName}
-                            </div>
-                            <div className="text-sm text-light-text/60 dark:text-dark-text/60 truncate">
-                              @{user.channelName}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 권한 */}
-                      <div className="col-span-2">
-                        <div className="flex items-center gap-2">
-                          <RoleIcon className="w-4 h-4" />
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleColors[user.role as keyof typeof roleColors]}`}>
-                            {roleLabels[user.role as keyof typeof roleLabels]}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* 최근 로그인 */}
-                      <div className="col-span-2">
-                        <div className="flex items-center gap-1 text-sm text-light-text/70 dark:text-dark-text/70">
-                          <ClockIcon className="w-4 h-4" />
-                          {formatDate(user.lastLoginAt)}
-                        </div>
-                      </div>
-
-                      {/* 가입일 */}
-                      <div className="col-span-2">
-                        <div className="flex items-center gap-1 text-sm text-light-text/70 dark:text-dark-text/70">
-                          <CalendarIcon className="w-4 h-4" />
-                          {formatDate(user.createdAt)}
-                        </div>
-                      </div>
-
-                      {/* 좋아요/플레이리스트 */}
-                      <div className="col-span-2">
-                        <div className="text-sm text-light-text/70 dark:text-dark-text/70">
-                          <div className="flex items-center gap-1 mb-1">
-                            <HeartIcon className="w-3 h-3 text-red-500" />
-                            <span>{user.likesCount || 0}곡</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <QueueListIcon className="w-3 h-3 text-blue-500" />
-                            <span>{user.playlistsCount || 0}개</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 액션 */}
-                      <div className="col-span-1">
-                        <button
-                          onClick={() => openUserModal(user)}
-                          className="p-2 rounded-lg hover:bg-light-accent/10 dark:hover:bg-dark-accent/10 
-                                     text-light-accent dark:text-dark-accent transition-colors"
-                          title="사용자 상세 보기"
-                        >
-                          <EyeIcon className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </motion.div>
-                  )
-                })}
-              </AnimatePresence>
-            </div>
-
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-              <div className="flex items-center justify-between p-4 border-t border-light-primary/20 dark:border-dark-primary/20">
-                <div className="text-sm text-light-text/60 dark:text-dark-text/60">
-                  {((pagination.currentPage - 1) * pagination.limit) + 1}-{Math.min(pagination.currentPage * pagination.limit, pagination.totalUsers)} / {pagination.totalUsers}명
-                </div>
-                <div className="flex items-center gap-2">
+                      {user.profileImageUrl ? (
+                        <img
+                          src={user.profileImageUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        (user.displayName || user.channelName).slice(0, 1)
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <button
+                        onClick={() => setSelected(user)}
+                        className="min-h-11 break-words text-left text-sm font-semibold hover:underline"
+                      >
+                        {user.displayName || user.channelName}
+                      </button>
+                      <p className="truncate text-xs text-light-text/70 dark:text-dark-text/70">
+                        {user.channelName}
+                      </p>
+                      <span className="mt-1 inline-block rounded-full bg-purple-50 px-2 py-1 text-[11px] text-purple-800 dark:bg-purple-950/60 dark:text-purple-200">
+                        {roles[user.role] || user.role}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-xs text-light-text/70 dark:text-dark-text/70 lg:hidden">
+                      최근 기록된 활동
+                    </p>
+                    <p className="text-sm tabular-nums">
+                      {adminDate(user.lastActivityAt)}
+                    </p>
+                    <p className={`${adminMuted} mt-1 text-xs`}>
+                      {adminAgo(user.lastActivityAt)} · 방문 기록{" "}
+                      {user.visitDays}일
+                    </p>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-xs text-light-text/70 dark:text-dark-text/70 lg:hidden">
+                      가입일
+                    </p>
+                    <p className="text-sm tabular-nums">
+                      {adminDate(user.createdAt)}
+                    </p>
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <p>
+                      좋아요{" "}
+                      <span className="text-light-text/70 dark:text-dark-text/70">
+                        곡 {user.likesCount ?? 0} · 클립 {user.clipLikesCount}
+                      </span>
+                    </p>
+                    <p>
+                      목록{" "}
+                      <span className="text-light-text/70 dark:text-dark-text/70">
+                        곡 {user.playlistsCount ?? 0} · 클립{" "}
+                        {user.clipPlaylistsCount}
+                      </span>
+                    </p>
+                    {(user.addedClipsCount > 0 || user.proposalsCount > 0) && (
+                      <p className="text-purple-700 dark:text-purple-300">
+                        클립 기여 {user.addedClipsCount} · 제안{" "}
+                        {user.proposalsCount}
+                      </p>
+                    )}
+                  </div>
                   <button
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={!pagination.hasPreviousPage}
-                    className="p-2 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 
-                               disabled:opacity-50 disabled:cursor-not-allowed
-                               hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors"
+                    aria-label={`${user.displayName || user.channelName} 사용자 상세 보기`}
+                    className={adminControl}
+                    onClick={() => setSelected(user)}
                   >
-                    <ChevronLeftIcon className="w-4 h-4" />
+                    상세 →
                   </button>
-                  <span className="text-sm text-light-text dark:text-dark-text px-3">
-                    {pagination.currentPage} / {pagination.totalPages}
-                  </span>
+                </li>
+              ))}
+            </ul>
+            {!data?.users.length && (
+              <p className={`${adminMuted} p-10 text-center`}>
+                검색 조건에 맞는 사용자가 없습니다.
+              </p>
+            )}
+            {data && (
+              <nav
+                aria-label="사용자 목록 페이지"
+                className="flex flex-wrap items-center justify-between gap-3 border-t border-light-primary/15 p-4 dark:border-dark-primary/15"
+              >
+                <p role="status" className={adminMuted}>
+                  검색 결과 {data.pagination.totalUsers}명 ·{" "}
+                  {data.pagination.currentPage} / {data.pagination.totalPages}{" "}
+                  페이지
+                </p>
+                <div className="flex gap-2">
                   <button
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={!pagination.hasNextPage}
-                    className="p-2 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 
-                               disabled:opacity-50 disabled:cursor-not-allowed
-                               hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 transition-colors"
+                    className={adminControl}
+                    disabled={!data.pagination.hasPreviousPage}
+                    onClick={() => setPage(data.pagination.currentPage - 1)}
                   >
-                    <ChevronRightIcon className="w-4 h-4" />
+                    이전
+                  </button>
+                  <button
+                    className={adminControl}
+                    disabled={!data.pagination.hasNextPage}
+                    onClick={() => setPage(data.pagination.currentPage + 1)}
+                  >
+                    다음
                   </button>
                 </div>
-              </div>
+              </nav>
             )}
           </>
         )}
-      </div>
-
-      {/* User Detail Modal */}
-      {selectedUser && (
+      </section>
+      <p className={`${adminMuted} text-xs`}>
+        최근 활동은 로그인·방문 기록 중 최신 시각입니다. 방문 추적이 없는 화면의
+        이용은 포함되지 않습니다. 좋아요·목록은 현재 보유 데이터입니다.
+      </p>
+      {selected && (
         <UserDetailModal
-          user={selectedUser}
-          isOpen={isModalOpen}
-          onClose={closeUserModal}
-          onUserUpdate={handleUserUpdate}
+          user={selected}
+          isOpen
+          onClose={() => setSelected(null)}
+          onUserUpdate={changed}
         />
       )}
     </div>
-  )
+  );
 }
