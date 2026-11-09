@@ -58,7 +58,7 @@ describe('mobile clip workflow', () => {
   }, 60000);
   afterAll(async () => { await browser?.close(); });
 
-  async function fixture(width = 390) {
+  async function fixture(width = 390, unmatched = false) {
     const page = await browser.newPage({ viewport: { width, height: 844 } });
     page.setDefaultTimeout(5000);
     const errors: string[] = [];
@@ -66,8 +66,10 @@ describe('mobile clip workflow', () => {
     const song = { id: 'song', artist: '가수', title: '곡', clipDuration: 240 };
     const items: WorkflowItem[] = Array.from({ length: 24 }, (_, index) => ({ id: `item-${index}`, platform: 'youtube', videoId: 'video', videoUrl: 'https://www.youtube.com/watch?v=video', videoTitle: '모바일 작업 영상', date: '2026-10-09', artist: '가수', songTitle: `곡 ${index + 1}`, startTimeSeconds: 10 + index * 300, endTimeSeconds: 250 + index * 300, matchedSongId: 'song', isRelevant: true, isExcluded: false, isTimeVerified: false, commentAuthor: '작성자' }));
     items[23] = { ...items[23], videoId: 'other-video', videoTitle: '다른 작업 영상', videoUrl: 'https://www.youtube.com/watch?v=other-video' };
+    if (unmatched) items[0] = { ...items[0], artist: '미등록 가수', songTitle: '미등록 노래', matchedSongId: undefined };
+    const otherCandidates = Array.from({ length: 51 }, (_, index) => ({ ...items[0], id: `candidate-${index}`, videoId: 'envhVMj3mc4', videoTitle: `다른 방송 ${index + 1}` }));
     let clips = [0, 1].map((index) => ({ _id: `clip-${index}`, songId: 'song', platform: 'youtube', videoId: 'video', videoUrl: items[0].videoUrl, title: `클립 ${index + 1}`, artist: '가수', startTime: 10 + index * 300, endTime: 250 + index * 300, description: '', isVerified: false, songDetail: song }));
-    const control = { failSave: false, delay: 0, saves: 0 };
+    const control = { failSave: false, delay: 0, saves: 0, candidateRequests: 0, candidateFail: false, candidateDelay: 0, candidateQuery: '', candidatePage: 0 };
     await page.route('**/*', async (route) => {
       const url = new URL(route.request().url());
       if (url.hostname !== 'workflow.test') return route.abort();
@@ -79,6 +81,15 @@ describe('mobile clip workflow', () => {
       else if (url.pathname.endsWith('/song-statuses')) data = { statuses: [{ songId: 'song', occurrences: 24, clips: 2 }] };
       else if (url.pathname.endsWith('/song-work')) data = { occurrences: items, clips: [], candidates: [] };
       else if (url.pathname.endsWith('/search-timelines')) data = { items };
+      else if (url.pathname.endsWith('/candidates')) {
+        control.candidateRequests++;
+        control.candidateQuery = url.searchParams.get('q') || '';
+        control.candidatePage = Number(url.searchParams.get('page')) || 1;
+        if (control.candidateDelay) await new Promise(resolve => setTimeout(resolve, control.candidateDelay));
+        if (control.candidateFail) return route.fulfill({ status: 500, json: { success: false, error: { message: '후보 조회 실패' } } });
+        const list = control.candidateQuery === '없는 곡' ? [] : otherCandidates;
+        data = { items: list.slice((control.candidatePage - 1) * 50, control.candidatePage * 50), total: list.length, page: control.candidatePage, pageSize: 50 };
+      }
       else if (url.pathname.includes('/item/')) {
         control.saves++;
         if (control.delay) await new Promise((resolve) => setTimeout(resolve, control.delay));
@@ -100,7 +111,8 @@ describe('mobile clip workflow', () => {
     });
     await page.goto('http://workflow.test/');
     await page.getByRole('button', { name: '모바일 작업 영상', exact: false }).click().catch(async (error) => { throw new Error(`${error.message}\n${errors.join('\n')}\n${(await page.locator('body').innerText()).slice(0,1200)}`); });
-    await page.getByRole('button', { name: '가수 - 곡 1 편집', exact: true }).waitFor();
+    if (width < 1024) await page.getByRole('button', { name: `${items[0].artist} - ${items[0].songTitle} 편집`, exact: true }).waitFor();
+    else await page.getByText(`${items[0].artist} - ${items[0].songTitle}`, { exact: true }).first().waitFor();
     return { page, errors, control };
   }
 
@@ -183,6 +195,60 @@ describe('mobile clip workflow', () => {
     await page.getByRole('button', { name: '가수 - 곡 1 편집', exact: true }).click();
     expect(await page.getByRole('button', { name: '← 타임라인', exact: true }).isVisible()).toBe(true);
     await page.screenshot({ path: path.join(tmpdir(), 'ayauke-mobile-clip-editor.png'), fullPage: false });
+    expect(errors).toEqual([]);
+    await page.close();
+  }, 30000);
+
+  it('looks up other unmatched candidates only after a click, with accurate pagination and no saves', async () => {
+    const { page, errors, control } = await fixture(390, true);
+    await page.getByRole('button', { name: '미등록 가수 - 미등록 노래 편집', exact: true }).click();
+    const trigger = page.getByRole('button', { name: '다른 미매칭 후보 보기', exact: true });
+    await trigger.waitFor();
+    expect(control.candidateRequests).toBe(0);
+    await trigger.click();
+    const dialog = page.getByRole('dialog', { name: '다른 미매칭 후보', exact: true });
+    await dialog.getByText('다른 미매칭 후보 총 51건', { exact: false }).waitFor();
+    expect(control.candidateRequests).toBe(1);
+    expect(control.candidateQuery).toBe('미등록 노래');
+    expect(await dialog.locator('li').count()).toBe(50);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.keyboard.press('Shift+Tab');
+    expect(await dialog.getByRole('button', { name: '다음 페이지', exact: true }).evaluate(element => element === document.activeElement)).toBe(true);
+    await dialog.getByLabel('후보 검색어 (곡명·가수)').fill('없는 곡');
+    expect(control.candidateRequests).toBe(1);
+    await dialog.getByRole('button', { name: '다음 페이지', exact: true }).click();
+    await dialog.getByText('51~51건 표시', { exact: false }).waitFor();
+    expect(control.candidateQuery).toBe('미등록 노래');
+    expect(await dialog.locator('li').count()).toBe(1);
+    await dialog.getByRole('button', { name: '검색', exact: true }).click();
+    await dialog.getByText('다른 미매칭 후보 총 0건', { exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'detached' });
+    expect(await page.evaluate(() => document.body.style.position)).toBe('fixed');
+    expect(await trigger.evaluate(element => element === document.activeElement)).toBe(true);
+    expect(control.saves).toBe(0);
+    expect(errors).toEqual([]);
+    await page.close();
+  }, 30000);
+
+  it('handles failed lookups and closing during a request without stale dialogs', async () => {
+    const { page, errors, control } = await fixture(1280, true);
+    const trigger = page.getByRole('button', { name: '다른 미매칭 후보 보기', exact: true });
+    await trigger.waitFor();
+    control.candidateFail = true;
+    await trigger.click();
+    const dialog = page.getByRole('dialog', { name: '다른 미매칭 후보', exact: true });
+    await dialog.getByRole('alert').waitFor();
+    control.candidateFail = false;
+    await dialog.getByRole('button', { name: '검색', exact: true }).click();
+    await dialog.getByText('다른 미매칭 후보 총 51건', { exact: false }).waitFor();
+    await dialog.getByRole('button', { name: '미매칭 후보 닫기' }).click();
+    control.candidateDelay = 250;
+    await trigger.click();
+    await dialog.getByRole('button', { name: '미매칭 후보 닫기' }).click();
+    await page.waitForTimeout(300);
+    expect(await dialog.count()).toBe(0);
+    expect(control.saves).toBe(0);
     expect(errors).toEqual([]);
     await page.close();
   }, 30000);

@@ -50,6 +50,13 @@ export interface WorkflowItem {
   videoUrl: string;
 }
 
+export interface UnmatchedTimelineCandidates {
+  items: WorkflowItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface WorkflowSong {
   id: string;
   title: string;

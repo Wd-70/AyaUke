@@ -15,6 +15,7 @@ import ClipTimeEditor from "@/app/admin/tabs/live-clips/ClipTimeEditor";
 import ClipVerifyButton from "@/app/admin/tabs/live-clips/ClipVerifyButton";
 import EditPlayer from "./EditPlayer";
 import AiTimingBadge from './AiTimingBadge';
+import UnmatchedCandidates from './UnmatchedCandidates';
 import { fmt, assignOptimistic, songSuggestions } from "./itemUtils";
 import type { WorkflowItem, WorkflowSong } from "./types";
 
@@ -179,6 +180,7 @@ const ItemEditor = forwardRef<ItemEditorHandle, Props>(function ItemEditor({ ite
         ) : (
           <>
             <input value={songQuery} onChange={(e) => setSongQuery(e.target.value)} placeholder="곡 검색 (제목/가수/태그, 비우면 자동 추천)" className="min-h-11 lg:min-h-0 w-full text-base lg:text-sm rounded border border-light-primary/20 dark:border-dark-primary/20 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text px-2 py-1 mb-1.5" />
+            {item.isRelevant && !item.isExcluded && !item.matchedSongId && <UnmatchedCandidates key={item.id} item={item} active={active} />}
             <div className="flex flex-wrap gap-1.5">
               {suggestions.length === 0 && <span className="text-xs text-light-text/50">후보 없음</span>}
               {suggestions.map((s) => (

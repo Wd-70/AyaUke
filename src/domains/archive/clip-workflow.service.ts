@@ -8,7 +8,8 @@ import SongDetail from '@/domains/catalog/song.schema';
 import { parseChzzkTimelineComments } from './chzzk-timeline.service';
 import { parseYouTubeTimelineComments } from './youtube-timeline.service';
 import { decodeHtmlEntities } from './youtube-timeline.parse';
-import { NotFoundError } from '@/shared/api/errors';
+import { NotFoundError, ValidationError } from '@/shared/api/errors';
+import { filterUnmatchedTimelines, paginateUnmatchedTimelines } from './unmatched-timeline-candidates';
 import { toKstDateString } from '@/shared/utils/stream-date';
 import { matchSongs, normalizeText } from '@/shared/utils/song-match';
 import type {
@@ -353,14 +354,20 @@ export async function searchUnmatchedTimelines(q: string): Promise<WorkflowItem[
   const tokens = (q || '').split(/\s+/).map(normalizeText).filter(Boolean);
   if (tokens.length === 0) return [];
 
-  const unmatched = await listItems({ isRelevant: true, isExcluded: { $ne: true }, matchedSong: { $exists: false } });
-  return unmatched
-    .filter((it) => {
-      const hay = normalizeText(`${it.artist} ${it.songTitle}`);
-      return tokens.every((t) => hay.includes(t));
-    })
-    .sort(byDateDesc)
-    .slice(0, 300);
+  const unmatched = await listItems({ isRelevant: true, isExcluded: { $ne: true }, 'matchedSong.songId': { $in: [null, ''] } });
+  return filterUnmatchedTimelines(unmatched, q).slice(0, 300);
+}
+
+/** On-demand discovery for an unmatched song item. Total is counted before pagination. */
+export async function getUnmatchedTimelineCandidates(id: string, query: string, page = 1) {
+  const source = await getWorkflowItem(id);
+  if (!source.isRelevant || source.isExcluded || source.matchedSongId) {
+    throw new ValidationError('곡으로 판정된 미매칭 항목에서만 후보를 확인할 수 있습니다.');
+  }
+  const tokens = query.split(/\s+/).map(normalizeText).filter(Boolean);
+  if (!tokens.length) return paginateUnmatchedTimelines([], 1);
+  const unmatched = await listItems({ isRelevant: true, isExcluded: { $ne: true }, 'matchedSong.songId': { $in: [null, ''] }, id: { $ne: id } });
+  return paginateUnmatchedTimelines(filterUnmatchedTimelines(unmatched, query, id), page);
 }
 
 /** 매칭용 등록곡 (searchTags 포함) */
