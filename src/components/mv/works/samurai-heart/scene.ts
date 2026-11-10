@@ -290,6 +290,10 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     };
   }
 
+  /**
+   * 원상(圓相) 경로. u가 커질수록 시계방향으로 그려지고, 붓은 시작이 굵고 끝이 가늘다.
+   * 돌릴 때는 반드시 반시계(start 감소)로 — 굵은 머리가 앞서고 마른 붓끝이 꼬리로 따라와야 자연스럽다.
+   */
   function ensoPoint(cx: number, cy: number, radius: number, start: number) {
     return (u: number): [number, number] => {
       const a = start + u * TAU * 0.9;
@@ -1036,7 +1040,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     const intro = easeOutCubic(clamp((t - secStart) / 1.3));
     const pulse = beat.pulse(t, 7);
     const radius = 232 + pulse * 10 + low * 8;
-    brushPath(c, ensoPoint(cx, cy, radius + 26, -1.7 + t * 0.15), 46, intro, 12 + Math.floor(secStart), RED, 0.95);
+    brushPath(c, ensoPoint(cx, cy, radius + 26, -1.7 - t * 0.15), 46, intro, 12 + Math.floor(secStart), RED, 0.95);
     c.save();
     blotPath(c, cx, cy, radius * intro, 5150, 0.1, t * 1.4);
     c.clip();
@@ -1144,7 +1148,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       brushPath(c, heartPoint(x + w / 2, y + h / 2, 150), 34, clamp(k / 2), 71, LAV, 0.8);
     }
     c.restore();
-    brushPath(c, ensoPoint(x + w / 2, y + h / 2, 318, -2.2 + k * 0.05), 22, easeOutCubic(clamp(k / 2.4)) * (1 - clamp((t - 132.6) / 1.1)), 404, LAV, 0.7);
+    brushPath(c, ensoPoint(x + w / 2, y + h / 2, 318, -2.2 - k * 0.05), 22, easeOutCubic(clamp(k / 2.4)) * (1 - clamp((t - 132.6) / 1.1)), 404, LAV, 0.7);
     // 등꽃 꽃잎 (아야 방송 배경의 등나무)
     const pr = rng(616);
     c.save();

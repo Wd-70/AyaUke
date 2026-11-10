@@ -12,6 +12,7 @@ import type { MvRenderer, MvWork } from './types';
 interface MvStageProps {
   clip: {
     id: string;
+    shareId: string;
     songId: string;
     platform: VideoPlatform;
     videoId: string;
@@ -72,7 +73,7 @@ export default function MvStage({ clip }: MvStageProps) {
     };
     // 클립 정체성(곡·범위)이 바뀔 때만 다시 로드
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clip.songId, clip.startTime, clip.endTime, clip.sungDateLabel]);
+  }, [clip.shareId, clip.songId, clip.startTime, clip.endTime, clip.sungDateLabel]);
 
   // 캔버스 해상도 = 표시 크기 × DPR (상한 1920px)
   useEffect(() => {

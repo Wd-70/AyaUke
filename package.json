@@ -13,7 +13,8 @@
     "db:backup": "node scripts/db/backup.mjs",
     "db:backfill-clip-shareids": "node scripts/db/backfill-clip-shareids.mjs",
     "db:backfill-clip-aliases": "node scripts/db/backfill-clip-aliases.mjs",
-    "db:migrate-shareids-short": "node scripts/db/migrate-shareids-short.mjs"
+    "db:migrate-shareids-short": "node scripts/db/migrate-shareids-short.mjs",
+    "mv:candidates": "node scripts/mv/candidates.mjs"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.10.0",

@@ -1,0 +1,12 @@
+{
+  "68610d4b042fb27d04542791": {
+    "title": "사무라이 하트",
+    "duration": 192,
+    "clips": [
+      { "shareId": "z1baTcmHs8WJ", "startTime": 9725, "endTime": 9917, "note": "기준 클립 (2026.08.26)" }
+    ],
+    "rejected": [
+      { "shareId": "PXGATNnFGwXq", "reason": "4인 합방 — 솔로 커버 아님 (2025.06.22)" }
+    ]
+  }
+}

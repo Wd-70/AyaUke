@@ -34,6 +34,7 @@ export default async function MvPage({ params }: MvPageProps) {
           <MvStage
             clip={{
               id: clip.id,
+              shareId: clip.shareId,
               songId: clip.songId,
               platform: clip.platform,
               videoId: clip.videoId,
