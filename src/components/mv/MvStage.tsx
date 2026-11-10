@@ -1,0 +1,202 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { ArrowsPointingOutIcon } from '@heroicons/react/24/outline';
+import ClipPlayer, { type ClipPlayerHandle } from '@/components/clip/ClipPlayer';
+import type { VideoPlatform } from '@/shared/utils/video-url';
+import { loadMv } from './registry';
+import { sectionAt } from './engine';
+import type { MvRenderer, MvWork } from './types';
+
+interface MvStageProps {
+  shareId: string;
+  clip: {
+    id: string;
+    platform: VideoPlatform;
+    videoId: string;
+    title: string;
+    artist: string;
+    sungDateLabel: string | null;
+    uploaderName: string;
+    thumbnailUrl: string | null;
+  };
+}
+
+const MAX_CANVAS_WIDTH = 1920;
+
+/**
+ * MV 무대: 원본 클립(ClipPlayer)이 소리를 내고, 캔버스는 그 재생 시각에 맞춰 그린다.
+ * 디버그용 쿼리: ?t=40 (그 시각 정지 화면) / ?preview=38 (소리 없이 그 시각부터 재생) / ?debug=1
+ */
+export default function MvStage({ shareId, clip }: MvStageProps) {
+  const params = useSearchParams();
+  const freezeT = params.get('t');
+  const previewT = params.get('preview');
+  const debug = params.get('debug') === '1';
+
+  const [work, setWork] = useState<MvWork | null>(null);
+  const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const playerBoxRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<ClipPlayerHandle>(null);
+  const rendererRef = useRef<MvRenderer | null>(null);
+  const startedRef = useRef(false);
+  const debugRef = useRef<HTMLDivElement>(null);
+
+  // 작품 코드 + 캔버스 폰트 로드
+  useEffect(() => {
+    let cancelled = false;
+    const pending = loadMv(shareId);
+    if (!pending) return;
+    pending
+      .then(async (w) => {
+        await Promise.all(
+          w.fonts.map((f) => document.fonts.load(`40px ${f.family}`, f.text).catch(() => [])),
+        );
+        if (cancelled) return;
+        rendererRef.current = w.createRenderer();
+        setWork(w);
+        setReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [shareId]);
+
+  // 캔버스 해상도 = 표시 크기 × DPR (상한 1920px)
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const resize = () => {
+      const cssW = canvas.clientWidth;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = Math.min(MAX_CANVAS_WIDTH, Math.round(cssW * dpr));
+      const h = Math.round((w * 9) / 16);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+    };
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, []);
+
+  // 렌더 루프
+  useEffect(() => {
+    if (!ready || !work) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    const fixed = freezeT !== null ? Number(freezeT) : null;
+    const previewFrom = previewT !== null ? Number(previewT) : null;
+    const perf0 = performance.now();
+    let raf = 0;
+
+    const frame = () => {
+      let t: number | null = null;
+      if (fixed !== null && Number.isFinite(fixed)) t = fixed;
+      else if (previewFrom !== null && Number.isFinite(previewFrom)) {
+        t = previewFrom + (performance.now() - perf0) / 1000;
+        if (t > work.duration) t = null;
+      } else if (startedRef.current) {
+        const abs = playerRef.current?.getCurrentTime?.();
+        if (typeof abs === 'number' && Number.isFinite(abs)) t = abs - work.sourceStart;
+      }
+      const footage = playerBoxRef.current?.querySelector('video') ?? null;
+      rendererRef.current?.render(ctx, { t, footage });
+      if (debugRef.current) {
+        debugRef.current.textContent =
+          t === null ? 'poster' : `t=${t.toFixed(2)}  ${sectionAt(work.sections, t).id}`;
+      }
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [ready, work, freezeT, previewT]);
+
+  const onPlayingChange = useCallback((playing: boolean) => {
+    if (playing) startedRef.current = true;
+  }, []);
+
+  const goFullscreen = () => {
+    const el = stageRef.current;
+    if (!el) return;
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void el.requestFullscreen?.().catch(() => {});
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-6xl">
+      <div
+        ref={stageRef}
+        className="group relative w-full overflow-hidden rounded-xl bg-black shadow-2xl ring-1 ring-white/10 [&:fullscreen]:rounded-none"
+      >
+        <canvas ref={canvasRef} className="block aspect-video w-full" />
+        {!ready && !loadError && (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-white/60">
+            MV 불러오는 중…
+          </div>
+        )}
+        {loadError && (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-white/70">
+            MV를 불러오지 못했습니다. 새로고침해 주세요.
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={goFullscreen}
+          aria-label="전체 화면"
+          className="absolute right-3 top-3 rounded-lg bg-black/50 p-2 text-white/80 opacity-0 transition-opacity hover:text-white focus:opacity-100 group-hover:opacity-100"
+        >
+          <ArrowsPointingOutIcon className="h-5 w-5" />
+        </button>
+        {debug && (
+          <div
+            ref={debugRef}
+            className="pointer-events-none absolute left-3 top-3 rounded bg-black/70 px-2 py-1 font-mono text-xs text-lime-300"
+          />
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,22rem)_1fr] md:items-start">
+        <div ref={playerBoxRef} className="overflow-hidden rounded-lg bg-black">
+          {work && (
+            <ClipPlayer
+              ref={playerRef}
+              platform={clip.platform}
+              videoId={clip.videoId}
+              startTime={work.sourceStart}
+              endTime={work.sourceStart + work.duration}
+              posterDate={clip.sungDateLabel ?? undefined}
+              posterAddedBy={clip.uploaderName}
+              posterThumbnail={clip.thumbnailUrl ?? undefined}
+              trackPlayClipId={clip.id}
+              onPlayingChange={onPlayingChange}
+              compact
+              className="aspect-video w-full"
+            />
+          )}
+        </div>
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-light-accent dark:text-dark-primary">
+            Clip MV
+          </p>
+          <h1 className="text-xl font-bold">{work?.title ?? clip.title}</h1>
+          <p className="text-sm opacity-70">{work?.subtitle ?? clip.artist}</p>
+          <p className="pt-2 text-sm opacity-60">
+            소리는 원본 방송 클립에서 나오고, 화면은 재생 시각에 맞춰 실시간으로 그려집니다.
+            {clip.sungDateLabel && ` · ${clip.sungDateLabel} 노래방송`}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
