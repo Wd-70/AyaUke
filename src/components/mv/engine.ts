@@ -146,7 +146,9 @@ export function fitSize(c: Ctx, text: string, family: string, size: number, maxW
 
 /**
  * 붓 자국: 경로 함수 p(u) 위를 따라 여러 가닥(bristle)을 그린다.
- * u∈[0, progress]까지만 그려서 "써 내려가는" 애니메이션이 된다.
+ * u∈[from, progress] 구간만 그린다 — progress를 늘리면 "써 내려가고",
+ * from을 늘리면 획의 시작(머리)부터 지워지며 마른 꼬리가 마지막에 사라진다.
+ * 굵기·질감은 절대 위치 u 기준이라 구간이 변해도 획 모양이 흔들리지 않는다.
  */
 export function brushPath(
   c: Ctx,
@@ -156,21 +158,22 @@ export function brushPath(
   seed: number,
   color: string,
   alpha = 1,
+  from = 0,
 ) {
-  if (progress <= 0.001) return;
+  if (progress - from <= 0.001) return;
   const r = rng(seed);
   const steps = 48;
-  const n = Math.max(2, Math.ceil(steps * progress));
-  const pts: [number, number, number, number][] = []; // x, y, nx, ny
+  const n = Math.max(2, Math.ceil(steps * (progress - from)));
+  const pts: [number, number, number, number, number][] = []; // x, y, nx, ny, u
   for (let i = 0; i <= n; i++) {
-    const u = (i / n) * progress;
+    const u = from + (i / n) * (progress - from);
     const [x, y] = p(u);
     const [x2, y2] = p(Math.min(1, u + 0.002));
     const [x0, y0] = p(Math.max(0, u - 0.002));
     const dx = x2 - x0;
     const dy = y2 - y0;
     const len = Math.hypot(dx, dy) || 1;
-    pts.push([x, y, -dy / len, dx / len]);
+    pts.push([x, y, -dy / len, dx / len, u]);
   }
   c.save();
   c.strokeStyle = color;
@@ -179,18 +182,18 @@ export function brushPath(
   c.lineJoin = 'round';
 
   // 몸통: 시작이 굵고 끝으로 갈수록 가늘어지는 면
-  const taper = (k: number) => Math.pow(Math.sin(Math.PI * clamp(0.08 + k * 0.92)), 0.45) * (1 - k * 0.35);
+  const taper = (u: number) => Math.pow(Math.sin(Math.PI * clamp(0.08 + u * 0.92)), 0.45) * (1 - u * 0.35);
   c.globalAlpha = alpha * 0.92;
   c.beginPath();
   for (let i = 0; i < pts.length; i++) {
-    const [x, y, nx, ny] = pts[i];
-    const w = width * 0.36 * taper((i / (pts.length - 1)) * progress);
+    const [x, y, nx, ny, u] = pts[i];
+    const w = width * 0.36 * taper(u);
     if (i === 0) c.moveTo(x + nx * w, y + ny * w);
     else c.lineTo(x + nx * w, y + ny * w);
   }
   for (let i = pts.length - 1; i >= 0; i--) {
-    const [x, y, nx, ny] = pts[i];
-    const w = width * 0.36 * taper((i / (pts.length - 1)) * progress);
+    const [x, y, nx, ny, u] = pts[i];
+    const w = width * 0.36 * taper(u);
     c.lineTo(x - nx * w, y - ny * w);
   }
   c.closePath();
@@ -208,10 +211,9 @@ export function brushPath(
     c.beginPath();
     let started = false;
     for (let i = 0; i < pts.length; i++) {
-      const k = i / (pts.length - 1);
-      if (k * progress > stop) break;
-      const [x, y, nx, ny] = pts[i];
-      const o = off * taper(k * progress) + noise1(k * 6 + wob) * width * 0.04;
+      const [x, y, nx, ny, u] = pts[i];
+      if (u > stop) break;
+      const o = off * taper(u) + noise1(u * 6 + wob) * width * 0.04;
       if (!started) {
         c.moveTo(x + nx * o, y + ny * o);
         started = true;

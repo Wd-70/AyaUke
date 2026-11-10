@@ -61,7 +61,10 @@ interface Shard {
   vr: number;
 }
 
-const FLASHES = [40.3, 95.55, 150.65, 171.85];
+/** 섬광 [시각, 세기] — 1절 진입은 칼베기가 주인공이라 약하게 */
+const FLASHES: [number, number][] = [[14.92, 0.45], [40.3, 1], [95.55, 1], [150.65, 1], [171.85, 1]];
+/** 칼베기: 1절 진입(밴드 합류) + 가사의 サムライハート */
+const CUTS = [14.92, ...SLASHES];
 
 /**
  * 구간 안 속도 배율 — 말이 빨라지면 군중도 빨리 감기(k>1), 「勘違い」에서 정지,
@@ -140,7 +143,35 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     return { x: (i / 22) * (W + 120) - 60 + r() * 20, w, h: 120 + r() * 260, seed: i };
   });
 
+  // 2절 유리 액자(아야가 비치는 창) — 금과 파편은 이 안에서만
+  const GLASS = { x: 620, y: 30, w: 620, h: 600 };
   const IMPACT: [number, number] = [868, 338];
+
+  /** 볼록 다각형을 액자 사각형으로 자른다 (Sutherland–Hodgman) */
+  const clipToGlass = (poly: [number, number][]) => {
+    const edges: [(p: [number, number]) => boolean, (a: [number, number], b: [number, number]) => [number, number]][] = [
+      [(p) => p[0] >= GLASS.x, (a, b) => { const k = (GLASS.x - a[0]) / (b[0] - a[0]); return [GLASS.x, a[1] + (b[1] - a[1]) * k]; }],
+      [(p) => p[0] <= GLASS.x + GLASS.w, (a, b) => { const k = (GLASS.x + GLASS.w - a[0]) / (b[0] - a[0]); return [GLASS.x + GLASS.w, a[1] + (b[1] - a[1]) * k]; }],
+      [(p) => p[1] >= GLASS.y, (a, b) => { const k = (GLASS.y - a[1]) / (b[1] - a[1]); return [a[0] + (b[0] - a[0]) * k, GLASS.y]; }],
+      [(p) => p[1] <= GLASS.y + GLASS.h, (a, b) => { const k = (GLASS.y + GLASS.h - a[1]) / (b[1] - a[1]); return [a[0] + (b[0] - a[0]) * k, GLASS.y + GLASS.h]; }],
+    ];
+    let out = poly;
+    for (const [inside, cross] of edges) {
+      const input = out;
+      out = [];
+      for (let i = 0; i < input.length; i++) {
+        const cur = input[i];
+        const prev = input[(i + input.length - 1) % input.length];
+        if (inside(cur)) {
+          if (!inside(prev)) out.push(cross(prev, cur));
+          out.push(cur);
+        } else if (inside(prev)) out.push(cross(prev, cur));
+      }
+      if (!out.length) break;
+    }
+    return out;
+  };
+
   const shards: Shard[] = (() => {
     const out: Shard[] = [];
     const radii = [0, 70, 170, 330, 760];
@@ -152,16 +183,17 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
         const a1 = angles[(si + 1) % sectors] + (si === sectors - 1 ? TAU : 0);
         const r0 = radii[ri] * (0.85 + r() * 0.3);
         const r1 = radii[ri + 1] * (0.85 + r() * 0.3);
-        const pts: [number, number][] = [
+        const pts = clipToGlass([
           [IMPACT[0] + Math.cos(a0) * r0, IMPACT[1] + Math.sin(a0) * r0],
           [IMPACT[0] + Math.cos(a0) * r1, IMPACT[1] + Math.sin(a0) * r1],
           [IMPACT[0] + Math.cos(a1) * r1, IMPACT[1] + Math.sin(a1) * r1],
           [IMPACT[0] + Math.cos(a1) * r0, IMPACT[1] + Math.sin(a1) * r0],
-        ];
-        const cx = pts.reduce((s, p) => s + p[0], 0) / 4;
-        const cy = pts.reduce((s, p) => s + p[1], 0) / 4;
+        ]);
+        if (pts.length < 3) continue;
+        const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+        const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
         const dist = Math.hypot(cx - IMPACT[0], cy - IMPACT[1]) || 1;
-        const sp = 500 + r() * 900;
+        const sp = 260 + r() * 520;
         out.push({ pts, cx, cy, vx: ((cx - IMPACT[0]) / dist) * sp, vy: ((cy - IMPACT[1]) / dist) * sp - 200, vr: (r() - 0.5) * 9 });
       }
     }
@@ -324,7 +356,8 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.fillRect(0, 0, W, H);
   }
 
-  function drawSkyline(c: Ctx, t: number, color: string, windowAlpha: number) {
+  /** litFrac: 불 켜진 창 비율(0~0.32). 전주에서 박자마다 하나둘 켜지게 할 때 쓴다 */
+  function drawSkyline(c: Ctx, t: number, color: string, windowAlpha: number, litFrac = 0.32) {
     for (const b of buildings) {
       c.fillStyle = color;
       c.fillRect(b.x, 470 - b.h, b.w, b.h);
@@ -333,7 +366,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       for (let wy = 470 - b.h + 14; wy < 456; wy += 18) {
         for (let wx = b.x + 8; wx < b.x + b.w - 10; wx += 16) {
           const lit = wr();
-          if (lit > 0.32) continue;
+          if (lit > litFrac) continue;
           const flick = 0.6 + 0.4 * noise1(t * 0.3 + lit * 50, b.seed);
           c.fillStyle = `rgba(185,160,234,${windowAlpha * flick * 0.55})`;
           c.fillRect(wx, wy, 6, 8);
@@ -351,6 +384,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     opts: {
       hero?: { x: number; glow: number; walk?: number } | null;
       alpha?: number;
+      heroAlpha?: number;
       layers?: number[];
       raining?: boolean;
       rim?: string | null;
@@ -384,7 +418,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
         c.fillStyle = g;
         c.fillRect(x - 170, 300, 340, 340);
       }
-      c.globalAlpha = 1;
+      c.globalAlpha = opts.heroAlpha ?? 1;
       drawAya(c, x, 556, 150, { t, walk: opts.hero.walk, heart: glow, rim: 'rgba(227,56,63,0.7)' });
     }
     if (show.includes(2)) draw(2);
@@ -724,20 +758,42 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
 
   // ── 장면 ────────────────────────────────────────────
 
+  /**
+   * 전주 — 오디오 구조를 따라 고조된다.
+   * ① 0~5.9 띄엄띄엄 들어오는 소리마다 먹이 번지고 제목이 써진다
+   * ② 5.9 베이스·킥이 들어오면 비 내리는 도시가 떠오르고, 박자마다 창문 불이 하나둘 켜지며 제목이 킥에 뛴다
+   * ③ 12.8~14.9 마지막 두 마디: 카메라가 제목을 뚫고 들어가며 군중과 주인공이 드러난다
+   * ④ 14.92 밴드 합류 — 칼베기 + 섬광으로 1절(이때 화면이 1절 첫 장면과 정확히 같아진다)
+   */
   function sceneTitle(c: Ctx, t: number, poster: boolean) {
+    const groove = poster ? 0 : smooth(invLerp(5.6, 6.6, t));
+    const build = poster ? 0 : smooth(invLerp(12.8, 14.9, t));
     c.fillStyle = INK;
     c.fillRect(0, 0, W, H);
-    // 먹 번짐
+
+    // ② 깨어나는 도시
+    if (groove > 0) {
+      c.save();
+      c.globalAlpha = groove * (0.55 + 0.45 * build);
+      drawSky(c, '#0b0a12', '#272233');
+      const beatsIn = Math.max(0, Math.floor(beat.pos(t) - beat.pos(5.89)));
+      drawSkyline(c, t, '#17141d', 1, Math.min(0.32, 0.02 + beatsIn * 0.02));
+      c.fillStyle = '#121017';
+      c.fillRect(0, 470, W, 400);
+      c.restore();
+    }
+
+    // ① 먹 번짐 — 전주 초반 소리(0.05 / 2.17 / 3.77초)에 맞춰, 도시가 떠오르면 걷힌다
     const blooms = [
-      { at: 0.6, x: 380, y: 300, rad: 420, col: LAV_DEEP, a: 0.9 },
-      { at: 2.4, x: 930, y: 420, rad: 360, col: RED_DEEP, a: 0.85 },
-      { at: 5.0, x: 640, y: 360, rad: 250, col: '#3d2a5c', a: 0.6 },
+      { at: 0.05, x: 380, y: 300, rad: 420, col: LAV_DEEP, a: 0.9 },
+      { at: 2.17, x: 930, y: 420, rad: 360, col: RED_DEEP, a: 0.85 },
+      { at: 3.77, x: 640, y: 360, rad: 250, col: '#3d2a5c', a: 0.6 },
     ];
     blooms.forEach((b, i) => {
-      const k = poster ? 1 : easeOutCubic(clamp((t - b.at) / 5));
+      const k = poster ? 1 : easeOutExpo(clamp((t - b.at) / 3.2));
       if (k <= 0) return;
       c.save();
-      c.globalAlpha = b.a * k;
+      c.globalAlpha = b.a * k * (1 - 0.65 * groove);
       blotPath(c, b.x, b.y, b.rad * (0.3 + 0.7 * k), 900 + i, 0.22, t * 0.4);
       const g = c.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.rad);
       g.addColorStop(0, b.col);
@@ -746,14 +802,48 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       c.fill();
       c.restore();
     });
-    const tk = poster ? 1 : clamp((t - 2.2) / 1.2);
-    if (tk > 0) {
-      // 원상 + 제목
-      brushPath(c, ensoPoint(640, 330, 210, -1.9), 34, poster ? 1 : easeOutCubic(clamp((t - 1.6) / 1.6)), 77, RED, 0.9);
+
+    // ② 박자 파문 — 제목에서 퍼지는 가는 라벤더 고리
+    if (groove > 0 && build < 1) {
+      const f = beat.frac(t);
       c.save();
+      c.globalAlpha = 0.28 * (1 - f) * groove * (1 - build);
+      c.strokeStyle = LAV;
+      c.lineWidth = 2;
+      c.beginPath();
+      c.arc(640, 330, 230 + f * 300, 0, TAU);
+      c.stroke();
+      c.restore();
+    }
+
+    // ③ 군중·주인공이 드러남
+    if (build > 0) {
+      drawCrowd(c, t, {
+        hero: { x: 760, glow: 0.4 * build },
+        alpha: build,
+        heroAlpha: build,
+        raining: true,
+        rim: 'rgba(185,160,234,0.55)',
+      });
+    }
+    drawRain(c, t, 0.12 * groove);
+
+    // 제목 — 킥에 뛰고, 마지막 두 마디에 카메라가 뚫고 지나간다
+    const tk = poster ? 1 : clamp((t - 2.2) / 1.2);
+    if (tk > 0 && build < 1) {
+      const kick = groove * (env('low', t) * 0.02 + beat.pulse(t, 8) * 0.015);
+      const zoom = 1 + kick + easeInCubic(build) * 1.8;
+      const fade = 1 - build;
+      c.save();
+      c.translate(640, 345);
+      c.scale(zoom, zoom);
+      c.translate(-640, -345);
+      // 원상은 다 그려진 뒤 반시계로 천천히 돈다(굵은 머리가 앞서도록)
+      const spin = poster ? 0 : Math.max(0, t - 3.2) * 0.12;
+      brushPath(c, ensoPoint(640, 330, 210, -1.9 - spin), 34, poster ? 1 : easeOutCubic(clamp((t - 1.6) / 1.6)), 77, RED, 0.9 * fade);
       c.textAlign = 'center';
       c.textBaseline = 'middle';
-      c.globalAlpha = tk;
+      c.globalAlpha = tk * fade;
       setFont(c, 104, fonts.brush);
       textShadow(c, 30, 'rgba(0,0,0,0.9)');
       c.fillStyle = PAPER;
@@ -761,26 +851,15 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       setFont(c, 30, fonts.display);
       c.fillStyle = LAV;
       c.fillText('Some Like It Hot!!', 640, 410);
-      c.restore();
-    }
-    const ck = poster ? 1 : clamp((t - 4.5) / 1);
-    if (ck > 0) {
-      c.save();
-      c.globalAlpha = ck * 0.85;
-      c.textAlign = 'center';
-      setFont(c, 18, fonts.ko, 500);
-      c.fillStyle = PAPER;
-      if ('letterSpacing' in c) (c as Ctx & { letterSpacing: string }).letterSpacing = '6px';
-      c.fillText('AyaUke  COVER  ·  SPYAIR', 640, 580);
-      c.restore();
-    }
-    // 1절로 넘어가며 잉크가 화면을 덮는다
-    if (!poster && t > 13.4) {
-      const k = easeInCubic(clamp((t - 13.4) / 1.5));
-      c.save();
-      blotPath(c, 640, 360, 900 * k, 4242, 0.2, t);
-      c.fillStyle = INK;
-      c.fill();
+      const ck = poster ? 1 : clamp((t - 4.5) / 1);
+      if (ck > 0) {
+        c.globalAlpha = ck * 0.85 * fade;
+        c.shadowBlur = 0;
+        setFont(c, 18, fonts.ko, 500);
+        c.fillStyle = PAPER;
+        if ('letterSpacing' in c) (c as Ctx & { letterSpacing: string }).letterSpacing = '6px';
+        c.fillText('AyaUke  COVER  ·  SPYAIR', 640, 580);
+      }
       c.restore();
     }
   }
@@ -835,22 +914,24 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       c.restore();
     }
 
-    // 발자국 (確かめた足跡)
+    // 발자국 (確かめた足跡) — 주인공이 왼쪽에서 걸어온 길.
+    // 신발 자국은 앞꿈치(큰 타원)가 주인공 쪽(오른쪽), 뒤꿈치(작은 원)가 왼쪽.
+    // 振り返り에 맞춰 시선을 따라 발밑에서 먼 쪽으로 드러난다.
     if (sec === 'verse2' && t > 81.0) {
       for (let i = 0; i < 12; i++) {
         const at = 81.2 + i * 0.13;
         const k = clamp((t - at) / 0.2);
         if (k <= 0) continue;
-        const x = 140 + i * 52;
+        const x = 700 - i * 52;
         const y = 566 + (i % 2) * 12;
         c.save();
         c.globalAlpha = k * 0.85;
         c.fillStyle = RED;
         c.beginPath();
-        c.ellipse(x, y, 9, 15, 1.35, 0, TAU);
+        c.ellipse(x + 4, y, 12, 7, 0, 0, TAU);
         c.fill();
         c.beginPath();
-        c.ellipse(x + 16, y - 2, 5, 6, 0, 0, TAU);
+        c.ellipse(x - 15, y, 6, 5.5, 0, 0, TAU);
         c.fill();
         c.restore();
       }
@@ -897,25 +978,27 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.restore();
 
     // 빗줄기 — 프리코러스 고조
-    const rain = sec === 'pre1' ? 0.25 + 0.75 * invLerp(31.8, 40.3, t) : sec === 'verse1' ? (rapidPassage(t) ? 0.4 : 0.12) : 0;
-    if (rain > 0) {
-      const rr = rng(55);
-      c.save();
-      c.strokeStyle = 'rgba(200,190,230,0.35)';
-      c.lineWidth = 1.2;
-      c.beginPath();
-      const n = Math.round(160 * rain);
-      for (let i = 0; i < n; i++) {
-        const x0 = rr() * (W + 200);
-        const sp = 900 + rr() * 700;
-        const y = ((rr() * 900 + t * sp) % 900) - 100;
-        const x = x0 - y * 0.18;
-        c.moveTo(x, y);
-        c.lineTo(x - 8 * (1 + rain), y + 40 * (1 + rain));
-      }
-      c.stroke();
-      c.restore();
+    drawRain(c, t, sec === 'pre1' ? 0.25 + 0.75 * invLerp(31.8, 40.3, t) : sec === 'verse1' ? (rapidPassage(t) ? 0.4 : 0.12) : 0);
+  }
+
+  function drawRain(c: Ctx, t: number, rain: number) {
+    if (rain <= 0) return;
+    const rr = rng(55);
+    c.save();
+    c.strokeStyle = 'rgba(200,190,230,0.35)';
+    c.lineWidth = 1.2;
+    c.beginPath();
+    const n = Math.round(160 * rain);
+    for (let i = 0; i < n; i++) {
+      const x0 = rr() * (W + 200);
+      const sp = 900 + rr() * 700;
+      const y = ((rr() * 900 + t * sp) % 900) - 100;
+      const x = x0 - y * 0.18;
+      c.moveTo(x, y);
+      c.lineTo(x - 8 * (1 + rain), y + 40 * (1 + rain));
     }
+    c.stroke();
+    c.restore();
   }
 
   function sceneGlass(c: Ctx, t: number, video: HTMLVideoElement | null, chroma: number) {
@@ -937,10 +1020,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       }
     }
     // 가운데 큰 창 — 비친 "나"(아야)
-    const px = 620;
-    const py = 30;
-    const pw = 620;
-    const ph = 600;
+    const { x: px, y: py, w: pw, h: ph } = GLASS;
     c.save();
     c.beginPath();
     c.rect(px, py, pw, ph);
@@ -970,6 +1050,9 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     // 금 가는 유리 (ムカつくんだ → 無関心な世界も)
     const waves = [91.3, 93.5];
     c.save();
+    c.beginPath();
+    c.rect(GLASS.x, GLASS.y, GLASS.w, GLASS.h);
+    c.clip();
     c.strokeStyle = 'rgba(255,255,255,0.85)';
     c.lineWidth = 2;
     c.lineCap = 'round';
@@ -1132,7 +1215,9 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       brushPath(c, heartPoint(x + w / 2, y + h / 2, 150), 34, clamp(k / 2), 71, LAV, 0.8);
     }
     c.restore();
-    brushPath(c, ensoPoint(x + w / 2, y + h / 2, 318, -2.2 - k * 0.05), 22, easeOutCubic(clamp(k / 2.4)) * (1 - clamp((t - 132.6) / 1.1)), 404, LAV, 0.7);
+    // 나타날 땐 써 내려가고, 사라질 땐 머리부터 지워져 마른 꼬리가 마지막에 빠져나간다
+    const ensoErase = smooth(clamp((t - 132.4) / 1.3));
+    brushPath(c, ensoPoint(x + w / 2, y + h / 2, 318, -2.2 - k * 0.05), 22, easeOutCubic(clamp(k / 2.4)), 404, LAV, 0.7, ensoErase);
     // 등꽃 꽃잎 (아야 방송 배경의 등나무)
     const pr = rng(616);
     c.save();
@@ -1378,8 +1463,8 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       const punchZoom = rapidHit ? (rapidHit.word.punch ? 0.08 : 0.03) * Math.exp(-rapidHit.age * 9) : 0;
       if (rapidHit?.word.punch) shake += 12 * Math.exp(-rapidHit.age * 8);
       let slash: { age: number; idx: number } | null = null;
-      for (let i = SLASHES.length - 1; i >= 0; i--) {
-        const age = t - SLASHES[i];
+      for (let i = CUTS.length - 1; i >= 0; i--) {
+        const age = t - CUTS[i];
         if (age >= 0 && age < 0.6) {
           slash = { age, idx: i };
           break;
@@ -1442,9 +1527,9 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
 
       // 섬광
       let flash = 0;
-      for (const f of FLASHES) {
+      for (const [f, strength] of FLASHES) {
         const a = t - f;
-        if (a >= 0 && a < 1) flash = Math.max(flash, Math.exp(-a * 5));
+        if (a >= 0 && a < 1) flash = Math.max(flash, strength * Math.exp(-a * 5));
       }
       flash = Math.max(flash, Math.pow(invLerp(149.9, 150.65, t), 2) * (t < 150.65 ? 1 : 0));
       if (flash > 0.01) {
