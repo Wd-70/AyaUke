@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Navigation from '@/components/Navigation'
 import Footer from '@/components/Footer'
@@ -27,6 +27,7 @@ import {
   ArrowUturnRightIcon,
   ChevronUpIcon,
   ChevronDownIcon,
+  EllipsisHorizontalIcon,
 } from '@heroicons/react/24/outline'
 
 interface ClipItem {
@@ -80,6 +81,8 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
   const { showSuccess, showError } = useToast()
   const { playQueue, syncQueue, current } = useClipPlayer()
   const { playlist, isOwner } = data
+  const itemToolsId = useId()
+  const [expandedItem, setExpandedItem] = useState<string | null>(null)
 
   const clipKey = (c: ClipItem) => c.id || c._id || ''
   const initialClips = () => playlist.clips.map((c) => c.clipId).filter((c): c is ClipItem => !!c)
@@ -234,7 +237,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
       <Navigation />
       <main className={`mobile-playlist-page mx-auto max-w-3xl px-4 pt-20 sm:pt-24 ${current ? 'pb-12 md:pb-28' : 'pb-12'}`}>
         {/* 헤더 */}
-        <div className="mb-6">
+        <div className="playlist-header mb-6">
           <div className="playlist-heading flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               {editingName ? (
@@ -352,19 +355,29 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
             {isOwner && (
               <p className="mb-2 text-xs leading-relaxed text-light-text/65 dark:text-dark-text/45">
                 <ArrowsUpDownIcon className="mr-1 inline h-3.5 w-3.5" />
-                <span className="md:hidden">위·아래 버튼으로 순서를 바꿀 수 있어요.</span>
+                <span className="md:hidden">더보기(···)에서 순서를 바꿀 수 있어요.</span>
                 <span className="hidden md:inline">손잡이를 잡고 끌어 순서를 바꿀 수 있어요.</span>
-                {' '}변경은 바로 저장되며, 되돌릴 수 있어요.
+                <span className="hidden md:inline"> 변경은 바로 저장되며, 되돌릴 수 있어요.</span>
               </p>
             )}
             {clips.map((clip, index) => {
               const key = clipKey(clip)
+              const isExpanded = expandedItem === key
+              const toolsId = `${itemToolsId}-${key}`
               const dur = fmtDur(clip.startTime, clip.endTime)
               const canPlay = !!playerClips[index]
               const isOver = overIndex === index && dragIndex !== null && dragIndex !== index
               return (
                 <div
                   key={key}
+                  data-expanded={isExpanded}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape' && isExpanded && window.matchMedia('(max-width: 767px)').matches) {
+                      event.stopPropagation()
+                      setExpandedItem(null)
+                      event.currentTarget.querySelector<HTMLButtonElement>('.playlist-more')?.focus()
+                    }
+                  }}
                   onDragOver={(e) => {
                     if (dragIndex == null) return
                     e.preventDefault()
@@ -414,6 +427,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                     <span className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-100 transition-opacity md:opacity-0 group-hover:opacity-100">
                       <PlayIcon className="h-6 w-6 text-white" />
                     </span>
+                    <span aria-hidden="true" className="absolute left-1 top-1 rounded bg-black/60 px-1 text-[10px] text-white md:hidden">{index + 1}</span>
                     {dur && (
                       <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 text-[10px] font-medium text-white">{dur}</span>
                     )}
@@ -442,6 +456,12 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                     </div>
                   </div>
 
+                  <button type="button" className="playlist-more inline-flex items-center justify-center rounded-full text-light-text/65 hover:bg-light-primary/10 focus-visible:outline focus-visible:outline-2 dark:text-dark-text/60 md:hidden"
+                    aria-label={`${clip.title ?? '클립'} 더보기`} aria-expanded={isExpanded} aria-controls={toolsId}
+                    onClick={() => setExpandedItem(isExpanded ? null : key)}>
+                    {isExpanded ? <ChevronUpIcon className="h-5 w-5" /> : <EllipsisHorizontalIcon className="h-5 w-5" />}
+                  </button>
+                  <div id={toolsId} className="playlist-item-tools">
                   {isOwner && (
                     <div className="playlist-reorder flex items-center gap-2 md:hidden" role="group" aria-label={`${clip.title ?? '클립'} 순서 변경`}>
                       <span className="mr-auto text-xs text-light-text/65 dark:text-dark-text/60">순서 변경</span>
@@ -488,6 +508,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                         <span className="md:hidden">제거</span>
                       </button>
                     )}
+                  </div>
                   </div>
                 </div>
               )
