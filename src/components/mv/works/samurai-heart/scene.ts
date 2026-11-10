@@ -8,6 +8,8 @@ import {
   easeOutCubic, easeOutExpo, fitSize, hash, invLerp, keyframes, lerp, lineAt, noise1, rng, sectionAt,
   setFont, smooth, splatter,
 } from '../../engine';
+import { drawAya } from '../../aya';
+import { type Hair, type PedestrianStyle, drawFan, drawPedestrian, pickPedestrianStyle } from '../../people';
 import { ENVELOPE } from './envelope';
 import { BEAT_PERIOD, BEAT_PHASE, CHROMA_KEYS, LYRICS, RAPID_PASSAGES, SECTIONS, SLASHES } from './timeline';
 
@@ -39,6 +41,7 @@ interface Figure {
   phase: number;
   hScale: number;
   seed: number;
+  style: PedestrianStyle;
 }
 
 interface Layer {
@@ -104,7 +107,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   const r = rng(20260826);
   const layers: Layer[] = [
     { ground: 470, h: 66, speed: 26, color: '#4a4454', figures: [] },
-    { ground: 548, h: 118, speed: 46, color: '#2f2a38', figures: [] },
+    { ground: 548, h: 118, speed: 46, color: '#29242f', figures: [] },
     { ground: 790, h: 300, speed: 92, color: '#131118', figures: [] },
   ];
   layers.forEach((layer, li) => {
@@ -117,9 +120,20 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
         phase: r() * TAU,
         hScale: 0.86 + r() * 0.28,
         seed: li * 100 + i,
+        style: pickPedestrianStyle(r),
       });
     }
   });
+
+  const fans = Array.from({ length: 24 }, (_, i) => ({
+    x: (i / 23) * (W + 80) - 40 + (r() - 0.5) * 30,
+    h: 150 + r() * 60,
+    hair: (['short', 'long', 'bun', 'cap', 'ponytail', 'long'] as Hair[])[Math.floor(r() * 6)],
+    joinAt: r(),
+    jump: 8 + r() * 14,
+    light: i % 3 === 0 ? LAV : i % 5 === 0 ? '#ffffff' : RED,
+    wavePhase: r() * TAU,
+  }));
 
   const buildings = Array.from({ length: 22 }, (_, i) => {
     const w = 50 + r() * 90;
@@ -302,38 +316,6 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     };
   }
 
-  function figure(c: Ctx, x: number, ground: number, h: number, color: string, walk: number, bob = 0) {
-    const rr = h * 0.105;
-    const top = ground - h + bob;
-    c.fillStyle = color;
-    c.strokeStyle = color;
-    c.beginPath();
-    c.arc(x, top + rr, rr, 0, TAU);
-    c.fill();
-    const sh = top + rr * 2.25;
-    const hip = ground - h * 0.42 + bob;
-    const sw = h * 0.16;
-    const hw = h * 0.11;
-    c.beginPath();
-    c.moveTo(x - sw * 0.6, sh);
-    c.lineTo(x + sw * 0.6, sh);
-    c.quadraticCurveTo(x + sw, sh, x + sw, sh + rr * 0.7);
-    c.lineTo(x + hw, hip);
-    c.lineTo(x - hw, hip);
-    c.lineTo(x - sw, sh + rr * 0.7);
-    c.quadraticCurveTo(x - sw, sh, x - sw * 0.6, sh);
-    c.fill();
-    const st = Math.sin(walk) * h * 0.09;
-    c.lineWidth = h * 0.075;
-    c.lineCap = 'round';
-    c.beginPath();
-    c.moveTo(x - hw * 0.45, hip);
-    c.lineTo(x - hw * 0.45 + st, ground - c.lineWidth / 2);
-    c.moveTo(x + hw * 0.45, hip);
-    c.lineTo(x + hw * 0.45 - st, ground - c.lineWidth / 2);
-    c.stroke();
-  }
-
   function drawSky(c: Ctx, top: string, bottom: string, yOffset = 0) {
     const g = c.createLinearGradient(0, -400 + yOffset, 0, 480 + yOffset);
     g.addColorStop(0, top);
@@ -361,12 +343,18 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   }
 
   /**
-   * 군중. redJoin(0~1)만큼의 사람이 붉게 물든다(마지막 후렴 서사).
-   * hero: 화면의 붉은 "나". null이면 그리지 않음.
+   * 군중(옆모습 행인 3겹) + 붉은 "나"(아야 실루엣).
+   * raining이면 우산을 쓴 사람들이 생기고, rim은 도시 불빛이 닿는 윤곽색.
    */
   function drawCrowd(
     c: Ctx, t: number,
-    opts: { redJoin?: number; hero?: { x: number; glow: number; walk?: number } | null; alpha?: number; layers?: number[] },
+    opts: {
+      hero?: { x: number; glow: number; walk?: number } | null;
+      alpha?: number;
+      layers?: number[];
+      raining?: boolean;
+      rim?: string | null;
+    },
   ) {
     const ct = crowdTime(t);
     const show = opts.layers ?? [0, 1, 2];
@@ -377,10 +365,12 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
         const raw = f.x0 + f.dir * layer.speed * f.speed * ct;
         const x = ((raw % span) + span) % span - 150;
         const walk = ct * f.speed * 6.5 + f.phase;
-        const isRed = (opts.redJoin ?? 0) > hash(f.seed * 13 + 1);
-        const color = isRed ? [RED, '#b52a35', '#5e1219'][li] : layer.color;
         c.globalAlpha = opts.alpha ?? 1;
-        figure(c, x, layer.ground, layer.h * f.hScale, color, walk, Math.abs(Math.sin(walk)) * -layer.h * 0.02);
+        drawPedestrian(c, x, layer.ground, layer.h * f.hScale, f.dir, walk, f.style, {
+          body: layer.color,
+          rim: li === 0 ? null : (opts.rim ?? null),
+          raining: !!opts.raining,
+        });
       }
     };
     if (show.includes(0)) draw(0);
@@ -395,7 +385,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
         c.fillRect(x - 170, 300, 340, 340);
       }
       c.globalAlpha = 1;
-      figure(c, x, 556, 150, RED, opts.hero.walk ?? 0);
+      drawAya(c, x, 556, 150, { t, walk: opts.hero.walk, heart: glow, rim: 'rgba(227,56,63,0.7)' });
     }
     if (show.includes(2)) draw(2);
     c.globalAlpha = 1;
@@ -880,7 +870,11 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       : rapidHit
         ? 0.3 + 0.6 * Math.exp(-rapidHit.age * 5)
         : 0.25 + 0.2 * beat.pulse(t, 5);
-    drawCrowd(c, t, { hero: { x: heroX, glow, walk: heroWalk } });
+    drawCrowd(c, t, {
+      hero: { x: heroX, glow, walk: heroWalk },
+      raining: !dusk,
+      rim: dusk ? 'rgba(255,170,200,0.5)' : 'rgba(185,160,234,0.55)',
+    });
 
     // 캐치볼 — 닿지 않는 대화
     if (sec === 'pre1' && t > 35.8 && t < 38.6) {
@@ -1055,29 +1049,19 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     }
     c.restore();
 
-    // 마지막 후렴: 관객이 함께 붉게 — "혼자가 아니다"
+    // 마지막 후렴: 관객의 응원봉이 하나둘 켜진다 — "혼자가 아니다"
     if (finalish) {
       const join = sec === 'final' ? invLerp(150.65, 166, t) : 1;
       const bob = beat.pulse(t, 5);
-      const ar = rng(808);
-      for (let i = 0; i < 26; i++) {
-        const x = (i / 25) * (W + 80) - 40 + (ar() - 0.5) * 30;
-        const h = 150 + ar() * 70;
-        const red = join > ar();
-        const jump = bob * (8 + ar() * 16);
-        figure(c, x, H + 128 - jump, h, red ? (i % 3 === 0 ? LAV : RED) : '#2a2430', 0);
-        if (red && ar() < 0.5) {
-          // 손 들기
-          c.save();
-          c.strokeStyle = red ? (i % 3 === 0 ? LAV : RED) : '#2a2430';
-          c.lineWidth = h * 0.07;
-          c.lineCap = 'round';
-          c.beginPath();
-          c.moveTo(x + h * 0.12, H + 128 - jump - h * 0.72);
-          c.lineTo(x + h * 0.2, H + 128 - jump - h * 1.05 - bob * 10);
-          c.stroke();
-          c.restore();
-        }
+      const bp = beat.pos(t);
+      for (const f of fans) {
+        const on = join > f.joinAt;
+        const wave = Math.sin(bp * Math.PI + f.wavePhase * 0.3);
+        drawFan(c, f.x, H + 60 - bob * f.jump, f.h, f.hair, on ? 1 : 0, wave, {
+          body: '#1c1622',
+          rim: 'rgba(227,56,63,0.55)',
+          light: on ? f.light : null,
+        });
       }
     }
 
@@ -1200,7 +1184,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.fillRect(0, 0, W, H);
     const build = invLerp(146.3, 150.6, t);
     // 군중 — 어둠 속 멈춘 실루엣
-    drawCrowd(c, t, { alpha: 0.45, hero: null, layers: [0, 1] });
+    drawCrowd(c, t, { alpha: 0.45, hero: null, layers: [0, 1], rim: 'rgba(255,250,240,0.18)' });
     // 스포트라이트 (흰색)
     const sp = 0.35 + 0.45 * build;
     const g = c.createLinearGradient(640, 0, 640, 560);
@@ -1218,21 +1202,9 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.beginPath();
     c.ellipse(640, 560, 170, 26, 0, 0, TAU);
     c.fill();
-    figure(c, 640, 556, 150, RED, 0);
-    // 하트 고동
+    // 하트 고동 — 고조될수록 강해진다
     const hb = beat.pulse(t, 8) * (0.3 + build);
-    c.save();
-    c.globalAlpha = 0.5 + 0.5 * build;
-    const hp = heartPoint(640, 445, 14 + hb * 6);
-    c.fillStyle = RED;
-    c.beginPath();
-    for (let i = 0; i <= 40; i++) {
-      const [x, y] = hp(i / 40);
-      if (i) c.lineTo(x, y);
-      else c.moveTo(x, y);
-    }
-    c.fill();
-    c.restore();
+    drawAya(c, 640, 556, 150, { t, heart: 0.3 + hb, rim: `rgba(255,250,240,${0.35 + 0.4 * build})` });
     // 떠오르는 빛 알갱이 — 고조될수록 빨라진다
     const pr = rng(919);
     const speed = 30 + build * 260;
