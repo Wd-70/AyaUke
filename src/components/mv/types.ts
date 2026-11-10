@@ -45,9 +45,12 @@ export interface MvRenderer {
   render(ctx: CanvasRenderingContext2D, frame: MvFrame): void;
 }
 
+/**
+ * 곡 단위 작품. 클립 범위가 곡 시작~끝에 정확히 맞춰져 있다는 전제로
+ * 클립 시작 시각을 t=0으로 쓴다(그래서 길이가 비슷한 클립에만 적용).
+ */
 export interface MvWork {
-  /** 원본 다시보기 기준, MV t=0에 해당하는 절대 초 */
-  sourceStart: number;
+  /** 기준 클립 길이(초) */
   duration: number;
   title: string;
   subtitle?: string;

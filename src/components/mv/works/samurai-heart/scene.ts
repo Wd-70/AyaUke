@@ -9,7 +9,7 @@ import {
   setFont, smooth, splatter,
 } from '../../engine';
 import { ENVELOPE } from './envelope';
-import { BEAT_PERIOD, BEAT_PHASE, CHROMA_KEYS, LYRICS, SECTIONS, SLASHES } from './timeline';
+import { BEAT_PERIOD, BEAT_PHASE, CHROMA_KEYS, LYRICS, RAPID_RANGE, RAPID_WORDS, SECTIONS, SLASHES } from './timeline';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -60,11 +60,33 @@ interface Shard {
 
 const FLASHES = [40.3, 95.55, 150.65, 171.85];
 
-/** 구간 안 속도 배율 — 군중이 멈추거나(立ち止まり) 느려지는(조용한 후렴) 연출 */
+/**
+ * 구간 안 속도 배율 — 말이 빨라지면 군중도 빨리 감기(k>1), 「勘違い」에서 정지,
+ * 立ち止まり에서 멈추고 조용한 후렴에서 느려진다.
+ */
 const CROWD_TIME_WINDOWS: { a: number; b: number; k: number }[] = [
+  { a: 23.1, b: 26.45, k: 2.6 },
+  { a: 26.45, b: 27.75, k: 0 },
+  { a: 27.75, b: 31.7, k: 1.7 },
   { a: 79.6, b: 81.2, k: 0 },
   { a: 133.75, b: 150.65, k: 0.25 },
 ];
+
+const inRapid = (t: number) => t >= RAPID_RANGE[0] && t < RAPID_RANGE[1];
+
+/** 빠른 구간에서 마지막으로 터진 단어와 그 경과 시간 */
+function lastRapidWord(t: number) {
+  if (!inRapid(t)) return null;
+  for (let i = RAPID_WORDS.length - 1; i >= 0; i--) {
+    if (t >= RAPID_WORDS[i].t) return { word: RAPID_WORDS[i], age: t - RAPID_WORDS[i].t };
+  }
+  return null;
+}
+
+/** 「とんだ勘違いだよ」에서 시간이 멈춘 듯한 정적 (0~1) */
+function freezeAmount(t: number) {
+  return clamp((t - 26.45) / 0.08) * (1 - clamp((t - 27.55) / 0.25));
+}
 
 function crowdTime(t: number) {
   let out = t;
@@ -487,6 +509,67 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
     koLine(c, line.ko, 66, 668, out * clamp((t - line.t) * 3));
   }
 
+  /** 말이 빨라지는 구간 — 단어가 군중 위로 연달아 터지고, 「勘違いだよ」는 가운데 크게 */
+  function rapidLyric(c: Ctx, t: number, line: MvLyricLine) {
+    const out = clamp((line.end + 0.35 - t) / 0.35);
+    const words = RAPID_WORDS.map((w, i) => ({ ...w, i })).filter((w) => w.t >= line.t - 0.01 && w.t <= line.end && t >= w.t);
+    const last = words[words.length - 1];
+    // 「勘違いだよ」가 터지면 앞 단어들은 바깥으로 튕겨 나간다
+    const punch = words.find((w) => w.punch);
+    const blast = punch ? easeOutCubic(clamp((t - punch.t) / 0.35)) : 0;
+    for (const w of words) {
+      const age = t - w.t;
+      const k = clamp(age / 0.12);
+      c.save();
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.lineJoin = 'round';
+      if (w.punch) {
+        const sc = lerp(1.9, 1, easeOutBack(k));
+        c.translate(w.x, w.y);
+        c.rotate(-0.05);
+        c.scale(sc, sc);
+        c.globalAlpha = out * clamp(age / 0.04);
+        setFont(c, 120, fonts.display);
+        c.lineWidth = 15;
+        c.strokeStyle = INK;
+        c.strokeText(w.text, 0, 0);
+        c.fillStyle = RED;
+        c.fillText(w.text, 0, 0);
+        c.lineWidth = 2.5;
+        c.strokeStyle = PAPER;
+        c.strokeText(w.text, 0, 0);
+        c.restore();
+        continue;
+      }
+      const latest = w === last;
+      const size = latest ? 64 : 48;
+      setFont(c, size, fonts.display);
+      const half = c.measureText(w.text).width / 2;
+      let x = clamp(w.x, half + 30, W - half - 30);
+      let y = w.y;
+      if (blast > 0) {
+        const dx = x - 640;
+        const dy = y - 245;
+        const d = Math.hypot(dx, dy) || 1;
+        x += (dx / d) * 320 * blast;
+        y += (dy / d) * 320 * blast;
+      }
+      const sc = lerp(1.7, 1, easeOutBack(k));
+      c.translate(x, y);
+      c.rotate((hash(w.i * 13) - 0.5) * 0.22);
+      c.scale(sc, sc);
+      c.globalAlpha = out * clamp(age / 0.04) * (latest ? 1 : 0.5) * (1 - blast);
+      c.lineWidth = size * 0.14;
+      c.strokeStyle = INK;
+      c.strokeText(w.text, 0, 0);
+      c.fillStyle = latest ? '#ffffff' : PAPER;
+      c.fillText(w.text, 0, 0);
+      c.restore();
+    }
+    koLine(c, line.ko, 66, 668, out * clamp((t - line.t) * 3));
+  }
+
   /** 조용한 후렴 — 가운데, 글자 하나씩 */
   function quietLyric(c: Ctx, t: number, line: MvLyricLine) {
     const out = clamp((line.end + 0.35 - t) / 0.35);
@@ -785,7 +868,12 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
       heroX += 80 * smooth(k);
       heroWalk = k > 0 && k < 1 ? t * 9 : 0;
     }
-    const glow = sec === 'pre1' ? invLerp(38, 40.3, t) : 0.25 + 0.2 * beat.pulse(t, 5);
+    const rapidHit = lastRapidWord(t);
+    const glow = sec === 'pre1'
+      ? invLerp(38, 40.3, t)
+      : rapidHit
+        ? 0.3 + 0.6 * Math.exp(-rapidHit.age * 5)
+        : 0.25 + 0.2 * beat.pulse(t, 5);
     drawCrowd(c, t, { hero: { x: heroX, glow, walk: heroWalk } });
 
     // 캐치볼 — 닿지 않는 대화
@@ -809,7 +897,7 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
     c.restore();
 
     // 빗줄기 — 프리코러스 고조
-    const rain = sec === 'pre1' ? 0.25 + 0.75 * invLerp(31.8, 40.3, t) : sec === 'verse1' ? 0.12 : 0;
+    const rain = sec === 'pre1' ? 0.25 + 0.75 * invLerp(31.8, 40.3, t) : sec === 'verse1' ? (inRapid(t) ? 0.4 : 0.12) : 0;
     if (rain > 0) {
       const rr = rng(55);
       c.save();
@@ -1284,6 +1372,12 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
           break;
       }
 
+      const freeze = sec.id === 'verse1' ? freezeAmount(t) : 0;
+      if (freeze > 0) {
+        b.fillStyle = `rgba(8,6,12,${0.45 * freeze})`;
+        b.fillRect(0, 0, W, H);
+      }
+
       if (line && !(sec.id === 'finale' && t >= 187.9)) {
         if (sec.id === 'quiet') quietLyric(b, t, line);
         else if (['chorus1', 'chorus2', 'final', 'finale', 'post1'].includes(sec.id)) {
@@ -1291,7 +1385,8 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
           kineticLyric(b, t, line, post
             ? { cx: 900, cy: 330, maxW: 560, vertX: 1170, koX: 900, koAlign: 'center' }
             : { cx: 360, cy: 340, maxW: 580, vertX: 600, koX: 360, koAlign: 'center' });
-        } else captionLyric(b, t, line, RED);
+        } else if (sec.id === 'verse1' && inRapid(t)) rapidLyric(b, t, line);
+        else captionLyric(b, t, line, RED);
       }
       if (sec.id === 'finale') sceneEnding(b, t);
 
@@ -1299,6 +1394,10 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
       const low = env('low', t);
       const loud = ['chorus1', 'chorus2', 'final', 'finale', 'post1'].includes(sec.id);
       let shake = loud ? Math.pow(low, 2) * 9 : 0;
+      // 빠른 구간: 단어마다 카메라가 툭툭 밀고 들어온다
+      const rapidHit = lastRapidWord(t);
+      const punchZoom = rapidHit ? (rapidHit.word.punch ? 0.08 : 0.03) * Math.exp(-rapidHit.age * 9) : 0;
+      if (rapidHit?.word.punch) shake += 12 * Math.exp(-rapidHit.age * 8);
       let slash: { age: number; idx: number } | null = null;
       for (let i = SLASHES.length - 1; i >= 0; i--) {
         const age = t - SLASHES[i];
@@ -1316,7 +1415,7 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
       main.globalCompositeOperation = 'source-over';
       main.fillStyle = '#000';
       main.fillRect(0, 0, main.canvas.width, main.canvas.height);
-      const over = 1 + (shake > 0 ? 0.03 : 0);
+      const over = 1 + (shake > 0 ? 0.03 : 0) + punchZoom;
       const ow = main.canvas.width * over;
       const oh = main.canvas.height * over;
       const ox = (main.canvas.width - ow) / 2 + sx * s;

@@ -22,10 +22,9 @@ export const metadata: Metadata = {
 
 export default async function MvPage({ params }: MvPageProps) {
   const { id } = await params;
-  if (!hasMv(id)) notFound();
   await connectDB();
   const clip = await getPublicClip(id);
-  if (!clip) notFound();
+  if (!clip || !clip.available || !hasMv(clip)) notFound();
 
   return (
     <div className="min-h-screen bg-light-background text-light-text dark:bg-dark-background dark:text-dark-text">
@@ -33,11 +32,13 @@ export default async function MvPage({ params }: MvPageProps) {
       <main className="px-4 pb-16 pt-24 sm:px-6">
         <Suspense>
           <MvStage
-            shareId={clip.shareId}
             clip={{
               id: clip.id,
+              songId: clip.songId,
               platform: clip.platform,
               videoId: clip.videoId,
+              startTime: clip.startTime,
+              endTime: clip.endTime,
               title: clip.title,
               artist: clip.artist,
               sungDateLabel: clip.sungDateLabel,

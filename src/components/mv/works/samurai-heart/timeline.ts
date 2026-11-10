@@ -83,6 +83,25 @@ export const LYRICS: MvLyricLine[] = [
   L(184.9, 190.3, [[184.9, 'Hey!!'], [185.95, 'Hey!!'], [188.0, 'サムライハート']], '사무라이 하트 (some like it hot)'),
 ];
 
+/**
+ * 1절 후반 말이 빨라지는 구간(ほら いつだって~) — 자막 대신 단어를 하나씩 터뜨린다.
+ * 23.1~25.0은 whisper가 깨져서 박자 기준 추정, 이후는 whisper 글자 타이밍.
+ */
+export const RAPID_RANGE: [number, number] = [23.05, 31.7];
+export const RAPID_WORDS: { t: number; text: string; x: number; y: number; punch?: boolean }[] = [
+  // 읽는 순서대로 좌우 지그재그 배치 (x,y = 글자 중심, 붉은 주인공 머리 위는 비움)
+  { t: 23.1, text: 'ほら', x: 210, y: 140 },
+  { t: 23.5, text: 'いつだって', x: 1000, y: 140 },
+  { t: 24.25, text: '同じで', x: 300, y: 250 },
+  { t: 24.95, text: '分かり合ってる？', x: 880, y: 250 },
+  { t: 25.8, text: 'とんだ', x: 520, y: 335 },
+  { t: 26.45, text: '勘違いだよ', x: 640, y: 245, punch: true },
+  { t: 27.9, text: 'ここに居る', x: 260, y: 150 },
+  { t: 28.8, text: '僕に', x: 560, y: 215 },
+  { t: 29.5, text: '気付けない', x: 860, y: 150 },
+  { t: 30.75, text: 'んだろう', x: 1000, y: 265 },
+];
+
 /** 사무라이 하트 "칼베기" 타이밍 — 화면이 사선으로 갈라지는 히트 */
 export const SLASHES: number[] = LYRICS.flatMap((l) => l.ja.filter((c) => c.text === 'サムライハート').map((c) => c.t));
 

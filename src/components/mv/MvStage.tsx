@@ -10,11 +10,13 @@ import { sectionAt } from './engine';
 import type { MvRenderer, MvWork } from './types';
 
 interface MvStageProps {
-  shareId: string;
   clip: {
     id: string;
+    songId: string;
     platform: VideoPlatform;
     videoId: string;
+    startTime: number;
+    endTime: number | null;
     title: string;
     artist: string;
     sungDateLabel: string | null;
@@ -27,9 +29,10 @@ const MAX_CANVAS_WIDTH = 1920;
 
 /**
  * MV 무대: 원본 클립(ClipPlayer)이 소리를 내고, 캔버스는 그 재생 시각에 맞춰 그린다.
+ * 클립 시작 시각이 MV의 t=0이다(클립 범위가 곡에 정확히 맞춰져 있다는 전제).
  * 디버그용 쿼리: ?t=40 (그 시각 정지 화면) / ?preview=38 (소리 없이 그 시각부터 재생) / ?debug=1
  */
-export default function MvStage({ shareId, clip }: MvStageProps) {
+export default function MvStage({ clip }: MvStageProps) {
   const params = useSearchParams();
   const freezeT = params.get('t');
   const previewT = params.get('preview');
@@ -49,7 +52,7 @@ export default function MvStage({ shareId, clip }: MvStageProps) {
   // 작품 코드 + 캔버스 폰트 로드
   useEffect(() => {
     let cancelled = false;
-    const pending = loadMv(shareId);
+    const pending = loadMv(clip);
     if (!pending) return;
     pending
       .then(async (w) => {
@@ -67,7 +70,9 @@ export default function MvStage({ shareId, clip }: MvStageProps) {
     return () => {
       cancelled = true;
     };
-  }, [shareId]);
+    // 클립 정체성(곡·범위)이 바뀔 때만 다시 로드
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clip.songId, clip.startTime, clip.endTime]);
 
   // 캔버스 해상도 = 표시 크기 × DPR (상한 1920px)
   useEffect(() => {
@@ -108,7 +113,7 @@ export default function MvStage({ shareId, clip }: MvStageProps) {
         if (t > work.duration) t = null;
       } else if (startedRef.current) {
         const abs = playerRef.current?.getCurrentTime?.();
-        if (typeof abs === 'number' && Number.isFinite(abs)) t = abs - work.sourceStart;
+        if (typeof abs === 'number' && Number.isFinite(abs)) t = abs - clip.startTime;
       }
       const footage = playerBoxRef.current?.querySelector('video') ?? null;
       rendererRef.current?.render(ctx, { t, footage });
@@ -120,7 +125,7 @@ export default function MvStage({ shareId, clip }: MvStageProps) {
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [ready, work, freezeT, previewT]);
+  }, [ready, work, freezeT, previewT, clip.startTime]);
 
   const onPlayingChange = useCallback((playing: boolean) => {
     if (playing) startedRef.current = true;
@@ -173,8 +178,8 @@ export default function MvStage({ shareId, clip }: MvStageProps) {
               ref={playerRef}
               platform={clip.platform}
               videoId={clip.videoId}
-              startTime={work.sourceStart}
-              endTime={work.sourceStart + work.duration}
+              startTime={clip.startTime}
+              endTime={clip.endTime}
               posterDate={clip.sungDateLabel ?? undefined}
               posterAddedBy={clip.uploaderName}
               posterThumbnail={clip.thumbnailUrl ?? undefined}
