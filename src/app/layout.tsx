@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
@@ -11,6 +11,8 @@ import ServiceWorkerRegistrar from "@/components/pwa/ServiceWorkerRegistrar";
 import { ClipPlayerProvider } from "@/components/clip/player/ClipPlayerProvider";
 import MiniPlayer from "@/components/clip/player/MiniPlayer";
 import PlayerQueueSync from "@/components/clip/player/PlayerQueueSync";
+import { PwaInstallProvider } from "@/components/pwa/usePwaInstall";
+
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,6 +24,14 @@ const poppins = Poppins({
   weight: ["300", "400", "500", "600", "700", "800"],
   variable: "--font-poppins",
 });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  // Keep pinch zoom available; installed apps need the same accessibility as the web.
+  themeColor: '#D1AFE3',
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000'),
@@ -72,7 +82,6 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/honeyz_pink.png" type="image/png" />
         <link rel="apple-touch-icon" href="/honeyz_pink.png" />
-        <meta name="theme-color" content="#D1AFE3" />
         <ThemeScript />
       </head>
       <body
@@ -82,11 +91,15 @@ export default function RootLayout({
         <AuthProvider>
           <QueryProvider>
             <ToastProvider>
-              <ClipPlayerProvider>
-                {children}
-                <MiniPlayer />
-                <PlayerQueueSync />
-              </ClipPlayerProvider>
+              <PwaInstallProvider>
+                <ClipPlayerProvider>
+                  <div id="app-shell">
+                    {children}
+                    <MiniPlayer />
+                    <PlayerQueueSync />
+                  </div>
+                </ClipPlayerProvider>
+              </PwaInstallProvider>
             </ToastProvider>
           </QueryProvider>
         </AuthProvider>

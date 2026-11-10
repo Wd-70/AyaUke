@@ -55,7 +55,7 @@ export default function ClipShareView({
   const sourceUrl = buildSourceUrl(clip.platform, clip.videoId, clip.startTime);
 
   return (
-    <main className="relative min-h-[calc(100vh-3rem)] overflow-hidden px-4 pb-24 pt-24 sm:px-6">
+    <main className="relative min-h-[calc(100vh-3rem)] overflow-hidden px-4 pb-12 pt-20 sm:px-6 sm:pt-24">
       {/* 앰비언트 배경 */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-light-primary/8 via-transparent to-transparent dark:from-dark-primary/10" />

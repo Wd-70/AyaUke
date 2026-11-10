@@ -101,6 +101,13 @@ export default function SongSearch({
   // 기본은 stuck이면 접고 해제되면 펼친다. 단, 사용자가 직접 토글한 뒤로는 그 상태를
   // 유지하고 자동 동작을 멈춘다(한 번 펼쳐두면 재진입해도 펼친 채 유지).
   const userToggledFilterRef = useRef(false);
+  useEffect(() => {
+    // Start with content on phones; filters stay available on demand.
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      userToggledFilterRef.current = true;
+      setIsFilterOpen(false);
+    }
+  }, [setIsFilterOpen]);
   const prevStuckRef = useRef(stuck);
   // 자동 접힘/펼침은 스크롤 중에 일어나므로 즉시(0초) 처리해 "줄어드는 동안" 구간이
   // 스크롤과 겹치지 않게 한다. 수동 토글만 부드럽게 애니메이션.
@@ -140,7 +147,9 @@ export default function SongSearch({
     <div className="relative group">
       <button
         onClick={onClick}
-        className={`p-1.5 rounded-lg transition-all duration-200 hover:scale-110 ${
+        aria-label={tooltip}
+        aria-pressed={active}
+        className={`inline-flex items-center justify-center gap-1.5 p-1.5 rounded-lg transition-all duration-200 hover:scale-110 ${
           active
             ? "bg-light-accent/20 dark:bg-dark-accent/20 text-light-accent dark:text-dark-accent"
             : "hover:bg-light-primary/10 dark:hover:bg-dark-primary/10 text-light-text/60 dark:text-dark-text/60 hover:text-light-accent dark:hover:text-dark-accent"
@@ -197,7 +206,7 @@ export default function SongSearch({
         // top은 --nav-height - --nav-shift 로 스크롤에 연동(트랜지션 없이 rAF가 매끄럽게
         // 갱신). 배경/보더/그림자만 stuck 시 트랜지션. 변수 미설정 페이지는 64px 기본.
         style={{ top: "calc(var(--nav-height, 64px) - var(--nav-shift, 0px))" }}
-        className={`sticky z-30 mb-8 py-3 transition-[background-color,border-color,box-shadow] duration-200 ${
+        className={`mobile-search-panel sticky z-30 mb-8 py-3 transition-[background-color,border-color,box-shadow] duration-200 ${
           stuck
             ? "bg-light-background/95 dark:bg-dark-background/95 backdrop-blur-md border-b border-light-primary/20 dark:border-dark-primary/20 shadow-sm -mx-3 sm:-mx-4 lg:-mx-6 xl:-mx-8 px-3 sm:px-4 lg:px-6 xl:px-8"
             : ""
@@ -205,28 +214,30 @@ export default function SongSearch({
       >
       {/* Search bar */}
       <div className="relative mb-3 sm:mb-4">
-        <div className="absolute inset-y-0 left-0 z-10 pl-2.5 sm:pl-3 flex items-center pointer-events-none">
+        <div className="absolute left-0 top-0 h-12 z-10 pl-2.5 sm:pl-3 flex items-center pointer-events-none">
           <MagnifyingGlassIcon className="h-4 w-4 sm:h-5 sm:w-5 text-light-accent/60 dark:text-dark-accent/60" />
         </div>
         <input
-          type="text"
-          placeholder="노래 제목, 아티스트, 검색태그로 검색... (띄어쓰기 무관, 초성검색, 한/영 오타 허용)"
+          type="search"
+          aria-label="노래 검색"
+          enterKeyHint="search"
+          placeholder="노래 제목, 가수, 초성 검색"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="block w-full pl-8 sm:pl-10 pr-24 sm:pr-32 py-2.5 sm:py-3 border border-light-primary/20 dark:border-dark-primary/20 
+          className="song-search-input block w-full pl-8 sm:pl-10 pr-24 sm:pr-32 py-2.5 sm:py-3 border border-light-primary/20 dark:border-dark-primary/20
                      rounded-xl bg-light-background/50 dark:bg-dark-background/50 backdrop-blur-sm
                      text-sm sm:text-base md:text-lg text-light-text dark:text-dark-text placeholder-light-text/50 dark:placeholder-dark-text/50
                      focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent 
                      focus:border-transparent transition-all duration-200"
         />
-        <div className="absolute inset-y-0 right-0 pr-2 sm:pr-3 flex items-center gap-1">
+        <div className="song-search-actions absolute inset-y-0 right-0 pr-2 sm:pr-3 flex items-center gap-1">
           {/* 검색어 지우기 */}
           {searchTerm && (
             <button
               type="button"
               onClick={() => setSearchTerm("")}
               aria-label="검색어 지우기"
-              className="flex h-7 w-7 items-center justify-center rounded-full text-light-text/40 transition-colors hover:bg-light-primary/15 hover:text-light-text/70 dark:text-dark-text/40 dark:hover:bg-dark-primary/15 dark:hover:text-dark-text/70"
+              className="flex h-7 w-11 items-center justify-center rounded-full text-light-text/65 transition-colors hover:bg-light-primary/15 hover:text-light-text/70 dark:text-dark-text/40 dark:hover:bg-dark-primary/15 dark:hover:text-dark-text/70"
             >
               <XMarkIcon className="h-4 w-4 sm:h-5 sm:w-5" />
             </button>
@@ -255,9 +266,10 @@ export default function SongSearch({
           {/* 필터 토글 버튼 */}
           <TooltipButton
             onClick={handleToggleFilter}
-            active={false}
+            active={isFilterOpen}
             tooltip={isFilterOpen ? "필터 숨기기" : "필터 보기"}
           >
+            <span className="text-xs md:hidden">필터</span>
             {isFilterOpen ? (
               <ChevronUpIcon className="h-5 w-5" />
             ) : (
@@ -270,6 +282,7 @@ export default function SongSearch({
       {/* Badge-style filters */}
       <motion.div
         initial={false}
+        hidden={!isFilterOpen}
         animate={{
           height: isFilterOpen ? "auto" : 0,
           opacity: isFilterOpen ? 1 : 0,

@@ -2,12 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useSession, signOut } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { UserIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { isSuperAdmin, canManageSongs, UserRole } from '@/lib/permissions';
+import MobileAppNavigation from '@/components/mobile/MobileAppNavigation';
+import { mobileParent, isRouteWithin } from '@/components/mobile/navigation-model';
+import { ChevronLeftIcon } from '@heroicons/react/24/outline';
 
 interface NavigationProps {
   /** 활성 경로 강제 지정(미지정 시 usePathname으로 자체 판단) */
@@ -82,24 +85,19 @@ export default function Navigation({ currentPath }: NavigationProps) {
   const scrolled = useScrolled();
   const reduce = useReducedMotion();
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
+  const parent = mobileParent(activePath);
 
-  useEffect(() => {
-    if (!isMobileMenuOpen) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsMobileMenuOpen(false);
-        mobileMenuButtonRef.current?.focus();
-      }
-    };
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [isMobileMenuOpen]);
+  useEffect(() => { setIsMobileMenuOpen(false); }, [pathname]);
 
   // 스크롤 연동: useScrollNav가 --nav-shift를 갱신하면 그만큼 위로 밀려 올라간다.
   // (변수가 없는 페이지는 0px → 이동 없음). 모바일 메뉴가 열려 있으면 항상 표시.
   return (
+    <>
     <nav
-      className={`fixed left-0 right-0 top-0 z-50 border-b backdrop-blur-md transition-shadow duration-300 ${
+      aria-label="주요 메뉴"
+      data-app-header
+      className={`app-header fixed left-0 right-0 top-0 z-50 border-b backdrop-blur-md transition-shadow duration-300 ${
         scrolled
           ? 'border-light-primary/30 bg-white/90 shadow-lg shadow-light-primary/5 dark:border-dark-primary/30 dark:bg-gray-900/90 dark:shadow-black/20'
           : 'border-light-primary/20 bg-white/80 dark:border-dark-primary/20 dark:bg-gray-900/80'
@@ -113,7 +111,8 @@ export default function Navigation({ currentPath }: NavigationProps) {
       <div className="mx-auto max-w-6xl px-3 sm:px-6 lg:px-8">
         <div className="flex h-12 items-center sm:h-16">
           {/* Left side - Logo */}
-          <div className="flex-1">
+          <div className="flex flex-1 items-center">
+            {parent && <Link href={parent.href} aria-label={`${parent.label}으로 돌아가기`} className="-ml-2 mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full md:hidden"><ChevronLeftIcon className="h-5 w-5" /></Link>}
             <Link href="/" className="group inline-flex cursor-pointer items-center space-x-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-light-accent to-light-purple p-1 transition-transform duration-200 group-hover:scale-105 dark:from-dark-primary dark:to-dark-secondary sm:h-10 sm:w-10">
                 <img src="/honeyz.png" alt="HONEYZ Logo" className="h-full w-full object-contain" />
@@ -127,11 +126,12 @@ export default function Navigation({ currentPath }: NavigationProps) {
           {/* Center - Desktop Navigation */}
           <div className="hidden flex-1 items-center justify-center space-x-8 md:flex">
             {NAV_LINKS.map((link) => {
-              const isActive = activePath === link.href;
+              const isActive = isRouteWithin(activePath, link.href);
               return (
                 <Link
                   key={link.href}
                   href={link.href}
+                  aria-current={isActive ? 'page' : undefined}
                   className={`relative whitespace-nowrap px-2 py-1 text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 ${
                     isActive
                       ? 'text-light-accent-deep dark:text-dark-primary'
@@ -164,7 +164,8 @@ export default function Navigation({ currentPath }: NavigationProps) {
               className="flex min-h-11 min-w-11 items-center justify-center rounded-full bg-light-primary/20 p-1.5 transition-all duration-300 hover:bg-light-primary/30 dark:bg-dark-primary/20 dark:hover:bg-dark-primary/30 md:hidden sm:p-2"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
               aria-label={isMobileMenuOpen ? '모바일 메뉴 닫기' : '모바일 메뉴 열기'}
-              aria-controls="mobile-navigation-menu"
+              aria-haspopup="dialog"
+              aria-controls={isMobileMenuOpen ? 'mobile-navigation-menu' : undefined}
               aria-expanded={isMobileMenuOpen}
             >
               <svg className="h-5 w-5 text-gray-600 dark:text-gray-300 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -191,40 +192,33 @@ export default function Navigation({ currentPath }: NavigationProps) {
           </div>
         </div>
 
-        {/* Mobile Navigation Menu */}
-        <AnimatePresence>
-          {isMobileMenuOpen && (
-            <motion.div
-              id="mobile-navigation-menu"
-              key="mobile-menu"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: reduce ? 0 : 0.22, ease: 'easeOut' }}
-              className="overflow-hidden border-t border-light-primary/20 bg-white/95 backdrop-blur-md dark:border-dark-primary/20 dark:bg-gray-900/95 md:hidden"
-            >
+      </div>
+    </nav>
+    <MobileAppNavigation path={activePath} open={isMobileMenuOpen} onOpen={() => setIsMobileMenuOpen(true)} onClose={closeMobileMenu}>
               <div className="space-y-1 px-3 py-2">
                 {/* 1. 사용자 정보 */}
                 <MobileUserProfile session={session} status={status} />
 
                 {/* 2. 기본 내비 링크 */}
+                <div className="grid grid-cols-2 gap-2 py-2" aria-label="바로가기">
                 {NAV_LINKS.map((link) => {
                   const isActive = activePath === link.href;
                   return (
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`flex min-h-11 items-center rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
+                      className={`flex min-h-11 items-center justify-center rounded-xl border border-light-primary/20 px-3 py-2 text-sm font-medium transition-all duration-200 dark:border-dark-primary/20 ${
                         isActive
                           ? 'bg-light-primary/10 text-light-accent-deep dark:bg-dark-primary/10 dark:text-dark-primary'
                           : 'text-gray-600 hover:bg-light-primary/5 hover:text-light-accent dark:text-gray-300 dark:hover:bg-dark-primary/5 dark:hover:text-dark-primary'
                       }`}
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
-                      {link.label}
+                      {link.href === '/player' ? '보관함' : link.label}
                     </Link>
                   );
                 })}
+                </div>
 
                 {/* 3. 권한별 추가 메뉴 */}
                 <MobileAdminMenus session={session} onMenuClose={() => setIsMobileMenuOpen(false)} />
@@ -238,6 +232,12 @@ export default function Navigation({ currentPath }: NavigationProps) {
                     type="button"
                     data-theme-toggle
                     aria-label="테마 전환"
+                    onClick={(event) => {
+                      // DialogPanel stops bubbling before ThemeScript's document listener.
+                      event.stopPropagation();
+                      const dark = document.documentElement.classList.toggle('dark');
+                      try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch { /* storage may be disabled */ }
+                    }}
                     className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-light-primary/5 hover:text-light-accent dark:text-gray-300 dark:hover:bg-dark-primary/5 dark:hover:text-dark-primary"
                   >
                     <span className="mr-3">
@@ -248,11 +248,8 @@ export default function Navigation({ currentPath }: NavigationProps) {
                   </button>
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </nav>
+    </MobileAppNavigation>
+    </>
   );
 }
 

@@ -55,14 +55,14 @@ export default function PlayerClient() {
   return (
     <div className="min-h-screen bg-light-background text-light-text dark:bg-dark-background dark:text-dark-text">
       <Navigation />
-      <main className={`mx-auto max-w-4xl px-4 pt-24 ${current ? 'pb-32' : 'pb-12'}`}>
-        <header className="mb-8">
+      <main className={`mx-auto max-w-4xl px-4 pt-20 sm:pt-24 ${current ? 'pb-12 md:pb-32' : 'pb-12'}`}>
+        <header className="mobile-page-header mb-8">
           <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
             <span className="bg-gradient-to-r from-light-accent to-light-purple bg-clip-text text-transparent dark:from-dark-accent dark:to-dark-secondary">
-              플레이어
+              나의 보관함
             </span>
           </h1>
-          <p className="mt-2 text-sm text-light-text/60 dark:text-dark-text/60">
+          <p className="mt-2 text-sm text-light-text/65 dark:text-dark-text/60">
             내 클립 플레이리스트를 앱처럼 이어서 감상하세요. 홈 화면에 설치하면 음악 앱처럼 쓸 수 있어요.
           </p>
         </header>
@@ -71,12 +71,8 @@ export default function PlayerClient() {
           <div className="rounded-xl border border-light-primary/15 p-10 text-center dark:border-dark-primary/15">
             <MusicalNoteIcon className="mx-auto mb-3 h-10 w-10 text-light-accent/40 dark:text-dark-accent/40" />
             <p className="text-light-text/70 dark:text-dark-text/70">로그인하면 내 클립 플레이리스트를 재생할 수 있어요.</p>
-            <Link
-              href="/songbook"
-              className="mt-4 inline-block rounded-lg bg-gradient-to-r from-light-cta-accent to-light-cta-purple px-5 py-2 font-medium text-white dark:from-dark-accent dark:to-dark-purple"
-            >
-              노래책으로
-            </Link>
+            <Link href="/auth/signin" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-xl bg-gradient-to-r from-light-cta-accent to-light-cta-purple px-6 py-2 font-medium text-white dark:from-dark-accent dark:to-dark-purple">로그인하고 시작하기</Link>
+            <Link href="/clips" className="mt-2 flex min-h-11 items-center justify-center text-sm text-light-accent-deep dark:text-dark-accent">먼저 클립 둘러보기 →</Link>
           </div>
         ) : status === 'loading' || isLoading ? (
           <div className="py-20 text-center text-light-text/50 dark:text-dark-text/50">불러오는 중...</div>
@@ -103,7 +99,7 @@ export default function PlayerClient() {
                 return (
                   <div
                     key={playlist._id}
-                    className="group flex items-center gap-3 rounded-2xl border border-light-primary/15 bg-white/60 p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/15 dark:bg-gray-800/50 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow"
+                    className="mobile-library-card group flex items-center gap-3 rounded-2xl border border-light-primary/15 bg-white/60 p-3 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/15 dark:bg-gray-800/50 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow"
                   >
                     <div className="flex aspect-square h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-light-accent/25 to-light-purple/20 dark:from-dark-accent/25 dark:to-dark-purple/20">
                       {cover ? (
@@ -114,7 +110,7 @@ export default function PlayerClient() {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold">{playlist.name}</div>
+                      <div className="library-name truncate font-semibold">{playlist.name}</div>
                       <div className="text-xs text-light-text/55 dark:text-dark-text/55">{count}개 클립</div>
                     </div>
                     {playlist.shareId && (
@@ -122,7 +118,7 @@ export default function PlayerClient() {
                         href={`/clip-playlist/${playlist.shareId}`}
                         aria-label={`${playlist.name} 관리`}
                         title="순서 변경·제거·공유 관리"
-                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-light-primary/25 text-light-text/60 transition-colors hover:border-light-accent/40 hover:text-light-accent dark:border-dark-primary/25 dark:text-dark-text/60 dark:hover:text-dark-accent"
+                        className="library-manage flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-light-primary/25 text-light-text/60 transition-colors hover:border-light-accent/40 hover:text-light-accent dark:border-dark-primary/25 dark:text-dark-text/60 dark:hover:text-dark-accent"
                       >
                         <Cog6ToothIcon className="h-5 w-5" />
                       </Link>
@@ -131,7 +127,7 @@ export default function PlayerClient() {
                       onClick={() => play(playlist)}
                       disabled={count === 0}
                       aria-label={`${playlist.name} 재생`}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-light-accent to-light-purple text-white shadow-md transition-transform hover:scale-105 disabled:opacity-40 dark:from-dark-accent dark:to-dark-purple"
+                      className="library-play flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-light-cta-accent to-light-cta-purple text-white shadow-md transition-transform hover:scale-105 disabled:opacity-40 dark:from-dark-accent dark:to-dark-purple"
                     >
                       <PlayIcon className="h-5 w-5 translate-x-0.5" />
                     </button>

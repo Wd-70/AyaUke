@@ -117,8 +117,8 @@ export default function ProfileClient() {
               <div className="absolute -top-4 -right-4 w-24 h-24 bg-light-accent/10 dark:bg-dark-accent/10 rounded-full blur-xl" />
               <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-light-secondary/10 dark:bg-dark-secondary/10 rounded-full blur-xl" />
               
-              <div className="relative p-8">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+              <div className="relative p-5 sm:p-8">
+                <div className="flex flex-row flex-wrap items-center gap-4 sm:gap-6">
                   {/* 프로필 이미지 */}
                   <div className="relative">
                     <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden bg-gradient-to-br from-light-accent to-light-secondary dark:from-dark-accent to-dark-secondary ring-4 ring-white/20 dark:ring-gray-800/20">
@@ -136,7 +136,8 @@ export default function ProfileClient() {
                     </div>
                     <button
                       onClick={() => setIsEditingProfile(true)}
-                      className="absolute -bottom-1 -right-1 w-8 h-8 bg-light-accent dark:bg-dark-accent text-white rounded-full flex items-center justify-center hover:scale-110 transition-transform duration-200 shadow-lg"
+                      aria-label="프로필 이미지 편집"
+                      className="absolute -bottom-1 -right-1 w-11 h-11 bg-light-accent dark:bg-dark-accent text-white rounded-full flex items-center justify-center hover:scale-110 transition-transform duration-200 shadow-lg"
                     >
                       <PencilIcon className="w-4 h-4" />
                     </button>
@@ -187,7 +188,7 @@ export default function ProfileClient() {
             transition={{ delay: 0.1 }}
             className="mb-8"
           >
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="mobile-profile-tabs flex flex-col sm:flex-row gap-4" role="group" aria-label="내 프로필 보기">
               {tabs.map((tab) => {
                 const Icon = tab.icon
                 const isActive = activeTab === tab.id
@@ -196,6 +197,7 @@ export default function ProfileClient() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
+                    aria-pressed={isActive}
                     className={`relative flex-1 p-4 rounded-xl border transition-all duration-300 group ${
                       isActive
                         ? 'bg-light-accent/10 dark:bg-dark-accent/10 border-light-accent/30 dark:border-dark-accent/30 text-light-accent dark:text-dark-accent'

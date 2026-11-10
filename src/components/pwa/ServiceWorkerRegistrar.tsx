@@ -20,7 +20,9 @@ export default function ServiceWorkerRegistrar() {
         /* 등록 실패는 앱 동작에 영향 없음 */
       });
     };
-    window.addEventListener('load', onLoad);
+    // Client hydration may run after load, especially on an installed app launch.
+    if (document.readyState === 'complete') onLoad();
+    else window.addEventListener('load', onLoad);
     return () => window.removeEventListener('load', onLoad);
   }, []);
 

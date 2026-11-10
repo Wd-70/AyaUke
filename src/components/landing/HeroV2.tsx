@@ -83,7 +83,7 @@ export default function HeroV2() {
     <section
       ref={sectionRef}
       onMouseMove={onMouseMove}
-      className="relative flex min-h-[100svh] items-center justify-center overflow-hidden px-4 pt-24 pb-16 sm:px-6"
+      className="mobile-hero relative flex min-h-[100svh] items-center justify-center overflow-hidden px-4 pt-24 pb-16 sm:px-6"
     >
       {/* ── 배경 레이어 (옅은 브랜드 메시 + 미세 블롭 — 앰비언스는 음표/스포트라이트가 담당) ── */}
       <div className="absolute inset-0 -z-10">
@@ -128,14 +128,14 @@ export default function HeroV2() {
         <NoteParticles mx={mx} my={my} />
       </div>
 
-      <motion.div style={{ opacity: contentOpacity }} className="relative z-10 mx-auto flex max-w-5xl flex-col items-center text-center">
+      <motion.div style={{ opacity: contentOpacity }} className="mobile-hero-content relative z-10 mx-auto flex max-w-5xl flex-col items-center text-center">
         {/* 라이브 상태 */}
-        <div className="mb-7">
+        <div className="mobile-hero-live mb-7">
           <LiveStatusPill />
         </div>
 
         {/* 캐릭터 포트레이트 (시네마틱) — 커서를 향해 3D로 고개를 돌린다 */}
-        <div className="relative mb-9 [perspective:900px]">
+        <div className="mobile-hero-portrait relative mb-9 [perspective:900px]">
           <motion.div
             style={{ y: portraitY, rotateX: rotX, rotateY: rotY }}
             className="relative mx-auto h-56 w-56 [transform-style:preserve-3d] sm:h-72 sm:w-72"
@@ -199,7 +199,7 @@ export default function HeroV2() {
           initial={{ opacity: 0, y: reduce ? 0 : 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: reduce ? 0 : 0.5 }}
-          className="mt-5 max-w-2xl break-keep text-lg text-light-text/70 dark:text-dark-text/70 sm:text-xl"
+          className="mobile-hero-description mt-5 max-w-2xl break-keep text-lg text-light-text/70 dark:text-dark-text/70 sm:text-xl"
         >
           허니즈의 메인보컬, 생활애교가 흘러넘치는 치지직의 분내담당
         </motion.p>
@@ -209,7 +209,7 @@ export default function HeroV2() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: reduce ? 0 : 0.65 }}
-          className="mt-6 flex flex-wrap justify-center gap-2"
+          className="mobile-hero-tags mt-6 flex flex-wrap justify-center gap-2"
         >
           {TAGS.map((t) => (
             <span
@@ -226,7 +226,7 @@ export default function HeroV2() {
           initial={{ opacity: 0, y: reduce ? 0 : 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: reduce ? 0 : 0.8 }}
-          className="mt-10 flex flex-col items-center gap-4 sm:flex-row"
+          className="mobile-hero-actions mt-10 flex flex-col items-center gap-4 sm:flex-row"
         >
           {isLive ? (
             <>
@@ -280,7 +280,7 @@ export default function HeroV2() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, y: [0, 8, 0] }}
           transition={{ opacity: { delay: 1.2 }, y: { duration: 1.8, repeat: Infinity } }}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 text-light-text/40 dark:text-dark-text/40"
+          className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 text-light-text/40 dark:text-dark-text/40 md:block"
         >
           <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />

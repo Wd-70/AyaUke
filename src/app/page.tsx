@@ -12,7 +12,7 @@ export default function Home() {
     <div className="min-h-screen bg-light-background text-light-text dark:bg-dark-background dark:text-dark-text">
       <ActivityTracker />
       <Navigation />
-      <main className="relative">
+      <main className="mobile-home relative">
         <HeroV2 />
         <NumbersSection />
         <AboutSection />

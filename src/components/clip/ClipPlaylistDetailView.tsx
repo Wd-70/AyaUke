@@ -230,7 +230,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
   return (
     <div className="min-h-screen bg-light-background text-light-text dark:bg-dark-background dark:text-dark-text">
       <Navigation />
-      <main className={`mx-auto max-w-3xl px-4 pt-24 ${current ? 'pb-28' : 'pb-12'}`}>
+      <main className={`mobile-playlist-page mx-auto max-w-3xl px-4 pt-20 sm:pt-24 ${current ? 'pb-12 md:pb-28' : 'pb-12'}`}>
         {/* 헤더 */}
         <div className="mb-6">
           <div className="flex items-start justify-between gap-4">

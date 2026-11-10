@@ -29,7 +29,7 @@ export function useScrollNav(shiftAnchorSelector?: string) {
   useIsoLayoutEffect(() => {
     const root = document.documentElement;
     const measure = () => {
-      const nav = document.querySelector('nav');
+      const nav = document.querySelector('[data-app-header]');
       const h = nav ? Math.round(nav.getBoundingClientRect().height) : 64;
       navHeightRef.current = h;
       root.style.setProperty('--nav-height', `${h}px`);

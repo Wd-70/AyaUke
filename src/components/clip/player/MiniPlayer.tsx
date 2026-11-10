@@ -256,8 +256,8 @@ export default function MiniPlayer() {
   };
 
   const stageClass = isExpanded
-    ? 'fixed z-[70] top-12 left-1/2 -translate-x-1/2'
-    : 'fixed z-[70] bottom-[7px] left-2 w-[88px]';
+    ? 'mini-player-stage--expanded fixed z-[70] top-12 left-1/2 -translate-x-1/2'
+    : 'mini-player-stage--compact fixed z-[70] bottom-[7px] left-2 w-[88px]';
 
   const ctrlBtn =
     'flex items-center justify-center rounded-full transition-colors disabled:opacity-30';
@@ -267,7 +267,7 @@ export default function MiniPlayer() {
       {/* 펼침 오버레이 (블러 아트워크 배경 + 컨트롤 + 큐) — 스테이지(z-70)보다 아래.
           루트는 스크롤하지 않고(flex 컬럼), 큐 영역만 스크롤 → 고정된 영상 위로 큐가 겹치지 않음 */}
       {isExpanded && (
-        <div className="fixed inset-0 z-[55] flex flex-col" role="dialog" aria-label="플레이어">
+        <div className="player-expanded fixed inset-0 z-[55] flex flex-col" role="dialog" aria-label="플레이어">
           {/* 불투명 배경 (아래 페이지가 비치지 않도록 솔리드) + 은은한 블러 아트워크 틴트 */}
           <div className="pointer-events-none fixed inset-0 -z-10 bg-light-background dark:bg-dark-background">
             {bgArtwork && (
@@ -279,7 +279,7 @@ export default function MiniPlayer() {
 
           {/* 상단 바: (좌) 접기 · 영상크기  —  (우) 닫기.
               영상 크기 토글은 '보기' 조작이라 접기와 묶고, 닫기와는 떨어뜨려 혼동을 줄인다. */}
-          <div className="flex h-12 shrink-0 items-center justify-between px-3">
+          <div className="player-expanded-toolbar flex h-12 shrink-0 items-center justify-between px-3">
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setExpanded(false)}
@@ -410,7 +410,7 @@ export default function MiniPlayer() {
           </div>
 
           {/* 큐 — 이 영역만 스크롤 (overscroll-contain: 끝에서 배경으로 스크롤 체이닝 방지) */}
-          <div className="mt-6 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="player-queue mt-6 min-h-0 flex-1 overflow-y-auto overscroll-contain">
             <div className="mx-auto w-[min(94vw,760px)] space-y-1 px-1 pb-10">
             <div className="mb-1 flex items-center justify-between">
               <span className="text-xs font-semibold text-light-text/45 dark:text-dark-text/45">재생목록</span>
@@ -506,7 +506,7 @@ export default function MiniPlayer() {
 
       {/* 접힘 바 chrome — 좌측 소형 영상(위 스테이지) 공간 확보 후 정보/컨트롤 */}
       {!isExpanded && (
-        <div className="fixed inset-x-0 bottom-0 z-[60] flex h-[64px] items-center gap-1.5 border-t border-light-primary/20 bg-white/95 pl-[104px] pr-2 backdrop-blur dark:border-dark-primary/20 dark:bg-gray-900/95">
+        <div className="mini-player-bar fixed inset-x-0 bottom-0 z-[60] flex h-[64px] items-center gap-1.5 border-t border-light-primary/20 bg-white/95 pl-[104px] pr-2 backdrop-blur dark:border-dark-primary/20 dark:bg-gray-900/95" role="region" aria-label="현재 재생 중">
           <button onClick={() => setExpanded(true)} className="min-w-0 flex-1 text-left" aria-label="플레이어 펼치기">
             <div className="truncate text-sm font-semibold text-light-text dark:text-dark-text">{current.title}</div>
             <div className="truncate text-xs text-light-text/55 dark:text-dark-text/55">{current.artist}</div>
@@ -515,14 +515,14 @@ export default function MiniPlayer() {
             onClick={prev}
             disabled={!hasPrev}
             aria-label="이전 곡"
-            className="p-1.5 text-light-text/70 disabled:opacity-30 dark:text-dark-text/70"
+            className="hidden p-1.5 text-light-text/70 disabled:opacity-30 dark:text-dark-text/70 md:block"
           >
             <BackwardIcon className="h-5 w-5" />
           </button>
           <button
             onClick={toggle}
             aria-label={playing ? '일시정지' : '재생'}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-light-accent to-light-purple text-white dark:from-dark-accent dark:to-dark-purple"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-light-cta-accent to-light-cta-purple text-white dark:from-dark-accent dark:to-dark-purple"
           >
             {playing ? <PauseIcon className="h-5 w-5" /> : <PlayIcon className="h-5 w-5 translate-x-0.5" />}
           </button>
@@ -534,7 +534,7 @@ export default function MiniPlayer() {
           >
             <ForwardIcon className="h-5 w-5" />
           </button>
-          <button onClick={() => setExpanded(true)} aria-label="펼치기" className="p-1.5 text-light-text/60 dark:text-dark-text/60">
+          <button onClick={() => setExpanded(true)} aria-label="펼치기" className="hidden p-1.5 text-light-text/60 dark:text-dark-text/60 md:block">
             <ChevronUpIcon className="h-5 w-5" />
           </button>
           <button onClick={close} aria-label="닫기" className="p-1.5 text-light-text/60 dark:text-dark-text/60">

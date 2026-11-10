@@ -162,11 +162,12 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
               stiffness: 500
             }}
             className={`
-              fixed top-20 right-4 z-50 max-w-sm w-full
+              app-toast fixed top-20 right-4 z-[120] max-w-sm w-full
               ${getToastColors(toast.type)}
               border rounded-lg shadow-lg backdrop-blur-sm p-4 cursor-pointer
               hover:shadow-xl transition-shadow duration-200
             `}
+            role="status"
             onClick={removeToast}
           >
             <div className="flex items-start gap-3">
@@ -184,6 +185,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
               </div>
               
               <button
+                aria-label="알림 닫기"
                 onClick={(e) => {
                   e.stopPropagation();
                   removeToast();

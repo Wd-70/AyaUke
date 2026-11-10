@@ -40,10 +40,11 @@ function Segmented<T extends string>({
         <button
           key={o.key}
           onClick={() => onChange(o.key)}
-          className={`rounded-lg px-3 py-1.5 font-medium transition-colors ${
+          aria-pressed={value === o.key}
+          className={`min-h-11 rounded-lg px-3 py-1.5 font-medium transition-colors ${
             value === o.key
-              ? 'bg-white text-light-accent shadow-sm dark:bg-gray-700 dark:text-dark-accent'
-              : 'text-light-text/55 hover:text-light-accent dark:text-dark-text/55 dark:hover:text-dark-accent'
+              ? 'bg-white text-light-accent-deep shadow-sm dark:bg-gray-700 dark:text-dark-accent'
+              : 'text-light-text/65 hover:text-light-accent dark:text-dark-text/55 dark:hover:text-dark-accent'
           }`}
         >
           {o.label}
@@ -146,29 +147,32 @@ export default function ClipsGallery() {
   }, [hasMore, searching, browse.isFetchingNextPage, searchResults.length, visibleCount]);
 
   return (
-    <main className="relative min-h-[calc(100vh-3rem)] overflow-hidden px-4 pb-24 pt-24 sm:px-6">
+    <main className="relative min-h-[calc(100vh-3rem)] overflow-hidden px-4 pb-12 pt-20 sm:px-6 sm:pt-24">
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute inset-0 bg-gradient-to-b from-light-primary/8 via-transparent to-transparent dark:from-dark-primary/10" />
       </div>
 
       <div className="mx-auto max-w-6xl">
         {/* 헤더 */}
-        <motion.div {...reveal({ y: 16 })} className="mb-8 text-center">
+        <motion.div {...reveal({ y: 16 })} className="mobile-page-header mb-8 text-center">
           <h1 className="font-display text-4xl font-extrabold sm:text-5xl">
             <span className="bg-gradient-to-r from-light-accent to-light-purple bg-clip-text text-transparent dark:from-dark-accent dark:to-dark-secondary">
               라이브 클립
             </span>
           </h1>
-          <p className="mt-3 text-lg text-light-text/60 dark:text-dark-text/60">
+          <p className="mt-3 text-lg text-light-text/65 dark:text-dark-text/60">
             아야가 부른 순간들을 모아봤어요{total > 0 ? ` · 총 ${total.toLocaleString()}개` : ''}
           </p>
         </motion.div>
 
         {/* 컨트롤 */}
-        <div className="mb-8 flex flex-col items-center gap-3">
+        <div className="mobile-search-panel mb-8 flex flex-col items-center gap-3">
           <div className="relative w-full max-w-md">
             <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-light-accent/60 dark:text-dark-accent/60" />
             <input
+              type="search"
+              aria-label="클립 검색"
+              enterKeyHint="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="곡 제목 · 가수 · 초성으로 검색"
@@ -179,17 +183,19 @@ export default function ClipsGallery() {
                 type="button"
                 onClick={() => setSearch('')}
                 aria-label="검색어 지우기"
-                className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-light-text/40 transition-colors hover:bg-light-primary/15 hover:text-light-text/70 dark:text-dark-text/40 dark:hover:bg-dark-primary/15 dark:hover:text-dark-text/70"
+                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-light-text/65 transition-colors hover:bg-light-primary/15 hover:text-light-text/70 dark:text-dark-text/40 dark:hover:bg-dark-primary/15 dark:hover:text-dark-text/70"
               >
                 <XMarkIcon className="h-4 w-4" />
               </button>
             )}
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <Segmented value={sort} options={SORTS} onChange={setSort} />
+          <div className="flex w-full flex-col items-stretch justify-center gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center" role="group" aria-label="클립 정렬과 필터">
+            <div className="mobile-clip-sort"><Segmented value={sort} options={SORTS} onChange={setSort} /></div>
+            <div className="mobile-filter-rail flex flex-wrap items-center justify-center gap-2">
             <Segmented value={platform} options={PLATFORMS} onChange={setPlatform} />
             <button
               onClick={() => setVerified((v) => !v)}
+              aria-pressed={verified}
               className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
                 verified
                   ? 'border-emerald-400/50 bg-emerald-400/10 text-emerald-600 dark:text-emerald-400'
@@ -210,6 +216,7 @@ export default function ClipsGallery() {
               <HeartIcon className="h-4 w-4" />
               좋아요한 클립
             </button>
+            </div>
           </div>
         </div>
 

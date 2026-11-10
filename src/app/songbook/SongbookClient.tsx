@@ -230,14 +230,18 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
               <button
                 onClick={() => setViewMode('grid')}
                 title="카드 보기"
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-light-accent dark:bg-dark-accent text-white' : 'text-light-text/60 dark:text-dark-text/60 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'}`}
+                aria-label="카드 보기"
+                aria-pressed={viewMode === 'grid'}
+                className={`min-h-11 min-w-11 flex items-center justify-center p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-light-cta-accent dark:bg-dark-accent text-white' : 'text-light-text/60 dark:text-dark-text/60 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'}`}
               >
                 <Squares2X2Icon className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
                 title="리스트 보기"
-                className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-light-accent dark:bg-dark-accent text-white' : 'text-light-text/60 dark:text-dark-text/60 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'}`}
+                aria-label="리스트 보기"
+                aria-pressed={viewMode === 'list'}
+                className={`min-h-11 min-w-11 flex items-center justify-center p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-light-cta-accent dark:bg-dark-accent text-white' : 'text-light-text/60 dark:text-dark-text/60 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'}`}
               >
                 <ListBulletIcon className="w-4 h-4" />
               </button>
@@ -387,10 +391,12 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
           scale: (showScrollTop && !hasOpenDialog) ? 1 : 0 
         }}
         transition={{ duration: 0.3, ease: "easeOut" }}
-        className="fixed bottom-6 right-6 z-50 w-12 h-12 bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary 
+        className="mobile-scroll-top fixed bottom-6 right-6 z-50 w-12 h-12 bg-gradient-to-r from-light-cta-accent to-light-cta-purple dark:from-dark-primary dark:to-dark-secondary
                    text-white rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300
                    flex items-center justify-center group"
         aria-label="맨 위로 가기"
+        tabIndex={showScrollTop && !hasOpenDialog ? 0 : -1}
+        aria-hidden={!showScrollTop || hasOpenDialog}
       >
         <svg 
           className="w-6 h-6 transform group-hover:-translate-y-0.5 transition-transform duration-200" 

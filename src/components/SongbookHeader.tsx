@@ -25,17 +25,17 @@ export default function SongbookHeader({
   }, []);
 
   return (
-    <div className="text-center mb-5 sm:mb-7">
+    <div className="mobile-page-header text-center mb-5 sm:mb-7">
       {/* 제목과 설명은 항상 즉시 표시 */}
       <div className="mb-2.5 sm:mb-3.5">
-        <div className="flex items-center justify-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
+        <div className="songbook-heading flex items-center justify-center gap-2 sm:gap-3 mb-1.5 sm:mb-2">
           <MusicalNoteIcon className="w-8 h-8 sm:w-12 sm:h-12 text-light-accent dark:text-dark-accent" />
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold font-display gradient-text">
             노래책
           </h1>
         </div>
         <p className="text-base sm:text-lg md:text-xl text-light-text/70 dark:text-dark-text/70">
-          아야가 부르는 노래들을 모아둔 특별한 공간입니다
+          오늘 듣고 싶은 아야의 노래를 찾아보세요.
         </p>
       </div>
       
@@ -45,7 +45,7 @@ export default function SongbookHeader({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
-          className="flex items-center justify-center gap-3 sm:gap-6 text-xs sm:text-sm md:text-base text-light-text/60 dark:text-dark-text/60"
+          className="songbook-stats flex items-center justify-center gap-3 sm:gap-6 text-xs sm:text-sm md:text-base text-light-text/65 dark:text-dark-text/60"
         >
           {isLoading ? (
             <div className="flex items-center gap-2">
