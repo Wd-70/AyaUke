@@ -60,7 +60,7 @@ export default function MvStage({ clip }: MvStageProps) {
           w.fonts.map((f) => document.fonts.load(`40px ${f.family}`, f.text).catch(() => [])),
         );
         if (cancelled) return;
-        rendererRef.current = w.createRenderer();
+        rendererRef.current = w.createRenderer({ sungDateLabel: clip.sungDateLabel });
         setWork(w);
         setReady(true);
       })
@@ -72,7 +72,7 @@ export default function MvStage({ clip }: MvStageProps) {
     };
     // 클립 정체성(곡·범위)이 바뀔 때만 다시 로드
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clip.songId, clip.startTime, clip.endTime]);
+  }, [clip.songId, clip.startTime, clip.endTime, clip.sungDateLabel]);
 
   // 캔버스 해상도 = 표시 크기 × DPR (상한 1920px)
   useEffect(() => {

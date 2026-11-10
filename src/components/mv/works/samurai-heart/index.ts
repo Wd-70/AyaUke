@@ -18,8 +18,8 @@ const work: MvWork = {
     { family: display.style.fontFamily, text: `${lyricText}Some Like It Hot!!AyaUkeDAY BY DAY0123456789` },
     { family: brush.style.fontFamily, text: 'サムライハート孤独' },
   ],
-  createRenderer: () =>
-    createSamuraiHeartRenderer({
+  createRenderer: (clip) =>
+    createSamuraiHeartRenderer(clip, {
       display: display.style.fontFamily,
       brush: brush.style.fontFamily,
       ko: "'Pretendard Variable', Pretendard, sans-serif",

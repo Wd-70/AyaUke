@@ -2,14 +2,14 @@
 // 콘셉트: 무채색 군중 속 홀로 붉은 "나" → 후렴마다 붉은 마음(사무라이 하트)이 번지고,
 // 마지막엔 군중 전체가 붉게 물든다. 먹·붓 질감 + 주홍(RED) + 아야의 라벤더(LAV).
 // 주의: 붉은 원 + 방사형 줄무늬 조합은 쓰지 않는다(욱일기 연상). 집중선은 흰색, 원은 붓 원상(圓相) 링으로만.
-import type { MvLyricLine, MvRenderer } from '../../types';
+import type { MvClipContext, MvLyricLine, MvRenderer } from '../../types';
 import {
   TAU, beatGrid, blotPath, brushPath, chunksShown, clamp, decodeEnvelope, easeInCubic, easeOutBack,
   easeOutCubic, easeOutExpo, fitSize, hash, invLerp, keyframes, lerp, lineAt, noise1, rng, sectionAt,
   setFont, smooth, splatter,
 } from '../../engine';
 import { ENVELOPE } from './envelope';
-import { BEAT_PERIOD, BEAT_PHASE, CHROMA_KEYS, LYRICS, RAPID_RANGE, RAPID_WORDS, SECTIONS, SLASHES } from './timeline';
+import { BEAT_PERIOD, BEAT_PHASE, CHROMA_KEYS, LYRICS, RAPID_PASSAGES, SECTIONS, SLASHES } from './timeline';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -68,17 +68,19 @@ const CROWD_TIME_WINDOWS: { a: number; b: number; k: number }[] = [
   { a: 23.1, b: 26.45, k: 2.6 },
   { a: 26.45, b: 27.75, k: 0 },
   { a: 27.75, b: 31.7, k: 1.7 },
+  { a: 78.2, b: 79.6, k: 2.6 },
   { a: 79.6, b: 81.2, k: 0 },
+  { a: 83.0, b: 85.4, k: 1.7 },
   { a: 133.75, b: 150.65, k: 0.25 },
 ];
 
-const inRapid = (t: number) => t >= RAPID_RANGE[0] && t < RAPID_RANGE[1];
+const rapidPassage = (t: number) => RAPID_PASSAGES.find((p) => t >= p.range[0] && t < p.range[1]) ?? null;
 
 /** 빠른 구간에서 마지막으로 터진 단어와 그 경과 시간 */
 function lastRapidWord(t: number) {
-  if (!inRapid(t)) return null;
-  for (let i = RAPID_WORDS.length - 1; i >= 0; i--) {
-    if (t >= RAPID_WORDS[i].t) return { word: RAPID_WORDS[i], age: t - RAPID_WORDS[i].t };
+  const words = rapidPassage(t)?.words ?? [];
+  for (let i = words.length - 1; i >= 0; i--) {
+    if (t >= words[i].t) return { word: words[i], age: t - words[i].t };
   }
   return null;
 }
@@ -94,7 +96,7 @@ function crowdTime(t: number) {
   return out;
 }
 
-export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
+export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFonts): MvRenderer {
   const env = decodeEnvelope(ENVELOPE);
   const beat = beatGrid(BEAT_PERIOD, BEAT_PHASE);
 
@@ -512,7 +514,7 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
   /** 말이 빨라지는 구간 — 단어가 군중 위로 연달아 터지고, 「勘違いだよ」는 가운데 크게 */
   function rapidLyric(c: Ctx, t: number, line: MvLyricLine) {
     const out = clamp((line.end + 0.35 - t) / 0.35);
-    const words = RAPID_WORDS.map((w, i) => ({ ...w, i })).filter((w) => w.t >= line.t - 0.01 && w.t <= line.end && t >= w.t);
+    const words = (rapidPassage(t)?.words ?? []).filter((w) => w.t >= line.t - 0.01 && w.t <= line.end && t >= w.t);
     const last = words[words.length - 1];
     // 「勘違いだよ」가 터지면 앞 단어들은 바깥으로 튕겨 나간다
     const punch = words.find((w) => w.punch);
@@ -557,7 +559,7 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
       }
       const sc = lerp(1.7, 1, easeOutBack(k));
       c.translate(x, y);
-      c.rotate((hash(w.i * 13) - 0.5) * 0.22);
+      c.rotate((hash(Math.round(w.t * 100)) - 0.5) * 0.22);
       c.scale(sc, sc);
       c.globalAlpha = out * clamp(age / 0.04) * (latest ? 1 : 0.5) * (1 - blast);
       c.lineWidth = size * 0.14;
@@ -897,7 +899,7 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
     c.restore();
 
     // 빗줄기 — 프리코러스 고조
-    const rain = sec === 'pre1' ? 0.25 + 0.75 * invLerp(31.8, 40.3, t) : sec === 'verse1' ? (inRapid(t) ? 0.4 : 0.12) : 0;
+    const rain = sec === 'pre1' ? 0.25 + 0.75 * invLerp(31.8, 40.3, t) : sec === 'verse1' ? (rapidPassage(t) ? 0.4 : 0.12) : 0;
     if (rain > 0) {
       const rr = rng(55);
       c.save();
@@ -1168,7 +1170,8 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
     const credits = [
       { at: 115.5, out: 121.5, a: 'Vocal', b: 'AyaUke' },
       { at: 122.0, out: 128.0, a: 'Original', b: 'SPYAIR「サムライハート (Some Like It Hot!!)」' },
-      { at: 128.4, out: 132.8, a: 'Live', b: '2026.08.26 노래방송' },
+      // 날짜는 재생 중인 클립 기준(작품은 여러 클립에 재사용된다)
+      ...(clip.sungDateLabel ? [{ at: 128.4, out: 132.8, a: 'Live', b: `${clip.sungDateLabel} 노래방송` }] : []),
     ];
     for (const cr of credits) {
       const a = clamp((t - cr.at) / 0.8) * (1 - clamp((t - cr.out) / 0.8));
@@ -1385,7 +1388,7 @@ export function createSamuraiHeartRenderer(fonts: SceneFonts): MvRenderer {
           kineticLyric(b, t, line, post
             ? { cx: 900, cy: 330, maxW: 560, vertX: 1170, koX: 900, koAlign: 'center' }
             : { cx: 360, cy: 340, maxW: 580, vertX: 600, koX: 360, koAlign: 'center' });
-        } else if (sec.id === 'verse1' && inRapid(t)) rapidLyric(b, t, line);
+        } else if ((sec.id === 'verse1' || sec.id === 'verse2') && rapidPassage(t)) rapidLyric(b, t, line);
         else captionLyric(b, t, line, RED);
       }
       if (sec.id === 'finale') sceneEnding(b, t);

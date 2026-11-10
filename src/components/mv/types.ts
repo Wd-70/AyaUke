@@ -41,6 +41,12 @@ export interface MvFrame {
   footage: HTMLVideoElement | null;
 }
 
+/** 재생 중인 클립 정보 — 같은 작품이 여러 클립에 쓰이므로 클립마다 다른 내용(날짜 등)은 여기로 받는다 */
+export interface MvClipContext {
+  /** 부른 날짜 (KST, YYYY.MM.DD) */
+  sungDateLabel: string | null;
+}
+
 export interface MvRenderer {
   render(ctx: CanvasRenderingContext2D, frame: MvFrame): void;
 }
@@ -57,5 +63,5 @@ export interface MvWork {
   sections: MvSection[];
   /** 렌더 전에 로드해 둘 폰트 — family(CSS)와 그 폰트로 그릴 글자 전체 */
   fonts: { family: string; text: string }[];
-  createRenderer(): MvRenderer;
+  createRenderer(clip: MvClipContext): MvRenderer;
 }
