@@ -1,15 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowsPointingOutIcon } from '@heroicons/react/24/outline';
 import ClipPlayer, { type ClipPlayerHandle } from '@/components/clip/ClipPlayer';
 import type { VideoPlatform } from '@/shared/utils/video-url';
 import { loadMv } from './registry';
 import { sectionAt } from './engine';
-import type { MvRenderer, MvWork } from './types';
+import type { MvLyricLine, MvRenderer, MvWork } from './types';
 
-interface MvStageProps {
+export interface MvStageProps {
   clip: {
     id: string;
     shareId: string;
@@ -24,6 +24,17 @@ interface MvStageProps {
     uploaderName: string;
     thumbnailUrl: string | null;
   };
+  /** 가사 타이밍 덮어쓰기 — 로컬 타이밍 편집기의 실시간 미리보기 */
+  lyrics?: MvLyricLine[];
+}
+
+/** 타이밍 편집기용 제어 핸들. 시각은 모두 MV 기준(클립 시작 = 0) */
+export interface MvStageHandle {
+  getTime(): number | null;
+  seek(t: number): void;
+  play(): void;
+  pause(): void;
+  isPlaying(): boolean;
 }
 
 const MAX_CANVAS_WIDTH = 1920;
@@ -33,7 +44,7 @@ const MAX_CANVAS_WIDTH = 1920;
  * 클립 시작 시각이 MV의 t=0이다(클립 범위가 곡에 정확히 맞춰져 있다는 전제).
  * 디버그용 쿼리: ?t=40 (그 시각 정지 화면) / ?preview=38 (소리 없이 그 시각부터 재생) / ?debug=1
  */
-export default function MvStage({ clip }: MvStageProps) {
+const MvStage = forwardRef<MvStageHandle, MvStageProps>(function MvStage({ clip, lyrics }, ref) {
   const params = useSearchParams();
   const freezeT = params.get('t');
   const previewT = params.get('preview');
@@ -74,6 +85,25 @@ export default function MvStage({ clip }: MvStageProps) {
     // 클립 정체성(곡·범위)이 바뀔 때만 다시 로드
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clip.shareId, clip.songId, clip.startTime, clip.endTime, clip.sungDateLabel]);
+
+  // 편집기에서 바뀐 타이밍을 즉시 반영
+  useEffect(() => {
+    if (ready && lyrics) rendererRef.current?.setLyrics?.(lyrics);
+  }, [ready, lyrics]);
+
+  useImperativeHandle(ref, () => ({
+    getTime: () => {
+      const abs = playerRef.current?.getCurrentTime?.();
+      return typeof abs === 'number' && Number.isFinite(abs) ? abs - clip.startTime : null;
+    },
+    seek: (t) => {
+      startedRef.current = true;
+      playerRef.current?.seekTo?.(clip.startTime + Math.max(0, t));
+    },
+    play: () => playerRef.current?.play(),
+    pause: () => playerRef.current?.pause(),
+    isPlaying: () => playerRef.current?.isPlaying() ?? false,
+  }), [clip.startTime]);
 
   // 캔버스 해상도 = 표시 크기 × DPR (상한 1920px)
   useEffect(() => {
@@ -204,4 +234,6 @@ export default function MvStage({ clip }: MvStageProps) {
       </div>
     </div>
   );
-}
+});
+
+export default MvStage;

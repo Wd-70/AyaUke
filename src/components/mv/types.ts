@@ -10,6 +10,11 @@
 export interface MvLyricChunk {
   t: number;
   text: string;
+  /** 연출용 배치 힌트(글자 중심 좌표) — 단어를 화면에 흩뿌리는 구간에서만 쓴다 */
+  x?: number;
+  y?: number;
+  /** 가운데 크게 찍히는 강조 단어 */
+  punch?: boolean;
 }
 
 export interface MvLyricLine {
@@ -49,6 +54,8 @@ export interface MvClipContext {
 
 export interface MvRenderer {
   render(ctx: CanvasRenderingContext2D, frame: MvFrame): void;
+  /** 가사 타이밍 교체 — 로컬 타이밍 편집기의 실시간 미리보기용 */
+  setLyrics?(lines: MvLyricLine[]): void;
 }
 
 /**
@@ -58,6 +65,8 @@ export interface MvRenderer {
 export interface MvWork {
   /** 기준 클립 길이(초) */
   duration: number;
+  /** 가사 타이밍 (편집기 초기값) */
+  lyrics: MvLyricLine[];
   title: string;
   subtitle?: string;
   sections: MvSection[];

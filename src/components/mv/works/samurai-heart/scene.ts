@@ -11,7 +11,7 @@ import {
 import { drawAya } from '../../aya';
 import { type Hair, type PedestrianStyle, drawFan, drawPedestrian, pickPedestrianStyle } from '../../people';
 import { ENVELOPE } from './envelope';
-import { BEAT_PERIOD, BEAT_PHASE, CHROMA_KEYS, LYRICS, RAPID_PASSAGES, SECTIONS, SLASHES } from './timeline';
+import { BEAT_PERIOD, BEAT_PHASE, CHROMA_KEYS, LYRICS, SECTIONS, rapidPassages, slashTimes } from './timeline';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -63,8 +63,8 @@ interface Shard {
 
 /** 섬광 [시각, 세기] — 1절 진입은 칼베기가 주인공이라 약하게 */
 const FLASHES: [number, number][] = [[14.92, 0.45], [40.3, 1], [95.55, 1], [150.65, 1], [171.85, 1]];
-/** 칼베기: 1절 진입(밴드 합류) + 가사의 サムライハート */
-const CUTS = [14.92, ...SLASHES];
+/** 1절 진입(밴드 합류) 칼베기 — 나머지 칼베기는 가사의 サムライハート 시각에서 */
+const INTRO_CUT = 14.92;
 
 /**
  * 구간 안 속도 배율 — 말이 빨라지면 군중도 빨리 감기(k>1), 「勘違い」에서 정지,
@@ -80,22 +80,6 @@ const CROWD_TIME_WINDOWS: { a: number; b: number; k: number }[] = [
   { a: 133.75, b: 150.65, k: 0.25 },
 ];
 
-const rapidPassage = (t: number) => RAPID_PASSAGES.find((p) => t >= p.range[0] && t < p.range[1]) ?? null;
-
-/** 빠른 구간에서 마지막으로 터진 단어와 그 경과 시간 */
-function lastRapidWord(t: number) {
-  const words = rapidPassage(t)?.words ?? [];
-  for (let i = words.length - 1; i >= 0; i--) {
-    if (t >= words[i].t) return { word: words[i], age: t - words[i].t };
-  }
-  return null;
-}
-
-/** 「とんだ勘違いだよ」에서 시간이 멈춘 듯한 정적 (0~1) */
-function freezeAmount(t: number) {
-  return clamp((t - 26.45) / 0.08) * (1 - clamp((t - 27.55) / 0.25));
-}
-
 function crowdTime(t: number) {
   let out = t;
   for (const w of CROWD_TIME_WINDOWS) out -= (1 - w.k) * clamp(t - w.a, 0, w.b - w.a);
@@ -105,6 +89,29 @@ function crowdTime(t: number) {
 export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFonts): MvRenderer {
   const env = decodeEnvelope(ENVELOPE);
   const beat = beatGrid(BEAT_PERIOD, BEAT_PHASE);
+
+  // ── 가사 (타이밍 편집기에서 실시간으로 교체된다) ──────
+  let lines = LYRICS;
+  let passages = rapidPassages(lines);
+  let cuts = [INTRO_CUT, ...slashTimes(lines)];
+
+  const rapidPassage = (t: number) => passages.find((p) => t >= p.range[0] && t < p.range[1]) ?? null;
+
+  /** 빠른 구간에서 마지막으로 터진 단어와 그 경과 시간 */
+  function lastRapidWord(t: number) {
+    const words = rapidPassage(t)?.words ?? [];
+    for (let i = words.length - 1; i >= 0; i--) {
+      if (t >= words[i].t) return { word: words[i], age: t - words[i].t };
+    }
+    return null;
+  }
+
+  /** 1절 강조 단어(「勘違いだよ」)에서 시간이 멈춘 듯한 정적 (0~1) */
+  function freezeAmount(t: number) {
+    const punch = passages[0]?.words.find((w) => w.punch);
+    if (!punch) return 0;
+    return clamp((t - punch.t) / 0.08) * (1 - clamp((t - punch.t - 1.1) / 0.25));
+  }
 
   // ── 정적 자산(한 번만 생성) ────────────────────────
   const r = rng(20260826);
@@ -1379,6 +1386,11 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   // ── 메인 ────────────────────────────────────────────
 
   return {
+    setLyrics(next) {
+      lines = next;
+      passages = rapidPassages(next);
+      cuts = [INTRO_CUT, ...slashTimes(next)];
+    },
     render(main, frame) {
       const b = ensureAssets(main);
       const s = main.canvas.width / W;
@@ -1398,7 +1410,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       const video = footageReady(frame.footage) ? frame.footage : null;
       const sec = sectionAt(SECTIONS, t);
       const chroma = keyframes(CHROMA_KEYS, t);
-      const line = lineAt(LYRICS, t);
+      const line = lineAt(lines, t);
 
       switch (sec.id) {
         case 'intro':
@@ -1463,8 +1475,8 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       const punchZoom = rapidHit ? (rapidHit.word.punch ? 0.08 : 0.03) * Math.exp(-rapidHit.age * 9) : 0;
       if (rapidHit?.word.punch) shake += 12 * Math.exp(-rapidHit.age * 8);
       let slash: { age: number; idx: number } | null = null;
-      for (let i = CUTS.length - 1; i >= 0; i--) {
-        const age = t - CUTS[i];
+      for (let i = cuts.length - 1; i >= 0; i--) {
+        const age = t - cuts[i];
         if (age >= 0 && age < 0.6) {
           slash = { age, idx: i };
           break;

@@ -11,6 +11,7 @@ const lyricText = LYRICS.flatMap((l) => l.ja.map((c) => c.text)).join('');
 
 const work: MvWork = {
   duration: 192,
+  lyrics: LYRICS,
   title: 'サムライハート (Some Like It Hot!!)',
   subtitle: 'SPYAIR · AyaUke cover',
   sections: SECTIONS,
