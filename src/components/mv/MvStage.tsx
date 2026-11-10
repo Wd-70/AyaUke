@@ -166,7 +166,7 @@ export default function MvStage({ shareId, clip }: MvStageProps) {
         )}
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,22rem)_1fr] md:items-start">
+      <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,26rem)_1fr] md:items-start">
         <div ref={playerBoxRef} className="overflow-hidden rounded-lg bg-black">
           {work && (
             <ClipPlayer
@@ -180,7 +180,6 @@ export default function MvStage({ shareId, clip }: MvStageProps) {
               posterThumbnail={clip.thumbnailUrl ?? undefined}
               trackPlayClipId={clip.id}
               onPlayingChange={onPlayingChange}
-              compact
               className="aspect-video w-full"
             />
           )}
