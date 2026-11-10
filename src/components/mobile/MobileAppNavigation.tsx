@@ -7,6 +7,7 @@ import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Description } from '@
 import { HomeIcon, Music2, PlaySquare, Library, MoreHorizontal, X, Download, WifiOff } from 'lucide-react';
 import { hasMobileTabs, mobileSection, MOBILE_TABS } from './navigation-model';
 import { usePwaInstall } from '@/components/pwa/usePwaInstall';
+import { shouldDismissSheet } from './sheet-gesture';
 
 const icons = [HomeIcon, Music2, PlaySquare, Library];
 
@@ -20,9 +21,29 @@ export default function MobileAppNavigation({ path, open, onOpen, onClose, child
   const [mounted, setMounted] = useState(false);
   const [offline, setOffline] = useState(false);
   const tabBarRef = useRef<HTMLElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const gesture = useRef<{ id: number; start: number; startX: number; distance: number } | null>(null);
+  const dragged = useRef(false);
+  const [pull, setPull] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const pwa = usePwaInstall();
   const enabled = hasMobileTabs(path);
   const section = mobileSection(path);
+
+  const resetPull = () => {
+    gesture.current = null;
+    setDragging(false);
+    setPull(0);
+  };
+
+  useEffect(() => {
+    gesture.current = null;
+    setDragging(false);
+    if (open) {
+      setPull(0);
+      dragged.current = false;
+    }
+  }, [open]);
 
   useEffect(() => {
     // This portal sits outside the app root that Dialog makes inert.
@@ -74,8 +95,47 @@ export default function MobileAppNavigation({ path, open, onOpen, onClose, child
     <Dialog open={open} onClose={onClose} className="relative z-[110]">
       <DialogBackdrop transition className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-200 data-[closed]:opacity-0 motion-reduce:transition-none" />
       <div className="fixed inset-0 flex items-end justify-center">
-        <DialogPanel id="mobile-navigation-menu" transition className="mobile-menu-sheet w-full max-w-lg overflow-y-auto rounded-t-[2rem] border border-light-primary/20 bg-white px-5 shadow-2xl transition duration-200 data-[closed]:translate-y-8 data-[closed]:opacity-0 motion-reduce:transition-none dark:border-dark-primary/20 dark:bg-gray-900">
-          <div aria-hidden className="mx-auto mb-2 mt-3 h-1 w-9 rounded-full bg-gray-300 dark:bg-gray-600" />
+        <DialogPanel ref={sheetRef} id="mobile-navigation-menu" transition
+          style={{ translate: `0 ${pull}px`, transitionDuration: dragging ? '0ms' : undefined }}
+          className="mobile-menu-sheet w-full max-w-lg overflow-y-auto rounded-t-[2rem] border border-light-primary/20 bg-white px-5 shadow-2xl transition-[translate,transform,opacity] duration-200 data-[closed]:translate-y-8 data-[closed]:opacity-0 motion-reduce:transition-none dark:border-dark-primary/20 dark:bg-gray-900">
+          <button type="button" aria-label="아래로 끌거나 눌러 메뉴 닫기"
+            className="sticky top-0 z-10 flex min-h-11 w-full touch-none select-none cursor-grab items-center justify-center bg-inherit active:cursor-grabbing focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-4px]"
+            onPointerDown={event => {
+              if (!event.isPrimary || event.button !== 0 || gesture.current) return;
+              dragged.current = false;
+              gesture.current = { id: event.pointerId, start: event.clientY, startX: event.clientX, distance: 0 };
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setDragging(true);
+            }}
+            onPointerMove={event => {
+              const active = gesture.current;
+              if (!active || active.id !== event.pointerId) return;
+              if (Math.hypot(event.clientY - active.start, event.clientX - active.startX) > 6) dragged.current = true;
+              active.distance = Math.max(0, event.clientY - active.start);
+              setPull(active.distance);
+            }}
+            onPointerUp={event => {
+              const active = gesture.current;
+              if (!active || active.id !== event.pointerId) return;
+              const distance = Math.max(0, event.clientY - active.start);
+              if (Math.hypot(event.clientY - active.start, event.clientX - active.startX) > 6) dragged.current = true;
+              if (shouldDismissSheet(distance, sheetRef.current?.offsetHeight ?? 0)) {
+                gesture.current = null;
+                setDragging(false);
+                setPull(distance);
+                onClose();
+              } else resetPull();
+            }}
+            onPointerCancel={() => { dragged.current = true; resetPull(); }}
+            onLostPointerCapture={() => { if (gesture.current) { dragged.current = true; resetPull(); } }}
+            onClick={event => {
+              // Browsers may emit a click after a completed or cancelled drag.
+              if (dragged.current) { event.preventDefault(); return; }
+              onClose();
+            }}
+            onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') dragged.current = false; }}>
+            <span aria-hidden className="h-1 w-9 rounded-full bg-gray-300 dark:bg-gray-600" />
+          </button>
           <div className="mb-4 flex items-center justify-between">
             <div><DialogTitle className="text-xl font-bold tracking-tight">나의 AyaUke</DialogTitle>
               <Description className="mt-1 text-xs text-gray-600 dark:text-gray-400">계정부터 앱 설정까지, 한곳에서</Description></div>
