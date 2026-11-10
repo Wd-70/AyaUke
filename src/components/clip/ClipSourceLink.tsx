@@ -8,6 +8,7 @@ interface ClipSourceLinkProps {
   videoId: string;
   startTime?: number;
   className?: string;
+  showLabel?: boolean;
 }
 
 /** 원본 영상(클립 시작 시각으로 딥링크)으로 이동하는 고스트 아이콘 링크. */
@@ -16,6 +17,7 @@ export default function ClipSourceLink({
   videoId,
   startTime = 0,
   className = '',
+  showLabel = false,
 }: ClipSourceLinkProps) {
   const url = buildSourceUrl(platform, videoId, startTime);
   const isChzzk = platform === 'chzzk';
@@ -30,6 +32,7 @@ export default function ClipSourceLink({
       className={`inline-flex items-center px-1.5 py-0.5 text-light-text/45 transition-colors hover:text-light-accent dark:text-dark-text/45 dark:hover:text-dark-accent ${className}`}
     >
       <ArrowTopRightOnSquareIcon className="h-4 w-4" />
+      {showLabel && <span className="md:hidden">원본</span>}
     </a>
   );
 }

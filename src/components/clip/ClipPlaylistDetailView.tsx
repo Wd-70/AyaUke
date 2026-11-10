@@ -25,6 +25,8 @@ import {
   XMarkIcon,
   ArrowUturnLeftIcon,
   ArrowUturnRightIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline'
 
 interface ClipItem {
@@ -233,12 +235,13 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
       <main className={`mobile-playlist-page mx-auto max-w-3xl px-4 pt-20 sm:pt-24 ${current ? 'pb-12 md:pb-28' : 'pb-12'}`}>
         {/* 헤더 */}
         <div className="mb-6">
-          <div className="flex items-start justify-between gap-4">
+          <div className="playlist-heading flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
               {editingName ? (
                 <div className="flex items-center gap-1.5">
                   <input
                     autoFocus
+                    aria-label="플레이리스트 이름"
                     value={draftName}
                     onChange={(e) => setDraftName(e.target.value)}
                     onKeyDown={(e) => {
@@ -257,7 +260,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <h1 className="truncate text-2xl font-bold">{name}</h1>
+                  <h1 className="playlist-title truncate text-2xl font-bold">{name}</h1>
                   {isOwner && (
                     <button
                       onClick={() => { setDraftName(name); setEditingName(true) }}
@@ -271,12 +274,12 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                 </div>
               )}
               {playlist.description && (
-                <p className="mt-1 whitespace-pre-line text-sm text-light-text/60 dark:text-dark-text/60">{playlist.description}</p>
+                <p className="mt-1 whitespace-pre-line break-words text-sm text-light-text/65 dark:text-dark-text/60">{playlist.description}</p>
               )}
               <p className="mt-1 text-xs text-light-text/45 dark:text-dark-text/45">{clips.length}개 클립</p>
             </div>
             {isOwner && (
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="playlist-management flex shrink-0 items-center gap-2">
                 <div className="flex items-center rounded-lg border border-light-primary/20 dark:border-dark-primary/20">
                   <button
                     onClick={undo}
@@ -299,6 +302,8 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                 </div>
                 <button
                   onClick={togglePublic}
+                  aria-label="플레이리스트 공개"
+                  aria-pressed={isPublic}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-light-primary/20 px-3 py-1.5 text-sm transition-colors hover:border-light-accent/40 dark:border-dark-primary/20"
                   title={isPublic ? '비공개로 전환' : '공개로 전환'}
                 >
@@ -319,10 +324,10 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
 
           {/* 재생 액션 */}
           {clips.length > 0 && (
-            <div className="mt-4 flex items-center gap-2">
+            <div className="playlist-playback mt-4 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => playFrom(0)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-light-accent to-light-purple px-4 py-2 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-[1.02] dark:from-dark-accent dark:to-dark-purple"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-light-cta-accent to-light-cta-purple px-4 py-2 text-sm font-semibold text-white shadow-sm transition-transform hover:scale-[1.02] dark:from-dark-accent dark:to-dark-purple"
               >
                 <PlayIcon className="h-4 w-4" /> 전체 재생
               </button>
@@ -345,9 +350,11 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
         ) : (
           <div className="space-y-1.5">
             {isOwner && (
-              <p className="mb-2 text-xs text-light-text/45 dark:text-dark-text/45">
+              <p className="mb-2 text-xs leading-relaxed text-light-text/65 dark:text-dark-text/45">
                 <ArrowsUpDownIcon className="mr-1 inline h-3.5 w-3.5" />
-                손잡이를 잡고 끌어 순서를 바꿀 수 있어요.
+                <span className="md:hidden">위·아래 버튼으로 순서를 바꿀 수 있어요.</span>
+                <span className="hidden md:inline">손잡이를 잡고 끌어 순서를 바꿀 수 있어요.</span>
+                {' '}변경은 바로 저장되며, 되돌릴 수 있어요.
               </p>
             )}
             {clips.map((clip, index) => {
@@ -364,7 +371,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                     setOverIndex(index)
                   }}
                   onDrop={() => onDrop(index)}
-                  className={`group flex items-center gap-3 rounded-lg border p-2 transition-colors ${
+                  className={`playlist-item group flex flex-wrap items-center gap-3 rounded-lg border p-2 transition-colors ${
                     isOver
                       ? 'border-light-accent/60 bg-light-accent/10 dark:border-dark-accent/60 dark:bg-dark-accent/10'
                       : 'border-light-primary/15 dark:border-dark-primary/15'
@@ -379,7 +386,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                         setDragIndex(null)
                         setOverIndex(null)
                       }}
-                      className="shrink-0 cursor-grab touch-none px-0.5 text-light-text/35 active:cursor-grabbing dark:text-dark-text/35"
+                      className="hidden shrink-0 cursor-grab touch-none px-0.5 text-light-text/35 active:cursor-grabbing md:inline dark:text-dark-text/35"
                       title="끌어서 순서 변경"
                       aria-label="순서 변경 손잡이"
                     >
@@ -387,14 +394,14 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                     </span>
                   )}
 
-                  <span className="w-5 shrink-0 text-center text-xs text-light-text/40 dark:text-dark-text/40">{index + 1}</span>
+                  <span className="playlist-position w-5 shrink-0 text-center text-xs text-light-text/65 dark:text-dark-text/40">{index + 1}</span>
 
                   {/* 썸네일 (클릭 재생) */}
                   <button
                     onClick={() => playFrom(index)}
                     disabled={!canPlay}
                     aria-label={`${clip.title ?? '클립'} 재생`}
-                    className="relative aspect-video w-24 shrink-0 overflow-hidden rounded bg-light-primary/10 disabled:opacity-50 dark:bg-dark-primary/10"
+                    className="playlist-thumbnail relative aspect-video w-24 shrink-0 overflow-hidden rounded bg-light-primary/10 disabled:opacity-50 dark:bg-dark-primary/10"
                   >
                     {clip.thumbnailUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -404,7 +411,7 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                         <MusicalNoteIcon className="h-4 w-4 text-light-accent/40 dark:text-dark-accent/40" />
                       </div>
                     )}
-                    <span className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition-opacity group-hover:opacity-100">
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-100 transition-opacity md:opacity-0 group-hover:opacity-100">
                       <PlayIcon className="h-6 w-6 text-white" />
                     </span>
                     {dur && (
@@ -413,12 +420,12 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                   </button>
 
                   {/* 정보 */}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 truncate text-sm font-medium">
+                  <div className="playlist-info min-w-0 flex-1">
+                    <div className="playlist-item-title flex items-center gap-1.5 truncate text-sm font-medium">
                       <span className="truncate">{clip.title}</span>
                       {clip.sourceUnavailable && <span className="shrink-0 text-[10px] text-rose-500">재생불가</span>}
                     </div>
-                    <div className="truncate text-xs text-light-text/55 dark:text-dark-text/55">
+                    <div className="playlist-item-meta truncate text-xs text-light-text/65 dark:text-dark-text/55">
                       {clip.artist}
                       {clip.sungDate && <span> · {fmtDate(clip.sungDate)}</span>}
                     </div>
@@ -435,9 +442,24 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                     </div>
                   </div>
 
+                  {isOwner && (
+                    <div className="playlist-reorder flex items-center gap-2 md:hidden" role="group" aria-label={`${clip.title ?? '클립'} 순서 변경`}>
+                      <span className="mr-auto text-xs text-light-text/65 dark:text-dark-text/60">순서 변경</span>
+                      <button type="button" onClick={() => moveClip(index, index - 1)} disabled={index === 0}
+                        aria-label={`${clip.title ?? '클립'} 위로 이동`}
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-light-primary/20 px-3 text-xs disabled:opacity-30 dark:border-dark-primary/20">
+                        <ChevronUpIcon className="h-4 w-4" /> 위로
+                      </button>
+                      <button type="button" onClick={() => moveClip(index, index + 1)} disabled={index === clips.length - 1}
+                        aria-label={`${clip.title ?? '클립'} 아래로 이동`}
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-light-primary/20 px-3 text-xs disabled:opacity-30 dark:border-dark-primary/20">
+                        <ChevronDownIcon className="h-4 w-4" /> 아래로
+                      </button>
+                    </div>
+                  )}
                   {/* 액션: 상세페이지 · 원본 다시보기 · (소유자)제거 */}
-                  <div className="flex shrink-0 items-center gap-0.5">
-                    {canPlay && <ClipRangeButton clipId={key} title={clip.title} variant="icon" />}
+                  <div className="playlist-item-actions flex shrink-0 items-center gap-0.5">
+                    {canPlay && <ClipRangeButton clipId={key} title={clip.title} variant="compact" />}
                     <Link
                       href={`/clip/${key}`}
                       title="클립 상세 페이지"
@@ -445,9 +467,11 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                       className="inline-flex items-center px-1.5 py-1 text-light-text/45 transition-colors hover:text-light-accent dark:text-dark-text/45 dark:hover:text-dark-accent"
                     >
                       <InformationCircleIcon className="h-4 w-4" />
+                      <span className="md:hidden">상세</span>
                     </Link>
                     {clip.videoId && clip.platform && (
                       <ClipSourceLink
+                        showLabel
                         platform={clip.platform as VideoPlatform}
                         videoId={clip.videoId}
                         startTime={clip.startTime ?? 0}
@@ -457,10 +481,11 @@ export default function ClipPlaylistDetailView({ data, shareId }: Props) {
                       <button
                         onClick={() => removeClip(key)}
                         title="플레이리스트에서 제거"
-                        aria-label="제거"
+                        aria-label={`${clip.title ?? '클립'} 플레이리스트에서 제거`}
                         className="inline-flex items-center px-1.5 py-1 text-light-text/40 transition-colors hover:text-red-500 dark:text-dark-text/40"
                       >
                         <TrashIcon className="h-4 w-4" />
+                        <span className="md:hidden">제거</span>
                       </button>
                     )}
                   </div>
