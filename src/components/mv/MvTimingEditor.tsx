@@ -301,6 +301,12 @@ export default function MvTimingEditor({ clip }: { clip: StageClip }) {
                 type="button"
                 onClick={(e) => {
                   setMode(m);
+                  // 효과 탭은 지금 재생 위치의 효과부터
+                  const t = stage.current?.getTime();
+                  if (m === 'cues' && t != null) {
+                    const hit = cueAt(cues, t);
+                    if (hit >= 0) setCueSel(hit);
+                  }
                   // 포커스가 남으면 Space가 버튼을 눌러 버린다
                   e.currentTarget.blur();
                 }}
