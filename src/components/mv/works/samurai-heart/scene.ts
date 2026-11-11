@@ -741,10 +741,13 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c: Ctx, t: number, line: MvLyricLine,
     layout: { cx: number; cy: number; maxW: number; vertX: number; koX: number; koAlign: CanvasTextAlign },
   ) {
-    const out = clamp((line.end + 0.35 - t) / 0.35);
-    const shown = chunksShown(line, t);
+    // 엔딩 제목 직전에는 서서히 사라진다
+    const out = clamp((line.end + 0.35 - t) / 0.35) * (1 - clamp((t - (C.endTitle - 0.45)) / 0.4));
+    if (out <= 0) return;
+    // 엔딩 제목이 곧 「サムライハート」라 그 직전에 부르는 サムライハート는 따로 쓰지 않는다
+    const chunks = line.ja.filter((ch) => t >= ch.t && !(ch.text === 'サムライハート' && ch.t > C.endTitle - 1));
+    const shown = chunks.length;
     if (shown === 0) return;
-    const chunks = line.ja.slice(0, shown);
     const active = chunks[shown - 1];
     const heys = chunks.filter((ch) => ch.text === 'Hey!!');
     const words = chunks.filter((ch) => ch.text !== 'Hey!!' && ch.text !== 'サムライハート');
@@ -1394,14 +1397,190 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     }
   }
 
+  // ── 조용한 후렴 끝(本当の声を): 구름이 갈라지고 하늘에서 빛이 내려온다 ──
+  /** 빛의 근원 — 화면 위 바깥 */
+  const SKY = { x: 640, y: -90 };
+  /** 빛줄기 — 가운데부터 차례로 열린다(delay), 각자 천천히 흔들리고 숨 쉰다 */
+  const RAYS = (() => {
+    const r = rng(2468);
+    return Array.from({ length: 17 }, (_, i) => {
+      const a = lerp(-0.66, 0.66, (i + 0.2 + r() * 0.6) / 17);
+      return {
+        a,
+        w: 0.01 + r() * 0.035,
+        power: 0.35 + r() * 0.65,
+        f: 0.15 + r() * 0.3,
+        ph: r() * TAU,
+        delay: Math.abs(a) * 0.75 + r() * 0.12,
+      };
+    });
+  })();
+  const CLOUDS = (() => {
+    const r = rng(1357);
+    return Array.from({ length: 30 }, (_, i) => ({
+      x: -120 + (i / 29) * (W + 240) + (r() - 0.5) * 70,
+      y: -40 + r() * 160,
+      rad: 90 + r() * 130,
+      drift: (r() - 0.5) * 10,
+    }));
+  })();
+  const MOTES = (() => {
+    const r = rng(8642);
+    return Array.from({ length: 170 }, () => ({ x: r() * W, y: r() * H, z: 0.35 + r() * 0.65, ph: r() * TAU }));
+  })();
+  /** 빛줄기는 1/4 크기 캔버스에 그려 확대한다 — 늘어나면서 가장자리가 자연스럽게 번진다 */
+  let rayCanvas: HTMLCanvasElement | null = null;
+
+  function rayAngle(ray: (typeof RAYS)[number], t: number) {
+    return ray.a + 0.018 * Math.sin(t * ray.f + ray.ph);
+  }
+
+  function rayPower(ray: (typeof RAYS)[number], i: number, t: number, build: number) {
+    const appear = smooth(clamp((build - ray.delay) / 0.35));
+    return ray.power * appear * (0.78 + 0.22 * noise1(t * 0.5, i + 3));
+  }
+
+  /** 하늘에서 내려오는 빛 — 근원 후광, 갈라지는 구름, 빛줄기, 주인공에게 내리는 기둥 */
+  function heavenLight(c: Ctx, t: number, build: number) {
+    const part = smooth(build);
+    const breath = 0.92 + 0.08 * beat.pulse(t, 4);
+
+    // 하늘이 조금 밝아진다
+    const sky = c.createLinearGradient(0, 0, 0, 420);
+    sky.addColorStop(0, `rgba(96,84,118,${0.4 * part})`);
+    sky.addColorStop(1, 'rgba(96,84,118,0)');
+    c.fillStyle = sky;
+    c.fillRect(0, 0, W, 420);
+
+    // 근원 후광
+    const haloR = 160 + 560 * part;
+    const halo = c.createRadialGradient(SKY.x, -30, 0, SKY.x, -30, haloR);
+    halo.addColorStop(0, `rgba(255,251,242,${0.95 * part})`);
+    halo.addColorStop(0.25, `rgba(255,236,212,${0.5 * part})`);
+    halo.addColorStop(1, 'rgba(255,236,212,0)');
+    c.fillStyle = halo;
+    c.fillRect(0, 0, W, haloR);
+
+    // 구름 — 가운데부터 양옆으로 갈라지고, 틈을 향한 쪽이 뒤에서 빛을 받는다
+    for (const cl of CLOUDS) {
+      const dx = cl.x - SKY.x;
+      const push = Math.sign(dx || 1) * part * 330 * Math.max(0, 1 - Math.abs(dx) / 1150);
+      const x = cl.x + push + cl.drift * (t - C.quiet) * 0.3;
+      const y = cl.y - part * 18;
+      const dark = c.createRadialGradient(x, y, 0, x, y, cl.rad);
+      dark.addColorStop(0, 'rgba(17,14,24,0.96)');
+      dark.addColorStop(0.6, 'rgba(17,14,24,0.7)');
+      dark.addColorStop(1, 'rgba(17,14,24,0)');
+      c.fillStyle = dark;
+      c.fillRect(x - cl.rad, y - cl.rad, cl.rad * 2, cl.rad * 2);
+    }
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    for (const cl of CLOUDS) {
+      const dx = cl.x - SKY.x;
+      const push = Math.sign(dx || 1) * part * 330 * Math.max(0, 1 - Math.abs(dx) / 1150);
+      const x = cl.x + push + cl.drift * (t - C.quiet) * 0.3;
+      const y = cl.y - part * 18;
+      const near = Math.max(0, 1 - Math.abs(x - SKY.x) / 620);
+      if (near <= 0) continue;
+      const toward = Math.atan2(SKY.y - y, SKY.x - x);
+      const lx = x + Math.cos(toward) * cl.rad * 0.45;
+      const ly = y + Math.max(0, Math.sin(toward)) * cl.rad * 0.2 + cl.rad * 0.25;
+      const lit = c.createRadialGradient(lx, ly, 0, lx, ly, cl.rad * 0.75);
+      lit.addColorStop(0, `rgba(255,232,206,${0.3 * near * part})`);
+      lit.addColorStop(1, 'rgba(255,232,206,0)');
+      c.fillStyle = lit;
+      c.fillRect(lx - cl.rad, ly - cl.rad, cl.rad * 2, cl.rad * 2);
+    }
+    c.restore();
+
+    // 빛줄기(저해상도) + 주인공에게 내리는 기둥
+    if (!rayCanvas) {
+      rayCanvas = document.createElement('canvas');
+      rayCanvas.width = W / 4;
+      rayCanvas.height = H / 4;
+    }
+    const rc = rayCanvas.getContext('2d')!;
+    rc.setTransform(1, 0, 0, 1, 0, 0);
+    rc.clearRect(0, 0, rayCanvas.width, rayCanvas.height);
+    rc.setTransform(0.25, 0, 0, 0.25, 0, 0);
+    rc.globalCompositeOperation = 'lighter';
+    // 빛은 땅(주인공 발밑 아래)에서 끝난다 — 아래쪽 자막 자리까지 하얗게 덮지 않도록
+    const L = 860;
+    const wedge = (a: number, w: number, len: number, alpha: number, tint: string) => {
+      if (alpha <= 0.002) return;
+      const ex = SKY.x + Math.sin(a) * len;
+      const ey = SKY.y + Math.cos(a) * len;
+      const g = rc.createLinearGradient(SKY.x, SKY.y, ex, ey);
+      g.addColorStop(0, `rgba(${tint},${alpha})`);
+      g.addColorStop(0.45, `rgba(${tint},${alpha * 0.45})`);
+      g.addColorStop(1, `rgba(${tint},0)`);
+      rc.fillStyle = g;
+      rc.beginPath();
+      rc.moveTo(SKY.x + Math.sin(a) * 20, SKY.y);
+      rc.lineTo(SKY.x + Math.sin(a - w) * len, SKY.y + Math.cos(a - w) * len);
+      rc.lineTo(SKY.x + Math.sin(a + w) * len, SKY.y + Math.cos(a + w) * len);
+      rc.closePath();
+      rc.fill();
+    };
+    RAYS.forEach((ray, i) => {
+      const pw = rayPower(ray, i, t, build) * breath;
+      const a = rayAngle(ray, t);
+      wedge(a, ray.w * 2.6, L, 0.17 * pw, '226,212,255');
+      wedge(a, ray.w, L, 0.42 * pw, '255,248,236');
+    });
+    // 기둥 — 마지막에 주인공에게 모인다
+    const pillar = easeInCubic(clamp((build - 0.45) / 0.55));
+    const pillarLen = Math.hypot(0, 600 - SKY.y);
+    wedge(0, lerp(0.11, 0.06, pillar), pillarLen, 0.5 * pillar * breath, '255,244,228');
+    wedge(0, 0.025, pillarLen, 0.6 * pillar * breath, '255,255,250');
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    c.imageSmoothingQuality = 'high';
+    c.drawImage(rayCanvas, 0, 0, W, H);
+    c.restore();
+    return pillar;
+  }
+
+  /** 빛줄기 속에서만 반짝이는 먼지 — 아래로 천천히 떠다닌다 */
+  function lightMotes(c: Ctx, t: number, build: number) {
+    if (build <= 0) return;
+    c.save();
+    c.globalCompositeOperation = 'lighter';
+    c.fillStyle = '#fff4e4';
+    const k = t - C.quiet;
+    MOTES.forEach((m, i) => {
+      const x = (m.x + Math.sin(k * 0.4 + m.ph) * 26 * m.z + k * 6 * m.z) % W;
+      const y = (m.y + k * 14 * m.z) % H;
+      const ang = Math.atan2(x - SKY.x, y - SKY.y);
+      let lit = 0;
+      RAYS.forEach((ray, j) => {
+        const d = (ang - rayAngle(ray, t)) / (ray.w * 1.6);
+        lit += rayPower(ray, j, t, build) * Math.exp(-d * d);
+      });
+      const tw = 0.6 + 0.4 * Math.sin(t * (1.5 + m.z * 2) + m.ph);
+      const a = Math.min(1, lit) * tw * m.z * 0.9;
+      if (a < 0.02) return;
+      const r = 0.8 + m.z * 1.6;
+      c.globalAlpha = a;
+      c.fillRect(x - r / 2, y - r / 2, r, r);
+      if (m.z > 0.75 && i % 3 === 0) {
+        c.globalAlpha = a * 0.25;
+        c.fillRect(x - r * 1.5, y - r * 1.5, r * 3, r * 3);
+      }
+    });
+    c.restore();
+  }
+
   function sceneQuiet(c: Ctx, t: number) {
     c.fillStyle = '#08070b';
     c.fillRect(0, 0, W, H);
     const build = invLerp(C.quietBuild, C.final - 0.05, t);
-    // 군중 — 어둠 속 멈춘 실루엣
-    drawCrowd(c, t, { alpha: 0.45, hero: null, layers: [0, 1], rim: 'rgba(255,250,240,0.18)' });
-    // 스포트라이트 (흰색)
-    const sp = 0.35 + 0.45 * build;
+    const pillar = build > 0 ? heavenLight(c, t, build) : 0;
+    // 군중 — 어둠 속 멈춘 실루엣. 빛이 내리면 머리와 어깨가 위에서 빛을 받는다
+    drawCrowd(c, t, { alpha: 0.45 + 0.15 * build, hero: null, layers: [0, 1], rim: `rgba(255,246,232,${0.18 + 0.42 * build})` });
+    // 스포트라이트 (흰색) — 하늘 빛기둥이 내려오면 그 속으로 녹아든다
+    const sp = (0.35 + 0.45 * build) * (1 - 0.6 * pillar);
     const g = c.createLinearGradient(640, 0, 640, 560);
     g.addColorStop(0, `rgba(255,250,240,${sp * 0.5})`);
     g.addColorStop(1, `rgba(255,250,240,${sp * 0.1})`);
@@ -1413,13 +1592,21 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.lineTo(480, 570);
     c.closePath();
     c.fill();
-    c.fillStyle = `rgba(255,250,240,${sp * 0.25})`;
-    c.beginPath();
-    c.ellipse(640, 560, 170, 26, 0, 0, TAU);
-    c.fill();
+    // 발밑 빛 웅덩이
+    const pool = c.createRadialGradient(640, 560, 0, 640, 560, 190 + 140 * build);
+    pool.addColorStop(0, `rgba(255,248,236,${0.3 + 0.45 * build})`);
+    pool.addColorStop(0.45, `rgba(255,240,222,${0.1 + 0.2 * build})`);
+    pool.addColorStop(1, 'rgba(255,240,222,0)');
+    c.save();
+    c.translate(640, 560);
+    c.scale(1, 0.16);
+    c.translate(-640, -560);
+    c.fillStyle = pool;
+    c.fillRect(640 - 340, 560 - 340, 680, 680);
+    c.restore();
     // 하트 고동 — 고조될수록 강해진다
     const hb = beat.pulse(t, 8) * (0.3 + build);
-    drawAya(c, 640, 556, 150, { t, heart: 0.3 + hb, rim: `rgba(255,250,240,${0.35 + 0.4 * build})` });
+    drawAya(c, 640, 556, 150, { t, heart: 0.3 + hb, rim: `rgba(255,250,240,${0.35 + 0.55 * build})` });
     // 떠오르는 빛 알갱이 — 고조될수록 빨라진다
     const pr = rng(919);
     const speed = 30 + build * 260;
@@ -1428,28 +1615,20 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       const x = pr() * W;
       const base = pr() * 1000;
       const y = H - ((base + (t - C.quiet) * speed * (0.5 + pr())) % (H + 40));
-      c.globalAlpha = (0.15 + pr() * 0.4) * (0.6 + build);
+      c.globalAlpha = (0.15 + pr() * 0.4) * (0.6 + build * 0.6);
       c.fillRect(x, y, 2, 2 + build * 14);
     }
     c.globalAlpha = 1;
-    // 위에서 내려오는 흰 빛줄기 (本当の声を)
-    if (build > 0) {
+    lightMotes(c, t, build);
+    // 기둥이 다 내려오면 주인공 주변이 하얗게 번진다(다음 후렴 섬광으로 이어짐)
+    if (pillar > 0) {
+      const bloom = c.createRadialGradient(640, 470, 0, 640, 470, 420);
+      bloom.addColorStop(0, `rgba(255,250,240,${0.32 * pillar})`);
+      bloom.addColorStop(1, 'rgba(255,250,240,0)');
       c.save();
       c.globalCompositeOperation = 'lighter';
-      const lr = rng(5);
-      for (let i = 0; i < 7; i++) {
-        const x = 200 + lr() * 880;
-        const w = 30 + lr() * 90;
-        c.globalAlpha = build * (0.08 + 0.1 * lr());
-        c.fillStyle = '#fff6ea';
-        c.beginPath();
-        c.moveTo(x, -10);
-        c.lineTo(x + w, -10);
-        c.lineTo(x + w * 2.4 - 200, H + 10);
-        c.lineTo(x - 200, H + 10);
-        c.closePath();
-        c.fill();
-      }
+      c.fillStyle = bloom;
+      c.fillRect(220, 50, 840, 840);
       c.restore();
     }
   }
@@ -1585,7 +1764,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       // 줄이 끝나고 사라지는 중에 다른 스타일의 장면으로 넘어가면 새 스타일로 잠깐 다시 그리지 않는다
       const style = lyricStyle(sec.id, line);
       const tailElsewhere = line && t > line.end && lyricStyle(sectionAt(sections, line.end).id, line) !== style;
-      if (line && style && !tailElsewhere && !(sec.id === 'finale' && t >= C.endTitle - 0.1)) {
+      if (line && style && !tailElsewhere && !(sec.id === 'finale' && t >= C.endTitle)) {
         if (style === 'quiet') quietLyric(b, t, line);
         else if (style === 'kinetic' || style === 'post') {
           const post = style === 'post';
