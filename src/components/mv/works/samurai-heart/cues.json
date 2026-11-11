@@ -1,4 +1,5 @@
 {
+  "beatOffset": 0,
   "bloom1": 0.05,
   "ensoDraw": 1.6,
   "bloom2": 2.17,
@@ -9,7 +10,7 @@
   "build": 12.8,
   "verse1": 14.92,
   "pre1": 31.75,
-  "skyTilt": 34,
+  "skyTilt": 32.3,
   "catchball": 35.8,
   "kodoku": 38,
   "chorus1": 40.3,

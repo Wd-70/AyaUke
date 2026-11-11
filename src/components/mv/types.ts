@@ -68,6 +68,8 @@ export interface MvCue {
   t: number;
   /** 장면 경계 — 경계끼리는 순서가 뒤집히면 안 된다 */
   section?: boolean;
+  /** 시각이 아니라 보정값(초, 음수 가능) — 예: 비트 연출 보정 */
+  offset?: boolean;
 }
 
 /**
@@ -83,6 +85,8 @@ export interface MvWork {
   subtitle?: string;
   /** 효과 타이밍 (편집기 초기값) */
   cues?: MvCue[];
+  /** 비트 그리드(보정 전) — 편집기에서 박자 탭으로 보정값을 잴 때 쓴다 */
+  beat?: { period: number; phase: number };
   /** 렌더 전에 로드해 둘 폰트 — family(CSS)와 그 폰트로 그릴 글자 전체 */
   fonts: { family: string; text: string }[];
   createRenderer(clip: MvClipContext): MvRenderer;

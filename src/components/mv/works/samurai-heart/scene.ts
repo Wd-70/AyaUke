@@ -69,6 +69,15 @@ const flashesOf = (c: Cues): [number, number][] => [[c.verse1, 0.45], [c.chorus1
 
 type RapidPassage = ReturnType<typeof rapidPassages>[number];
 
+/** 장면별 가사 스타일 — 브레이크·아웃트로는 가사 없이 */
+function lyricStyle(sec: string, line: MvLyricLine | null) {
+  if (!line || sec === 'break' || sec === 'outro') return null;
+  if (sec === 'quiet') return 'quiet';
+  if (sec === 'post1') return 'post';
+  if (['chorus1', 'chorus2', 'final', 'finale'].includes(sec)) return 'kinetic';
+  return isRapidLine(line) ? 'rapid' : 'caption';
+}
+
 /**
  * 구간 안 속도 배율 — 말이 빨라지면 군중도 빨리 감기(k>1), 1절은 「勘違い」에서,
  * 2절은 立ち止まり에서 멈추고(발자국이 드러날 때까지), 조용한 후렴에서 느려진다.
@@ -94,8 +103,7 @@ function crowdWindows(c: Cues, passages: RapidPassage[]) {
 }
 
 export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFonts): MvRenderer {
-  const env = decodeEnvelope(ENVELOPE);
-  const beat = beatGrid(BEAT_PERIOD, BEAT_PHASE);
+  const rawEnv = decodeEnvelope(ENVELOPE);
 
   // ── 가사 (타이밍 편집기에서 실시간으로 교체된다) ──────
   let lines = LYRICS;
@@ -109,8 +117,12 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   // 칼베기: 1절 진입 + 가사의 サムライハート
   let cuts = [C.verse1, ...slashTimes(lines)];
   let windows = crowdWindows(C, passages);
+  // 비트 연출 보정(+면 늦게) — 박자 그리드와 오디오 반응(엔벨로프)을 같이 민다
+  let beat = beatGrid(BEAT_PERIOD, BEAT_PHASE + C.beatOffset);
+  const env = (ch: Parameters<typeof rawEnv>[0], t: number) => rawEnv(ch, t - C.beatOffset);
 
   function derive() {
+    beat = beatGrid(BEAT_PERIOD, BEAT_PHASE + C.beatOffset);
     sections = sectionsOf(C);
     chromaKeyframes = chromaKeys(C);
     flashes = flashesOf(C);
@@ -528,8 +540,14 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.shadowOffsetY = 2;
   }
 
-  function koLine(c: Ctx, text: string | undefined, x: number, y: number, alpha: number, align: CanvasTextAlign = 'left') {
+  /** 한글 자막 — 화면 흔들림·칼베기·줌의 영향을 받지 않도록 모았다가 합성 후 맨 위에 그린다 */
+  let koQueue: { text: string; x: number; y: number; alpha: number; align: CanvasTextAlign }[] = [];
+  function koLine(_c: Ctx, text: string | undefined, x: number, y: number, alpha: number, align: CanvasTextAlign = 'left') {
     if (!text || alpha <= 0) return;
+    koQueue.push({ text, x, y, alpha, align });
+  }
+
+  function drawKo(c: Ctx, { text, x, y, alpha, align }: (typeof koQueue)[number]) {
     c.save();
     c.globalAlpha = alpha;
     setFont(c, 21, fonts.ko, 600);
@@ -902,7 +920,9 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
 
   function sceneCity(c: Ctx, t: number, sec: string) {
     // 하늘을 올려다보는 틸트 (虚しくって 見上げる空)
-    const tilt = sec === 'pre1' ? smooth(invLerp(C.skyTilt, C.skyTilt + 0.9, t)) * (1 - smooth(invLerp(C.skyTilt + 3.6, C.skyTilt + 4.6, t))) : 0;
+    const tilt = sec === 'pre1'
+      ? smooth(smooth(invLerp(C.skyTilt, C.skyTilt + 2.6, t))) * (1 - smooth(invLerp(C.kodoku - 0.4, C.kodoku + 0.6, t)))
+      : 0;
     const off = tilt * 360;
     const dusk = sec === 'verse2';
     drawSky(c, dusk ? '#1d1430' : '#0b0a12', dusk ? '#5a3b52' : '#272233', off);
@@ -950,26 +970,14 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       c.restore();
     }
 
-    // 발자국 (確かめた足跡) — 주인공이 왼쪽에서 걸어온 길.
-    // 신발 자국은 앞꿈치(큰 타원)가 주인공 쪽(오른쪽), 뒤꿈치(작은 원)가 왼쪽.
-    // 振り返り에 맞춰 시선을 따라 발밑에서 먼 쪽으로 드러난다.
+    // 발자국 (確かめた足跡) — 주인공이 왼쪽에서 걸어온 길(앞코가 주인공 쪽인 부츠 자국, 왼발·오른발 번갈아).
+    // 振り返り에 맞춰 시선을 따라 발밑에서 먼 쪽으로 하나씩 찍힌다. 먼(오래된) 자국일수록 옅다.
     if (sec === 'verse2' && t > C.footprints) {
       for (let i = 0; i < 12; i++) {
-        const at = C.footprints + i * 0.13;
-        const k = clamp((t - at) / 0.2);
-        if (k <= 0) continue;
-        const x = 700 - i * 52;
-        const y = 566 + (i % 2) * 12;
-        c.save();
-        c.globalAlpha = k * 0.85;
-        c.fillStyle = RED;
-        c.beginPath();
-        c.ellipse(x + 4, y, 12, 7, 0, 0, TAU);
-        c.fill();
-        c.beginPath();
-        c.ellipse(x - 15, y, 6, 5.5, 0, 0, TAU);
-        c.fill();
-        c.restore();
+        const age = t - (C.footprints + i * 0.13);
+        if (age <= 0) continue;
+        const left = i % 2 === 0;
+        drawFootprint(c, 700 - i * 52, left ? 564 : 577, left ? -1 : 1, age, 1 - i * 0.045, i);
       }
     }
 
@@ -1015,6 +1023,92 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
 
     // 빗줄기 — 프리코러스 고조
     drawRain(c, t, sec === 'pre1' ? 0.25 + 0.75 * invLerp(C.pre1 + 0.05, C.chorus1, t) : sec === 'verse1' ? (rapidPassage(t) ? 0.4 : 0.12) : 0);
+  }
+
+  /**
+   * 부츠 밑창 자국 하나. 바닥을 비스듬히 내려다본 원근으로 납작하게, 앞꿈치와 굽이 떨어진 실루엣에
+   * 홈 무늬가 파여 있다. 찍히는 순간 살짝 눌리며 붉은 물결이 퍼진다.
+   * side: -1 왼발(안쪽이 아래) / 1 오른발
+   */
+  function drawFootprint(c: Ctx, x: number, y: number, side: -1 | 1, age: number, fade: number, seed: number) {
+    const k = clamp(age / 0.18);
+    const press = 1 + 0.22 * (1 - easeOutCubic(k));
+    const pr = rng(4000 + seed);
+    c.save();
+    c.translate(x, y);
+    // 물결 — 찍힐 때 한 번
+    if (age < 0.6) {
+      const a = age / 0.6;
+      c.globalAlpha = 0.45 * (1 - a) * fade;
+      c.strokeStyle = '#ff8b95';
+      c.lineWidth = 1.5;
+      c.beginPath();
+      c.ellipse(0, 0, 16 + a * 46, (16 + a * 46) * 0.28, 0, 0, TAU);
+      c.stroke();
+    }
+    // 젖은 바닥에 번지는 붉은 빛
+    const glow = c.createRadialGradient(0, 0, 0, 0, 0, 34);
+    glow.addColorStop(0, 'rgba(227,56,63,0.38)');
+    glow.addColorStop(1, 'rgba(227,56,63,0)');
+    c.globalAlpha = k * fade;
+    c.save();
+    c.scale(1, 0.32);
+    c.fillStyle = glow;
+    c.beginPath();
+    c.arc(0, 0, 34, 0, TAU);
+    c.fill();
+    c.restore();
+
+    // 밑창 — 원근으로 세로를 눌러 그린다(앞코가 오른쪽)
+    c.scale(press * 1.3, press * 1.3 * 0.62);
+    c.rotate(side * 0.07 + (pr() - 0.5) * 0.05);
+    c.globalAlpha = k * 0.92 * fade;
+    const sole = c.createLinearGradient(-22, 0, 22, 0);
+    sole.addColorStop(0, RED_DEEP);
+    sole.addColorStop(0.4, RED);
+    sole.addColorStop(1, '#f25a60');
+    // 앞꿈치: 허리(왼쪽)는 좁고, 안쪽(side 쪽) 엄지 볼이 불룩하고, 바깥쪽은 완만하다
+    const fore = new Path2D();
+    fore.moveTo(-8, -2.4 * side);
+    fore.bezierCurveTo(-3, -4.2 * side, 3, -7.4 * side, 10, -7.6 * side);
+    fore.bezierCurveTo(17, -7.8 * side, 21.8, -4.6 * side, 21.8, -0.8 * side);
+    fore.bezierCurveTo(21.8, 3 * side, 18.5, 5.6 * side, 13, 6 * side);
+    fore.bezierCurveTo(6, 6.4 * side, -1, 5.4 * side, -8, 3.4 * side);
+    fore.quadraticCurveTo(-9, 0.5 * side, -8, -2.4 * side);
+    fore.closePath();
+    const heel = new Path2D();
+    heel.roundRect(-22, -4.2, 10, 8.4, [4.2, 2.5, 2.5, 4.2]);
+    for (const part of [fore, heel]) {
+      c.fillStyle = sole;
+      c.fill(part);
+      c.save();
+      c.clip(part);
+      // 밑창 홈 몇 줄 — 멀리서도 신발 자국으로 읽히게
+      c.strokeStyle = 'rgba(26,19,32,0.55)';
+      c.lineWidth = 1.3;
+      c.beginPath();
+      for (const gx of part === fore ? [1, 6.5, 12, 17] : [-17]) {
+        c.moveTo(gx, -9);
+        c.quadraticCurveTo(gx + 1.4, 0, gx, 9);
+      }
+      c.stroke();
+      // 잉크가 덜 묻은 자리
+      c.fillStyle = 'rgba(26,19,32,0.35)';
+      for (let i = 0; i < 26; i++) c.fillRect(-22 + pr() * 44, -8 + pr() * 16, 0.6 + pr() * 0.9, 0.6 + pr() * 0.9);
+      c.restore();
+      c.strokeStyle = 'rgba(122,20,32,0.9)';
+      c.lineWidth = 0.7;
+      c.stroke(part);
+    }
+    // 빛을 받는 앞코 테두리
+    c.globalAlpha = k * 0.55 * fade;
+    c.strokeStyle = '#ffc8cc';
+    c.lineWidth = 0.8;
+    c.beginPath();
+    c.moveTo(8, -7.2 * side);
+    c.bezierCurveTo(15, -7.6 * side, 20.5, -5 * side, 21.2, -1.4 * side);
+    c.stroke();
+    c.restore();
   }
 
   function drawRain(c: Ctx, t: number, rain: number) {
@@ -1481,20 +1575,24 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
           break;
       }
 
+      koQueue = [];
       const freeze = sec.id === 'verse1' ? freezeAmount(t) : 0;
       if (freeze > 0) {
         b.fillStyle = `rgba(8,6,12,${0.45 * freeze})`;
         b.fillRect(0, 0, W, H);
       }
 
-      if (line && !(sec.id === 'finale' && t >= C.endTitle - 0.1)) {
-        if (sec.id === 'quiet') quietLyric(b, t, line);
-        else if (['chorus1', 'chorus2', 'final', 'finale', 'post1'].includes(sec.id)) {
-          const post = sec.id === 'post1';
+      // 줄이 끝나고 사라지는 중에 다른 스타일의 장면으로 넘어가면 새 스타일로 잠깐 다시 그리지 않는다
+      const style = lyricStyle(sec.id, line);
+      const tailElsewhere = line && t > line.end && lyricStyle(sectionAt(sections, line.end).id, line) !== style;
+      if (line && style && !tailElsewhere && !(sec.id === 'finale' && t >= C.endTitle - 0.1)) {
+        if (style === 'quiet') quietLyric(b, t, line);
+        else if (style === 'kinetic' || style === 'post') {
+          const post = style === 'post';
           kineticLyric(b, t, line, post
             ? { cx: 900, cy: 330, maxW: 560, vertX: 1170, koX: 900, koAlign: 'center' }
             : { cx: 360, cy: 340, maxW: 580, vertX: 600, koX: 360, koAlign: 'center' });
-        } else if (isRapidLine(line)) rapidLyric(b, t, line);
+        } else if (style === 'rapid') rapidLyric(b, t, line);
         else captionLyric(b, t, line, RED);
       }
       if (sec.id === 'finale') sceneEnding(b, t);
@@ -1569,6 +1667,11 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       } else {
         main.drawImage(buffer!, ox, oy, ow, oh);
       }
+
+      // 한글 자막 — 흔들리지 않는 층
+      main.setTransform(s, 0, 0, s, 0, 0);
+      for (const k of koQueue) drawKo(main, k);
+      main.setTransform(1, 0, 0, 1, 0, 0);
 
       // 섬광
       let flash = 0;

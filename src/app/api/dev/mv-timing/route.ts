@@ -18,7 +18,7 @@ const Body = z.object({
   lines: z
     .array(z.object({ end: z.number().min(0), ko: z.string().optional(), chunks: z.array(Chunk).min(1) }))
     .min(1),
-  cues: z.record(z.string(), z.number().min(0)).optional(),
+  cues: z.record(z.string(), z.number().min(-5)).optional(),
 });
 
 /** 타이밍(t, end) 외의 모든 내용 — 저장 전후로 같아야 한다 */

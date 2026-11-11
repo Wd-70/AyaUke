@@ -62,7 +62,7 @@ function chunkAt(lines: MvLyricLine[], now: number): Sel | null {
 function cueAt(cues: MvCue[], now: number) {
   let best = -1;
   cues.forEach((c, k) => {
-    if (c.t <= now && (best < 0 || c.t >= cues[best].t)) best = k;
+    if (!c.offset && c.t <= now && (best < 0 || c.t >= cues[best].t)) best = k;
   });
   return best;
 }
@@ -81,6 +81,23 @@ function badCues(cues: MvCue[]) {
   });
   return bad;
 }
+
+/**
+ * 박자 탭들로 비트 보정값을 잰다 — 각 탭이 보정 전 그리드에서 얼마나 늦은지(±반 박)의 원형 평균.
+ * 반 박 넘게 어긋난 탭이 섞여도 각도로 평균하므로 한쪽으로 쏠리지 않는다.
+ */
+function measureBeatOffset(taps: number[], beat: { period: number; phase: number }) {
+  let x = 0;
+  let y = 0;
+  for (const t of taps) {
+    const a = (((t - beat.phase) / beat.period) % 1) * 2 * Math.PI;
+    x += Math.cos(a);
+    y += Math.sin(a);
+  }
+  return round((Math.atan2(y, x) / (2 * Math.PI)) * beat.period);
+}
+
+const fmtCue = (c: MvCue) => (c.offset ? `${c.t >= 0 ? '+' : ''}${fmt(c.t)}` : fmt(c.t));
 
 const cueValues = (cues: MvCue[]) => Object.fromEntries(cues.map((c) => [c.id, c.t]));
 const snapshot = (lines: MvLyricLine[] | null, cues: MvCue[]) => JSON.stringify([lines, cueValues(cues)]);
@@ -109,6 +126,8 @@ export default function MvTimingEditor({ clip }: { clip: StageClip }) {
   const [tapLag, setTapLag] = useState(0.05);
   const [following, setFollowing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [beatTaps, setBeatTaps] = useState<number[]>([]);
+  const [beat, setBeat] = useState<{ period: number; phase: number } | null>(null);
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
   const cueRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -116,6 +135,7 @@ export default function MvTimingEditor({ clip }: { clip: StageClip }) {
     loadMv(clip)?.then((w) => {
       setLines(w.lyrics);
       setCues(w.cues ?? []);
+      setBeat(w.beat ?? null);
       setSaved(snapshot(w.lyrics, w.cues ?? []));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -198,8 +218,12 @@ export default function MvTimingEditor({ clip }: { clip: StageClip }) {
 
   /** 선택한 효과의 시각을 바꾼다 — "이후 전체"면 그 시각 이후의 효과도 함께 */
   const shiftCues = useCallback((next: (t: number) => number, all: boolean) => {
-    const from = cues[cueSel]?.t ?? 0;
-    return cues.map((c, k) => (k === cueSel || (all && c.t >= from) ? { ...c, t: round(Math.max(0, next(c.t))) } : c));
+    const sel = cues[cueSel];
+    if (!sel) return cues;
+    if (sel.offset) return cues.map((c, k) => (k === cueSel ? { ...c, t: round(Math.max(-2, Math.min(2, next(c.t)))) } : c));
+    return cues.map((c, k) =>
+      k === cueSel || (all && !c.offset && c.t >= sel.t) ? { ...c, t: round(Math.max(0, next(c.t))) } : c,
+    );
   }, [cues, cueSel]);
 
   // 단축키 — 방향키와 WASD는 같은 동작
@@ -237,6 +261,15 @@ export default function MvTimingEditor({ clip }: { clip: StageClip }) {
         if (lyricsMode) {
           commit(applyTime(lines, sel, () => at, false));
           setSel(step(lines, sel, 1));
+        } else if (cues[cueSel]?.offset) {
+          // 박자에 맞춰 여러 번 두드리면 평균으로 보정(2초 넘게 쉬면 새로 잰다, 최근 16번까지)
+          if (!beat) return;
+          const taps = [...(beatTaps.length && at - beatTaps[beatTaps.length - 1] > 2 ? [] : beatTaps), at].slice(-16);
+          setBeatTaps(taps);
+          if (taps.length >= 4) {
+            const off = measureBeatOffset(taps, beat);
+            if (off !== cues[cueSel].t) commitCues(shiftCues(() => off, false));
+          }
         } else if (cues.length) {
           commitCues(shiftCues(() => at, false));
           setCueSel(Math.min(cueSel + 1, cues.length - 1));
@@ -264,12 +297,14 @@ export default function MvTimingEditor({ clip }: { clip: StageClip }) {
         }
       } else if (k === 'r') {
         e.preventDefault();
-        listen(lyricsMode ? timeAt(lines, sel) : (cues[cueSel]?.t ?? 0));
+        const c = cues[cueSel];
+        if (lyricsMode) listen(timeAt(lines, sel));
+        else if (c && !c.offset) listen(c.t);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mode, lines, sel, cues, cueSel, tapLag, following, commit, commitCues, shiftCues, undo, save, listen]);
+  }, [mode, lines, sel, cues, cueSel, tapLag, following, beat, beatTaps, commit, commitCues, shiftCues, undo, save, listen]);
 
   // 선택한 항목이 보이도록 스크롤
   useEffect(() => {
@@ -369,16 +404,22 @@ export default function MvTimingEditor({ clip }: { clip: StageClip }) {
                   setCueSel(k);
                   e.currentTarget.blur();
                 }}
-                onDoubleClick={() => listen(c.t)}
+                onDoubleClick={() => !c.offset && listen(c.t)}
                 className={`flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left ${k === passedCue ? 'bg-white/10' : ''} ${
                   cueSel === k ? 'ring-2 ring-lime-300' : cueProblems.has(k) ? 'ring-1 ring-red-500' : ''
                 }`}
               >
                 <span className="w-16 shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-right font-mono text-xs text-lime-200/80">
-                  {fmt(c.t)}
+                  {fmtCue(c)}
                 </span>
                 <span className={c.section ? 'font-semibold' : 'text-white/85'}>{c.label}</span>
                 {c.section && <span className="rounded bg-white/10 px-1.5 text-[10px] text-white/60">장면 경계</span>}
+                {c.offset && (
+                  <span className="text-xs text-white/50">
+                    선택하고 재생하며 박자에 맞춰 <b>T</b>를 4번 이상 두드리면 자동으로 맞춥니다
+                    {cueSel === k && beatTaps.length > 0 && ` · 탭 ${beatTaps.length}회`}
+                  </span>
+                )}
                 <span className="ml-auto font-mono text-[10px] text-white/30">{c.id}</span>
               </button>
             ))}

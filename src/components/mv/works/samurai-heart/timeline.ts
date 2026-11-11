@@ -16,6 +16,7 @@ export const CUES: Cues = cuesDoc;
 
 /** 편집기에 보이는 이름 — 순서도 이대로 */
 export const CUE_LABELS: Record<keyof Cues, string> = {
+  beatOffset: '비트 연출 보정 (+ 늦게 / − 일찍)',
   bloom1: '전주 먹 번짐 ①',
   ensoDraw: '제목 원상 그리기',
   bloom2: '전주 먹 번짐 ②',
@@ -26,7 +27,7 @@ export const CUE_LABELS: Record<keyof Cues, string> = {
   build: '빌드업 — 카메라가 제목을 뚫고 들어감',
   verse1: '1절 진입 칼베기 · 섬광',
   pre1: '프리코러스 — 비 고조',
-  skyTilt: '하늘 올려다보기 (虚しくって)',
+  skyTilt: '하늘 올려다보기 시작',
   catchball: '캐치볼 (届かない)',
   kodoku: '孤独 붓글씨',
   chorus1: '1절 후렴 · 섬광',
@@ -57,6 +58,7 @@ export const CUE_LIST: MvCue[] = (Object.keys(CUE_LABELS) as (keyof Cues)[]).map
   label: CUE_LABELS[id],
   t: CUES[id],
   ...((SECTION_IDS as readonly string[]).includes(id) ? { section: true } : {}),
+  ...(id === 'beatOffset' ? { offset: true } : {}),
 }));
 
 /** 장면 구간 — 경계는 효과 시각에서 */
