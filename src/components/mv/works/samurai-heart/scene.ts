@@ -11,7 +11,10 @@ import {
 import { drawAya } from '../../aya';
 import { type Hair, type PedestrianStyle, drawFan, drawPedestrian, pickPedestrianStyle } from '../../people';
 import { ENVELOPE } from './envelope';
-import { BEAT_PERIOD, BEAT_PHASE, CHROMA_KEYS, LYRICS, SECTIONS, rapidPassages, slashTimes } from './timeline';
+import {
+  BEAT_PERIOD, BEAT_PHASE, CUES, type Cues, LYRICS, type RapidWord, chromaKeys, isRapidLine, rapidPassages, sectionsOf,
+  slashTimes,
+} from './timeline';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -62,27 +65,31 @@ interface Shard {
 }
 
 /** 섬광 [시각, 세기] — 1절 진입은 칼베기가 주인공이라 약하게 */
-const FLASHES: [number, number][] = [[14.92, 0.45], [40.3, 1], [95.55, 1], [150.65, 1], [171.85, 1]];
-/** 1절 진입(밴드 합류) 칼베기 — 나머지 칼베기는 가사의 サムライハート 시각에서 */
-const INTRO_CUT = 14.92;
+const flashesOf = (c: Cues): [number, number][] => [[c.verse1, 0.45], [c.chorus1, 1], [c.chorus2, 1], [c.final, 1], [c.finale, 1]];
+
+type RapidPassage = ReturnType<typeof rapidPassages>[number];
 
 /**
- * 구간 안 속도 배율 — 말이 빨라지면 군중도 빨리 감기(k>1), 「勘違い」에서 정지,
- * 立ち止まり에서 멈추고 조용한 후렴에서 느려진다.
+ * 구간 안 속도 배율 — 말이 빨라지면 군중도 빨리 감기(k>1), 1절은 「勘違い」에서,
+ * 2절은 立ち止まり에서 멈추고(발자국이 드러날 때까지), 조용한 후렴에서 느려진다.
  */
-const CROWD_TIME_WINDOWS: { a: number; b: number; k: number }[] = [
-  { a: 23.1, b: 26.45, k: 2.6 },
-  { a: 26.45, b: 27.75, k: 0 },
-  { a: 27.75, b: 31.7, k: 1.7 },
-  { a: 78.2, b: 79.6, k: 2.6 },
-  { a: 79.6, b: 81.2, k: 0 },
-  { a: 83.0, b: 85.4, k: 1.7 },
-  { a: 133.75, b: 150.65, k: 0.25 },
-];
-
-function crowdTime(t: number) {
-  let out = t;
-  for (const w of CROWD_TIME_WINDOWS) out -= (1 - w.k) * clamp(t - w.a, 0, w.b - w.a);
+function crowdWindows(c: Cues, passages: RapidPassage[]) {
+  const out: { a: number; b: number; k: number }[] = [];
+  const [p1, p2] = passages;
+  const punch = p1?.words.find((w) => w.punch);
+  if (p1 && punch) {
+    out.push({ a: p1.words[0].t, b: punch.t, k: 2.6 }, { a: punch.t, b: punch.t + 1.3, k: 0 });
+    out.push({ a: punch.t + 1.3, b: Math.max(punch.t + 1.3, p1.range[1] - 0.35), k: 1.7 });
+  }
+  if (p2 && p2.words.length > 2) {
+    const stop = p2.words[2].t;
+    out.push({ a: p2.words[0].t, b: stop, k: 2.6 }, { a: stop, b: Math.max(stop, c.footprints), k: 0 });
+    // 「足跡」 다음 줄(前より~)부터 다시 걷는다
+    const punchT = p2.words.find((w) => w.punch)?.t ?? c.footprints;
+    const after = p2.words.find((w) => w.t > punchT);
+    if (after) out.push({ a: after.t, b: Math.max(after.t, c.heroWalk), k: 1.7 });
+  }
+  out.push({ a: c.quiet, b: c.final, k: 0.25 });
   return out;
 }
 
@@ -93,7 +100,29 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   // ── 가사 (타이밍 편집기에서 실시간으로 교체된다) ──────
   let lines = LYRICS;
   let passages = rapidPassages(lines);
-  let cuts = [INTRO_CUT, ...slashTimes(lines)];
+
+  // ── 효과 시각 (같은 방식으로 실시간 교체) ──────────
+  let C: Cues = CUES;
+  let sections = sectionsOf(C);
+  let chromaKeyframes = chromaKeys(C);
+  let flashes = flashesOf(C);
+  // 칼베기: 1절 진입 + 가사의 サムライハート
+  let cuts = [C.verse1, ...slashTimes(lines)];
+  let windows = crowdWindows(C, passages);
+
+  function derive() {
+    sections = sectionsOf(C);
+    chromaKeyframes = chromaKeys(C);
+    flashes = flashesOf(C);
+    cuts = [C.verse1, ...slashTimes(lines)];
+    windows = crowdWindows(C, passages);
+  }
+
+  function crowdTime(t: number) {
+    let out = t;
+    for (const w of windows) out -= (1 - w.k) * clamp(t - w.a, 0, w.b - w.a);
+    return out;
+  }
 
   const rapidPassage = (t: number) => passages.find((p) => t >= p.range[0] && t < p.range[1]) ?? null;
 
@@ -549,7 +578,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   /** 말이 빨라지는 구간 — 단어가 군중 위로 연달아 터지고, 「勘違いだよ」는 가운데 크게 */
   function rapidLyric(c: Ctx, t: number, line: MvLyricLine) {
     const out = clamp((line.end + 0.35 - t) / 0.35);
-    const words = (rapidPassage(t)?.words ?? []).filter((w) => w.t >= line.t - 0.01 && w.t <= line.end && t >= w.t);
+    const words = line.ja.filter((w): w is RapidWord => w.x !== undefined && w.y !== undefined && t >= w.t);
     const last = words[words.length - 1];
     // 「勘違いだよ」가 터지면 앞 단어들은 바깥으로 튕겨 나간다
     const punch = words.find((w) => w.punch);
@@ -773,8 +802,8 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
    * ④ 14.92 밴드 합류 — 칼베기 + 섬광으로 1절(이때 화면이 1절 첫 장면과 정확히 같아진다)
    */
   function sceneTitle(c: Ctx, t: number, poster: boolean) {
-    const groove = poster ? 0 : smooth(invLerp(5.6, 6.6, t));
-    const build = poster ? 0 : smooth(invLerp(12.8, 14.9, t));
+    const groove = poster ? 0 : smooth(invLerp(C.groove - 0.29, C.groove + 0.71, t));
+    const build = poster ? 0 : smooth(invLerp(C.build, C.verse1, t));
     c.fillStyle = INK;
     c.fillRect(0, 0, W, H);
 
@@ -783,7 +812,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       c.save();
       c.globalAlpha = groove * (0.55 + 0.45 * build);
       drawSky(c, '#0b0a12', '#272233');
-      const beatsIn = Math.max(0, Math.floor(beat.pos(t) - beat.pos(5.89)));
+      const beatsIn = Math.max(0, Math.floor(beat.pos(t) - beat.pos(C.groove)));
       drawSkyline(c, t, '#17141d', 1, Math.min(0.32, 0.02 + beatsIn * 0.02));
       c.fillStyle = '#121017';
       c.fillRect(0, 470, W, 400);
@@ -792,9 +821,9 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
 
     // ① 먹 번짐 — 전주 초반 소리(0.05 / 2.17 / 3.77초)에 맞춰, 도시가 떠오르면 걷힌다
     const blooms = [
-      { at: 0.05, x: 380, y: 300, rad: 420, col: LAV_DEEP, a: 0.9 },
-      { at: 2.17, x: 930, y: 420, rad: 360, col: RED_DEEP, a: 0.85 },
-      { at: 3.77, x: 640, y: 360, rad: 250, col: '#3d2a5c', a: 0.6 },
+      { at: C.bloom1, x: 380, y: 300, rad: 420, col: LAV_DEEP, a: 0.9 },
+      { at: C.bloom2, x: 930, y: 420, rad: 360, col: RED_DEEP, a: 0.85 },
+      { at: C.bloom3, x: 640, y: 360, rad: 250, col: '#3d2a5c', a: 0.6 },
     ];
     blooms.forEach((b, i) => {
       const k = poster ? 1 : easeOutExpo(clamp((t - b.at) / 3.2));
@@ -836,7 +865,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     drawRain(c, t, 0.12 * groove);
 
     // 제목 — 킥에 뛰고, 마지막 두 마디에 카메라가 뚫고 지나간다
-    const tk = poster ? 1 : clamp((t - 2.2) / 1.2);
+    const tk = poster ? 1 : clamp((t - C.titleText) / 1.2);
     if (tk > 0 && build < 1) {
       const kick = groove * (env('low', t) * 0.02 + beat.pulse(t, 8) * 0.015);
       const zoom = 1 + kick + easeInCubic(build) * 1.8;
@@ -846,8 +875,8 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       c.scale(zoom, zoom);
       c.translate(-640, -345);
       // 원상은 다 그려진 뒤 반시계로 천천히 돈다(굵은 머리가 앞서도록)
-      const spin = poster ? 0 : Math.max(0, t - 3.2) * 0.12;
-      brushPath(c, ensoPoint(640, 330, 210, -1.9 - spin), 34, poster ? 1 : easeOutCubic(clamp((t - 1.6) / 1.6)), 77, RED, 0.9 * fade);
+      const spin = poster ? 0 : Math.max(0, t - C.ensoDraw - 1.6) * 0.12;
+      brushPath(c, ensoPoint(640, 330, 210, -1.9 - spin), 34, poster ? 1 : easeOutCubic(clamp((t - C.ensoDraw) / 1.6)), 77, RED, 0.9 * fade);
       c.textAlign = 'center';
       c.textBaseline = 'middle';
       c.globalAlpha = tk * fade;
@@ -858,7 +887,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       setFont(c, 30, fonts.display);
       c.fillStyle = LAV;
       c.fillText('Some Like It Hot!!', 640, 410);
-      const ck = poster ? 1 : clamp((t - 4.5) / 1);
+      const ck = poster ? 1 : clamp((t - C.credit) / 1);
       if (ck > 0) {
         c.globalAlpha = ck * 0.85 * fade;
         c.shadowBlur = 0;
@@ -873,7 +902,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
 
   function sceneCity(c: Ctx, t: number, sec: string) {
     // 하늘을 올려다보는 틸트 (虚しくって 見上げる空)
-    const tilt = sec === 'pre1' ? smooth(invLerp(34.0, 34.9, t)) * (1 - smooth(invLerp(37.6, 38.6, t))) : 0;
+    const tilt = sec === 'pre1' ? smooth(invLerp(C.skyTilt, C.skyTilt + 0.9, t)) * (1 - smooth(invLerp(C.skyTilt + 3.6, C.skyTilt + 4.6, t))) : 0;
     const off = tilt * 360;
     const dusk = sec === 'verse2';
     drawSky(c, dusk ? '#1d1430' : '#0b0a12', dusk ? '#5a3b52' : '#272233', off);
@@ -893,7 +922,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.translate(0, off);
     drawSkyline(c, t, dusk ? '#241a2e' : '#17141d', dusk ? 0.6 : 1);
     // DAY BY DAY 티커
-    if (dusk && t < 78.2) {
+    if (dusk && t < (passages[1]?.range[0] ?? C.glass)) {
       c.save();
       setFont(c, 150, fonts.display);
       c.textBaseline = 'middle';
@@ -901,7 +930,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       c.strokeStyle = 'rgba(255,236,250,0.2)';
       const txt = 'DAY BY DAY  ';
       const tw = c.measureText(txt).width;
-      const sx = -(((t - 69.5) * 120) % tw);
+      const sx = -(((t - C.verse2) * 120) % tw);
       for (let x = sx; x < W; x += tw) c.strokeText(txt, x, 300);
       c.restore();
     }
@@ -909,8 +938,8 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.fillRect(0, 470, W, 400);
 
     // 孤独 — 군중 뒤로 커지는 거대한 붓글씨
-    if (sec === 'pre1' && t > 38.0) {
-      const k = clamp((t - 38.0) / 2.3);
+    if (sec === 'pre1' && t > C.kodoku) {
+      const k = clamp((t - C.kodoku) / 2.3);
       c.save();
       c.globalAlpha = 0.2 + 0.25 * k;
       setFont(c, 330 + 80 * k, fonts.brush);
@@ -924,9 +953,9 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     // 발자국 (確かめた足跡) — 주인공이 왼쪽에서 걸어온 길.
     // 신발 자국은 앞꿈치(큰 타원)가 주인공 쪽(오른쪽), 뒤꿈치(작은 원)가 왼쪽.
     // 振り返り에 맞춰 시선을 따라 발밑에서 먼 쪽으로 드러난다.
-    if (sec === 'verse2' && t > 81.0) {
+    if (sec === 'verse2' && t > C.footprints) {
       for (let i = 0; i < 12; i++) {
-        const at = 81.2 + i * 0.13;
+        const at = C.footprints + i * 0.13;
         const k = clamp((t - at) / 0.2);
         if (k <= 0) continue;
         const x = 700 - i * 52;
@@ -948,13 +977,13 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     let heroX = 760;
     let heroWalk = 0;
     if (sec === 'verse2') {
-      const k = invLerp(85.4, 86.9, t);
+      const k = invLerp(C.heroWalk, C.heroWalk + 1.5, t);
       heroX += 80 * smooth(k);
       heroWalk = k > 0 && k < 1 ? t * 9 : 0;
     }
     const rapidHit = lastRapidWord(t);
     const glow = sec === 'pre1'
-      ? invLerp(38, 40.3, t)
+      ? invLerp(C.kodoku, C.chorus1, t)
       : rapidHit
         ? 0.3 + 0.6 * Math.exp(-rapidHit.age * 5)
         : 0.25 + 0.2 * beat.pulse(t, 5);
@@ -965,18 +994,18 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     });
 
     // 캐치볼 — 닿지 않는 대화
-    if (sec === 'pre1' && t > 35.8 && t < 38.6) {
-      const k = clamp((t - 35.8) / 1.5);
+    if (sec === 'pre1' && t > C.catchball && t < C.catchball + 2.8) {
+      const k = clamp((t - C.catchball) / 1.5);
       let bx = lerp(300, 650, k);
       let by = 430 - Math.sin(k * Math.PI) * 220 + (k > 0.75 ? (k - 0.75) * 500 : 0);
-      if (t > 37.3) {
-        const b = t - 37.3;
+      if (t > C.catchball + 1.5) {
+        const b = t - C.catchball - 1.5;
         bx = 650 + b * 120;
         by = 520 - Math.abs(Math.sin(b * 7)) * 50 * Math.exp(-b * 2);
       }
       c.save();
       c.fillStyle = PAPER;
-      c.globalAlpha = 1 - clamp((t - 38.1) / 0.5);
+      c.globalAlpha = 1 - clamp((t - C.catchball - 2.3) / 0.5);
       c.beginPath();
       c.arc(bx, by, 10, 0, TAU);
       c.fill();
@@ -985,7 +1014,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.restore();
 
     // 빗줄기 — 프리코러스 고조
-    drawRain(c, t, sec === 'pre1' ? 0.25 + 0.75 * invLerp(31.8, 40.3, t) : sec === 'verse1' ? (rapidPassage(t) ? 0.4 : 0.12) : 0);
+    drawRain(c, t, sec === 'pre1' ? 0.25 + 0.75 * invLerp(C.pre1 + 0.05, C.chorus1, t) : sec === 'verse1' ? (rapidPassage(t) ? 0.4 : 0.12) : 0);
   }
 
   function drawRain(c: Ctx, t: number, rain: number) {
@@ -1034,14 +1063,14 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.clip();
     c.fillStyle = '#1b1526';
     c.fillRect(px, py, pw, ph);
-    const reveal = easeOutCubic(clamp((t - 87.2) / 1.6));
+    const reveal = easeOutCubic(clamp((t - C.glass - 0.2) / 1.6));
     if (footageReady(video)) {
       drawFootage(c, video, px, py, pw, ph, { chroma: chroma * 0.5, tint: LAV, tintAlpha: 0.55, alpha: 0.25 + 0.6 * reveal, zoom: 1.05 });
     } else {
       brushPath(c, heartPoint(px + pw / 2, py + ph / 2, 170), 30, reveal, 61, LAV, 0.7);
     }
     // 유리 반사광
-    const sweep = ((t - 87) * 0.35) % 1.4;
+    const sweep = ((t - C.glass) * 0.35) % 1.4;
     const sxp = px - 300 + sweep * (pw + 600);
     const sg = c.createLinearGradient(sxp, py, sxp + 220, py + ph);
     sg.addColorStop(0, 'rgba(255,255,255,0)');
@@ -1055,7 +1084,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.strokeRect(px, py, pw, ph);
 
     // 금 가는 유리 (ムカつくんだ → 無関心な世界も)
-    const waves = [91.3, 93.5];
+    const waves = [C.crack1, C.crack2];
     c.save();
     c.beginPath();
     c.rect(GLASS.x, GLASS.y, GLASS.w, GLASS.h);
@@ -1076,7 +1105,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   }
 
   function drawShards(c: Ctx, t: number) {
-    const s = t - 95.55;
+    const s = t - C.chorus2;
     if (s < 0 || s > 1.2) return;
     c.save();
     for (const sh of shards) {
@@ -1141,7 +1170,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
 
     // 마지막 후렴: 관객의 응원봉이 하나둘 켜진다 — "혼자가 아니다"
     if (finalish) {
-      const join = sec === 'final' ? invLerp(150.65, 166, t) : 1;
+      const join = sec === 'final' ? invLerp(C.final, C.final + 15.35, t) : 1;
       const bob = beat.pulse(t, 5);
       const bp = beat.pos(t);
       for (const f of fans) {
@@ -1190,7 +1219,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   }
 
   function sceneInterlude(c: Ctx, t: number, video: HTMLVideoElement | null, chroma: number) {
-    const k = t - 113.2;
+    const k = t - C.interlude;
     drawSky(c, '#150f22', '#3a2a58');
     // 보케
     const br = rng(313);
@@ -1209,7 +1238,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     const y = 50;
     const w = 620;
     const h = 620;
-    const fade = easeOutCubic(clamp(k / 1.5)) * (1 - clamp((t - 132.6) / 1.1));
+    const fade = easeOutCubic(clamp(k / 1.5)) * (1 - clamp((t - C.ensoErase - 0.2) / 1.1));
     c.save();
     blotPath(c, x + w / 2, y + h / 2, 300 + 6 * Math.sin(t * 0.8), 2026, 0.07, t * 0.3);
     c.clip();
@@ -1223,7 +1252,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     }
     c.restore();
     // 나타날 땐 써 내려가고, 사라질 땐 머리부터 지워져 마른 꼬리가 마지막에 빠져나간다
-    const ensoErase = smooth(clamp((t - 132.4) / 1.3));
+    const ensoErase = smooth(clamp((t - C.ensoErase) / 1.3));
     brushPath(c, ensoPoint(x + w / 2, y + h / 2, 318, -2.2 - k * 0.05), 22, easeOutCubic(clamp(k / 2.4)), 404, LAV, 0.7, ensoErase);
     // 등꽃 꽃잎 (아야 방송 배경의 등나무)
     const pr = rng(616);
@@ -1248,10 +1277,10 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     c.restore();
     // 크레딧
     const credits = [
-      { at: 115.5, out: 121.5, a: 'Vocal', b: 'AyaUke' },
-      { at: 122.0, out: 128.0, a: 'Original', b: 'SPYAIR「サムライハート (Some Like It Hot!!)」' },
+      { at: C.interlude + 2.3, out: C.interlude + 8.3, a: 'Vocal', b: 'AyaUke' },
+      { at: C.interlude + 8.8, out: C.interlude + 14.8, a: 'Original', b: 'SPYAIR「サムライハート (Some Like It Hot!!)」' },
       // 날짜는 재생 중인 클립 기준(작품은 여러 클립에 재사용된다)
-      ...(clip.sungDateLabel ? [{ at: 128.4, out: 132.8, a: 'Live', b: `${clip.sungDateLabel} 노래방송` }] : []),
+      ...(clip.sungDateLabel ? [{ at: C.interlude + 15.2, out: C.ensoErase + 0.4, a: 'Live', b: `${clip.sungDateLabel} 노래방송` }] : []),
     ];
     for (const cr of credits) {
       const a = clamp((t - cr.at) / 0.8) * (1 - clamp((t - cr.out) / 0.8));
@@ -1274,7 +1303,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   function sceneQuiet(c: Ctx, t: number) {
     c.fillStyle = '#08070b';
     c.fillRect(0, 0, W, H);
-    const build = invLerp(146.3, 150.6, t);
+    const build = invLerp(C.quietBuild, C.final - 0.05, t);
     // 군중 — 어둠 속 멈춘 실루엣
     drawCrowd(c, t, { alpha: 0.45, hero: null, layers: [0, 1], rim: 'rgba(255,250,240,0.18)' });
     // 스포트라이트 (흰색)
@@ -1304,7 +1333,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     for (let i = 0; i < 90; i++) {
       const x = pr() * W;
       const base = pr() * 1000;
-      const y = H - ((base + (t - 133.75) * speed * (0.5 + pr())) % (H + 40));
+      const y = H - ((base + (t - C.quiet) * speed * (0.5 + pr())) % (H + 40));
       c.globalAlpha = (0.15 + pr() * 0.4) * (0.6 + build);
       c.fillRect(x, y, 2, 2 + build * 14);
     }
@@ -1334,8 +1363,8 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   function sceneBreak(c: Ctx, t: number) {
     c.fillStyle = '#050407';
     c.fillRect(0, 0, W, H);
-    const k = t - 168.6;
-    const swell = easeInCubic(clamp((t - 171.2) / 0.65));
+    const k = t - C.break;
+    const swell = easeInCubic(invLerp(C.heartSwell, C.finale, t));
     const size = 18 + beat.pulse(t, 6) * 8 + swell * 400;
     const hp = heartPoint(640, 360, size);
     c.save();
@@ -1354,7 +1383,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
   }
 
   function sceneEnding(c: Ctx, t: number) {
-    const k = clamp((t - 188.0) / 0.6);
+    const k = clamp((t - C.endTitle) / 0.6);
     if (k <= 0) return;
     c.save();
     c.globalAlpha = k;
@@ -1389,7 +1418,11 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
     setLyrics(next) {
       lines = next;
       passages = rapidPassages(next);
-      cuts = [INTRO_CUT, ...slashTimes(next)];
+      derive();
+    },
+    setCues(next) {
+      C = { ...C, ...next };
+      derive();
     },
     render(main, frame) {
       const b = ensureAssets(main);
@@ -1408,8 +1441,8 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       }
 
       const video = footageReady(frame.footage) ? frame.footage : null;
-      const sec = sectionAt(SECTIONS, t);
-      const chroma = keyframes(CHROMA_KEYS, t);
+      const sec = sectionAt(sections, t);
+      const chroma = keyframes(chromaKeyframes, t);
       const line = lineAt(lines, t);
 
       switch (sec.id) {
@@ -1454,14 +1487,14 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
         b.fillRect(0, 0, W, H);
       }
 
-      if (line && !(sec.id === 'finale' && t >= 187.9)) {
+      if (line && !(sec.id === 'finale' && t >= C.endTitle - 0.1)) {
         if (sec.id === 'quiet') quietLyric(b, t, line);
         else if (['chorus1', 'chorus2', 'final', 'finale', 'post1'].includes(sec.id)) {
           const post = sec.id === 'post1';
           kineticLyric(b, t, line, post
             ? { cx: 900, cy: 330, maxW: 560, vertX: 1170, koX: 900, koAlign: 'center' }
             : { cx: 360, cy: 340, maxW: 580, vertX: 600, koX: 360, koAlign: 'center' });
-        } else if ((sec.id === 'verse1' || sec.id === 'verse2') && rapidPassage(t)) rapidLyric(b, t, line);
+        } else if (isRapidLine(line)) rapidLyric(b, t, line);
         else captionLyric(b, t, line, RED);
       }
       if (sec.id === 'finale') sceneEnding(b, t);
@@ -1539,11 +1572,11 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
 
       // 섬광
       let flash = 0;
-      for (const [f, strength] of FLASHES) {
+      for (const [f, strength] of flashes) {
         const a = t - f;
         if (a >= 0 && a < 1) flash = Math.max(flash, strength * Math.exp(-a * 5));
       }
-      flash = Math.max(flash, Math.pow(invLerp(149.9, 150.65, t), 2) * (t < 150.65 ? 1 : 0));
+      flash = Math.max(flash, Math.pow(invLerp(C.final - 0.75, C.final, t), 2) * (t < C.final ? 1 : 0));
       if (flash > 0.01) {
         main.globalAlpha = flash * 0.85;
         main.fillStyle = '#fffaf2';
@@ -1565,7 +1598,7 @@ export function createSamuraiHeartRenderer(clip: MvClipContext, fonts: SceneFont
       }
 
       // 시작/끝 페이드
-      const fade = Math.max(1 - clamp(t / 0.6), clamp((t - 190.4) / 1.2));
+      const fade = Math.max(1 - clamp(t / 0.6), clamp((t - C.outro) / 1.2));
       if (fade > 0) {
         main.globalAlpha = fade;
         main.fillStyle = '#000';

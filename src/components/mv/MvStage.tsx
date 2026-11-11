@@ -6,7 +6,6 @@ import { ArrowsPointingOutIcon } from '@heroicons/react/24/outline';
 import ClipPlayer, { type ClipPlayerHandle } from '@/components/clip/ClipPlayer';
 import type { VideoPlatform } from '@/shared/utils/video-url';
 import { loadMv } from './registry';
-import { sectionAt } from './engine';
 import type { MvLyricLine, MvRenderer, MvWork } from './types';
 
 export interface MvStageProps {
@@ -26,6 +25,8 @@ export interface MvStageProps {
   };
   /** 가사 타이밍 덮어쓰기 — 로컬 타이밍 편집기의 실시간 미리보기 */
   lyrics?: MvLyricLine[];
+  /** 효과 타이밍 덮어쓰기 — 같은 용도 */
+  cues?: Record<string, number>;
 }
 
 /** 타이밍 편집기용 제어 핸들. 시각은 모두 MV 기준(클립 시작 = 0) */
@@ -44,7 +45,7 @@ const MAX_CANVAS_WIDTH = 1920;
  * 클립 시작 시각이 MV의 t=0이다(클립 범위가 곡에 정확히 맞춰져 있다는 전제).
  * 디버그용 쿼리: ?t=40 (그 시각 정지 화면) / ?preview=38 (소리 없이 그 시각부터 재생) / ?debug=1
  */
-const MvStage = forwardRef<MvStageHandle, MvStageProps>(function MvStage({ clip, lyrics }, ref) {
+const MvStage = forwardRef<MvStageHandle, MvStageProps>(function MvStage({ clip, lyrics, cues }, ref) {
   const params = useSearchParams();
   const freezeT = params.get('t');
   const previewT = params.get('preview');
@@ -90,6 +91,10 @@ const MvStage = forwardRef<MvStageHandle, MvStageProps>(function MvStage({ clip,
   useEffect(() => {
     if (ready && lyrics) rendererRef.current?.setLyrics?.(lyrics);
   }, [ready, lyrics]);
+
+  useEffect(() => {
+    if (ready && cues) rendererRef.current?.setCues?.(cues);
+  }, [ready, cues]);
 
   useImperativeHandle(ref, () => ({
     getTime: () => {
@@ -149,8 +154,9 @@ const MvStage = forwardRef<MvStageHandle, MvStageProps>(function MvStage({ clip,
       const footage = playerBoxRef.current?.querySelector('video') ?? null;
       rendererRef.current?.render(ctx, { t, footage });
       if (debugRef.current) {
+        const now = t;
         debugRef.current.textContent =
-          t === null ? 'poster' : `t=${t.toFixed(2)}  ${sectionAt(work.sections, t).id}`;
+          now === null ? 'poster' : `t=${now.toFixed(2)}  ${work.cues?.filter((c) => c.t <= now).at(-1)?.id ?? 'start'}`;
       }
       raf = requestAnimationFrame(frame);
     };

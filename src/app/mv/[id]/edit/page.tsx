@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** 로컬 전용 가사 타이밍 편집기 — `npm run dev`에서만 열린다(운영 404) */
+/** 로컬 전용 타이밍 편집기(가사·효과) — `npm run dev`에서만 열린다(운영 404) */
 export default async function MvEditPage({ params }: MvEditPageProps) {
   if (process.env.NODE_ENV !== 'development') notFound();
   const { id } = await params;
@@ -28,7 +28,7 @@ export default async function MvEditPage({ params }: MvEditPageProps) {
   return (
     <main className="min-h-screen bg-[#0d0b11] px-4 py-6 text-white sm:px-6">
       <h1 className="mx-auto mb-4 max-w-6xl text-sm font-semibold uppercase tracking-[0.2em] text-white/60">
-        MV 가사 타이밍 편집 · 로컬 전용
+        MV 타이밍 편집 · 로컬 전용
       </h1>
       <Suspense>
         <MvTimingEditor

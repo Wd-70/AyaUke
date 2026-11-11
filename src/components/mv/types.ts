@@ -56,6 +56,18 @@ export interface MvRenderer {
   render(ctx: CanvasRenderingContext2D, frame: MvFrame): void;
   /** 가사 타이밍 교체 — 로컬 타이밍 편집기의 실시간 미리보기용 */
   setLyrics?(lines: MvLyricLine[]): void;
+  /** 효과 타이밍 교체 — 같은 용도 */
+  setCues?(cues: Record<string, number>): void;
+}
+
+/** 편집기에서 조정할 수 있는 효과 시각(장면 전환, 칼베기, 섬광 등) */
+export interface MvCue {
+  id: string;
+  /** 편집기에 보이는 이름 */
+  label: string;
+  t: number;
+  /** 장면 경계 — 경계끼리는 순서가 뒤집히면 안 된다 */
+  section?: boolean;
 }
 
 /**
@@ -69,7 +81,8 @@ export interface MvWork {
   lyrics: MvLyricLine[];
   title: string;
   subtitle?: string;
-  sections: MvSection[];
+  /** 효과 타이밍 (편집기 초기값) */
+  cues?: MvCue[];
   /** 렌더 전에 로드해 둘 폰트 — family(CSS)와 그 폰트로 그릴 글자 전체 */
   fonts: { family: string; text: string }[];
   createRenderer(clip: MvClipContext): MvRenderer;
