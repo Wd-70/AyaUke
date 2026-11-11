@@ -1,0 +1,12 @@
+# MV 분석 환경 (setup.ps1이 설치). torch는 CUDA판을 따로 깐 뒤 마지막에 다시 고정한다
+# — audio-separator·faster-whisper 의존성이 CPU판 최신 torch로 바꿔 버리기 때문.
+transformers==4.57.6
+accelerate==1.12.0
+nagisa==0.2.11
+soynlp==0.0.493
+librosa==0.11.0
+soundfile==0.13.1
+audio-separator==0.48.0
+faster-whisper==1.2.1
+pykakasi==2.3.0
+audioread  # audio-separator가 쓰지만 의존성에 빠져 있음

@@ -73,3 +73,6 @@ dev-err.log
 
 # AI asset generation sources/references (not for distribution)
 asset-src/
+
+# python
+__pycache__/

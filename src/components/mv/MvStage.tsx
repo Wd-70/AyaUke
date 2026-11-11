@@ -136,10 +136,16 @@ const MvStage = forwardRef<MvStageHandle, MvStageProps>(function MvStage({ clip,
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
-    const fixed = freezeT !== null ? Number(freezeT) : null;
+    let fixed = freezeT !== null ? Number(freezeT) : null;
     const previewFrom = previewT !== null ? Number(previewT) : null;
     const perf0 = performance.now();
     let raf = 0;
+    // 정지 화면 모드에서는 검수 도구(scripts/mv/sheet.mjs)가 새로고침 없이 시각을 바꿀 수 있다
+    const hook = window as unknown as { __mvSeek?: (t: number) => void; __mvDuration?: number };
+    if (fixed !== null) {
+      hook.__mvSeek = (t) => (fixed = t);
+      hook.__mvDuration = work.duration;
+    }
 
     const frame = () => {
       let t: number | null = null;
@@ -161,7 +167,11 @@ const MvStage = forwardRef<MvStageHandle, MvStageProps>(function MvStage({ clip,
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      delete hook.__mvSeek;
+      delete hook.__mvDuration;
+    };
   }, [ready, work, freezeT, previewT, clip.startTime]);
 
   const onPlayingChange = useCallback((playing: boolean) => {
