@@ -222,8 +222,8 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
         for (let row = 0; row < 3; row++) {
           for (let i = 0; i < 12; i++) {
             const x = 120 + i * 95 + hash(i + row * 31) * 50 + row * 30;
-            const y = 420 + row * 70 + hash(i * 7 + row) * 20;
-            const r = 26 + row * 12;
+            const y = 420 + row * 70 + (hash(i * 7 + row) - 0.5) * 44;
+            const r = (26 + row * 12) * (0.82 + hash(i * 5 + row * 3) * 0.36);
             stem(c, x, y, H + 40, 4 + row * 2, { sat: 0.35, lean: 8, seed: i, leaves: 1 });
             stampFlower(c, x, y, r, { seed: i + row * 12, sat: 0.4, squash: 0.7, rot: 0.5 + hash(i) * 0.3 });
             c.fillStyle = 'rgba(248,250,252,0.92)';
@@ -338,34 +338,69 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
       girl(c, W / 2, mid, 300, { t, color: '#2b3244', wind: 0.4 });
     },
 
-    // 23 꽃잎 폭풍(올려다봄) — 고음에서 화면 가득, 끝에 모든 것이 멈춤
+    // 23 꽃잎 폭풍(올려다봄) — 위쪽 꽃송이에서 꽃잎이 떨어져 나와 바람을 타고 흘러내린다.
+    // 고음에 가까울수록 바람이 세지고 꽃잎이 많아져 화면을 채운다. 끝에 모든 것이 멈춤
     petalStorm(c, f) {
       const C = kit.cues();
       const t = Math.min(f.t, C.hush - 0.4);
+      const age = t - f.span.start;
       const k = span01(t, f.span.start, C.hush - 1.2);
-      const rot = f.age * 0.08 + k * k * 0.6;
-      // 아래에서 올려다본 해바라기들 — 줄기는 화면 아래에서 곧게 솟는다(한 점으로 모이는 방사선은 쓰지 않는다)
+      const gust = k * k;
+      const flowers = Array.from({ length: 9 }, (_, i) => ({
+        x: -80 + i * 180 + hash(i + 40) * 50,
+        y: 60 + hash(i + 41) * 240,
+        r: 110 + hash(i + 42) * 50,
+      }));
+      // 꽃잎 — 일부는 꽃송이 가장자리에서 막 떨어져 나오고, 나머지는 바람 위쪽(왼쪽 밖)에서 실려 와 화면을 가로지른다.
+      // 바람은 오른쪽으로, 올려다보는 쪽(아래)으로 천천히 내려오며 다가올수록 커진다
+      const N = 320;
+      const active = 30 + (N - 30) * gust;
+      const windX = 90 + 300 * gust;
+      const petals = (front: boolean) => {
+        for (let i = 0; i < active; i++) {
+          const near = hash(i * 5 + 1) > 0.55;
+          if (near !== front) continue;
+          const sp = near ? 1.35 : 0.75;
+          const vx = windX * sp;
+          const vy = (25 + 55 * hash(i * 29 + 4)) * sp;
+          const fromFlower = hash(i * 31 + 6) < 0.4;
+          const life = fromFlower ? 2.2 + hash(i * 7 + 2) * 1.6 : (W + 300) / vx;
+          const run = age + hash(i * 11 + 3) * life;
+          const a = run % life;
+          const cyc = Math.floor(run / life);
+          let x0: number;
+          let y0: number;
+          if (fromFlower) {
+            const fl = flowers[Math.floor(hash(i * 13 + cyc * 17) * flowers.length)];
+            const ang = hash(i * 19 + cyc * 23) * TAU;
+            x0 = fl.x + Math.cos(ang) * fl.r * 0.55;
+            y0 = fl.y + Math.sin(ang) * fl.r * 0.45;
+          } else {
+            x0 = -150;
+            y0 = -60 + hash(i * 37 + cyc * 41) * (H * 0.85);
+          }
+          const x = x0 + vx * a + Math.sin(a * 1.8 + i) * 36;
+          const y = y0 + vy * a + Math.sin(a * 1.1 + i * 0.7) * 24;
+          const len = (near ? 20 + 26 * gust : 11) * (1 + a * (near ? 0.35 : 0.12));
+          const fade = clamp(a * (fromFlower ? 4 : 8)) * (fromFlower ? clamp((life - a) * 2) : 1);
+          fallingPetal(c, x, y, len, a * (1.2 + hash(i)) + i, a * 4 + i, 0.85, fade * (near ? 0.95 : 0.7));
+        }
+      };
       cam(c, 1.08 + k * 0.12, W / 2, H / 2, () => {
         vgrad(c, [[0, desat('#d3e2ef', 0.9)], [0.55, desat('#fff1cf', 0.9)], [1, desat('#ffd27a', 0.9)]], -200, -200, W + 400, H + 400);
         for (let i = 0; i < 4; i++) {
-          wash(c, `k-storm-cloud-${i}`, { color: '#fffaf0', size: 300, aspect: 2.4, layers: 20, alpha: 0.05 }, 160 + i * 330, 120 + (i % 2) * 90, 360, 1, 0.7);
+          const cx = ((160 + i * 330 + age * 18 * (1 + gust * 4)) % (W + 500)) - 250;
+          wash(c, `k-storm-cloud-${i}`, { color: '#fffaf0', size: 300, aspect: 2.4, layers: 20, alpha: 0.05 }, cx, 120 + (i % 2) * 90, 360, 1, 0.7);
         }
-        for (let i = 0; i < 9; i++) {
-          const x = -80 + i * 180 + hash(i + 40) * 50;
-          const headY = 60 + hash(i + 41) * 240;
-          const r = 110 + hash(i + 42) * 50;
-          stem(c, x, headY + r * 0.4, H + 220, 13, { sat: 0.85, lean: (W / 2 - x) * 0.06, seed: i });
-          stampFlower(c, x + Math.sin(t * 0.8 + i) * 6, headY, r, { seed: i + 30, sat: 0.85, squash: 0.9, rot: (hash(i + 43) - 0.5) * 0.5 });
-        }
-      }, Math.sin(f.age * 0.25) * 0.04 + rot * 0.05);
-      // 소용돌이 꽃잎 — 점점 많고 빠르게
-      const n = Math.floor(30 + 190 * k * k);
-      for (let i = 0; i < n; i++) {
-        const d = hash(i * 7 + 3);
-        const a = hash(i * 13) * TAU + t * (0.4 + d * 0.8) * (1 + k * 2);
-        const r = 60 + ((hash(i * 3) * 700 + t * (40 + 120 * k) * (0.5 + d)) % 760);
-        fallingPetal(c, W / 2 + Math.cos(a) * r, H / 2 + Math.sin(a) * r * 0.75, 14 + d * 22 + k * 10, a + Math.PI / 2, t * 3 + i, 0.85, 0.85);
-      }
+        petals(false);
+        flowers.forEach((fl, i) => {
+          // 바람이 세지면 꽃송이도 흔들린다
+          const sway = Math.sin(t * 0.8 + i) * 6 + gust * Math.sin(t * 3.2 + i * 1.7) * 12;
+          stem(c, fl.x, fl.y + fl.r * 0.4, H + 220, 13, { sat: 0.85, lean: (W / 2 - fl.x) * 0.06, seed: i });
+          stampFlower(c, fl.x + sway, fl.y, fl.r, { seed: i + 30, sat: 0.85, squash: 0.9, rot: (hash(i + 43) - 0.5) * 0.5 + sway * 0.004 });
+        });
+        petals(true);
+      }, Math.sin(age * 0.25) * 0.04 + gust * 0.03);
       const hold = span01(f.t, C.hush - 0.4, C.hush);
       if (hold > 0) {
         c.fillStyle = `rgba(10,8,12,${hold * 0.9})`;

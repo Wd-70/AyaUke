@@ -10,41 +10,63 @@ import { cutWithin } from './timeline';
 
 type Pt = [number, number];
 
-/** 눈물 방울 — 밝은 물빛 */
-function tear(c: Ctx, x: number, y: number, r: number, stretch = 1, alpha = 1) {
+/**
+ * 눈물 방울 — 밝은 물빛. 꼬리는 움직임의 반대쪽을 향한다.
+ * dir: 꼬리가 향하는 각도(기본 위쪽 = 아래로 떨어지는 방울), stretch: 꼬리 길이(빠를수록 길게)
+ */
+function tear(c: Ctx, x: number, y: number, r: number, stretch = 1, alpha = 1, dir = -Math.PI / 2) {
   c.save();
   c.globalAlpha *= alpha;
-  const g = c.createLinearGradient(x - r, y - r * 2, x + r, y + r);
+  c.translate(x, y);
+  c.rotate(dir + Math.PI / 2);
+  const g = c.createLinearGradient(-r, -r * 2, r, r);
   g.addColorStop(0, 'rgba(235,245,255,0.95)');
   g.addColorStop(1, 'rgba(150,185,225,0.85)');
   c.fillStyle = g;
-  dropPath(c, x, y, r, stretch);
+  dropPath(c, 0, 0, r, stretch);
   c.fill();
+  c.rotate(-(dir + Math.PI / 2));
+  // 반사광은 화면 기준 왼쪽 위에 고정
   c.fillStyle = 'rgba(255,255,255,0.9)';
   c.beginPath();
-  c.ellipse(x - r * 0.35, y - r * 0.2, r * 0.18, r * 0.3, -0.4, 0, TAU);
+  c.ellipse(-r * 0.35, -r * 0.2, r * 0.18, r * 0.3, -0.4, 0, TAU);
   c.fill();
   c.restore();
+}
+
+/** 밭의 한 송이 — 줄에서 조금씩 어긋나게(앞뒤·좌우 위치, 키, 크기, 고개 각도), 드문드문 빈자리 */
+function looseSpot(id: number, size: number) {
+  return {
+    dx: (hash(id * 3 + 1) - 0.5) * size * 0.9,
+    dy: (hash(id * 3 + 2) - 0.5) * size * 0.55,
+    s: 0.82 + hash(id * 3 + 3) * 0.36,
+    tilt: (hash(id * 3 + 4) - 0.5) * 0.7,
+    skip: hash(id * 3 + 5) < 0.06,
+  };
 }
 
 /** 원근 해바라기 밭 — horizon 아래로 줄지어, open(d)로 줄마다 피어나는 정도 */
 function field(c: Ctx, t: number, horizon: number, rows: number, sat: number, open: (d: number, i: number) => number) {
   for (let r = 0; r < rows; r++) {
     const d = (r + 1) / rows;
-    const y = horizon + Math.pow(d, 1.8) * (H + 260 - horizon);
-    const size = 10 + d * 120;
-    const n = Math.ceil(W / (size * 1.25)) + 2;
+    const y0 = horizon + Math.pow(d, 1.8) * (H + 260 - horizon);
+    const size0 = 10 + d * 120;
+    const n = Math.ceil(W / (size0 * 1.25)) + 2;
     for (let i = 0; i < n; i++) {
       const id = r * 37 + i;
-      const x = (i - 0.5) * size * 1.25 + (r % 2) * size * 0.6 + (hash(id) - 0.5) * size * 0.4;
+      const j = looseSpot(id, size0);
+      if (j.skip) continue;
+      const size = size0 * j.s;
+      const x = (i - 0.5) * size0 * 1.25 + (r % 2) * size0 * 0.6 + j.dx;
+      const y = y0 + j.dy;
       const o = open(d, id);
       c.strokeStyle = desat('#4f6b33', sat);
       c.lineWidth = Math.max(1, size * 0.08);
       c.beginPath();
       c.moveTo(x, y);
-      c.lineTo(x + (hash(id + 3) - 0.5) * size * 0.2, y + size * 1.6);
+      c.lineTo(x + (hash(id + 3) - 0.5) * size * 0.3, y + size * 1.6);
       c.stroke();
-      stampFlower(c, x + Math.sin(t * 0.9 + id) * size * 0.04, y, size * 0.55, { seed: id, sat, squash: 0.82, rot: (hash(id + 5) - 0.5) * 0.5, open: o });
+      stampFlower(c, x + Math.sin(t * 0.9 + id) * size * 0.04, y, size * 0.55, { seed: id, sat, squash: 0.82, rot: j.tilt, open: o });
     }
   }
 }
@@ -169,14 +191,17 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
         const at = (r: number) => horizon + Math.pow((r + 1) / rows, 1.5) * (H + 200 - horizon);
         const row = (r: number) => {
           const d = (r + 1) / rows;
-          const y = at(r);
-          const size = 14 + d * 110;
-          const n = Math.ceil(W / (size * 1.15)) + 2;
+          const size0 = 14 + d * 110;
+          const n = Math.ceil(W / (size0 * 1.15)) + 2;
           for (let i = 0; i < n; i++) {
             const id = r * 41 + i + 500;
-            const x = (i - 0.5) * size * 1.15 + (r % 2) * size * 0.55 + (hash(id) - 0.5) * size * 0.3;
-            if (Math.abs(x - W / 2) < size * 0.9 && Math.abs(y - 470) < 60) continue;
-            stampFlower(c, x + Math.sin(t * 0.9 + id) * size * 0.05, y, size * 0.55, { seed: id, sat: 1, squash: 0.75, rot: (hash(id + 2) - 0.5) * 0.4 });
+            const j = looseSpot(id, size0);
+            if (j.skip) continue;
+            const size = size0 * j.s;
+            const x = (i - 0.5) * size0 * 1.15 + (r % 2) * size0 * 0.55 + j.dx;
+            const y = at(r) + j.dy;
+            if (Math.abs(x - W / 2) < size0 * 0.9 && Math.abs(y - 470) < 60) continue;
+            stampFlower(c, x + Math.sin(t * 0.9 + id) * size * 0.05, y, size * 0.55, { seed: id, sat: 1, squash: 0.75, rot: j.tilt });
           }
         };
         for (let r = 0; r < rows; r++) {
@@ -342,7 +367,10 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
             const z = ((age * 0.8 + hash(i)) % 1);
             const a = hash(i + 5) * TAU;
             const r = z * z * 700;
-            tear(c, 640 + Math.cos(a) * r, 360 + Math.sin(a) * r * 0.7, 4 + z * z * 36, 1, clamp(z * 3) * (1 - clamp((z - 0.85) * 6)));
+            const dx = Math.cos(a);
+            const dy = Math.sin(a) * 0.7;
+            // 소실점(가운데)에서 카메라 쪽으로 오므로 꼬리는 가운데를 향하고, 가까울수록 정면이라 짧다
+            tear(c, 640 + dx * r, 360 + dy * r, 4 + z * z * 36, 1.5 - z * 0.9, clamp(z * 3) * (1 - clamp((z - 0.85) * 6)), Math.atan2(-dy, -dx));
           }
         }
       }
@@ -373,7 +401,10 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
           const a = Math.PI + (i / 8) * Math.PI;
           const d = easeOutCubic(clamp(spread * 5)) * 80;
           const up = Math.sin(clamp(spread * 5) * Math.PI) * 50;
-          if (spread < 0.25) tear(c, 640 + Math.cos(a) * d, 420 + Math.sin(a) * d * 0.3 - up, 5, 1, 1 - spread * 4);
+          const px = 640 + Math.cos(a) * d;
+          const py = 420 + Math.sin(a) * d * 0.3 - up;
+          // 튀어 오르는 동안 꼬리는 떨어진 자리를 향한다
+          if (spread < 0.25) tear(c, px, py, 5, 1, 1 - spread * 4, Math.atan2(420 - py, 640 - px));
         }
         wash(c, 'k-last-blue', { color: '#8fa6c8', size: 300, alpha: 0.06 }, 640, 430, 160 + 1200 * easeOutCubic(spread), spread, 0.9);
         wash(c, 'k-last-gold', { color: PETAL, size: 300, alpha: 0.05 }, 660, 420, 80 + 640 * easeOutCubic(span01(t, hitT + 0.3, f.span.end)), spread, 0.5);

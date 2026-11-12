@@ -162,19 +162,40 @@ export function leafPath(c: Ctx, len: number, wid: number) {
 }
 
 /** 떨어지는 꽃잎 한 장 — 회전하며 펄럭이는 모습(가로 눌림으로 뒤집힘 표현) */
+const petalSprites = new Map<number, HTMLCanvasElement>();
+
+/** 꽃잎 한 장 이미지(길이 100px, 가운데 기준) — 꽃잎 비는 수백 장이라 매번 그라데이션을 만들지 않고 찍는다 */
+function petalSprite(sat: number) {
+  const key = Math.round(sat * 10);
+  let cv = petalSprites.get(key);
+  if (!cv) {
+    cv = document.createElement('canvas');
+    cv.width = 56;
+    cv.height = 108;
+    const c = cv.getContext('2d')!;
+    c.translate(28, 104);
+    const g = c.createLinearGradient(0, 0, 0, -100);
+    g.addColorStop(0, desat(PETAL_DEEP, key / 10));
+    g.addColorStop(1, desat(PETAL, key / 10));
+    c.fillStyle = g;
+    petalPath(c, 100, 22);
+    c.fill();
+    petalSprites.set(key, cv);
+  }
+  return cv;
+}
+
 export function fallingPetal(c: Ctx, x: number, y: number, len: number, spin: number, flutter: number, sat = 1, alpha = 1) {
+  if (alpha <= 0) return;
   c.save();
   c.translate(x, y);
   c.rotate(spin);
   c.scale(0.35 + 0.65 * Math.abs(Math.cos(flutter)), 1);
   c.globalAlpha *= alpha;
-  const g = c.createLinearGradient(0, len * 0.5, 0, -len * 0.5);
-  g.addColorStop(0, desat(PETAL_DEEP, sat));
-  g.addColorStop(1, desat(PETAL, sat));
-  c.fillStyle = g;
-  c.translate(0, len * 0.5);
-  petalPath(c, len, len * 0.22);
-  c.fill();
+  if (typeof document !== 'undefined') {
+    const k = len / 100;
+    c.drawImage(petalSprite(sat), -28 * k, -54 * k, 56 * k, 108 * k);
+  }
   c.restore();
 }
 
