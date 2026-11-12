@@ -72,7 +72,7 @@ def voice_mask(wav, hop=320):
     import numpy as np
     n = len(wav) // hop
     rms = np.sqrt(np.mean(wav[:n * hop].reshape(n, hop) ** 2, axis=1))
-    return rms > max(np.percentile(rms, 95) * 0.12, 1e-4), hop / SR
+    return rms > max(np.percentile(rms, 95) * 0.03, 1e-4), hop / SR
 
 
 class Aligner:
@@ -218,6 +218,9 @@ def main():
     ap.add_argument('--offset', type=float, help='파일 시각 - MV 시각 (기본: source.json의 offset)')
     ap.add_argument('--start', type=float, default=0.0, help='이 MV 시각부터 찾는다(앞쪽 잡담을 건너뛸 때)')
     ap.add_argument('--lead', type=float, default=0.0, help='덩어리를 이만큼 일찍 띄움(초) — 화면에 미리 보이게')
+    ap.add_argument('--anchors', default='',
+                    help='구간 닻 "줄번호@MV시각,…" (예: 1@8,6@31.5,15@76) — 음량·음높이로 보이는 절·후렴 시작을 '
+                         '알려 주면 구간마다 따로 맞춘다. 줄번호는 1부터, 시각은 ±0.5초 정도면 된다')
     ap.add_argument('--refine', action='store_true',
                     help='--from-json의 줄 시작 시각(편집기에서 줄마다 탭한 값)을 믿고 줄 안 덩어리만 맞춘다 — 가장 정확')
     ap.add_argument('--jitter', type=float, default=0.0, help=argparse.SUPPRESS)  # 검증용: 줄 시작을 ±이만큼 흔든다
@@ -247,7 +250,16 @@ def main():
         unsure = al.refine([l['chunks'][0]['t'] + offset + a.jitter * ((hash((k, 7)) % 1001) / 500 - 1)
                             for k, l in enumerate(lines)], len(wav) / SR)
     else:
-        unsure = al.solve(offset + a.start, len(wav) / SR)
+        anchors = sorted((int(n) - 1, float(t)) for n, t in (s.split('@') for s in a.anchors.split(',') if s.strip()))
+        if not anchors or anchors[0][0] > 0:
+            anchors.insert(0, (0, a.start))
+        unsure = []
+        for k, (li, t) in enumerate(anchors):
+            lj, t_next = anchors[k + 1] if k + 1 < len(anchors) else (len(lines), None)
+            t1 = t_next + offset + 0.3 if t_next is not None else len(wav) / SR
+            part = Aligner(model, wav, lines[li:lj], a.lang)
+            unsure += [li + i for i in part.solve(max(0.0, t + offset - 0.5), t1)]
+            al.ct[li:lj], al.ok[li:lj] = part.ct, part.ok
 
     for li, l in enumerate(lines):
         T = iter(al.ct[li])

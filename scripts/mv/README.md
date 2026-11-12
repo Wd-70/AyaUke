@@ -17,7 +17,7 @@ powershell -File scripts/mv/setup.ps1     # D:\cache\ayauke-mv\venv (CUDA PyTorc
 |---|---|---|
 | 1. 오디오 | `python scripts/mv/fetch_audio.py <곡> --video <다시보기 번호> --start <s> --end <e>` | `source.wav`(44.1k 스테레오, 앞뒤 5초 여유), `source.json` |
 | 2. 분리 | `python scripts/mv/separate.py <곡>` | `vocals.wav`, `instrumental.wav` (RTX 2060 약 3분) |
-| 3. 분석 | `python scripts/mv/analyze.py <곡> --duration <클립 길이>` | `envelope.ts`(작품 폴더로 복사), `analysis.json` + 박·구간 후보·에너지·노래 구간 요약 |
+| 3. 분석 | `python scripts/mv/analyze.py <곡> --duration <클립 길이>` | `envelope.ts`(작품 폴더로 복사), `analysis.json` + 박·구간 후보·에너지·노래 구간·음높이·고음 후보 요약 |
 | 4. 가사 | 아래 '가사 정렬' | `lyrics.aligned.json` → 작품 `lyrics.json`으로 |
 | 5. 검수 | `node scripts/mv/sheet.mjs <클립 shareId> --every 2` | `D:\cache\ayauke-mv\sheets\*.jpg` 장면 모음 |
 
@@ -30,7 +30,8 @@ powershell -File scripts/mv/setup.ps1     # D:\cache\ayauke-mv\venv (CUDA PyTorc
 - **권장 — 줄 시작만 탭하고 나머지는 자동**: 편집기(`/mv/<id>/edit`)에서 노래를 들으며 줄마다 T로 시작만 탭(한 번 훑기) → 저장 →
   `python scripts/mv/align_lyrics.py <곡> --from-json src/components/mv/works/<곡>/lyrics.json --refine`
   → 줄 안의 덩어리 시각을 채운 초안. 편집기에서 다듬는다.
-- **완전 자동(초안)**: `--lyrics 가사.txt --lang Japanese`. 절(verse)은 잘 맞지만 떼창·반주가 큰 후렴은 무너질 수 있다. 끝까지 못 맞춘 줄은 '확인 필요'로 출력되지만, 확정된 줄도 틀릴 수 있으니 반드시 들어 보고 고친다.
+- **완전 자동(초안)**: `--lyrics 가사.txt --lang Japanese --anchors 1@8.5,6@31.5,15@76`. 절(verse)·브릿지처럼 작게 부르는 곳은 잘 맞지만 크게 지르는 후렴은 무너진다. 끝까지 못 맞춘 줄은 '확인 필요'로 출력되지만, 확정된 줄도 틀릴 수 있으니 반드시 들어 보고 고친다.
+- `--anchors 줄번호@MV시각,…`: 분석 요약의 에너지·음높이로 보이는 절·프리코러스·브릿지 시작을 알려 주면 구간마다 따로 맞춘다. 닻 없이 곡 전체를 한 번에 맞추면 한 구간이 틀리면서 뒤가 줄줄이 밀린다(카타포에서 2절 첫 줄이 50초로 감).
 - 가사.txt: 한 줄 = 한 소절(부른 순서대로, 반복 후렴도 다 적기). 덩어리는 ` | `로 나누고, 탭 뒤에 번역(ko).
 - `--lead 0.2`: 덩어리를 노래보다 살짝 먼저 띄우고 싶을 때.
 
@@ -38,12 +39,20 @@ powershell -File scripts/mv/setup.ps1     # D:\cache\ayauke-mv\venv (CUDA PyTorc
 | 방식 | 덩어리 시작 오차 |
 |---|---|
 | 완전 자동 | 앞 절(1~8줄)은 ±0.1~0.7초, 후렴·Hey!! 구간은 수십 초까지 무너짐 |
-| 줄 시작 탭(±0.5초 흔들어도) + `--refine` | 줄 안 덩어리 중앙값 0.4초, 90%가 1초 이내 |
+| 줄 시작 탭(±0.5초 흔들어도) + `--refine` | 줄 안 덩어리 중앙값 0.33초, 90%가 1초 이내 |
 
 정렬기 특성(겪은 것):
 - 가사보다 오디오가 훨씬 길면(3분 통째, 두 줄에 90초 등) 전부 0초로 무너진다 → 스크립트가 목소리 없는 구간을 잘라 붙이고 좁은 창으로 다시 맞춘다.
 - 창 앞에 소리가 있으면 첫 단어 시작을 창 시작까지 끌어당긴다 → `--refine`은 그럴 때 탭한 시각을 쓴다.
-- 떼창·MR 코러스의 "Hey!!" 같은 외침은 잘 못 잡는다.
+- 크게 지르는 후렴(길게 끄는 음·바이브레이션)은 분리 보컬로도 원본 믹스로도 무너진다 — 떼창이 없는 카타포에서도 같았다. 후렴은 줄 시작 탭이 필요하다.
+- 떼창·MR 코러스의 "Hey!!" 같은 외침도 잘 못 잡는다.
+- 목소리 판정 기준은 가장 큰 소리의 -30dB(`voice_mask`). 처음엔 -18dB였는데, 절을 후렴보다 18dB 작게 부르는 카타포에서 절 전체가 '목소리 없음'으로 잘려 나가 정렬이 통째로 무너졌다. 낮춘 뒤 사무라이 하트도 조금 나아졌다(탭+`--refine` 중앙값 0.33초).
+
+### 음높이·고음 후보 (`analyze.py`)
+
+분리 보컬을 pyin으로 재서 0.5초마다 음높이(MIDI)와, 곡 최고음 근처(2.5반음 안)를 0.4초 넘게 끈 '고음 후보'를 낸다.
+지르는 순간·전조(키 올림)·작게 부르는 절을 찾아 연출의 낙차를 짜는 데 쓴다. 카타포: 마지막 후렴(166.8초)에서 반음 전조,
+고음 후보 178.9초 F5·195.8초 A5.
 
 ## 로컬 AI 자원 (`D:\cache`)
 

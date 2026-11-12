@@ -10,6 +10,8 @@
 - 라이브 커버는 MR 위에서 불러 템포가 일정하므로 고정 그리드(period·phase)를 맞춘다(사무라이 하트: 손으로 잰 값과
   1ms 이내). librosa가 반 박에 찍는 경우가 있어 맞는 비율이 0.6 안팎이어도 정상 — 그리드가 의심되면 편집기 박자 탭으로 확인.
 - 노래 구간(vocals)은 보컬 분리 파일에서 잰다 — 가사 없는 간주·브레이크 장면 위치를 잡는 데 쓴다.
+  절을 후렴보다 20dB 가까이 작게 부르는 곡이 있어(카타포) 기준을 낮게(가장 큰 소리의 -30dB) 잡는다.
+- 음높이(pitch)와 고음 후보(peaks)도 보컬 파일에서 잰다 — 지르는 순간·전조(키 올림)를 찾아 터뜨릴 시각으로 쓴다.
 """
 import argparse
 import json
@@ -114,7 +116,7 @@ def main():
     if voc is not None:
         vr = librosa.feature.rms(y=voc, hop_length=hop)[0]
         vt = librosa.times_like(vr, sr=sr, hop_length=hop)
-        on = vr > max(np.percentile(vr, 95) * 0.12, 1e-4)
+        on = vr > max(np.percentile(vr, 95) * 0.03, 1e-4)
         start = None
         for t, v in zip(vt, on):
             if v and start is None:
@@ -129,8 +131,35 @@ def main():
             sung.append([float(start), float(vt[-1])])
         sung = [[round(s, 2), round(e, 2)] for s, e in sung if e - s > 0.3]
 
+    # 음높이: 0.5초마다 중앙값(MIDI, 노래 안 하면 None) + 고음 후보(곡 최고음 근처를 0.4초 넘게 끈 곳)
+    pitch, peaks = [], []
+    if voc is not None:
+        y16 = librosa.resample(voc, orig_sr=sr, target_sr=16000)
+        f0, vflag, _ = librosa.pyin(y16, fmin=110, fmax=1100, sr=16000, frame_length=1024, hop_length=160)
+        r16 = librosa.feature.rms(y=y16, frame_length=1024, hop_length=160)[0][:len(f0)]
+        loud = r16 > np.percentile(r16, 95) * 0.03  # 노래 구간과 같은 기준 — 끝난 뒤 잡음의 가짜 음높이 제외
+        midi = np.where(vflag & loud, librosa.hz_to_midi(np.nan_to_num(f0, nan=1.0)), np.nan)
+        for s in range(int(a.duration * 2)):
+            seg = midi[s * 50:(s + 1) * 50]
+            seg = seg[~np.isnan(seg)]
+            pitch.append(round(float(np.median(seg)), 1) if len(seg) > 10 else None)
+        top = np.nanpercentile(midi, 99)
+        hi = np.nan_to_num(midi, nan=0) >= top - 2.5
+        i = 0
+        while i < len(hi):
+            if hi[i]:
+                j = i
+                while j < len(hi) and (hi[j] or (j + 5 < len(hi) and hi[j + 5])):
+                    j += 1
+                if j - i >= 40:
+                    peaks.append({'t': round(i / 100, 2), 'len': round((j - i) / 100, 2),
+                                  'note': librosa.midi_to_note(float(np.nanmedian(midi[i:j])))})
+                i = j
+            i += 1
+
     out = {'offset': offset, 'duration': a.duration, 'grid': grid, 'beats': [round(float(b), 3) for b in beats],
-           'energy': [round(float(e), 2) for e in energy], 'segments': [round(float(b), 1) for b in bounds], 'sung': sung}
+           'energy': [round(float(e), 2) for e in energy], 'segments': [round(float(b), 1) for b in bounds], 'sung': sung,
+           'pitch': pitch, 'peaks': peaks}
     (d / 'analysis.json').write_text(json.dumps(out, ensure_ascii=False), encoding='utf-8')
 
     print(f"박: BPM {grid['bpm']}  period {grid['period']}  phase {grid['phase']}  (감지된 박 중 그리드에 맞는 비율 {grid['fit']})")
@@ -140,6 +169,13 @@ def main():
         print(f'  {i:>4}s ' + ' '.join(f'{v:.2f}' for v in energy[i:i + 16]))
     if sung:
         print('노래 구간:', ' '.join(f'{s:.1f}-{e:.1f}' for s, e in sung))
+    if pitch:
+        print('음높이(2초마다 중앙값):')
+        row = [pitch[k] for k in range(0, len(pitch), 4)]
+        for i in range(0, len(row), 16):
+            print(f'  {i * 2:>4}s ' + ' '.join(librosa.midi_to_note(v, octave=True, unicode=False).ljust(3) if v else ' - ' for v in row[i:i + 16]))
+    if peaks:
+        print('고음 후보:', '  '.join(f"{p['t']:.1f}s {p['note']} {p['len']:.1f}초" for p in peaks))
     print('→', d / 'envelope.ts', '/', d / 'analysis.json')
 
 
