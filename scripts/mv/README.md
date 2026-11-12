@@ -15,13 +15,31 @@ powershell -File scripts/mv/setup.ps1     # D:\cache\ayauke-mv\venv (CUDA PyTorc
 
 | 단계 | 명령 | 결과 (`D:\cache\ayauke-mv\work\<곡>\`) |
 |---|---|---|
+| 0. 곡 조사 | 웹 검색(아래 '곡 조사') | 기획서 `src/components/mv/works/<곡>/PLAN.md`의 '곡 정보' |
 | 1. 오디오 | `python scripts/mv/fetch_audio.py <곡> --video <다시보기 번호> --start <s> --end <e>` | `source.wav`(44.1k 스테레오, 앞뒤 5초 여유), `source.json` |
 | 2. 분리 | `python scripts/mv/separate.py <곡>` | `vocals.wav`, `instrumental.wav` (RTX 2060 약 3분) |
 | 3. 분석 | `python scripts/mv/analyze.py <곡> --duration <클립 길이>` | `envelope.ts`(작품 폴더로 복사), `analysis.json` + 박·구간 후보·에너지·노래 구간·음높이·고음 후보 요약 |
 | 4. 가사 | 아래 '가사 정렬' | `lyrics.aligned.json` → 작품 `lyrics.json`으로 |
-| 5. 검수 | `node scripts/mv/sheet.mjs <클립 shareId> --every 2` | `D:\cache\ayauke-mv\sheets\*.jpg` 장면 모음 |
+| 5. 구간별 기획 | 조사 + 분석 결과로 `PLAN.md` 작성(아래 '기획 원칙') → 사용자 확인 | 장면·구도·기법 표, cue 이름 |
+| 6. 제작 | 작품 코드(`scene.ts`·`timeline.ts`·`cues.json`) | |
+| 7. 검수 | `node scripts/mv/sheet.mjs <클립 shareId> --every 2` | `D:\cache\ayauke-mv\sheets\*.jpg` 장면 모음 — 같은 그림이 이어지는 칸이 없는지 본다 |
 
 `<곡>`은 작업 폴더 이름(작품 폴더명과 같게, 예: `samurai-heart`).
+
+### 곡 조사 (0단계)
+
+대부분 원곡이 있는 커버라 웹에 정보가 많다. 직접 분석(박·음높이)으로는 알 수 없는 것을 찾는다.
+- 원곡: 작사·작곡, 수록 앨범, 타이업(애니·영화·드라마), 다른 버전(어쿠스틱 등)
+- 의미: 가사 해설·인터뷰에서 곡의 주제, 반복되는 이미지(꽃·계절·색), 화자의 감정선
+- 공식 MV·타이업 작품의 장면은 **재현하지 않으려고** 확인한다(구도·캐릭터·상징을 그대로 가져오지 않는다). 우리 MV의 이미지는 가사와 곡 구조에서 직접 만든다.
+- 출처 URL을 PLAN.md에 남긴다(사이트에 따라 403이 나면 다른 출처로).
+
+### 기획 원칙 (5단계)
+
+- **끊을 수 있는 곳마다 새 장면**: 구간 경계뿐 아니라 프레이즈(가사 1~2줄, 보통 2~4마디)마다 바꾼다. 같은 장소·소재를 다시 쓰더라도 구도(와이드↔클로즈업, 정면↔옆↔위, 좌우 배치, 카메라 이동 방향)를 바꾼다.
+- **기법 전환**: 곡의 느낌에 따라 표현 방식을 갈아탄다(수채화 번짐, 그려지는 선화, 실루엣·역광, 입자, 키네틱 타이포, 분할 화면, 원본 영상 프레임 등). 한 기법이 한 구간 넘게 이어지지 않게.
+- **낙차 설계**: 작게 부르는 절·브릿지·무음은 감성 연출로 눌러 두고(색·밝기·움직임을 아낌), 전조·최고음·마지막 후렴에서 푼다. 분석 요약의 에너지·음높이·고음 후보로 시각을 잡는다.
+- PLAN.md 표: 시각(MV 기준) · 가사 · 데이터 · 장면 · 구도 · 기법 · 전환. 시각은 가사 정렬이 끝나면 줄 시작에 맞춘다.
 
 ### 가사 정렬 (`align_lyrics.py`, Qwen3-ForcedAligner)
 
