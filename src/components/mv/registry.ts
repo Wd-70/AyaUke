@@ -8,13 +8,16 @@ import approved from './approved-clips.json';
  * 적용 클립은 approved-clips.json의 허용 목록으로만 정한다.
  * `npm run mv:candidates`로 후보(같은 곡·비슷한 길이)를 뽑고, 화면·싱크 검수 후 목록에 올린다.
  * 승인 당시 범위를 함께 기록해 두어, 클립 범위가 나중에 바뀌면 재검수 전까지 MV를 끈다.
+ * 제작 중인 곡은 draft: true — 로컬 dev(편집기)에서만 열리고 운영에서는 404.
  */
 const WORKS: Record<string, () => Promise<MvWork>> = {
   '68610d4b042fb27d04542791': () => import('./works/samurai-heart').then((m) => m.default),
+  '68610d51042fb27d04542823': () => import('./works/katappo').then((m) => m.default),
 };
 
 interface ApprovedSong {
   duration: number;
+  draft?: boolean;
   clips: { shareId: string; startTime: number; endTime: number }[];
 }
 
@@ -29,7 +32,9 @@ interface ClipRange {
 
 export function hasMv(clip: ClipRange): boolean {
   if (!WORKS[clip.songId]) return false;
-  return !!APPROVED[clip.songId]?.clips.some(
+  const song = APPROVED[clip.songId];
+  if (song?.draft && process.env.NODE_ENV === 'production') return false;
+  return !!song?.clips.some(
     (c) => c.shareId === clip.shareId && c.startTime === clip.startTime && c.endTime === clip.endTime,
   );
 }

@@ -5,4 +5,8 @@ export const TIMING_FILES: Record<string, { lyrics: string; cues?: string }> = {
     lyrics: 'src/components/mv/works/samurai-heart/lyrics.json',
     cues: 'src/components/mv/works/samurai-heart/cues.json',
   },
+  '68610d51042fb27d04542823': {
+    lyrics: 'src/components/mv/works/katappo/lyrics.json',
+    cues: 'src/components/mv/works/katappo/cues.json',
+  },
 };
