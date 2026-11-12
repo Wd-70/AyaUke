@@ -29,6 +29,9 @@ const NO_LYRICS = new Set(['hush']);
 /** 밝은 화면 — 자막을 짙은 먹색 + 흰 번짐으로 */
 const INK_CAPTION = new Set(['morningBack', 'hands', 'halfAlone', 'crackedWords', 'footprints', 'standing', 'winterCore', 'coda']);
 
+/** 원본 영상을 여러 칸에 쓰는 장면 — 이 근처에서만 지난 화면을 기억해 둔다 */
+const FOOTAGE = new Set(['polaroids', 'filmStrip', 'flowerFootage']);
+
 /** 앞 장면이 이만큼(초) 겹치며 사라지는 장면 */
 const DISSOLVE: Record<string, number> = {
   unfinishedMap: 0.5,
@@ -63,6 +66,54 @@ export function createKatappoRenderer(clip: MvClipContext, fonts: SceneFonts): M
 
   const footageReady = (v: HTMLVideoElement | null): v is HTMLVideoElement => !!v && v.readyState >= 2 && v.videoWidth > 0;
 
+  // ── 원본 화면 기억 ──────────────────────────────────
+  // 같은 영상을 여러 칸(폴라로이드·필름)에 쓸 때 칸마다 다른 순간을 보여 주려고, 원본 장면 근처에서
+  // 지난 HISTORY_SEC초의 아바타 부분을 작게(HISTORY_W) 찍어 둔다. 넘기기(시각이 튐)하면 비운다.
+  const HISTORY_SEC = 4.5;
+  const HISTORY_FPS = 12;
+  const HISTORY_W = 360;
+  const history: { t: number; canvas: HTMLCanvasElement }[] = [];
+  let spare: HTMLCanvasElement[] = [];
+  let lastT = -Infinity;
+  let nowT = 0;
+  const avatarRect = (vw: number) => [vw * 0.285, vw * 0.555] as const;
+
+  function remember(video: HTMLVideoElement | null, t: number) {
+    nowT = t;
+    if (t < lastT - 0.1 || t > lastT + 1) {
+      spare.push(...history.map((h) => h.canvas));
+      history.length = 0;
+    }
+    lastT = t;
+    const near = FOOTAGE.has(sceneAt(t).id) || FOOTAGE.has(sceneAt(t + HISTORY_SEC).id);
+    if (!near) {
+      if (history.length) {
+        spare.push(...history.map((h) => h.canvas));
+        history.length = 0;
+      }
+      if (spare.length) spare = [];
+      return;
+    }
+    if (!footageReady(video)) return;
+    const last = history[history.length - 1];
+    if (last && t - last.t < 1 / HISTORY_FPS) return;
+    const [rx, rw] = avatarRect(video.videoWidth);
+    const old = history.length >= HISTORY_SEC * HISTORY_FPS ? history.shift()!.canvas : null;
+    const cv = old ?? spare.pop() ?? document.createElement('canvas');
+    cv.width = HISTORY_W;
+    cv.height = Math.round((HISTORY_W * video.videoHeight) / rw);
+    cv.getContext('2d')!.drawImage(video, rx, 0, rw, video.videoHeight, 0, 0, cv.width, cv.height);
+    history.push({ t, canvas: cv });
+  }
+
+  /** at초 무렵의 기억 — 그보다 앞선 것 중 가장 늦은 것, 기억이 거기까지 안 닿으면 null */
+  function recalled(at: number) {
+    if (!history.length || history[0].t > at) return null;
+    let i = history.length - 1;
+    while (i > 0 && history[i].t > at) i--;
+    return history[i].canvas;
+  }
+
   const kit: Kit = {
     fonts,
     dateLabel: clip.sungDateLabel,
@@ -70,20 +121,20 @@ export function createKatappoRenderer(clip: MvClipContext, fonts: SceneFonts): M
     cues: () => C,
     beat: () => beat,
     env: (ch, t) => rawEnv(ch, t - C.beatOffset),
-    footage(c, video, x, y, w, h) {
+    footage(c, video, x, y, w, h, delay = 0) {
       if (!footageReady(video)) return false;
       // 방송 화면에서 아바타 부분(왼쪽 채팅 제외, x 0.285~0.84)만, 얼굴이 가운데 오도록
-      const vw = video.videoWidth;
-      const vh = video.videoHeight;
-      const rx = vw * 0.285;
-      const rw = vw * 0.555;
+      const past = delay > 0 ? recalled(nowT - delay) : null;
+      const src: CanvasImageSource = past ?? video;
+      const [rx, rw] = past ? [0, past.width] : avatarRect(video.videoWidth);
+      const vh = past ? past.height : video.videoHeight;
       let sw = rw;
       let sh = rw / (w / h);
       if (sh > vh) {
         sh = vh;
         sw = vh * (w / h);
       }
-      c.drawImage(video, rx + (rw - sw) / 2, Math.max(0, (vh - sh) * 0.3), sw, sh, x, y, w, h);
+      c.drawImage(src, rx + (rw - sw) / 2, Math.max(0, (vh - sh) * 0.3), sw, sh, x, y, w, h);
       return true;
     },
   };
@@ -117,7 +168,8 @@ export function createKatappoRenderer(clip: MvClipContext, fonts: SceneFonts): M
   function drawScene(c: Ctx, span: SceneSpan, t: number, video: HTMLVideoElement | null) {
     const f: SceneFrame = {
       t,
-      k: clamp((t - span.start) / Math.max(0.01, span.end - span.start)),
+      // 위로는 막지 않는다 — 겹치며 사라지는 앞 장면의 카메라가 전환 중에도 계속 움직이게
+      k: Math.max(0, (t - span.start) / Math.max(0.01, span.end - span.start)),
       age: t - Math.max(0, span.start),
       dur: span.end - Math.max(0, span.start),
       span,
@@ -245,6 +297,7 @@ export function createKatappoRenderer(clip: MvClipContext, fonts: SceneFonts): M
       C = { ...C, ...next };
       derive();
     },
+    scenes: () => scenes.map(({ id, start, end }) => ({ id, start, end })),
     render(main, frame) {
       ensureBuffers(main);
       const s = main.canvas.width / W;
@@ -264,6 +317,7 @@ export function createKatappoRenderer(clip: MvClipContext, fonts: SceneFonts): M
         return;
       }
       const video = footageReady(frame.footage) ? frame.footage : null;
+      remember(video, t);
       const span = sceneAt(t);
       drawScene(main, span, t, video);
 

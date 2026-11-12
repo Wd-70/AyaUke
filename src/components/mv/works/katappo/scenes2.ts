@@ -4,7 +4,7 @@ import { desat, mixHex, wash } from '../../paint';
 import { fallingPetal, stampFlower, stem, sunflower } from './flora';
 import { girl, profile } from './figure';
 import { dust, petalfall, snowfall } from './fx';
-import { COL, type Ctx, H, type Kit, type SceneFn, W, cam, chunkT, glow, span01, vgrad } from './kit';
+import { COL, type Ctx, H, type Kit, type SceneFn, W, cam, chunkT, glow, span01, vgrad, zoomAt } from './kit';
 import { ayaTop, drawFragment, roomScatter } from './scenes1';
 
 // ── 공용 ──────────────────────────────────────────────
@@ -72,32 +72,37 @@ function flowerPortrait(c: Ctx, t: number, cx: number) {
 
 export function scenes2(kit: Kit): Record<string, SceneFn> {
   return {
-    // 12 눈길 발자국이 멀리 낮은 해 쪽으로 — 해가 멀어지며 작아짐
+    // 12 눈길 발자국이 멀리 낮은 해 쪽으로 — 해가 멀어지며 작아지고, 카메라는 발자국을 따라 낮게 나아감
     footprints(c, f) {
       const { t } = f;
       const horizon = 300;
-      snowField(c, horizon, ['#c8d4e2', '#f0e6dc'], ['#e2e8ef', '#f6f8fb']);
-      const sunR = lerp(70, 34, smooth(f.k));
-      const sunY = lerp(horizon - 40, horizon - 8, smooth(f.k));
-      glow(c, 780, sunY, sunR * 5, 'rgba(255,246,228,0.95)', 0.85);
-      c.fillStyle = 'rgba(255,252,244,0.95)';
-      c.beginPath();
-      c.arc(780, sunY, sunR * 0.6, 0, TAU);
-      c.fill();
-      footprints(c, horizon, 780, 26, 0.25 + 0.75 * smooth(span01(t, f.span.start, f.span.start + 2.5)), (f.age * 0.35) % 2);
-      snowfall(c, t, { count: 40, seed: 121, wind: 20, alpha: 0.7, size: [1, 3] });
+      zoomAt(c, 1 + f.k * 0.12, 780, 300, () => {
+        snowField(c, horizon, ['#c8d4e2', '#f0e6dc'], ['#e2e8ef', '#f6f8fb']);
+        const sunR = lerp(70, 34, f.k);
+        const sunY = lerp(horizon - 40, horizon - 8, f.k);
+        glow(c, 780, sunY, sunR * 5, 'rgba(255,246,228,0.95)', 0.85);
+        c.fillStyle = 'rgba(255,252,244,0.95)';
+        c.beginPath();
+        c.arc(780, sunY, sunR * 0.6, 0, TAU);
+        c.fill();
+        footprints(c, horizon, 780, 26, 0.25 + 0.75 * smooth(span01(t, f.span.start, f.span.start + 2.5)), (f.age * 0.35) % 2);
+      });
+      snowfall(c, t, { count: 50, seed: 121, wind: 20, alpha: 0.75, size: [1, 3.5] });
     },
 
     // 13 발자국이 멈춘 자리의 아야(뒷모습) — 해는 지평선 너머, 청색 저녁
+    // 저물어 가는 빛과 함께 카메라가 천천히 물러나 혼자 선 모습이 작아진다
     standing(c, f) {
       const { t } = f;
       const horizon = 380;
-      const dusk = smooth(f.k);
-      snowField(c, horizon, [mixHex('#c3cfde', '#5d6f8c', dusk), mixHex('#efe2d6', '#9aa6bd', dusk)], [mixHex('#dfe6ee', '#a9b6c8', dusk), '#eef2f6']);
-      glow(c, 760, horizon + 4, 260, 'rgba(255,236,214,0.9)', 0.6 * (1 - dusk));
-      footprints(c, horizon, 700, 18, 0.82, 0);
-      girl(c, 700, horizon + 70, 190, { t, color: '#2b3244', back: true, wind: 0.6 + Math.sin(t) * 0.2 });
-      snowfall(c, t, { count: 50, seed: 131, wind: 30, alpha: 0.75, size: [1, 3] });
+      const dusk = f.k;
+      zoomAt(c, 1.12 - 0.12 * f.k, 700, 420, () => {
+        snowField(c, horizon, [mixHex('#c3cfde', '#5d6f8c', dusk), mixHex('#efe2d6', '#9aa6bd', dusk)], [mixHex('#dfe6ee', '#a9b6c8', dusk), '#eef2f6']);
+        glow(c, 760, horizon + 4, 260, 'rgba(255,236,214,0.9)', 0.6 * (1 - clamp(dusk)));
+        footprints(c, horizon, 700, 18, 0.82, 0);
+        girl(c, 700, horizon + 70, 190, { t, color: '#2b3244', back: true, wind: 0.6 + Math.sin(t) * 0.2 });
+      });
+      snowfall(c, t, { count: 60, seed: 131, wind: 30, alpha: 0.75, size: [1, 3.5] });
     },
 
     // 14 눈보라 한가운데 아야 — 청백만
@@ -171,11 +176,10 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
       draw(true);
     },
 
-    // 18 조각과 가사 글자가 아야에게 빨려 듦 — 빌드업, 마지막 반 박 정지
+    // 18 조각과 가사 글자가 아야에게 빨려 듦 — 빌드업, 끝까지 빨라지며 다음 장면으로
     scatterPull(c, f) {
-      const beat = kit.beat();
-      const t = Math.min(f.t, f.span.end - beat.period * 0.5);
-      const k = clamp((t - f.span.start) / f.dur);
+      const { t } = f;
+      const k = clamp(f.k);
       roomScatter(c, t, lerp(1.0, 1.55, easeInCubic(k)), 181, 0.45, easeInCubic(k) * 0.9);
       const line = kit.lines()[20];
       if (line) {
@@ -256,7 +260,8 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
       const { t } = f;
       vgrad(c, [[0, '#2c2532'], [1, '#18141c']]);
       glow(c, W / 2, H / 2, 600, 'rgba(120,100,140,0.6)', 0.6);
-      const strip = (y: number, dir: number, rot: number, tint: string, seed: number) => {
+      // 칸마다 다른 순간 — 띠가 들어오는 쪽 칸이 가장 최근, 흘러갈수록 지난 순간(아래 띠는 1.2초 더 지난 것부터)
+      const strip = (y: number, dir: number, rot: number, tint: string, seed: number, lag: number) => {
         c.save();
         c.translate(W / 2, y);
         c.rotate(rot);
@@ -269,7 +274,8 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
         c.fillRect(-W, -fh / 2 - 34, W * 2, fh + 68);
         for (let i = -5; i <= 5; i++) {
           const x = i * step + off - step / 2;
-          if (!kit.footage(c, f.video, x - fw / 2, -fh / 2, fw, fh)) {
+          const past = lag + clamp((x * dir + W / 2) / W) * 3;
+          if (!kit.footage(c, f.video, x - fw / 2, -fh / 2, fw, fh, past)) {
             c.fillStyle = '#4c4258';
             c.fillRect(x - fw / 2, -fh / 2, fw, fh);
             wash(c, `k-film-${seed}-${(i + 20) % 3}`, { color: COL.lav, size: 200 }, x, 0, fh * 0.9, 1, 0.7);
@@ -285,8 +291,8 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
         }
         c.restore();
       };
-      strip(220, 1, -0.06, 'rgba(255,220,160,0.14)', 1);
-      strip(520, -1, -0.06, 'rgba(170,190,230,0.16)', 2);
+      strip(220, 1, -0.06, 'rgba(255,220,160,0.14)', 1, 0);
+      strip(520, -1, -0.06, 'rgba(170,190,230,0.16)', 2, 1.2);
       dust(c, t, 30, 201, '#fff4e0', 0.4);
     },
 
@@ -298,7 +304,7 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
       glow(c, 360, 300, 560, 'rgba(255,248,226,0.95)', 0.9);
       dust(c, t, 50, 211, '#fffaf0', 0.8);
       const ah = line ? span01(t, line.t, line.t + 1.6) : 0;
-      cam(c, 1 + f.k * 0.08, 700, 360, () => {
+      cam(c, 1 + f.k * 0.12, 700 - f.k * 30, 360, () => {
         profile(c, 640, 330, 520, { t, color: '#2a2233', rim: 'rgba(255,240,205,0.95)', rimBlur: 36, breath: ah > 0 && ah < 1 ? ah : 0 });
       });
     },
@@ -307,6 +313,10 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
     splitTB(c, f) {
       const { t } = f;
       const mid = H / 2 + 40;
+      // 경계(수면) 높이를 기준으로 천천히 다가간다
+      c.translate(W / 2, mid);
+      c.scale(1 + f.k * 0.07, 1 + f.k * 0.07);
+      c.translate(-W / 2, -mid);
       vgrad(c, [[0, '#9fb3ca'], [1, '#dce4ed']], 0, 0, W, mid);
       snowfall(c, t, { count: 60, seed: 221, wind: 18, area: [0, 0, W, mid] });
       vgrad(c, [[0, desat('#f7c96a', 0.85)], [1, desat('#e48d2a', 0.85)]], 0, mid, W, H - mid);
@@ -339,12 +349,12 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
     },
 
     // 23 꽃잎 폭풍(올려다봄) — 위쪽 꽃송이에서 꽃잎이 떨어져 나와 바람을 타고 흘러내린다.
-    // 고음에 가까울수록 바람이 세지고 꽃잎이 많아져 화면을 채운다. 끝에 모든 것이 멈춤
+    // 고음에 가까울수록 바람이 세지고 꽃잎이 많아진다. 무음 직전엔 큰 꽃잎 떼가 몰려와 화면을 덮은 채로
+    // 무음(어둠 속 꽃잎 하나)으로 끊긴다 — 느려지거나 멈추지 않고 가장 꽉 찬 순간에 컷
     petalStorm(c, f) {
       const C = kit.cues();
-      const t = Math.min(f.t, C.hush - 0.4);
-      const age = t - f.span.start;
-      const k = span01(t, f.span.start, C.hush - 1.2);
+      const { t, age } = f;
+      const k = span01(t, f.span.start, C.hush);
       const gust = k * k;
       const flowers = Array.from({ length: 9 }, (_, i) => ({
         x: -80 + i * 180 + hash(i + 40) * 50,
@@ -401,10 +411,24 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
         });
         petals(true);
       }, Math.sin(age * 0.25) * 0.04 + gust * 0.03);
-      const hold = span01(f.t, C.hush - 0.4, C.hush);
-      if (hold > 0) {
-        c.fillStyle = `rgba(10,8,12,${hold * 0.9})`;
-        c.fillRect(0, 0, W, H);
+
+      // 마지막 1.6초 — 큰 꽃잎 떼가 바람 위쪽(왼쪽 위)에서 빠르게 몰려온다. 늦게 출발할수록 많고 크고 가까워서
+      // 컷 순간 화면이 꽃잎으로 덮인다
+      const waveFrom = C.hush - 1.6;
+      if (t > waveFrom) {
+        for (let j = 0; j < 420; j++) {
+          const lateness = Math.pow(hash(j * 3 + 900), 0.55);
+          const born = waveFrom + lateness * 1.6;
+          const a = t - born;
+          if (a < 0) continue;
+          const vx = 1500 + hash(j * 5 + 901) * 1000;
+          const vy = vx * (0.2 + hash(j * 7 + 902) * 0.22);
+          const x = -300 + vx * a;
+          const y = -420 + hash(j * 11 + 903) * (H + 360) + vy * a;
+          if (x > W + 300 || y > H + 300) continue;
+          const len = (80 + hash(j * 13 + 904) * 140) * (0.6 + 0.8 * lateness);
+          fallingPetal(c, x, y, len, a * 2.4 + j, a * 7 + j, 0.85, 0.96);
+        }
       }
     },
   };

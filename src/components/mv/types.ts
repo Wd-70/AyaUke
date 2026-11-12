@@ -58,6 +58,8 @@ export interface MvRenderer {
   setLyrics?(lines: MvLyricLine[]): void;
   /** 효과 타이밍 교체 — 같은 용도 */
   setCues?(cues: Record<string, number>): void;
+  /** 지금의 장면 경계 — 검수 도구(scripts/mv/motion.mjs)용 */
+  scenes?(): MvSection[];
 }
 
 /** 편집기에서 조정할 수 있는 효과 시각(장면 전환, 칼베기, 섬광 등) */

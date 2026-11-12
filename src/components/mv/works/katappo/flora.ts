@@ -164,15 +164,19 @@ export function leafPath(c: Ctx, len: number, wid: number) {
 /** 떨어지는 꽃잎 한 장 — 회전하며 펄럭이는 모습(가로 눌림으로 뒤집힘 표현) */
 const petalSprites = new Map<number, HTMLCanvasElement>();
 
-/** 꽃잎 한 장 이미지(길이 100px, 가운데 기준) — 꽃잎 비는 수백 장이라 매번 그라데이션을 만들지 않고 찍는다 */
+/**
+ * 꽃잎 한 장 이미지(길이 100px, 가운데 기준) — 꽃잎 비는 수백 장이라 매번 그라데이션을 만들지 않고 찍는다.
+ * 화면을 덮는 큰 꽃잎(길이 200px 넘게)도 흐려지지 않게 두 배 크기로 그려 둔다
+ */
 function petalSprite(sat: number) {
   const key = Math.round(sat * 10);
   let cv = petalSprites.get(key);
   if (!cv) {
     cv = document.createElement('canvas');
-    cv.width = 56;
-    cv.height = 108;
+    cv.width = 112;
+    cv.height = 216;
     const c = cv.getContext('2d')!;
+    c.scale(2, 2);
     c.translate(28, 104);
     const g = c.createLinearGradient(0, 0, 0, -100);
     g.addColorStop(0, desat(PETAL_DEEP, key / 10));

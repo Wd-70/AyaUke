@@ -6,7 +6,7 @@ import { ArrowsPointingOutIcon } from '@heroicons/react/24/outline';
 import ClipPlayer, { type ClipPlayerHandle } from '@/components/clip/ClipPlayer';
 import type { VideoPlatform } from '@/shared/utils/video-url';
 import { loadMv } from './registry';
-import type { MvLyricLine, MvRenderer, MvWork } from './types';
+import type { MvLyricLine, MvRenderer, MvSection, MvWork } from './types';
 
 export interface MvStageProps {
   clip: {
@@ -141,10 +141,15 @@ const MvStage = forwardRef<MvStageHandle, MvStageProps>(function MvStage({ clip,
     const perf0 = performance.now();
     let raf = 0;
     // 정지 화면 모드에서는 검수 도구(scripts/mv/sheet.mjs)가 새로고침 없이 시각을 바꿀 수 있다
-    const hook = window as unknown as { __mvSeek?: (t: number) => void; __mvDuration?: number };
+    const hook = window as unknown as {
+      __mvSeek?: (t: number) => void;
+      __mvDuration?: number;
+      __mvScenes?: () => MvSection[] | undefined;
+    };
     if (fixed !== null) {
       hook.__mvSeek = (t) => (fixed = t);
       hook.__mvDuration = work.duration;
+      hook.__mvScenes = () => rendererRef.current?.scenes?.();
     }
 
     const frame = () => {
@@ -171,6 +176,7 @@ const MvStage = forwardRef<MvStageHandle, MvStageProps>(function MvStage({ clip,
       cancelAnimationFrame(raf);
       delete hook.__mvSeek;
       delete hook.__mvDuration;
+      delete hook.__mvScenes;
     };
   }, [ready, work, freezeT, previewT, clip.startTime]);
 

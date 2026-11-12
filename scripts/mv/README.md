@@ -24,6 +24,8 @@ powershell -File scripts/mv/setup.ps1     # D:\cache\ayauke-mv\venv (CUDA PyTorc
 | 6. 제작 | 작품 코드(`scene.ts`·`timeline.ts`·`cues.json`) | |
 | 7. 검수 | `node scripts/mv/sheet.mjs <클립 shareId> --every 2` | `D:\cache\ayauke-mv\sheets\*.jpg` 장면 모음 — 같은 그림이 이어지는 칸이 없는지 본다 |
 | 8. 성능 | `node scripts/mv/perf.mjs <클립 shareId> 3,10,64` | 시각별 프레임 시간 — 16.7ms를 넘는 장면은 스프라이트·Path2D 묶음으로 줄인다 |
+| 9. 전환 | `node scripts/mv/motion.mjs <클립 shareId>` | 장면마다 움직임 흐름과 '끝에서 멈춤' 표시 — 렌더러가 `scenes()`를 내놓아야 함 |
+| 10. 원본 영상 | `node scripts/mv/live.mjs <클립 shareId> 52,121,175` | 실제로 재생하며 캔버스를 찍음(`?t=` 정지 모드엔 원본 영상이 없음) → `sheets\<id>-live-<시각>.jpg` |
 
 `<곡>`은 작업 폴더 이름(작품 폴더명과 같게, 예: `samurai-heart`).
 
@@ -41,6 +43,12 @@ powershell -File scripts/mv/setup.ps1     # D:\cache\ayauke-mv\venv (CUDA PyTorc
 - **기법 전환**: 곡의 느낌에 따라 표현 방식을 갈아탄다(수채화 번짐, 그려지는 선화, 실루엣·역광, 입자, 키네틱 타이포, 분할 화면, 원본 영상 프레임 등). 한 기법이 한 구간 넘게 이어지지 않게.
 - **낙차 설계**: 작게 부르는 절·브릿지·무음은 감성 연출로 눌러 두고(색·밝기·움직임을 아낌), 전조·최고음·마지막 후렴에서 푼다. 분석 요약의 에너지·음높이·고음 후보로 시각을 잡는다.
 - PLAN.md 표: 시각(MV 기준) · 가사 · 데이터 · 장면 · 구도 · 기법 · 전환. 시각은 가사 정렬이 끝나면 줄 시작에 맞춘다.
+- **움직이는 채로 컷**: 장면의 연출이 전환 전에 끝나 화면이 멈춘 채 넘어가면 어색하다(카타포 검수에서 지적됨).
+  - 카메라 이동에 `smooth(k)`·`easeOutCubic(k)`처럼 끝에서 감속하는 곡선을 쓰지 않는다 — 선형이나 끝으로 갈수록 빨라지는 곡선으로.
+  - 장면 안 애니메이션(피어남·그려짐·갈라짐)이 일찍 끝나면 그 뒤에도 무언가(카메라·입자·회전·빛)가 계속 움직이게.
+  - '마지막 반 박 정지' 같은 시간 멈춤은 쓰지 않는다. 겹쳐 사라지는 동안 앞 장면의 `k`는 1을 넘어 계속 간다.
+  - 확대한 카메라를 한쪽 점으로 옮기면(`cam`) 가장자리가 빈다 — 그 점을 제자리에 두고 확대(`zoomAt`)하거나 배경을 넓게 그린다.
+- **원본 영상을 여러 칸에**: 칸마다 같은 화면이면 복사해 붙인 듯 보인다 → `kit.footage(..., delay)`로 칸마다 조금 전의 순간을 쓴다(렌더러가 원본 장면 근처에서 지난 몇 초를 기억).
 
 ### 가사 정렬 (`align_lyrics.py`, Qwen3-ForcedAligner)
 

@@ -86,7 +86,7 @@ export function vaseFlower(c: Ctx, t: number, x: number, table: number, s: numbe
 }
 
 /** 위에서 본 폴라로이드 — 사진 칸에 원본 영상(없으면 라벤더 번짐) */
-export function polaroid(kit: Kit, c: Ctx, video: HTMLVideoElement | null, x: number, y: number, s: number, rot: number, seed: number) {
+export function polaroid(kit: Kit, c: Ctx, video: HTMLVideoElement | null, x: number, y: number, s: number, rot: number, seed: number, delay = 0) {
   const w = 240 * s;
   const hh = 290 * s;
   c.save();
@@ -101,7 +101,7 @@ export function polaroid(kit: Kit, c: Ctx, video: HTMLVideoElement | null, x: nu
   const ix = -w / 2 + 15 * s;
   const iy = -hh / 2 + 15 * s;
   const iw = w - 30 * s;
-  if (!kit.footage(c, video, ix, iy, iw, iw)) {
+  if (!kit.footage(c, video, ix, iy, iw, iw, delay)) {
     c.fillStyle = '#5b5068';
     c.fillRect(ix, iy, iw, iw);
     wash(c, `k-pol-${seed}`, { color: COL.lav, size: 200 }, 0, iy + iw / 2, iw * 0.8, 1, 0.8);
@@ -140,7 +140,8 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
       fog.addColorStop(1, 'rgba(240,245,250,0.78)');
       c.fillStyle = fog;
       c.fillRect(0, 0, W, H);
-      drawFrost(c, frost, smooth(span01(t, 0.2, 7.4)), 'rgba(255,255,255,0.92)');
+      // 장면 끝까지 자란다(감속해서 멈추지 않게 끝 무렵에도 속도가 남음)
+      drawFrost(c, frost, 1 - Math.pow(1 - span01(t, 0.2, f.span.end + 1.5), 2), 'rgba(255,255,255,0.92)');
 
       // 제목 — 유리에 김이 서리듯
       const C = kit.cues();
@@ -159,9 +160,9 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
         c.fillText('eill · AyaUke cover', W / 2, 400);
         c.restore();
       }
-      // 입김 — 다음 장면으로
-      const b = span01(t, f.span.end - 1.3, f.span.end);
-      if (b > 0) glow(c, W / 2, H / 2 + 40, 220 + 760 * easeOutCubic(b), 'rgba(250,252,255,0.97)', clamp(b * 1.4));
+      // 입김 — 다음 장면으로 겹치는 동안에도 계속 퍼진다
+      const b = Math.max(0, (t - (f.span.end - 1.3)) / 1.3);
+      if (b > 0) glow(c, W / 2, H / 2 + 40, 220 + 820 * b, 'rgba(250,252,255,0.97)', clamp(b * 1.1));
     },
 
     // 01 미완성 지도 — 연필이 길·집·두 사람을 그리다 멈춤, 물방울이 떨어져 번짐
@@ -284,6 +285,11 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
       const lw = 2 + 1.6 * grip;
       const fillK = span01(t, t0 + 1.6, t0 + 3.2);
       const pulse = 1 + 0.03 * Math.exp(-Math.max(0, t - squeezeT) * 6) * (t > squeezeT ? 1 : 0);
+      // 그리는 사이에도 화면이 숨 쉬듯 — 아주 느리게 다가간다
+      c.translate(W / 2, H / 2);
+      c.scale(1 + f.k * 0.05, 1 + f.k * 0.05);
+      c.rotate(-0.01 + f.k * 0.02);
+      c.translate(-W / 2, -H / 2 - f.k * 10);
 
       const body: Pt[] = [
         ...sample((u) => [lerp(0, 110, u), -50 - 5 * Math.sin(u * Math.PI)], 10),
@@ -366,11 +372,15 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
       const { t } = f;
       const lines = kit.lines();
       const halfT = chunkT(lines, 5, 1);
+      // 가운데 기준으로 천천히 다가간다 — 반쪽 경계는 화면 가운데에 그대로
+      c.translate(W / 2, H / 2);
+      c.scale(1 + f.k * 0.07, 1 + f.k * 0.07);
+      c.translate(-W / 2, -H / 2);
       vgrad(c, [[0, '#b4c3d4'], [0.72, '#dde5ee'], [1, '#eef2f6']], 0, 0, W / 2, H);
       vgrad(c, [[0, '#e4ebf2'], [0.72, '#eff3f7'], [1, '#f5f7fa']], W / 2, 0, W / 2, H);
       c.fillStyle = 'rgba(150,170,195,0.35)';
       c.fillRect(0, 578, W, 2);
-      girl(c, 330 + Math.sin(t * 0.3) * 3, 610, 330, { t, color: '#3a4157', wind: 0.25, rim: 'rgba(230,238,248,0.7)', rimBlur: 12 });
+      girl(c, 330 + Math.sin(t * 0.3) * 3, 610, 330, { t, color: '#3a4157', wind: 0.25 + f.k * 0.35, rim: 'rgba(230,238,248,0.7)', rimBlur: 12 });
       c.save();
       c.beginPath();
       c.rect(0, 0, W / 2, H);
@@ -380,20 +390,26 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
       const w = easeOutCubic(span01(t, halfT, halfT + 1.1));
       c.fillStyle = `rgba(250,251,253,${w})`;
       c.fillRect(W / 2, 0, W / 2, H);
+      if (w > 0) {
+        c.save();
+        c.beginPath();
+        c.rect(W / 2, 0, W / 2, H);
+        c.clip();
+        snowfall(c, t, { count: 40, seed: 43, wind: 14, area: [W / 2, 0, W / 2, H], color: '#c9d4e1', alpha: 0.6 * w });
+        c.restore();
+      }
       c.fillStyle = 'rgba(255,255,255,0.6)';
       c.fillRect(W / 2 - 1, 0, 2, H);
     },
 
     // 05 방 안 물건이 공중에 흩어져 돎 — 가운데 아야, 카메라가 뒤로 빠짐
     scatter(c, f) {
-      roomScatter(c, f.t, lerp(1.4, 1.0, easeOutCubic(f.k)), 51, 0);
+      roomScatter(c, f.t, lerp(1.4, 1.0, f.k), 51, 0);
     },
 
-    // 06 위에서 본 아야 — 조각과 가사 글자가 둘레를 돌며 빨라짐, 마지막 반 박 정지
+    // 06 위에서 본 아야 — 조각과 가사 글자가 둘레를 돌며 빨라진 채로 다음 장면에 넘어감
     scatterRing(c, f) {
-      const beat = kit.beat();
-      const t = Math.min(f.t, f.span.end - beat.period * 0.5);
-      const age = t - f.span.start;
+      const { t, age } = f;
       c.fillStyle = '#1f1a24';
       c.fillRect(0, 0, W, H);
       glow(c, W / 2, H / 2, 520, 'rgba(90,76,110,0.9)', 0.8);
@@ -448,7 +464,7 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
     vase(c, f) {
       const { t } = f;
       const beat = kit.beat();
-      cam(c, 1.0 + 0.12 * smooth(f.k), 640, 330, () => {
+      cam(c, 1.0 + 0.12 * f.k, 640, 330, () => {
         c.drawImage(
           washBackdrop('k-vase-bg', W, H, '#3d3540', [
             { color: '#5d5161', x: 920, y: 240, d: 760 },
@@ -470,7 +486,8 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
       if (d > 0) fallingPetal(c, 720 + d * 40, 300 + easeInCubic(d) * 300, 34, 0.6 + d * 2.5, d * 7, 0.5);
     },
 
-    // 08 폴라로이드가 박자마다 놓임(사진 속은 원본 영상) — 끝에 한 장으로 들어감
+    // 08 폴라로이드가 박자마다 놓임(사진 속은 원본 영상) — 끝에 한 장으로 들어감.
+    // 먼저 놓인 사진일수록 조금 전의 순간(1.2초씩) — 마지막 장(줌인)만 지금
     polaroids(c, f) {
       const { t } = f;
       const beat = kit.beat();
@@ -481,7 +498,7 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
       const shown = lands.filter((l) => t >= l).length;
       const last = spots[Math.max(0, shown - 1)];
       const zoomK = easeInCubic(span01(t, f.span.end - 0.9, f.span.end));
-      cam(c, 1 + zoomK * 1.7, lerp(W / 2, last.x, zoomK), lerp(H / 2, last.y - 30, zoomK), () => {
+      cam(c, 1.04 + f.k * 0.04 + zoomK * 1.7, lerp(W / 2 - 20 + f.k * 40, last.x, zoomK), lerp(H / 2, last.y - 30, zoomK), () => {
         desk(c);
         lands.forEach((l, i) => {
           if (t < l) return;
@@ -489,7 +506,7 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
           const s = 0.9 * (1.25 - 0.25 * k);
           c.save();
           c.globalAlpha = clamp(k * 2);
-          polaroid(kit, c, f.video, spots[i].x, spots[i].y, s, spots[i].rot, i);
+          polaroid(kit, c, f.video, spots[i].x, spots[i].y, s, spots[i].rot, i, (3 - i) * 1.2);
           c.restore();
         });
       });
@@ -506,6 +523,10 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
         0,
         0,
       );
+      // 글자 쪽으로 천천히 다가간다(배경 번짐은 고정 — 종이 위의 글씨에 다가가는 느낌)
+      c.translate(W / 2, 420);
+      c.scale(1 + f.k * 0.06, 1 + f.k * 0.06);
+      c.translate(-W / 2, -420);
       const line = kit.lines()[10];
       if (!line) return;
       const [c0, c1, c2] = line.ja;
@@ -535,7 +556,8 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
       const x = (W - tw) / 2;
       const y = 560;
       const crackT = Math.min(f.span.end - 1.6, c2.t + 1.8);
-      const split = easeOutCubic(span01(t, f.span.end - 0.9, f.span.end));
+      // 갈라진 두 쪽은 점점 빨리 벌어지며 다음 장면으로(끝에서 서지 않게)
+      const split = easeInCubic(span01(t, f.span.end - 1.3, f.span.end)) * 1.3;
       // 「気づかなきゃ」까지만 금이 가고 살짝 어긋난다 — 「よかった」는 그대로(읽혀야 하므로)
       const cutText = text.slice(0, text.indexOf('よかった') > 0 ? text.indexOf('よかった') : Math.ceil(text.length * 0.6));
       const xCut = x + c.measureText(cutText).width + 4;
@@ -568,9 +590,10 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
       const ck = span01(t, crackT, crackT + 0.35);
       if (ck > 0) {
         pencil(c, crackPts, ck, { width: 2, seed: 9, color: '#1d2433', passes: 1, jitter: 0.4, alpha: 0.85 });
-        // 금에서 떨어지는 작은 조각
-        for (let i = 0; i < 10; i++) {
-          const at = crackT + 0.2 + hash(i) * 1.2;
+        // 금에서 떨어지는 작은 조각 — 금이 간 뒤 장면 끝까지 이어서 떨어진다
+        const shed = Math.max(1.2, f.span.end - crackT - 0.2);
+        for (let i = 0; i < 16; i++) {
+          const at = crackT + 0.2 + hash(i) * shed;
           const fk = span01(t, at, at + 0.9);
           if (fk <= 0 || fk >= 1) continue;
           const [px, py] = crackPts[Math.floor(hash(i + 3) * (crackPts.length - 1))];

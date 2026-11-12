@@ -1,5 +1,5 @@
 // 片っぽ 장면 24~36 — 무음 · 브릿지 · 마지막 후렴(전조) · 아웃트로 (PLAN.md 표 번호)
-import { TAU, clamp, easeInCubic, easeOutBack, easeOutCubic, hash, lerp, setFont, smooth } from '../../engine';
+import { TAU, clamp, easeInCubic, easeOutBack, easeOutCubic, hash, lerp, setFont } from '../../engine';
 import { desat, mixHex, pencil, sample, wash, washBackdrop } from '../../paint';
 import { type FrostSeg, PETAL, dropPath, drawFrost, fallingPetal, frostSegments, stampFlower, sunflower } from './flora';
 import { girl, profile } from './figure';
@@ -80,13 +80,17 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
       c.fillStyle = '#060508';
       c.fillRect(0, 0, W, H);
       glow(c, 640, 340, 280, 'rgba(255,214,120,0.4)', 0.45);
-      fallingPetal(c, 640, 340 + Math.sin(f.age * 0.8) * 5, 96, 0.5 + f.age * 0.42, Math.PI / 3 + f.age * 0.35, 0.75, 1);
+      // 거의 멈춘 듯 — 그래도 아주 천천히 가라앉으며 돈다
+      fallingPetal(c, 640, 326 + f.age * 7 + Math.sin(f.age * 0.8) * 5, 96, 0.5 + f.age * 0.42, Math.PI / 3 + f.age * 0.35, 0.75, 1);
       dust(c, f.t, 14, 241, '#ffe9b8', 0.35);
     },
 
-    // 25 흑백에 가까운 수채, 방 안 꽃병
+    // 25 흑백에 가까운 수채, 방 안 꽃병 — 고요하게, 카메라만 옆으로 아주 천천히 흐른다
     bridgeVase(c, f) {
       const { t } = f;
+      c.translate(W / 2, H / 2);
+      c.scale(1.06 + f.k * 0.03, 1.06 + f.k * 0.03);
+      c.translate(-W / 2 + 26 - f.k * 52, -H / 2);
       c.drawImage(
         washBackdrop('k-bridge', W, H, '#cfd0d4', [
           { color: '#9a9ca4', x: 300, y: 300, d: 700 },
@@ -110,15 +114,19 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
       c.fillStyle = '#6c6e75';
       c.fillRect(0, 560, W, 160);
       vaseFlower(c, t, 480, 566, 0.78, { sat: 0.08, petals: 0.5, seed: 5 });
+      dust(c, t, 18, 252, '#f4f4f6', 0.3);
     },
 
     // 26 아야를 감싸는 희미한 따뜻한 빛(유일한 색)
     warmLight(c, f) {
       const { t } = f;
-      vgrad(c, [[0, '#3a3d48'], [1, '#22232b']]);
-      const warm = 0.4 + 0.5 * smooth(f.k);
-      glow(c, 640, 400, 520, 'rgba(255,200,120,0.85)', warm);
-      girl(c, 640, 1270, 1150, { t, color: '#25202c', rim: 'rgba(255,214,150,0.95)', rimBlur: 30 + 20 * warm });
+      const warm = 0.4 + 0.5 * f.k;
+      // 27(빛이 팔처럼 감쌈)과 같은 구도 — 여기서 1.06까지 다가가 27이 이어받는다
+      cam(c, 1 + 0.06 * f.k, 640, 380, () => {
+        vgrad(c, [[0, '#3a3d48'], [1, '#22232b']], 0, -60, W, H + 120);
+        glow(c, 640, 400, 520, 'rgba(255,200,120,0.85)', warm);
+        girl(c, 640, 1270, 1150, { t, color: '#25202c', rim: 'rgba(255,214,150,0.95)', rimBlur: 30 + 20 * warm });
+      });
       dust(c, t, 36, 261, '#ffd9a0', 0.55 * warm);
     },
 
@@ -128,8 +136,9 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
       const lines = kit.lines();
       const a1 = chunkT(lines, 31, 0);
       const a2 = chunkT(lines, 31, 1);
-      cam(c, 1 + 0.28 * smooth(f.k), 640, 380, () => {
-        vgrad(c, [[0, '#33343f'], [1, '#1b1c23']]);
+      // 26에서 이어받아(1.06) 점점 빨리 다가가며 암전으로
+      cam(c, 1.06 + 0.3 * (0.3 * f.k + 0.7 * f.k * f.k), 640, 380, () => {
+        vgrad(c, [[0, '#33343f'], [1, '#1b1c23']], 0, -60, W, H + 120);
         glow(c, 640, 400, 560, 'rgba(255,196,110,0.85)', 0.85);
         girl(c, 640, 1270, 1150, { t, color: '#25202c', rim: 'rgba(255,214,150,0.95)', rimBlur: 46 });
         const arm = (pts: Pt[], p: number, seed: number) => {
@@ -147,7 +156,7 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
         arm(left, easeOutCubic(span01(t, a1, a1 + 2.2)), 271);
         arm(right, easeOutCubic(span01(t, a2, a2 + 2.2)), 273);
       });
-      const tight = smooth(f.k);
+      const tight = f.k * f.k;
       const v = c.createRadialGradient(W / 2, H / 2, 360 - 260 * tight, W / 2, H / 2, 760 - 380 * tight);
       v.addColorStop(0, 'rgba(0,0,0,0)');
       v.addColorStop(1, `rgba(4,3,6,${0.5 + 0.5 * tight})`);
@@ -164,8 +173,9 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
     bloom(c, f) {
       const { t } = f;
       const t0 = f.span.start;
-      const p = easeOutCubic(span01(t, t0, t0 + 2.4));
-      const horizon = lerp(-160, 430, p);
+      // 크레인 업 — 처음에 빠르게 올라오고, 끝까지 천천히 계속 올라간다(멈춘 채 넘어가지 않게)
+      const p = easeOutCubic(span01(t, t0, t0 + 2.2));
+      const horizon = lerp(-160, 400, p) + f.age * 16;
       vgrad(c, [[0, '#fff6d6'], [1, '#ffd27a']], 0, 0, W, Math.max(1, horizon + 4));
       glow(c, 640, horizon - 60, 520, 'rgba(255,250,232,0.95)', 0.8);
       const melt = easeOutCubic(span01(t, t0, t0 + 1.4));
@@ -182,7 +192,7 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
     // 29 해바라기 밭 한가운데 아야(비스듬한 부감)
     fieldWide(c, f) {
       const { t } = f;
-      cam(c, 1.12 - 0.1 * smooth(f.k), W / 2, H / 2 - 20, () => {
+      cam(c, 1.12 - 0.1 * f.k, W / 2, H / 2 - 20, () => {
         const horizon = 90;
         vgrad(c, [[0, '#fff3cf'], [1, '#ffd98a']], 0, -200, W, horizon + 204);
         vgrad(c, [[0, '#7f8a3a'], [1, '#4c5e26']], 0, horizon, W, H - horizon + 200);
@@ -218,14 +228,16 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
     flowerFootage(c, f) {
       const { t } = f;
       vgrad(c, [[0, '#ffe9a6'], [1, '#f2a43c']]);
-      cam(c, 1 + 0.12 * smooth(f.k), W / 2, H / 2, () => {
+      cam(c, 1 + 0.12 * f.k, W / 2, H / 2, () => {
         sunflower(c, W / 2, H / 2, 470, {
           sat: 1,
           t,
           seed: 9,
           rot: f.age * 0.05,
           disk: (cc, r) => {
-            if (!kit.footage(cc, f.video, -r * 1.15, -r, r * 2.3, r * 2)) {
+            // 원본 화면은 인물이 가운데보다 왼쪽에 있어서 오른쪽으로 당긴다 — 꽃이 도는 축이 인물에 오게
+            // (영상 폭 2.3r 중 원 밖 여유가 양쪽 0.15r라 0.13r까지는 원 가장자리가 비지 않는다)
+            if (!kit.footage(cc, f.video, -r * 1.02, -r, r * 2.3, r * 2)) {
               cc.fillStyle = '#5b4a62';
               cc.fillRect(-r, -r, r * 2, r * 2);
               wash(cc, 'k-ff', { color: '#c4b0e6', size: 220 }, 0, 0, r * 1.6, 1, 0.8);
@@ -262,7 +274,7 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
       const bloomT = chunkT(kit.lines(), 36, 1);
       vgrad(c, [[0, '#fbe3a8'], [1, '#e9a24a']]);
       glow(c, 640, 380, 520, 'rgba(255,248,226,0.9)', 0.8);
-      cam(c, 1 + 0.06 * f.k, 640, 380, () => {
+      cam(c, 1 + 0.1 * f.k, 640, 370, () => {
         girl(c, 640, 1600, 1820, { t, color: '#33262a', arms: 'chest', rim: 'rgba(255,240,205,0.9)', rimBlur: 30 });
         const cx = 640;
         const cy = 360;
@@ -286,8 +298,10 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
         }
         const open = easeOutCubic(span01(t, bloomT - 0.1, bloomT + 0.9));
         if (open > 0) {
-          glow(c, cx, cy, 300, 'rgba(255,230,160,0.9)', open);
-          sunflower(c, cx, cy, 230, { sat: 1, t, seed: 11, bloom: open, alpha: open });
+          // 핀 뒤에도 천천히 돌고 빛이 숨 쉰다
+          const after = Math.max(0, t - bloomT);
+          glow(c, cx, cy, 300 + after * 30, 'rgba(255,230,160,0.9)', open * (0.85 + 0.15 * Math.sin(after * 2.4)));
+          sunflower(c, cx, cy, 230 + after * 8, { sat: 1, t, seed: 11, bloom: open, alpha: open, rot: after * 0.12 });
         }
       });
     },
@@ -416,7 +430,7 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
       const { t } = f;
       frost ??= frostSegments(W, H, 9, 16);
       const C = kit.cues();
-      cam(c, 1.12 - 0.12 * smooth(f.k), W / 2, H / 2, () => {
+      cam(c, 1.12 - 0.12 * f.k, W / 2, H / 2, () => {
         vgrad(c, [[0, '#cfd9e4'], [1, '#e7ecf1']]);
         snowfall(c, t, { count: 80, seed: 361, wind: 10, size: [1.5, 4.5] });
         drawFrost(c, frost!, 1, 'rgba(255,255,255,0.8)');

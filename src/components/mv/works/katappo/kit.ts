@@ -34,7 +34,7 @@ export const COL = {
 
 export interface SceneFrame {
   t: number;
-  /** 장면 안 진행 0→1 */
+  /** 장면 안 진행 0→1 — 앞 장면이 겹치며 사라지는 동안엔 1을 넘어 계속 간다(카메라가 멈추지 않게) */
   k: number;
   /** 장면 시작 후 초 */
   age: number;
@@ -55,8 +55,12 @@ export interface Kit {
   cues(): Cues;
   beat(): ReturnType<typeof beatGrid>;
   env(ch: 'onset' | 'rms' | 'low' | 'high', t: number): number;
-  /** 원본 방송 화면의 아바타 부분을 (x,y,w,h)에 꽉 채워 그린다. 영상이 없으면 false */
-  footage(c: Ctx, video: HTMLVideoElement | null, x: number, y: number, w: number, h: number): boolean;
+  /**
+   * 원본 방송 화면의 아바타 부분을 (x,y,w,h)에 꽉 채워 그린다. 영상이 없으면 false.
+   * delay(초)를 주면 그만큼 전의 화면 — 같은 영상을 여러 칸에 쓸 때 칸마다 조금씩 다른 순간을 보여 준다
+   * (재생하며 지난 몇 초를 기억해 둔 것이라, 막 넘겨 온 직후엔 기억이 없어 지금 화면을 쓴다)
+   */
+  footage(c: Ctx, video: HTMLVideoElement | null, x: number, y: number, w: number, h: number, delay?: number): boolean;
 }
 
 /** 줄 번호(1부터)의 n번째 덩어리 시각 */
@@ -72,6 +76,16 @@ export function cam(c: Ctx, zoom: number, cx: number, cy: number, draw: () => vo
   if (rot) c.rotate(rot);
   c.scale(zoom, zoom);
   c.translate(-cx, -cy);
+  draw();
+  c.restore();
+}
+
+/** (px,py)를 화면의 같은 자리에 둔 채 확대해 그리기 — zoom ≥ 1이면 가장자리가 비지 않는다(cam은 그 점을 가운데로 옮김) */
+export function zoomAt(c: Ctx, zoom: number, px: number, py: number, draw: () => void) {
+  c.save();
+  c.translate(px, py);
+  c.scale(zoom, zoom);
+  c.translate(-px, -py);
   draw();
   c.restore();
 }
