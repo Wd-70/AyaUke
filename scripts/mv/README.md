@@ -23,6 +23,7 @@ powershell -File scripts/mv/setup.ps1     # D:\cache\ayauke-mv\venv (CUDA PyTorc
 | 5. 구간별 기획 | 조사 + 분석 결과로 `PLAN.md` 작성(아래 '기획 원칙') → 사용자 확인 | 장면·구도·기법 표, cue 이름 |
 | 6. 제작 | 작품 코드(`scene.ts`·`timeline.ts`·`cues.json`) | |
 | 7. 검수 | `node scripts/mv/sheet.mjs <클립 shareId> --every 2` | `D:\cache\ayauke-mv\sheets\*.jpg` 장면 모음 — 같은 그림이 이어지는 칸이 없는지 본다 |
+| 8. 성능 | `node scripts/mv/perf.mjs <클립 shareId> 3,10,64` | 시각별 프레임 시간 — 16.7ms를 넘는 장면은 스프라이트·Path2D 묶음으로 줄인다 |
 
 `<곡>`은 작업 폴더 이름(작품 폴더명과 같게, 예: `samurai-heart`).
 
@@ -89,4 +90,5 @@ powershell -File scripts/mv/setup.ps1     # D:\cache\ayauke-mv\venv (CUDA PyTorc
 p5.js로 mp4를 굽는 방식이라 그대로는 안 쓰고 아이디어만 가져왔다.
 - 곡 전체 장면 모음으로 검수 → `sheet.mjs`
 - 보컬 분리 후 강제 정렬 → `separate.py` + `align_lyrics.py`(원본은 demucs+MMS·한글 전용, 여기선 RoFormer+Qwen3·다국어)
-- 아직 안 가져온 것: 수채화 붓(다각형 변형+반투명 겹칠 — 실시간 60fps라 정적 요소는 미리 그려 두는 식으로 옮겨야 함), 실제 박 목록 기반 박자(`analysis.json`의 `beats`에 이미 있음).
+- 수채화 붓 → `src/components/mv/paint.ts`(`washSprite`·`wash`·`washBackdrop` — 번짐을 스프라이트로 미리 그려 두고 찍는다). 연필 선(`pencil`)·종이결(`paperGrain`)도 같은 파일.
+- 아직 안 가져온 것: 실제 박 목록 기반 박자(`analysis.json`의 `beats`에 이미 있음).
