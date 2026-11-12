@@ -13,6 +13,7 @@ import approved from './approved-clips.json';
 const WORKS: Record<string, () => Promise<MvWork>> = {
   '68610d4b042fb27d04542791': () => import('./works/samurai-heart').then((m) => m.default),
   '68610d51042fb27d04542823': () => import('./works/katappo').then((m) => m.default),
+  '68610d4c042fb27d045427ac': () => import('./works/odo').then((m) => m.default),
 };
 
 interface ApprovedSong {
