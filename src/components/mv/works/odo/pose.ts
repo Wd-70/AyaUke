@@ -254,11 +254,11 @@ export function figure(c: Ctx, x: number, ground: number, h: number, pose: Pose,
       const lag = -pose.lean * 0.22 + swing * 0.09;
       const bottom = j.hip[1] + 0.07;
       c.beginPath();
-      c.moveTo(hx - 0.07, hy - 0.04);
-      c.bezierCurveTo(hx - 0.14, hy + 0.06, hx - 0.15 + lag * 0.5, bottom - 0.16, hx - 0.17 + lag, bottom);
-      c.quadraticCurveTo(hx - 0.08 + lag, bottom - 0.035, hx + lag, bottom + 0.012);
-      c.quadraticCurveTo(hx + 0.08 + lag, bottom - 0.035, hx + 0.17 + lag, bottom);
-      c.bezierCurveTo(hx + 0.15 + lag * 0.5, bottom - 0.16, hx + 0.14, hy + 0.06, hx + 0.07, hy - 0.04);
+      c.moveTo(hx - 0.072, hy - 0.03);
+      c.bezierCurveTo(hx - 0.105, hy + 0.07, hx - 0.085 + lag * 0.4, bottom - 0.2, hx - 0.115 + lag, bottom);
+      c.quadraticCurveTo(hx - 0.055 + lag, bottom - 0.03, hx + lag, bottom + 0.014);
+      c.quadraticCurveTo(hx + 0.055 + lag, bottom - 0.03, hx + 0.115 + lag, bottom);
+      c.bezierCurveTo(hx + 0.085 + lag * 0.4, bottom - 0.2, hx + 0.105, hy + 0.07, hx + 0.072, hy - 0.03);
       c.closePath();
       c.fill();
     }
@@ -284,9 +284,9 @@ export function figure(c: Ctx, x: number, ground: number, h: number, pose: Pose,
       c.beginPath();
       c.moveTo(waist[0] - 0.05, waist[1]);
       c.lineTo(waist[0] + 0.05, waist[1]);
-      c.quadraticCurveTo(j.hip[0] + 0.13, j.hip[1] + 0.02, j.hip[0] + 0.17 + sw, hem);
-      c.quadraticCurveTo(j.hip[0] + sw, hem + 0.03, j.hip[0] - 0.17 + sw, hem);
-      c.quadraticCurveTo(j.hip[0] - 0.13, j.hip[1] + 0.02, waist[0] - 0.05, waist[1]);
+      c.quadraticCurveTo(j.hip[0] + 0.15, j.hip[1] + 0.01, j.hip[0] + 0.205 + sw, hem);
+      c.quadraticCurveTo(j.hip[0] + sw, hem + 0.035, j.hip[0] - 0.205 + sw, hem);
+      c.quadraticCurveTo(j.hip[0] - 0.15, j.hip[1] + 0.01, waist[0] - 0.05, waist[1]);
       c.closePath();
       c.fill();
     } else {
@@ -388,8 +388,11 @@ export function fan(c: Ctx, x: number, y: number, s: number, o: FanOpts) {
   if (o.rim) {
     c.fillStyle = o.rim;
     c.beginPath();
-    c.arc(0, -64, 19.5, 0, TAU);
-    c.ellipse(0, -8, 43, 34, 0, Math.PI, TAU);
+    c.arc(0, -63, 21, 0, TAU);
+    c.fill();
+    c.beginPath();
+    c.ellipse(0, -5, 46, 38, 0, Math.PI, TAU);
+    c.rect(-46, -6, 92, 62);
     c.fill();
   }
   c.fillStyle = o.color;

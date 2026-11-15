@@ -25,7 +25,7 @@ export const BG = '#050408';
 
 /** 장면 안 간판·전광판·글자 연출에 쓰는 글자 전부 — 글꼴을 미리 받아 두려고 index.ts가 읽는다 */
 export const SIGN_TEXT =
-  '踊暗転満員御礼終演次回半端NOPARTYYEAHK.O.またのお越しをALRIGHTDON\'TMINDBADご法度UPDOWN▲▼既読…！？あのねほんとはだってでもねえずっと本音劣等感非常口EXITADMITONE別に興味ない特に関係ない「」ふわふわどうぞ0123456789·:';
+  '踊暗転満員御礼終演次回半端NOPARTYYEAHK.O.またのお越しをALRIGHTDON\'TMINDBADご法度UPDOWN▲▼既読…！？あのねほんとはだってでもねえずっと本音劣等感非常口EXITADMITONE別に興味ない特に関係ない「」ふわふわどうぞ夜行独言テンションねえ>0123456789·:';
 
 export interface SceneFrame {
   t: number;
@@ -307,7 +307,7 @@ export function ledMask(text: string, family: string, rows = 16, weight = 900): 
     g.fillText(text, 1, rows * 0.54);
     const data = g.getImageData(0, 0, w, rows).data;
     const bits = new Uint8Array(w * rows);
-    for (let i = 0; i < bits.length; i++) bits[i] = data[i * 4 + 3] > 110 ? 1 : 0;
+    for (let i = 0; i < bits.length; i++) bits[i] = data[i * 4 + 3] > 150 ? 1 : 0;
     m = { w, h: rows, bits };
     masks.set(key, m);
   }
