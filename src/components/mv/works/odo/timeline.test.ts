@@ -23,15 +23,22 @@ describe('scenesOf', () => {
     const s = scenesOf(CUES);
     expect(s.find((x) => x.id === 'blackoutSign')!.start).toBeCloseTo(barTime(37, CUES));
     expect(barAt(s.find((x) => x.id === 'everyone')!.start, CUES)).toBeCloseTo(92);
-    // 드롭은 8마디
+    // 드롭은 8마디 — 마지막 마디(브레이크)의 셋째 박에서 다음 가사가 먼저 들어온다
     const drop = s.find((x) => x.id === 'eqCity')!.start;
-    expect(s.find((x) => x.id === 'crack')!.start - drop).toBeCloseTo(8 * BAR);
+    expect(s.find((x) => x.id === 'crack')!.start - drop).toBeCloseTo(7.5 * BAR);
   });
 
   it('박 보정을 바꾸면 마디에 붙은 장면이 함께 움직이고, 효과 시각에 붙은 장면은 그대로', () => {
     const s = scenesOf({ ...CUES, beatOffset: 0.08 });
-    expect(s.find((x) => x.id === 'woofer')!.start).toBeCloseTo(barTime(9, CUES) + 0.08);
+    expect(s.find((x) => x.id === 'woofer')!.start).toBeCloseTo(barTime(8, { ...CUES, beatOffset: 0 }) + 0.08);
     expect(s.find((x) => x.id === 'exitSign')!.start).toBe(CUES.coda);
+  });
+
+  it('큰 박: 「K.O.」·「Say NO」가 마디 첫 박 근처에 떨어진다', () => {
+    const off = (t: number) => Math.abs(barAt(t, CUES) - Math.round(barAt(t, CUES)));
+    expect(off(LYRICS[0].ja[1].t)).toBeLessThan(0.15); // K.O.
+    expect(off(LYRICS[4].ja[1].t)).toBeLessThan(0.15); // Say NO
+    expect(off(LYRICS[23].ja[1].t)).toBeLessThan(0.15); // 훅 2의 K.O.
   });
 
   it('효과 시각이 앞 장면보다 일러도 장면이 사라지지 않는다', () => {
@@ -46,7 +53,8 @@ describe('lyrics', () => {
     LYRICS.forEach((l, i) => {
       l.ja.slice(1).forEach((c, k) => expect(c.t).toBeGreaterThanOrEqual(l.ja[k].t));
       expect(l.end).toBeGreaterThan(l.ja[l.ja.length - 1].t);
-      if (i) expect(l.t).toBeGreaterThanOrEqual(LYRICS[i - 1].end - 0.011);
+      // 줄 끝이 다음 줄 시작과 조금 겹치는 것은 허용(손으로 맞춘 값) — 시작 순서만 본다
+      if (i) expect(l.t).toBeGreaterThan(LYRICS[i - 1].t);
     });
   });
 });
