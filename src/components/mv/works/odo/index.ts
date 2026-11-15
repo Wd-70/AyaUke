@@ -1,5 +1,6 @@
 import { Dela_Gothic_One, Zen_Kaku_Gothic_New } from 'next/font/google';
 import type { MvWork } from '../../types';
+import { SIGN_TEXT } from './kit';
 import { createOdoRenderer } from './scene';
 import { BEAT_PERIOD, BEAT_PHASE, CUE_LIST, DURATION, LYRICS } from './timeline';
 
@@ -10,7 +11,7 @@ const display = Dela_Gothic_One({ weight: '400', subsets: ['latin'], preload: fa
 
 const lyricText = LYRICS.flatMap((l) => l.ja.map((c) => c.text)).join('');
 /** 장면 안 간판·전광판·도장에 쓰는 글자 */
-const signText = '踊暗転満員御礼終演次回半端NOPARTYYEAHK.O.またのお越しを';
+const signText = SIGN_TEXT;
 
 const work: MvWork = {
   duration: DURATION,

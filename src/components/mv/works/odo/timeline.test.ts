@@ -9,7 +9,7 @@ describe('cues', () => {
 
 describe('scenesOf', () => {
   it('PLAN.md 표와 같은 57장면, 빈틈없이 이어진다', () => {
-    const s = scenesOf(CUES);
+    const s = scenesOf(LYRICS, CUES);
     expect(s).toHaveLength(57);
     expect(new Set(SCENES.map((d) => d.id)).size).toBe(57);
     s.slice(1).forEach((x, i) => {
@@ -19,18 +19,22 @@ describe('scenesOf', () => {
     expect(s[s.length - 1].end).toBeGreaterThan(DURATION);
   });
 
-  it('마디에 붙은 장면은 마디 경계에서 시작한다', () => {
-    const s = scenesOf(CUES);
+  it('가사에 붙은 장면은 그 말이 시작하는 시각에, 마디에 붙은 장면은 마디 경계에서 시작한다', () => {
+    const s = scenesOf(LYRICS, CUES);
+    expect(s.find((x) => x.id === 'halfKO')!.start).toBe(LYRICS[0].t);
+    expect(s.find((x) => x.id === 'ringAll')!.start).toBe(LYRICS[42].ja[2].t); // yeah
     expect(s.find((x) => x.id === 'blackoutSign')!.start).toBeCloseTo(barTime(37, CUES));
-    expect(barAt(s.find((x) => x.id === 'everyone')!.start, CUES)).toBeCloseTo(92);
-    // 드롭은 8마디 — 마지막 마디(브레이크)의 셋째 박에서 다음 가사가 먼저 들어온다
-    const drop = s.find((x) => x.id === 'eqCity')!.start;
-    expect(s.find((x) => x.id === 'crack')!.start - drop).toBeCloseTo(7.5 * BAR);
+    // 드롭 1은 마디 48에서
+    expect(barAt(s.find((x) => x.id === 'eqCity')!.start, CUES)).toBeCloseTo(48);
+    expect(s.find((x) => x.id === 'mosaic')!.start - s.find((x) => x.id === 'eqCity')!.start).toBeCloseTo(2 * BAR);
   });
 
-  it('박 보정을 바꾸면 마디에 붙은 장면이 함께 움직이고, 효과 시각에 붙은 장면은 그대로', () => {
-    const s = scenesOf({ ...CUES, beatOffset: 0.08 });
-    expect(s.find((x) => x.id === 'woofer')!.start).toBeCloseTo(barTime(8, { ...CUES, beatOffset: 0 }) + 0.08);
+  it('가사 타이밍을 고치면 그 줄에 붙은 장면이 따라 움직이고, 박 보정은 마디에 붙은 장면만 민다', () => {
+    const moved = LYRICS.map((l, i) => (i === 30 ? { ...l, t: l.t + 0.2, ja: l.ja.map((c) => ({ ...c, t: c.t + 0.2 })) } : l));
+    expect(scenesOf(moved, CUES).find((x) => x.id === 'strobeDancer')!.start).toBeCloseTo(LYRICS[30].t + 0.2);
+    const s = scenesOf(LYRICS, { ...CUES, beatOffset: CUES.beatOffset + 0.08 });
+    expect(s.find((x) => x.id === 'eqCity')!.start).toBeCloseTo(barTime(48, CUES) + 0.08);
+    expect(s.find((x) => x.id === 'woofer')!.start).toBe(LYRICS[5].t);
     expect(s.find((x) => x.id === 'exitSign')!.start).toBe(CUES.coda);
   });
 
@@ -41,8 +45,8 @@ describe('scenesOf', () => {
     expect(off(LYRICS[23].ja[1].t)).toBeLessThan(0.15); // 훅 2의 K.O.
   });
 
-  it('효과 시각이 앞 장면보다 일러도 장면이 사라지지 않는다', () => {
-    const s = scenesOf({ ...CUES, coda: 100 });
+  it('시각이 뒤집혀도 장면이 사라지지 않는다', () => {
+    const s = scenesOf(LYRICS, { ...CUES, coda: 100 });
     s.forEach((x) => expect(x.end - x.start).toBeGreaterThan(0));
   });
 });
