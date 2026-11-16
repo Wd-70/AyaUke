@@ -181,7 +181,7 @@ export default function CreatedClipsReview({ query, title = "생성된 클립", 
     setSavingDefault(true);
     setMsg(null);
     try {
-      const res = await fetch(`/api/songdetails/${selected.songId}`, {
+      const res = await fetch(`/api/songdetails/${selected.songId}/clip-duration`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clipDuration: duration }),
       });

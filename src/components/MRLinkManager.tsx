@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { removeMRLink as removeMRItem } from '@/domains/catalog/mr-search';
+import MRVideoPreview from '@/components/MRVideoPreview';
 import { PlusIcon, TrashIcon, StarIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 interface MRLink {
@@ -39,9 +40,9 @@ export default function MRLinkManager({
   // MR 링크 제거 함수
   const removeMRLink = (index: number) => {
     if (mrLinks.length > 1) {
-      const newLinks = mrLinks.filter((_, i) => i !== index);
+      const { mrLinks: newLinks, selectedMRIndex: nextIndex } = removeMRItem(mrLinks, selectedMRIndex, index);
       onMRLinksChange(newLinks);
-      onSelectedMRIndexChange(Math.min(selectedMRIndex, newLinks.length - 1));
+      onSelectedMRIndexChange(nextIndex);
     }
   };
 
@@ -105,6 +106,7 @@ export default function MRLinkManager({
               </button>
             )}
           </div>
+          <MRVideoPreview url={link.url} />
           
           <div className="space-y-3">
             <div>
@@ -119,7 +121,7 @@ export default function MRLinkManager({
               />
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">시작 시간 (초)</label>
                 <input
@@ -141,17 +143,6 @@ export default function MRLinkManager({
                   className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
                              rounded-md outline-none text-light-text dark:text-dark-text"
                   placeholder="공식 MR"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">길이</label>
-                <input
-                  type="text"
-                  value={link.duration}
-                  onChange={(e) => updateMRLink(index, 'duration', e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-light-accent/50 dark:border-dark-accent/50 
-                             rounded-md outline-none text-light-text dark:text-dark-text"
-                  placeholder="3:45"
                 />
               </div>
             </div>

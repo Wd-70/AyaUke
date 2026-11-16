@@ -30,12 +30,14 @@ interface SongCardProps {
 }
 
 export default function SongCard({
-  song,
+  song: initialSong,
   showNumber = false,
   number,
   compact = false,
   onDialogStateChange,
 }: SongCardProps) {
+  const [song, setSong] = useState(initialSong);
+  useEffect(() => setSong(initialSong), [initialSong]);
   const queryClient = useQueryClient();
   const rangeEditor = useClipRangeEditor();
   const { liked, isLoading: likeLoading, toggleLike } = useLike(song.id);
@@ -654,6 +656,7 @@ export default function SongCard({
 
       {/* 새로운 SongDetailModal */}
       <SongDetailModal
+        onSongUpdated={setSong}
         song={song}
         isExpanded={isExpanded}
         onClose={() => setIsExpanded(false)}

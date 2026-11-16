@@ -5,7 +5,7 @@ import { SelfiePost, SelfieDay, SelfieAlias } from './selfie.schema'
 import { normalizeText } from '@/shared/utils/song-match'
 import { isLocalEnvironment } from '@/domains/operations/local-backup.service'
 import { AppError, ForbiddenError, ValidationError } from '@/shared/api/errors'
-import { canAccessAdminPanel, UserRole } from '@/lib/permissions'
+import { canManageSystem, AdminScope } from '@/lib/permissions'
 
 const ARCHIVE_ROOT = path.join(process.cwd(), 'selfie-archive')
 
@@ -16,7 +16,7 @@ const ARCHIVE_ROOT = path.join(process.cwd(), 'selfie-archive')
  */
 export function authorizeSelfieDev(
   headerToken: string | null,
-  session: { user?: { role?: string } } | null,
+  session: { user?: { role?: string; adminScopes?: AdminScope[] } } | null,
 ): void {
   if (!isLocalEnvironment()) throw new AppError('LOCAL_ONLY', '로컬 서버에서만 가능합니다.', 400)
   const devToken = process.env.SELFIE_DEV_TOKEN
@@ -27,7 +27,7 @@ export function authorizeSelfieDev(
     if (!headerToken) throw new AppError('NO_CLIENT_TOKEN', '요청에 토큰이 없습니다 — 확장 옵션에서 토큰을 입력·저장했는지 확인하세요.', 401)
     throw new AppError('TOKEN_MISMATCH', '토큰 불일치 — 확장 옵션 값과 .env.local의 SELFIE_DEV_TOKEN을 동일하게 맞추세요.', 401)
   }
-  if (!canAccessAdminPanel(session.user.role as UserRole)) {
+  if (!canManageSystem(session.user)) {
     throw new ForbiddenError('관리자만 사용할 수 있습니다.')
   }
 }

@@ -7,6 +7,7 @@ import {
   ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 import { useReveal } from './useReveal';
+import BirthdayCard from './BirthdayCard';
 
 const CARDS = [
   {
@@ -59,6 +60,7 @@ export default function AboutSection() {
             <br className="hidden sm:block" />
             노래할 땐 완전히 다른 모습을 보여주는 허니즈의 메인보컬.
           </p>
+          <BirthdayCard />
         </motion.div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">

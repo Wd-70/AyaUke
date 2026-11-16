@@ -10,6 +10,7 @@ export enum Permission {
   // 시스템 관리
   SYSTEM_ADMIN = 'system.admin',
   USER_MANAGE = 'users.manage',
+  CLIPS_MANAGE = 'clips.manage',
   
   // 노래 관리
   SONGS_VIEW = 'songs.view',
@@ -55,24 +56,43 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   [UserRole.USER]: []
 }
 
-export function hasPermission(userRole: UserRole, permission: Permission): boolean {
-  const permissions = ROLE_PERMISSIONS[userRole] || []
+export const ADMIN_SCOPES = ['songs', 'clips', 'users', 'system'] as const;
+export type AdminScope = typeof ADMIN_SCOPES[number];
+export const ADMIN_SCOPE_LABELS: Record<AdminScope, string> = { songs: '노래', clips: '클립', users: '사용자', system: '시스템' };
+export type PermissionSubject = string | { role?: string; adminScopes?: readonly AdminScope[] } | null | undefined;
+const roleOf = (subject: PermissionSubject) => typeof subject === 'string' ? subject : subject?.role;
+/** Missing field preserves legacy roles; an explicit empty array revokes all delegated access. */
+export function getAdminScopes(subject: PermissionSubject): readonly AdminScope[] {
+  if (isSuperAdmin(subject)) return ADMIN_SCOPES;
+  if (typeof subject === 'object' && subject?.adminScopes !== undefined) return Array.isArray(subject.adminScopes) ? subject.adminScopes.filter(s => ADMIN_SCOPES.includes(s)) : [];
+  return ['song_admin', 'ayauke_admin', 'song_editor'].includes(roleOf(subject) || '') ? ['songs'] : [];
+}
+export const canManageClips = (subject: PermissionSubject) => getAdminScopes(subject).includes('clips');
+export const canManageUsers = (subject: PermissionSubject) => getAdminScopes(subject).includes('users');
+export const canManageSystem = (subject: PermissionSubject) => getAdminScopes(subject).includes('system');
+export function hasPermission(subject: PermissionSubject, permission: Permission): boolean {
+  if (isSuperAdmin(subject)) return true;
+  if (permission === Permission.CLIPS_MANAGE) return canManageClips(subject);
+  if (permission === Permission.USER_MANAGE) return canManageUsers(subject);
+  if (permission === Permission.SYSTEM_ADMIN) return canManageSystem(subject);
+  if (typeof subject === 'object' && subject?.adminScopes !== undefined) return getAdminScopes(subject).includes('songs');
+  const permissions = ROLE_PERMISSIONS[roleOf(subject) as UserRole] || []
   return permissions.includes(permission)
 }
 
-export function canAccessAdminPanel(role: UserRole): boolean {
-  return role !== UserRole.USER
+export function canAccessAdminPanel(subject: PermissionSubject): boolean {
+  return getAdminScopes(subject).length > 0
 }
 
-export function isSuperAdmin(role: UserRole): boolean {
-  return role === UserRole.SUPER_ADMIN
+export function isSuperAdmin(subject: PermissionSubject): boolean {
+  return roleOf(subject) === UserRole.SUPER_ADMIN
 }
 
-export function canManageSongs(role: UserRole): boolean {
-  return hasPermission(role, Permission.SONGS_VIEW)
+export function canManageSongs(subject: PermissionSubject): boolean {
+  return hasPermission(subject, Permission.SONGS_VIEW)
 }
 
 // 하위 호환성을 위한 임시 함수 (나중에 제거)
-export function roleToIsAdmin(role: UserRole): boolean {
-  return role !== UserRole.USER
+export function roleToIsAdmin(subject: PermissionSubject): boolean {
+  return canAccessAdminPanel(subject)
 }

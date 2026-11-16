@@ -4,6 +4,7 @@ import { JWT, DefaultJWT } from "next-auth/jwt"
 declare module "next-auth" {
   interface Session {
     user: {
+      adminScopes?: Array<'songs' | 'clips' | 'users' | 'system'>
       naverId: string
       channelId: string
       userId: string // MongoDB ObjectId

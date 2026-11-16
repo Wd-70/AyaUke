@@ -93,7 +93,7 @@ const ItemEditor = forwardRef<ItemEditorHandle, Props>(function ItemEditor({ ite
     if (!matchedSong) return;
     setSavingDefault(true);
     try {
-      await workflowRequest(`/api/songdetails/${matchedSong.id}`, {
+      await workflowRequest(`/api/songdetails/${matchedSong.id}/clip-duration`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clipDuration: duration }),
       });

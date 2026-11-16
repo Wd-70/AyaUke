@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/authOptions';
 import { connectDB as connectToDatabase } from '@/shared/db/mongodb';
 import SongVideo from '@/domains/archive/schemas/song-video.schema';
 import SongDetail from '@/domains/catalog/song.schema';
-import { canManageSongs, UserRole } from '@/lib/permissions';
+import { canManageClips, UserRole } from '@/lib/permissions';
 import { parseVideoUrl } from '@/shared/utils/video-url';
 import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
 
@@ -74,7 +74,7 @@ export async function PUT(
     const isOwnerByUserId = video.addedBy.toString() === session.user.userId;
     const isOwnerByChannelId = video.addedBy.toString() === session.user.channelId;
     const isOwner = isOwnerByUserId || isOwnerByChannelId;
-    const isAdmin = canManageSongs(session.user.role as UserRole);
+    const isAdmin = canManageClips(session.user);
     
     if (!isOwner && !isAdmin) {
       return NextResponse.json(
@@ -223,7 +223,7 @@ export async function DELETE(
     const isOwnerByUserId = video.addedBy.toString() === session.user.userId;
     const isOwnerByChannelId = video.addedBy.toString() === session.user.channelId;
     const isOwner = isOwnerByUserId || isOwnerByChannelId;
-    const isAdmin = canManageSongs(session.user.role as UserRole);
+    const isAdmin = canManageClips(session.user);
     
     if (!isOwner && !isAdmin) {
       return NextResponse.json(

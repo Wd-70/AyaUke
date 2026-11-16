@@ -1,4 +1,5 @@
 "use client";
+import { hasPermission, Permission } from "@/lib/permissions";
 
 import { useState, useEffect, useCallback, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
@@ -24,7 +25,7 @@ import { useSongPlaylists } from "@/hooks/useGlobalPlaylists";
 import PlaylistContextMenu from "./PlaylistContextMenu";
 import LiveClipManager from "./LiveClipManager";
 import { useClipRangeEditor } from './clip/range/ClipRangeProvider';
-import SongEditForm from "./SongEditForm";
+import SongEditForm, { type SongEditFormHandle } from "./SongEditForm";
 import OfficialBadge from "./OfficialBadge";
 import { isOfficialSong } from "@/shared/utils/song-source";
 import { useToast } from "./Toast";
@@ -38,6 +39,7 @@ interface YouTubePlayer {
 }
 
 interface SongDetailModalProps {
+  onSongUpdated?: (song: Song) => void;
   song: Song;
   isExpanded: boolean;
   onClose: () => void;
@@ -49,6 +51,7 @@ interface SongDetailModalProps {
 }
 
 export default function SongDetailModal({
+  onSongUpdated,
   song,
   isExpanded,
   onClose,
@@ -64,6 +67,15 @@ export default function SongDetailModal({
   const { liked, isLoading: likeLoading, toggleLike } = useLike(song.id);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isEditMode, setIsEditMode] = useState(false);
+  const editFormRef = useRef<SongEditFormHandle>(null);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const [editorViewportHeight, setEditorViewportHeight] = useState<number>();
+  useEffect(() => {
+    if (!isEditMode) return;
+    const update = () => setEditorViewportHeight(window.visualViewport?.height ?? window.innerHeight);
+    update(); window.visualViewport?.addEventListener('resize', update);
+    return () => window.visualViewport?.removeEventListener('resize', update);
+  }, [isEditMode]);
   const [isPlaying, setIsPlaying] = useState(false);
   // 마지막으로 보던 탭을 브라우저에 저장(모든 곡 공용) → 다음에 열 때 그 탭으로
   const [activeTab, setActiveTab] = useState<'mr' | 'clips'>(() => {
@@ -85,6 +97,7 @@ export default function SongDetailModal({
     if (saved === 'mr' || saved === 'clips') setActiveTab(saved);
   }, [isExpanded]);
   const [selectedMRIndex, setSelectedMRIndex] = useState(song.selectedMRIndex || 0);
+  useEffect(() => { setSelectedMRIndex(song.selectedMRIndex || 0); }, [song.id, song.selectedMRIndex, isExpanded]);
   const [showPlaylistMenu, setShowPlaylistMenu] = useState(false);
   const [playlistMenuPos, setPlaylistMenuPos] = useState({ x: 0, y: 0 });
   const [showLyricsMenu, setShowLyricsMenu] = useState(false);
@@ -107,7 +120,7 @@ export default function SongDetailModal({
   };
 
   // 관리자 권한 체크
-  const isAdmin = session?.user?.isAdmin || false;
+  const isAdmin = hasPermission(session?.user, Permission.SONGS_EDIT);
 
   // 현재 표시되는 제목과 아티스트 (alias 우선)
   const displayTitle = song.titleAlias || song.title;
@@ -138,7 +151,8 @@ export default function SongDetailModal({
       }>;
   }, [song.mrLinks]);
 
-  const youtubeMR = youtubeMRs[selectedMRIndex] || null;
+  // selectedMRIndex is an index into all MR links, not the YouTube-only subset.
+  const youtubeMR = youtubeMRs.find(mr => mr.index === selectedMRIndex) || null;
 
   // 라이브 클립 메타데이터 로드는 useSongVideos(enabled: isExpanded)가 자동 처리한다.
   // (loadSongVideos는 클립 추가/편집/삭제 후 강제 새로고침용으로 LiveClipManager에 전달)
@@ -156,7 +170,7 @@ export default function SongDetailModal({
         event.stopPropagation();
         event.preventDefault();
       } else if (isEditMode) {
-        setIsEditMode(false);
+        editFormRef.current?.requestCancel();
         event.stopPropagation();
         event.preventDefault();
       }
@@ -198,18 +212,24 @@ export default function SongDetailModal({
 
   // 편집 모드 토글
   const toggleEditMode = () => {
-    setIsEditMode(!isEditMode);
+    setShowPlaylistMenu(false); setShowLyricsMenu(false);
+    playerRef.current?.pauseVideo();
+    setIsEditMode(true);
   };
 
   // 편집 저장 핸들러
   const handleSaveEdit = (updatedSong: Song) => {
-    Object.assign(song, updatedSong);
+    const next = { ...song, ...updatedSong, id: song.id };
+    setSelectedMRIndex(next.selectedMRIndex || 0);
+    onSongUpdated?.(next);
     setIsEditMode(false);
+    requestAnimationFrame(() => editButtonRef.current?.focus());
   };
 
   // 편집 취소 핸들러
   const handleCancelEdit = () => {
     setIsEditMode(false);
+    requestAnimationFrame(() => editButtonRef.current?.focus());
   };
 
   // MR 검색: 유튜브에서 노래방/MR 영상 검색 (MR 링크가 없을 때 대체 수단)
@@ -220,6 +240,7 @@ export default function SongDetailModal({
 
   // 모달 닫기 핸들러 (OBS가 켜져 있으면 함께 정리)
   const handleClose = () => {
+    if (isEditMode) { editFormRef.current?.requestCancel(); return; }
     if (obsActive && session?.user?.userId) {
       fetch("/api/obs/delete", { method: "DELETE" }).catch((error) => {
         console.error("OBS 상태 정리 오류:", error);
@@ -417,14 +438,15 @@ export default function SongDetailModal({
         animate={{ opacity: 1, scale: 1, x: "-50%", y: "0%" }}
         exit={{ opacity: 0, scale: 0.9, x: "-50%", y: "-10%" }}
         transition={{ duration: 0.3 }}
-        className="fixed top-20 sm:top-20 left-1/2 z-40 
-                   w-[95vw] max-w-[1600px] overflow-hidden
+        role="dialog" aria-modal="true" aria-label={isEditMode ? `곡 정보 수정: ${displayTitle}` : displayTitle}
+        className={`fixed top-20 sm:top-20 left-1/2 z-40
+                   ${isEditMode ? "w-[calc(100vw-16px)] rounded-2xl sm:w-[95vw] sm:max-w-[1600px]" : "w-[95vw] max-w-[1600px] rounded-xl"} overflow-hidden
                    bg-white dark:bg-gray-900 backdrop-blur-sm 
-                   rounded-xl border border-light-primary/20 dark:border-dark-primary/20 
-                   shadow-2xl transform -translate-x-1/2"
+                   border border-light-primary/20 dark:border-dark-primary/20
+                   shadow-2xl transform -translate-x-1/2`}
         style={{
-          top: isMobileScreen ? "4.5rem" : "5rem",
-          height: isMobileScreen
+          top: isEditMode && isMobileScreen ? 8 : isMobileScreen ? "4.5rem" : "5rem",
+          height: isEditMode && isMobileScreen ? (editorViewportHeight ? `${Math.max(0, editorViewportHeight - 16)}px` : "calc(100dvh - 16px)") : isMobileScreen
             ? "calc(var(--vh, 1vh) * 100 - 5rem)"
             : "calc(var(--vh, 1vh) * 100 - 6rem)",
         }}
@@ -434,9 +456,11 @@ export default function SongDetailModal({
                         dark:from-dark-accent/5 dark:to-dark-purple/5 rounded-xl"></div>
 
         {/* 우상단 고정: 편집(관리자) + 닫기 */}
-        <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
+        {!isEditMode && <div className="absolute top-3 right-3 z-30 flex items-center gap-2">
           {isAdmin && (
             <button
+              ref={editButtonRef}
+              aria-label="곡 정보 수정"
               onClick={toggleEditMode}
               className={`p-2 rounded-full transition-colors duration-200 ${
                 isEditMode
@@ -451,15 +475,16 @@ export default function SongDetailModal({
           <button
             onClick={handleClose}
             className="p-2 rounded-full bg-red-500/15 hover:bg-red-500/25 text-red-500 transition-colors duration-200"
+            aria-label="닫기"
             title="닫기"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
-        </div>
+        </div>}
 
-        <div className="relative p-3 sm:p-4 md:p-5 lg:p-6 flex flex-col h-full gap-3">
+        <div className={`relative flex h-full flex-col ${isEditMode ? 'gap-2 p-2 sm:p-4' : 'gap-3 p-3 sm:p-4 md:p-5 lg:p-6'}`}>
           {/* 메타데이터 헤더 (제목/아티스트/태그) */}
-          <div className="flex flex-col gap-2 pr-24 md:pr-24">
+          {isEditMode ? <header className="shrink-0 border-b border-slate-200 pb-2 dark:border-slate-700"><h2 className="text-xl font-semibold text-light-text dark:text-dark-text">곡 정보 수정</h2><p className="mt-1 truncate text-sm text-slate-600 dark:text-slate-400">{displayTitle} · {displayArtist}</p></header> : <div className="flex flex-col gap-2 pr-24 md:pr-24">
             <div className="flex items-center gap-3 min-w-0">
               <h3 className="min-w-0 text-lg md:text-xl lg:text-2xl font-bold text-light-text dark:text-dark-text truncate">
                 {displayTitle}
@@ -507,7 +532,7 @@ export default function SongDetailModal({
                   </span>
                 ))}
             </div>
-          </div>
+          </div>}
 
           {/* 본문: 영상/콘텐츠 (좌) + 액션 아이콘바 (우, 데스크톱) */}
           <div className="flex flex-row gap-3 lg:gap-4 flex-1 min-h-0 min-w-0">
@@ -522,6 +547,8 @@ export default function SongDetailModal({
                   className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
                 >
                   <SongEditForm
+                    ref={editFormRef}
+                    key={song.id}
                     song={song}
                     isVisible={true}
                     onSave={handleSaveEdit}
@@ -642,9 +669,9 @@ export default function SongDetailModal({
             </div>
 
             {/* 데스크톱 액션바: 우측 세로 스택 */}
-            <div className="hidden md:flex flex-col items-center gap-1.5 flex-shrink-0">
+            {!isEditMode && <div className="hidden md:flex flex-col items-center gap-1.5 flex-shrink-0">
               {renderActionButtons('vertical')}
-            </div>
+            </div>}
           </div>
 
           {/* 하단 메타 정보 바 (부른 횟수 · 추가일 · 마지막 부른날) — 탭 무관 항상 표시 */}
@@ -672,9 +699,9 @@ export default function SongDetailModal({
           )}
 
           {/* 모바일 액션바: 하단 고정 수평 바 */}
-          <div className="flex md:hidden items-center justify-around flex-shrink-0 pt-2 border-t border-light-primary/15 dark:border-dark-primary/15">
+          {!isEditMode && <div className="flex md:hidden items-center justify-around flex-shrink-0 pt-2 border-t border-light-primary/15 dark:border-dark-primary/15">
             {renderActionButtons('horizontal')}
-          </div>
+          </div>}
         </div>
       </motion.div>
 

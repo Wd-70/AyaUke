@@ -25,7 +25,7 @@ import AddClipToPlaylistButton from './clip/AddClipToPlaylistButton';
 import { useBulkClipLikes } from '@/hooks/useClipLikes';
 import ChzzkPlayer, { type ChzzkPlayerHandle } from './video/ChzzkPlayer';
 import { useSession } from 'next-auth/react';
-import { UserRole, roleToIsAdmin } from '@/lib/permissions';
+import { UserRole, canManageClips } from '@/lib/permissions';
 import { updateVideoData } from '@/lib/youtube';
 import { useToast } from './Toast';
 import { useConfirm } from './ConfirmDialog';
@@ -321,7 +321,7 @@ export default function LiveClipManager({
   // 관리자 여부 확인
   const isAdmin = (): boolean => {
     if (!session?.user?.isAdmin || !session?.user?.role) return false;
-    return roleToIsAdmin(session.user.role as UserRole);
+    return canManageClips(session.user);
   };
 
   // 권한 확인 함수 (메모이제이션으로 무한 리렌더링 방지)

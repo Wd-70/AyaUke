@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
-import { isSuperAdmin, UserRole } from "@/lib/permissions";
+import { canManageUsers, UserRole } from "@/lib/permissions";
 import { getAdminUserActivity } from "@/domains/identity/admin-user.service";
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
   const session = await getServerSession(authOptions);
-  if (!session || !isSuperAdmin(session.user.role as UserRole))
+  if (!session || !canManageUsers(session.user))
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   try {
     const result = await getAdminUserActivity((await params).userId);

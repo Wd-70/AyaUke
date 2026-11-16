@@ -1,3 +1,4 @@
+import { ADMIN_SCOPES } from "@/lib/permissions";
 import { Types } from "mongoose";
 import { adminDatabase } from "@/domains/operations/admin-overview.service";
 import type { AdminUserView } from "./user.view";
@@ -19,6 +20,9 @@ export interface UserListInput {
   sortBy: UserSortField;
   sortOrder: "asc" | "desc";
 }
+// Match the same legacy fallback and explicit revocation rules as permissions.ts.
+const effectiveScopes = { $ifNull: ["$adminScopes", { $cond: [{ $in: ["$role", ["song_admin", "song_editor", "ayauke_admin"]] }, ["songs"], []] }] };
+const isAdminExpression = { $or: [{ $eq: ["$role", "super_admin"] }, { $gt: [{ $size: { $setIntersection: [effectiveScopes, [...ADMIN_SCOPES]] } }, 0] }] };
 const safeRegex = (value: string) =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -31,7 +35,11 @@ export async function listAdminUsers(input: UserListInput) {
     filter.$or = ["channelName", "displayName", "channelId"].map((key) => ({
       [key]: { $regex: safeRegex(input.search), $options: "i" },
     }));
-  if (input.role !== "all") filter.role = input.role;
+  if (ADMIN_SCOPES.includes(input.role as typeof ADMIN_SCOPES[number])) {
+    filter.$expr = { $or: [{ $eq: ["$role", "super_admin"] }, { $in: [input.role, effectiveScopes] }] };
+  } else if (input.role === "user") {
+    filter.$expr = { $not: [isAdminExpression] };
+  } else if (input.role !== "all") filter.role = input.role;
   const totalUsers = await db.collection("users").countDocuments(filter, opts);
   const totalPages = Math.max(1, Math.ceil(totalUsers / input.limit)),
     page = Math.min(input.page, totalPages);
@@ -110,6 +118,7 @@ export async function listAdminUsers(input: UserListInput) {
       displayName: 1,
       profileImageUrl: 1,
       role: 1,
+      adminScopes: 1,
       createdAt: 1,
       lastLoginAt: 1,
       activityStats: 1,
@@ -138,7 +147,7 @@ export async function listAdminUsers(input: UserListInput) {
           $group: {
             _id: null,
             total: { $sum: 1 },
-            admins: { $sum: { $cond: [{ $ne: ["$role", "user"] }, 1, 0] } },
+            admins: { $sum: { $cond: [isAdminExpression, 1, 0] } },
           },
         },
       ],

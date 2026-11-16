@@ -228,7 +228,7 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
 
   const defaultDurationMutation = useMutation({
     mutationFn: async (duration: number) => {
-      const res = await fetch(`/api/songdetails/${clip.songId}`, {
+      const res = await fetch(`/api/songdetails/${clip.songId}/clip-duration`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clipDuration: duration }),

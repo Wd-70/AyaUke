@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
-import { canAccessAdminPanel, isSuperAdmin, UserRole } from "@/lib/permissions";
+import { canAccessAdminPanel, canManageUsers, canManageClips, UserRole } from "@/lib/permissions";
 import { adminPeriod } from "@/domains/operations/admin-overview";
 import { getAdminOverview } from "@/domains/operations/admin-overview.service";
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || !canAccessAdminPanel(session.user.role as UserRole))
+  if (!session || !canAccessAdminPanel(session.user))
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   let period;
   try {
@@ -20,8 +20,9 @@ export async function GET(request: NextRequest) {
   try {
     return NextResponse.json(
       await getAdminOverview(
-        isSuperAdmin(session.user.role as UserRole),
+        canManageUsers(session.user),
         period,
+        canManageClips(session.user),
       ),
       { headers: { "Cache-Control": "private, no-store" } },
     );

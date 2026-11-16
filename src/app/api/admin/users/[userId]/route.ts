@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
-import { isSuperAdmin, UserRole } from '@/lib/permissions'
+import { canManageUsers, UserRole } from '@/lib/permissions'
 import dbConnect from '@/shared/db/mongodb'
 import User, { IUser } from '@/models/User'
 import Like from '@/domains/engagement/like.schema'
 import Playlist from '@/domains/engagement/playlist.schema'
 import SongDetail from '@/domains/catalog/song.schema'
+import { AdminUserUpdate, canChangeGrants } from '@/domains/identity/admin-grants'
+import { isSuperAdmin } from '@/lib/permissions'
 
 interface RouteParams {
   params: Promise<{
@@ -18,7 +20,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+    if (!session || !canManageUsers(session.user)) {
       return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
     }
 
@@ -71,12 +73,14 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+    if (!session || !canManageUsers(session.user)) {
       return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
     }
 
     const body = await request.json()
-    const { role, displayName, profileImageUrl } = body
+    const parsed = AdminUserUpdate.safeParse(body)
+    if (!parsed.success) return NextResponse.json({ error: '올바른 사용자 정보와 권한을 입력해주세요.' }, { status: 400 })
+    const { adminScopes, displayName, profileImageUrl } = parsed.data
 
     await dbConnect()
 
@@ -90,8 +94,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     // 권한 변경 시 기록
     const updateData: any = {}
     
-    if (role && role !== user.role) {
-      updateData.role = role
+    if (isSuperAdmin(user) && !isSuperAdmin(session.user)) return NextResponse.json({ error: '최고 관리자 계정은 수정할 수 없습니다.' }, { status: 403 })
+    if (adminScopes !== undefined) {
+      if (!canChangeGrants(session.user, user)) return NextResponse.json({ error: '권한 변경은 최고 관리자만 가능합니다. 최고 관리자 권한은 이 화면에서 변경할 수 없습니다.' }, { status: 403 })
+      updateData.adminScopes = adminScopes
       updateData.grantedBy = session.user.channelId
       updateData.grantedAt = new Date()
     }

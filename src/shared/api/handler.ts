@@ -53,7 +53,7 @@ export function withApi<S extends z.ZodType | undefined = undefined>(
       }
       if (auth !== 'none' && auth !== 'user') {
         const role = (session!.user as { role?: string }).role as UserRole | undefined;
-        if (!role || !hasPermission(role, auth)) {
+        if (!role || !hasPermission(session!.user, auth)) {
           return fail('FORBIDDEN', '권한이 없습니다.', 403);
         }
       }

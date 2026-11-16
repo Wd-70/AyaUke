@@ -1,4 +1,5 @@
 "use client";
+import { ADMIN_SCOPE_LABELS, getAdminScopes, isSuperAdmin } from "@/lib/permissions";
 import { useEffect, useState } from "react";
 import {
   ArrowPathIcon,
@@ -17,9 +18,10 @@ import type { AdminUserListItem } from "@/domains/identity/admin-user.service";
 import type { AdminUserView } from "@/domains/identity/user.view";
 const roles: Record<string, string> = {
   super_admin: "최고 관리자",
-  ayauke_admin: "아야우케 관리자",
-  song_admin: "노래 관리자",
-  song_editor: "노래 편집자",
+  songs: "노래",
+  clips: "클립",
+  users: "사용자",
+  system: "시스템",
   user: "일반 사용자",
 };
 interface UserResponse {
@@ -259,7 +261,7 @@ export default function UserManagementTab() {
                         {user.channelName}
                       </p>
                       <span className="mt-1 inline-block rounded-full bg-purple-50 px-2 py-1 text-[11px] text-purple-800 dark:bg-purple-950/60 dark:text-purple-200">
-                        {roles[user.role] || user.role}
+                        {isSuperAdmin(user) ? '최고 관리자' : getAdminScopes(user).map(s => ADMIN_SCOPE_LABELS[s]).join(' · ') || '일반 사용자'}
                       </span>
                     </div>
                   </div>

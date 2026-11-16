@@ -1,6 +1,7 @@
 import mongoose, { Model } from "mongoose";
 
 export interface IUser extends mongoose.Document {
+  adminScopes?: Array<'songs' | 'clips' | 'users' | 'system'>;
   channelId: string;
   channelName: string;
   displayName: string;
@@ -39,6 +40,7 @@ export interface IUser extends mongoose.Document {
 
 const userSchema = new mongoose.Schema<IUser>(
   {
+    adminScopes: { type: [String], enum: ['songs', 'clips', 'users', 'system'], default: undefined },
     channelId: {
       type: String,
       required: true,
@@ -58,7 +60,7 @@ const userSchema = new mongoose.Schema<IUser>(
     },
     role: {
       type: String,
-      enum: ["super_admin", "song_admin", "song_editor", "user"],
+      enum: ["super_admin", "ayauke_admin", "song_admin", "song_editor", "user"],
       default: "user",
     },
     grantedBy: {

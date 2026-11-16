@@ -1,3 +1,4 @@
+import { revalidatePath } from 'next/cache';
 import mongoose from 'mongoose';
 import SongDetailModel from '@/domains/catalog/song.schema';
 import { withApi, ok } from '@/shared/api/handler';
@@ -30,6 +31,7 @@ export const PUT = withApi({ auth: Permission.SONGS_EDIT }, async ({ req, params
       lean: true,
     });
     if (!song) throw new NotFoundError('곡을 찾을 수 없습니다.');
+    revalidatePath('/songbook');
     return ok({ song });
   } catch (error) {
     if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
@@ -39,7 +41,7 @@ export const PUT = withApi({ auth: Permission.SONGS_EDIT }, async ({ req, params
   }
 });
 
-export const DELETE = withApi({ auth: Permission.SONGS_EDIT }, async ({ params }) => {
+export const DELETE = withApi({ auth: Permission.SONGS_DELETE }, async ({ params }) => {
   assertValidId(params.id);
 
   const deleted = await SongDetailModel.findByIdAndDelete(params.id);

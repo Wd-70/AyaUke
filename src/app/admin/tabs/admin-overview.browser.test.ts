@@ -20,10 +20,13 @@ describe("admin overview and people UI", () => {
       plugins: [
         {
           name: "admin-review-fixture",
+          enforce: "pre",
           resolveId(id) {
+            if (id === "next-auth/react") return "\0auth-mock";
             if (id === "admin-fixture") return "\0admin-fixture.tsx";
           },
           load(id) {
+            if (id === "\0auth-mock") return "export const useSession = () => ({data:{user:globalThis.__adminActor}});";
             if (id === "\0admin-fixture.tsx")
               return `import React from 'react';import {createRoot} from 'react-dom/client';import Dashboard from '${path.resolve("src/app/admin/tabs/DashboardTab.tsx").replaceAll("\\", "/")}';import Users from '${path.resolve("src/app/admin/tabs/UserManagementTab.tsx").replaceAll("\\", "/")}';function App(){const [tab,setTab]=React.useState('dashboard');return <main style={{padding:16,maxWidth:1440,margin:'auto'}}><button onClick={()=>setTab('users')}>사용자 화면</button><button onClick={()=>setTab('dashboard')}>대시보드 화면</button>{tab==='users'?<Users/>:<Dashboard onNavigate={setTab}/>}</main>}createRoot(document.getElementById('root')).render(<App/>);`;
           },
@@ -65,7 +68,7 @@ describe("admin overview and people UI", () => {
   afterAll(async () => {
     await browser?.close();
   });
-  async function fixture(width = 390, dark = false) {
+  async function fixture(width = 390, dark = false, root = true) {
     const page = await browser.newPage({
       viewport: { width, height: 900 },
       reducedMotion: "reduce",
@@ -158,16 +161,16 @@ describe("admin overview and people UI", () => {
       channelNameHistory: [],
       preferences: { theme: "system", defaultPlaylistView: "grid" },
     };
-    const control = { queries: [] as string[], writes: 0, fail: false };
+    const control = { queries: [] as string[], writes: 0, fail: false, lastWrite: {} as Record<string, unknown> };
     await page.route("**/*", async (route) => {
       const url = new URL(route.request().url());
       if (url.hostname !== "admin.test") return route.abort();
       if (url.pathname === "/")
         return route.fulfill({
           contentType: "text/html; charset=utf-8",
-          body: `<html ${dark ? 'class="dark"' : ""}><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body style="background:${dark ? "#111827" : "#faf8ff"}"><div id="root"></div><script type="module">${javascript}</script></body></html>`,
+          body: `<html ${dark ? 'class="dark"' : ""}><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body style="background:${dark ? "#111827" : "#faf8ff"}"><div id="root"></div><script>globalThis.__adminActor=${JSON.stringify(root ? {role:"super_admin"} : {role:"user",adminScopes:["users"]})};</script><script type="module">${javascript}</script></body></html>`,
         });
-      if (route.request().method() !== "GET") control.writes++;
+      if (route.request().method() !== "GET") { control.writes++; control.lastWrite = route.request().postDataJSON(); Object.assign(user, control.lastWrite); }
       control.queries.push(url.pathname + url.search);
       if (control.fail)
         return route.fulfill({
@@ -301,7 +304,7 @@ describe("admin overview and people UI", () => {
     const dialog = page.getByRole("dialog", {
       name: "활동 사용자 사용자 상세",
     });
-    await dialog.waitFor();
+    await dialog.waitFor().catch(error => { throw new Error(`${error.message}\nBrowser errors: ${errors.join("; ")}`); });
     await dialog.getByRole("button", { name: "클립·활동 기록" }).click();
     await dialog
       .getByRole("heading", { name: "방문 기록", exact: true })
@@ -329,6 +332,41 @@ describe("admin overview and people UI", () => {
       fullPage: true,
     });
     expect(control.writes).toBe(0);
+    expect(errors).toEqual([]);
+    await page.close();
+  });
+  it("saves multiple scopes and allows complete revocation on mobile", async () => {
+    const { page, control, errors } = await fixture();
+    await page.getByRole("button", { name: "사용자 화면", exact: true }).click();
+    const open = () => page.getByRole("button", { name: "활동 사용자 사용자 상세 보기", exact: true }).click();
+    await open();
+    let dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "편집", exact: true }).click();
+    await dialog.getByRole("checkbox", { name: "노래", exact: true }).check();
+    await dialog.getByRole("checkbox", { name: "클립", exact: true }).check();
+    expect(await dialog.evaluate(e => e.scrollWidth <= e.clientWidth)).toBe(true);
+    await dialog.getByRole("button", { name: "저장", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    expect(control.lastWrite.adminScopes).toEqual(["songs", "clips"]);
+    expect(control.lastWrite).not.toHaveProperty("role");
+    await open();
+    dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "편집", exact: true }).click();
+    await dialog.getByRole("checkbox", { name: "노래", exact: true }).uncheck();
+    await dialog.getByRole("checkbox", { name: "클립", exact: true }).uncheck();
+    await dialog.getByRole("button", { name: "저장", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    expect(control.lastWrite.adminScopes).toEqual([]);
+    expect(errors).toEqual([]);
+    await page.close();
+  });
+  it("hides permission assignment from delegated user managers", async () => {
+    const { page, errors } = await fixture(1440, false, false);
+    await page.getByRole("button", { name: "사용자 화면", exact: true }).click();
+    await page.getByRole("button", { name: "활동 사용자 사용자 상세 보기", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "편집", exact: true }).click();
+    expect(await dialog.getByRole("checkbox").count()).toBe(0);
     expect(errors).toEqual([]);
     await page.close();
   });

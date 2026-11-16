@@ -1,5 +1,7 @@
 "use client";
 
+import { useSession } from "next-auth/react";
+import { isSuperAdmin } from "@/lib/permissions";
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
@@ -39,12 +41,13 @@ function formatBackupName(name: string): string {
 }
 
 /**
- * 데이터 유지보수 탭 (super_admin 전용).
+ * 데이터 유지보수 탭 (시스템 권한, DB 복원은 최고 관리자 전용).
  * - 백업 내보내기: 전체 DB를 JSON 파일로 스트리밍 다운로드 (DB에 저장하지 않음)
  * - 재계산: 비정규화 카운트(likeCount, sungCount)를 실측치로 보정
  * - 컬렉션 현황: 읽기 전용 요약
  */
 export default function MaintenanceTab() {
+  const { data: session } = useSession();
   const { showSuccess, showError } = useToast();
   const [collections, setCollections] = useState<CollectionInfo[]>([]);
   const [collectionsLoading, setCollectionsLoading] = useState(true);
@@ -349,9 +352,9 @@ export default function MaintenanceTab() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       onClick={() => restoreBackup(b.name)}
-                      disabled={busyBackup !== null}
+                      disabled={busyBackup !== null || !isSuperAdmin(session?.user)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-50 transition-colors"
-                      title="이 백업 시점으로 DB를 복원합니다 (현재 데이터를 덮어씀)"
+                      title="최고 관리자만 DB 복원이 가능합니다 (사용자 권한 포함 전체 덮어쓰기)"
                     >
                       {busyBackup === b.name ? (
                         <div className="w-4 h-4 border-2 border-amber-400/40 border-t-amber-500 rounded-full animate-spin" />

@@ -231,7 +231,7 @@ async function saveCommentWithReplies(commentThread: any, videoId: string) {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !hasPermission(session.user.role as UserRole, Permission.SONGS_VIEW)) {
+    if (!session || !hasPermission(session.user, Permission.CLIPS_MANAGE)) {
       return NextResponse.json(
         { success: false, error: '권한이 필요합니다.' },
         { status: 403 }
@@ -406,7 +406,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !hasPermission(session.user.role as UserRole, Permission.SONGS_EDIT)) {
+    if (!session || !hasPermission(session.user, Permission.CLIPS_MANAGE)) {
       return NextResponse.json(
         { success: false, error: '편집 권한이 필요합니다.' },
         { status: 403 }

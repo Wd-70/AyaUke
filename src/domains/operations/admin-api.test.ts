@@ -34,6 +34,18 @@ beforeEach(() => {
 const session = (role: string) =>
   vi.mocked(getServerSession).mockResolvedValue({ user: { role } } as never);
 describe("admin API access and input validation", () => {
+  it("allows delegated users scope without leaking identities to clip-only admins", async () => {
+    vi.mocked(getServerSession).mockResolvedValue({ user: { role: "user", adminScopes: ["users"] } } as never);
+    vi.mocked(listAdminUsers).mockResolvedValue({} as never);
+    expect((await users(request("/users?role=clips"))).status).toBe(200);
+    vi.mocked(getAdminOverview).mockResolvedValue({} as never);
+    expect((await dashboard(request("/dashboard"))).status).toBe(200);
+    expect(getAdminOverview).toHaveBeenLastCalledWith(true, {}, false);
+    vi.mocked(getServerSession).mockResolvedValue({ user: { role: "user", adminScopes: ["clips"] } } as never);
+    expect((await users(request("/users"))).status).toBe(403);
+    expect((await dashboard(request("/dashboard"))).status).toBe(200);
+    expect(getAdminOverview).toHaveBeenLastCalledWith(false, {}, true);
+  });
   it("blocks unauthenticated requests before any data query", async () => {
     vi.mocked(getServerSession).mockResolvedValue(null);
     expect((await dashboard(request("/dashboard"))).status).toBe(403);
@@ -47,7 +59,7 @@ describe("admin API access and input validation", () => {
     session("song_editor");
     vi.mocked(getAdminOverview).mockResolvedValue({} as never);
     expect((await dashboard(request("/dashboard"))).status).toBe(200);
-    expect(getAdminOverview).toHaveBeenCalledWith(false, {});
+    expect(getAdminOverview).toHaveBeenCalledWith(false, {}, false);
     expect((await users(request("/users"))).status).toBe(403);
     expect((await activity(request("/activity"), context)).status).toBe(403);
   });
@@ -77,6 +89,7 @@ describe("admin API access and input validation", () => {
     expect(getAdminOverview).toHaveBeenCalledWith(
       true,
       expect.objectContaining({ start: expect.any(Date) }),
+      true,
     );
   });
   it("defaults users to full-history activity ordering and returns 404 for missing detail", async () => {

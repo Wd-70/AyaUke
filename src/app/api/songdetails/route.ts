@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import SongDetailModel from '@/domains/catalog/song.schema';
 import { withApi, ok } from '@/shared/api/handler';
-import { Permission } from '@/lib/permissions';
-import { ConflictError } from '@/shared/api/errors';
+import { Permission, canManageSongs, canManageClips } from '@/lib/permissions';
+import { ConflictError, ForbiddenError } from '@/shared/api/errors';
 
 const ListQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -10,7 +10,8 @@ const ListQuery = z.object({
   search: z.string().default(''),
 });
 
-export const GET = withApi({ schema: ListQuery, auth: Permission.SONGS_VIEW }, async ({ input }) => {
+export const GET = withApi({ schema: ListQuery, auth: 'user' }, async ({ input, session }) => {
+  if (!canManageSongs(session?.user) && !canManageClips(session?.user)) throw new ForbiddenError();
   const query: Record<string, unknown> = {};
   if (input.search) {
     const regex = { $regex: input.search, $options: 'i' };

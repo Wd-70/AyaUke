@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useSession } from 'next-auth/react'
+import { ADMIN_SCOPES, ADMIN_SCOPE_LABELS, getAdminScopes, isSuperAdmin, type AdminScope } from '@/lib/permissions'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import UserActivityDetails from './UserActivityDetails'
 import { usePortalHost, useWorkflowOverlay } from '@/app/admin/tabs/clip-workflow/WorkflowWorkspace'
@@ -150,6 +152,10 @@ const titleTemplates = [
 ]
 
 export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }: UserDetailModalProps) {
+  const { data: actorSession } = useSession()
+  const mayEdit = !isSuperAdmin(user) || isSuperAdmin(actorSession?.user)
+  const mayGrant = isSuperAdmin(actorSession?.user) && !isSuperAdmin(user)
+  const [scopes, setScopes] = useState<AdminScope[]>([...getAdminScopes(user)])
   const [isEditing, setIsEditing] = useState(false)
   const [editForm, setEditForm] = useState({
     role: user.role,
@@ -202,6 +208,7 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
 
   useEffect(() => {
     if (isOpen) {
+      setIsEditing(false)
       setEditForm({
         role: user.role,
         displayName: user.displayName || '',
@@ -216,6 +223,7 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
         condition: '',
         rarity: 'common'
       })
+      setScopes([...getAdminScopes(user)])
       setActiveTab('info')
       
       // 상세 정보 가져오기
@@ -235,7 +243,7 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify({ displayName: editForm.displayName, profileImageUrl: editForm.profileImageUrl, ...(mayGrant && ADMIN_SCOPES.some(scope => scopes.includes(scope) !== getAdminScopes(user).includes(scope)) ? { adminScopes: scopes } : {}) }),
       })
 
       const data = await response.json()
@@ -558,25 +566,23 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
                       <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
                         권한
                       </label>
-                      {isEditing ? (
-                        <select
-                          value={editForm.role}
-                          onChange={(e) => setEditForm({ ...editForm, role: e.target.value as UserRoleValue })}
-                          className="w-full px-3 py-2 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 
-                                     bg-white/50 dark:bg-gray-900/50 text-light-text dark:text-dark-text
-                                     focus:outline-none focus:ring-2 focus:ring-light-accent dark:focus:ring-dark-accent"
-                        >
-                          <option value="user">일반 사용자</option>
-                          <option value="song_editor">노래 편집자</option>
-                          <option value="song_admin">노래 관리자</option>
-                          <option value="ayauke_admin">아야우케 관리자</option>
-                          <option value="super_admin">최고 관리자</option>
-                        </select>
+                      {isEditing && mayGrant ? (
+                        <fieldset className="grid grid-cols-2 gap-2">
+                          <legend className="sr-only">관리 권한 복수 선택</legend>
+                          <p className="col-span-2 text-xs opacity-70">여러 권한을 함께 선택할 수 있습니다. 모두 해제하면 관리 메뉴 접근이 차단됩니다.</p>
+                          {ADMIN_SCOPES.map(scope => (
+                            <label key={scope} className="flex min-h-11 items-center gap-2 rounded-lg border p-3 text-sm">
+                              <input type="checkbox" checked={scopes.includes(scope)}
+                                onChange={e => setScopes(current => e.target.checked ? [...current, scope] : current.filter(v => v !== scope))} />
+                              {ADMIN_SCOPE_LABELS[scope]}
+                            </label>
+                          ))}
+                        </fieldset>
                       ) : (
                         <div className="flex items-center gap-2">
                           <RoleIcon className="w-5 h-5" />
                           <span className={`px-3 py-1 rounded-full text-sm font-medium ${roleColors[user.role as keyof typeof roleColors]}`}>
-                            {roleLabels[user.role as keyof typeof roleLabels]}
+                            {isSuperAdmin(user) ? '최고 관리자 · 모든 권한' : getAdminScopes(user).map(s => ADMIN_SCOPE_LABELS[s]).join(' · ') || '관리 권한 없음'}
                           </span>
                         </div>
                       )}
@@ -1032,7 +1038,8 @@ export default function UserDetailModal({ user, isOpen, onClose, onUserUpdate }:
                 </>
               ) : (
                 <button
-                  onClick={() => setIsEditing(true)}
+                  disabled={!mayEdit}
+                  onClick={() => { setScopes([...getAdminScopes(user)]); setIsEditing(true) }}
                   className="px-4 py-2 bg-light-accent dark:bg-dark-accent text-white rounded-lg 
                              hover:bg-light-accent/90 dark:hover:bg-dark-accent/90 transition-colors"
                 >

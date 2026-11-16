@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { withApi, ok } from '@/shared/api/handler';
 import { AppError, ForbiddenError, NotFoundError } from '@/shared/api/errors';
-import { canManageSongs, type UserRole } from '@/lib/permissions';
+import { canManageClips, type UserRole } from '@/lib/permissions';
 import * as ranges from '@/domains/archive/clip-range.service';
 
 export const dynamic = 'force-dynamic';
@@ -48,7 +48,7 @@ export const POST = withApi({ schema: Body, auth: 'user' }, async ({ input, para
     case 'vote': await ranges.evaluate(id, userId, input.proposalId, input.start, input.end); break;
     case 'withdraw': await ranges.withdraw(id, userId, input.proposalId); break;
     case 'publish':
-      if (!canManageSongs(session!.user.role as UserRole)) throw new ForbiddenError();
+      if (!canManageClips(session!.user)) throw new ForbiddenError();
       result = { clip: await ranges.publishOfficial(id, userId, input.sourceVersion, input.baseVersion, input.range, input.proposalId) };
       break;
   }

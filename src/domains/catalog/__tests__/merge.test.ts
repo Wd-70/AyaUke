@@ -37,6 +37,15 @@ describe('normalizeTitle / createSongKey', () => {
 });
 
 describe('mergeSongsData', () => {
+  test('representative MR index and order survive both sheet merge and DB-only mapping', () => {
+    const mrLinks = [{ url: 'https://example.test/not-youtube' }, { url: 'https://youtu.be/abcdefghijk' }];
+    const data = detail({ title: 'Song', artist: 'Artist', mrLinks, selectedMRIndex: 1 });
+    for (const sheets of [[], [sheetSong('s1', 'Song', 'Artist')]]) {
+      const [song] = mergeSongsData(sheets, [data], new Set());
+      expect(song.selectedMRIndex).toBe(1);
+      expect(song.mrLinks?.[song.selectedMRIndex!].url).toBe(mrLinks[1].url);
+    }
+  });
   test('시트 전용 곡은 source=sheet로 유지된다', () => {
     const result = mergeSongsData([sheetSong('s1', '하입보이', '뉴진스')], [], new Set());
 

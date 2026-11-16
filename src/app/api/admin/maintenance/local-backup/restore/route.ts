@@ -7,7 +7,7 @@ import { restoreBackup } from '@/domains/operations/local-backup.service';
 
 function assertSuperAdmin(session: Session | null) {
   const role = (session?.user as { role?: string } | undefined)?.role as UserRole | undefined;
-  if (!role || !isSuperAdmin(role)) {
+  if (!role || !isSuperAdmin(session?.user)) {
     throw new ForbiddenError('최고관리자 권한이 필요합니다.');
   }
 }

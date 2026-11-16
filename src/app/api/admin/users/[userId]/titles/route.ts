@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
-import { isSuperAdmin, UserRole } from '@/lib/permissions'
+import { canManageUsers, isSuperAdmin, UserRole } from '@/lib/permissions'
 import { connectDB as connectToDatabase } from '@/shared/db/mongodb'
 import User, { IUser } from '@/models/User'
 // Simple UUID v4 generator
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+    if (!session || !canManageUsers(session.user)) {
       return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
     }
 
@@ -47,6 +47,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!user) {
       return NextResponse.json({ error: '사용자를 찾을 수 없습니다.' }, { status: 404 })
     }
+
+    if (isSuperAdmin(user) && !isSuperAdmin(session.user)) return NextResponse.json({ error: '최고 관리자 계정은 수정할 수 없습니다.' }, { status: 403 })
 
     // 중복 타이틀 확인
     const existingTitle = user.titles?.find(title => title.name === name)
@@ -85,7 +87,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+    if (!session || !canManageUsers(session.user)) {
       return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
     }
 
@@ -104,6 +106,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     if (!user) {
       return NextResponse.json({ error: '사용자를 찾을 수 없습니다.' }, { status: 404 })
     }
+
+    if (isSuperAdmin(user) && !isSuperAdmin(session.user)) return NextResponse.json({ error: '최고 관리자 계정은 수정할 수 없습니다.' }, { status: 403 })
 
     // 타이틀 존재 확인
     const titleExists = user.titles?.some(title => title.id === titleId)

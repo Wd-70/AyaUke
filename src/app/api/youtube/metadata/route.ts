@@ -1,3 +1,4 @@
+import { youtubeMRVideoId } from '@/domains/catalog/mr-search';
 import { NextRequest, NextResponse } from 'next/server';
 
 // YouTube 비디오 메타데이터 조회 API
@@ -14,13 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     // YouTube 비디오 ID 추출
-    const extractYouTubeVideoId = (url: string): string | null => {
-      const regex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/;
-      const match = url.match(regex);
-      return match ? match[1] : null;
-    };
-
-    const videoId = extractYouTubeVideoId(videoUrl);
+    const videoId = youtubeMRVideoId(videoUrl);
     if (!videoId) {
       return NextResponse.json(
         { error: '올바른 YouTube URL이 아닙니다.' },
@@ -46,7 +41,7 @@ export async function GET(request: NextRequest) {
     // YouTube Data API 호출
     const youtubeApiUrl = `https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=snippet&key=${apiKey}`;
     
-    const response = await fetch(youtubeApiUrl);
+    const response = await fetch(youtubeApiUrl, { signal: AbortSignal.timeout(10000), next: { revalidate: 3600 } });
     const data = await response.json();
     
     if (!response.ok || !data.items || data.items.length === 0) {

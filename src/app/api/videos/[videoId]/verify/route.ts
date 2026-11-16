@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import { connectDB as connectToDatabase } from '@/shared/db/mongodb';
 import SongVideo from '@/domains/archive/schemas/song-video.schema';
-import { canManageSongs, UserRole } from '@/lib/permissions';
+import { canManageClips, UserRole } from '@/lib/permissions';
 
 // PUT: 영상 검증 (관리자 전용)
 export async function PUT(
@@ -20,7 +20,7 @@ export async function PUT(
     }
 
     // 관리자 권한 확인
-    if (!canManageSongs(session.user.role as UserRole)) {
+    if (!canManageClips(session.user)) {
       return NextResponse.json(
         { error: '관리자 권한이 필요합니다.' },
         { status: 403 }

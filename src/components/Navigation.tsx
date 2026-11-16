@@ -7,7 +7,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { useSession, signOut } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { UserIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
-import { isSuperAdmin, canManageSongs, UserRole } from '@/lib/permissions';
+import { canAccessAdminPanel, canManageSongs, UserRole } from '@/lib/permissions';
 import MobileAppNavigation from '@/components/mobile/MobileAppNavigation';
 import { mobileParent, isRouteWithin } from '@/components/mobile/navigation-model';
 import { ChevronLeftIcon } from '@heroicons/react/24/outline';
@@ -30,12 +30,12 @@ const NAV_LINKS = [
  * (권한 분기 로직을 한 곳에만 두어 양쪽 메뉴가 어긋나지 않게 한다.)
  */
 function adminMenuItems(session: Session | null): { href: string; label: string }[] {
-  if (!session || !canManageSongs(session.user.role as UserRole)) return [];
+  if (!session || !canAccessAdminPanel(session.user)) return [];
   const items: { href: string; label: string }[] = [];
-  if (isSuperAdmin(session.user.role as UserRole)) {
+  if (canAccessAdminPanel(session.user)) {
     items.push({ href: '/admin', label: '관리자 대시보드' });
   }
-  items.push({ href: '/admin/songs', label: '노래 관리' });
+  if (canManageSongs(session.user)) items.push({ href: '/admin?tab=songs', label: '노래 관리' });
   return items;
 }
 

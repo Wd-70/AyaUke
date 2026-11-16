@@ -3,14 +3,14 @@ import { NextResponse } from 'next/server';
 import type { Session } from 'next-auth';
 import { withApi, ok } from '@/shared/api/handler';
 import { ForbiddenError, ValidationError } from '@/shared/api/errors';
-import { canAccessAdminPanel, UserRole } from '@/lib/permissions';
+import { canManageClips, UserRole } from '@/lib/permissions';
 import * as syncService from '@/domains/archive/chzzk-sync.service';
 import { fetchVideoHlsInfo } from '@/domains/archive/chzzk.client';
 
-/** 관리자 역할(any admin) 확인 — 기존 isAdmin 불리언 게이트와 동일한 의미 */
+/** 클립 관리 권한으로 영상 동기화를 제한한다. */
 function assertAdmin(session: Session | null) {
   const role = (session?.user as { role?: string } | undefined)?.role as UserRole | undefined;
-  if (!role || !canAccessAdminPanel(role)) {
+  if (!role || !canManageClips(session?.user)) {
     throw new ForbiddenError('관리자 권한이 필요합니다.');
   }
 }

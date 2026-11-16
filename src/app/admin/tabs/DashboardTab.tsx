@@ -23,8 +23,10 @@ import {
 type Destination = "clip-workflow" | "clips" | "clip-reports" | "users";
 export default function DashboardTab({
   onNavigate,
+  allowedTabs,
 }: {
   onNavigate?: (tab: Destination) => void;
+  allowedTabs?: readonly string[];
 }) {
   const [data, setData] = useState<AdminOverview | null>(null),
     [error, setError] = useState(""),
@@ -64,7 +66,7 @@ export default function DashboardTab({
     return () => controller.abort();
   }, [period, custom, refresh]);
   const go = (tab: Destination, label: string) =>
-    onNavigate ? (
+    onNavigate && (!allowedTabs || allowedTabs.includes(tab)) ? (
       <button
         className={`${adminControl} inline-flex items-center gap-2`}
         onClick={() => onNavigate(tab)}

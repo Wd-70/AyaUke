@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { isSuperAdmin, canAccessAdminPanel, canManageSongs, UserRole } from "@/lib/permissions";
+import { canManageClips, canManageUsers, canManageSystem, canAccessAdminPanel, canManageSongs, PermissionSubject, UserRole } from "@/lib/permissions";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChartBarIcon,
@@ -36,6 +36,7 @@ import DashboardTab from "./tabs/DashboardTab";
 import LiveClipManagementTab from "./tabs/live-clips/LiveClipManagementTab";
 import ClipReportsTab from "./tabs/ClipReportsTab";
 import ChzzkYoutubeConverterTab from "./tabs/ChzzkYoutubeConverterTab";
+import SongManagementTab from "./tabs/songs/SongManagementTab";
 import ClipWorkflowTab from "./tabs/clip-workflow/ClipWorkflowTab";
 
 type TabType =
@@ -51,13 +52,15 @@ type TabType =
   | "maintenance"
   | "system";
 
-/** 탭 접근 레벨: admin=모든 관리자, songs=노래 관리 권한, super=최고관리자 */
-type TabAccess = "admin" | "songs" | "super";
+/** 대시보드는 모든 관리자, 나머지는 각 담당 권한으로 제한한다. */
+type TabAccess = "admin" | "songs" | "clips" | "users" | "system";
 
-const TAB_ACCESS_CHECKS: Record<TabAccess, (role: UserRole) => boolean> = {
+const TAB_ACCESS_CHECKS: Record<TabAccess, (role: PermissionSubject) => boolean> = {
   admin: canAccessAdminPanel,
   songs: canManageSongs,
-  super: isSuperAdmin,
+  clips: canManageClips,
+  users: canManageUsers,
+  system: canManageSystem,
 };
 
 const tabs = [
@@ -73,7 +76,7 @@ const tabs = [
     name: "라이브 클립",
     icon: PlayIcon,
     description: "라이브 클립 조회, 재생, 관리",
-    access: "super" as TabAccess,
+    access: "clips" as TabAccess,
   },
   {
     id: "songs" as const,
@@ -81,71 +84,70 @@ const tabs = [
     icon: MusicalNoteIcon,
     description: "노래 데이터 조회, 편집, 삭제",
     access: "songs" as TabAccess,
-    external: true,
-    externalLink: "/admin/songs",
   },
   {
     id: "clip-reports" as const,
     name: "클립 신고",
     icon: FlagIcon,
     description: "사용자 클립 신고 검토 및 처리",
-    access: "songs" as TabAccess,
+    access: "clips" as TabAccess,
   },
   {
     id: "clip-workflow" as const,
     name: "클립 만들기",
     icon: PlayIcon,
     description: "치지직/유튜브 댓글 → 클립 생성 (통합)",
-    access: "super" as TabAccess,
+    access: "clips" as TabAccess,
   },
   {
     id: "timeline" as const,
     name: "타임라인 파싱",
     icon: AdjustmentsHorizontalIcon,
     description: "YouTube 댓글 수집 및 타임라인 분석 (레거시)",
-    access: "super" as TabAccess,
+    access: "clips" as TabAccess,
   },
   {
     id: "comments" as const,
     name: "댓글 분석",
     icon: ChatBubbleBottomCenterTextIcon,
     description: "댓글 분석 도구",
-    access: "super" as TabAccess,
+    access: "clips" as TabAccess,
   },
   {
     id: "converter" as const,
     name: "치지직→유튜브",
     icon: AdjustmentsHorizontalIcon,
     description: "타임라인 댓글 변환",
-    access: "super" as TabAccess,
+    access: "clips" as TabAccess,
   },
   {
     id: "users" as const,
     name: "사용자 관리",
     icon: UsersIcon,
     description: "사용자 권한 및 활동 관리",
-    access: "super" as TabAccess,
+    access: "users" as TabAccess,
   },
   {
     id: "maintenance" as const,
     name: "데이터 유지보수",
     icon: ServerIcon,
     description: "백업 내보내기, 재계산, 컬렉션 현황",
-    access: "super" as TabAccess,
+    access: "system" as TabAccess,
   },
   {
     id: "system" as const,
     name: "시스템 설정",
     icon: ServerIcon,
     description: "시스템 설정 및 모니터링",
-    access: "super" as TabAccess,
+    access: "system" as TabAccess,
   },
 ];
 
-export default function AdminClient() {
+export default function AdminClient({ initialTab = "dashboard" }: { initialTab?: TabType }) {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>("dashboard");
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+  useEffect(() => { setActiveTab(initialTab); }, [initialTab]);
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -166,7 +168,7 @@ export default function AdminClient() {
       return;
     }
 
-    if (!canAccessAdminPanel(session.user.role as UserRole)) {
+    if (!canAccessAdminPanel(session.user)) {
       router.push("/");
       return;
     }
@@ -180,12 +182,12 @@ export default function AdminClient() {
     );
   }
 
-  if (!session || !canAccessAdminPanel(session.user.role as UserRole)) {
+  if (!session || !canAccessAdminPanel(session.user)) {
     return null;
   }
 
   // 보유 권한에 따라 노출할 탭 필터링
-  const role = session.user.role as UserRole;
+  const role = session.user;
   const visibleTabs = tabs.filter((tab) => TAB_ACCESS_CHECKS[tab.access](role));
 
   // 현재 활성 탭이 권한 밖이면 첫 번째 가시 탭으로 이동
@@ -195,8 +197,10 @@ export default function AdminClient() {
   const renderTabContent = () => {
     switch (effectiveActiveTab) {
       case "dashboard":
-        return <DashboardTab onNavigate={setActiveTab} />;
+        return <DashboardTab onNavigate={setActiveTab} allowedTabs={visibleTabs.map(tab => tab.id)} />;
 
+      case "songs":
+        return <SongManagementTab />;
       case "clips":
         return <LiveClipManagementTab />;
       case "clip-reports":
@@ -417,7 +421,7 @@ export default function AdminClient() {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <AnimatePresence mode="wait">
               <motion.div
                 key={effectiveActiveTab}

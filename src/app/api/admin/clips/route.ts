@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import type { Session } from 'next-auth'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/authOptions'
-import { isSuperAdmin, UserRole } from '@/lib/permissions'
+import { canManageClips, UserRole } from '@/lib/permissions'
 import { connectDB as connectToDatabase } from '@/shared/db/mongodb'
 import { withApi, ok } from '@/shared/api/handler'
 import { ForbiddenError } from '@/shared/api/errors'
@@ -11,10 +11,10 @@ import SongVideo from '@/domains/archive/schemas/song-video.schema'
 import { parseVideoUrl } from '@/shared/utils/video-url'
 import * as clipService from '@/domains/archive/clip.service'
 
-function assertSuperAdmin(session: Session | null) {
+function assertClipsAdmin(session: Session | null) {
   const role = (session?.user as { role?: string } | undefined)?.role as UserRole | undefined
-  if (!role || !isSuperAdmin(role)) {
-    throw new ForbiddenError('최고관리자 권한이 필요합니다.')
+  if (!role || !canManageClips(session?.user)) {
+    throw new ForbiddenError('클립 관리 권한이 필요합니다.')
   }
 }
 
@@ -34,7 +34,7 @@ const GetQuery = z.object({
 })
 
 export const GET = withApi({ schema: GetQuery, auth: 'user' }, async ({ input, session }) => {
-  assertSuperAdmin(session)
+  assertClipsAdmin(session)
 
   // 레거시 호환: 업로드 중복검사용 전체 클립 (성공 형태 유지)
   if (input.getAllForDuplicateCheck) {
@@ -87,7 +87,7 @@ export const GET = withApi({ schema: GetQuery, auth: 'user' }, async ({ input, s
 export async function PATCH(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+    if (!session || !canManageClips(session.user)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -203,7 +203,7 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !isSuperAdmin(session.user.role as UserRole)) {
+    if (!session || !canManageClips(session.user)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

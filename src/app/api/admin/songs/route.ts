@@ -28,7 +28,7 @@ const ACTION_PERMISSIONS: Record<z.infer<typeof ActionBody>['action'], Permissio
 
 export const POST = withApi({ schema: ActionBody, auth: 'user' }, async ({ input, session }) => {
   const role = (session!.user as { role?: string }).role as UserRole;
-  if (!hasPermission(role, ACTION_PERMISSIONS[input.action])) {
+  if (!hasPermission(session!.user, ACTION_PERMISSIONS[input.action])) {
     throw new ForbiddenError('해당 작업에 대한 권한이 없습니다.');
   }
 

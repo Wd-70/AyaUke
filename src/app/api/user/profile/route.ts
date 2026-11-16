@@ -92,7 +92,7 @@ export async function PATCH(request: NextRequest) {
         channelName: updatedUser.channelName,
         displayName: updatedUser.displayName,
         profileImageUrl: updatedUser.profileImageUrl,
-        isAdmin: roleToIsAdmin(updatedUser.role as UserRole),
+        isAdmin: roleToIsAdmin(updatedUser),
         lastLoginAt: updatedUser.lastLoginAt,
         preferences: updatedUser.preferences
       }
@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
         channelName: user.channelName,
         displayName: user.displayName,
         profileImageUrl: user.profileImageUrl,
-        isAdmin: roleToIsAdmin(user.role as UserRole),
+        isAdmin: roleToIsAdmin(user),
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
         preferences: user.preferences

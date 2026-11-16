@@ -6,7 +6,7 @@ import SongVideo from '@/domains/archive/schemas/song-video.schema';
 import SongDetail from '@/domains/catalog/song.schema';
 import { parseVideoUrl } from '@/shared/utils/video-url';
 import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
-import { roleToIsAdmin } from '@/lib/permissions';
+import { canManageClips } from '@/lib/permissions';
 
 interface BulkClipData {
   songId: string;
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 관리자 권한 확인
-    const isAdmin = roleToIsAdmin(session.user.role);
+    const isAdmin = canManageClips(session.user);
     if (!isAdmin) {
       return NextResponse.json(
         { error: '관리자 권한이 필요합니다.' },

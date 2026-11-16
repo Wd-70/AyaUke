@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
-import { canAccessAdminPanel, UserRole } from '@/lib/permissions';
+import { canManageClips, UserRole } from '@/lib/permissions';
 import Navigation from '@/components/Navigation';
 import YtClipBuilderClient from './YtClipBuilderClient';
 
@@ -12,7 +12,7 @@ import YtClipBuilderClient from './YtClipBuilderClient';
 export default async function YtClipBuilderPage() {
   const session = await getServerSession(authOptions);
   if (!session) redirect('/auth/signin');
-  if (!canAccessAdminPanel(session.user.role as UserRole)) redirect('/');
+  if (!canManageClips(session.user)) redirect('/');
 
   return (
     <div className="min-h-screen bg-light-background dark:bg-dark-background">

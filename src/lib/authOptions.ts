@@ -10,40 +10,11 @@ import UserActivity from '@/models/UserActivity'
 import ChzzkProvider from '@/lib/chzzkOAuthProvider'
 import { getSelectedTitleInfo } from '@/lib/titleSystem'
 
-// 사용자 정보 메모리 캐시 (5분간 유효)
-const userCache = new Map<string, { data: any, timestamp: number }>()
-const CACHE_DURATION = 5 * 60 * 1000 // 5분
-
-// 캐시된 사용자 정보 조회
-async function getCachedUser(channelId: string) {
-  const now = Date.now()
-  const cached = userCache.get(channelId)
-  
-  // 캐시가 있고 아직 유효하면 캐시 사용
-  if (cached && (now - cached.timestamp) < CACHE_DURATION) {
-    return cached.data
-  }
-  
-  // 캐시가 없거나 만료되었으면 DB 조회
-  try {
-    await dbConnect()
-    const user = await User.findOne({ channelId })
-    
-    // 조회 결과를 캐시에 저장
-    userCache.set(channelId, {
-      data: user,
-      timestamp: now
-    })
-    
-    return user
-  } catch (error) {
-    // DB 조회 실패 시 만료된 캐시라도 있으면 사용
-    if (cached) {
-      console.log('DB 조회 실패, 만료된 캐시 사용:', channelId)
-      return cached.data
-    }
-    throw error
-  }
+// Authorization must be refreshed from DB on every session evaluation; never use stale grants.
+async function getCurrentUser(channelId: string) {
+  if (!channelId || typeof channelId !== "string") return null;
+  await dbConnect();
+  return User.findOne({ channelId });
 }
 
 export const authOptions = {
@@ -200,8 +171,9 @@ export const authOptions = {
         session.user.channelId = token.channelId as string
         session.user.userId = token.userId as string // MongoDB ObjectId 추가
         session.user.followerCount = token.followerCount as number
-        session.user.role = token.role as string
-        session.user.isAdmin = token.isAdmin as boolean
+        session.user.role = "user"
+        session.user.adminScopes = []
+        session.user.isAdmin = false
         session.user.adminRole = token.adminRole as string
         
         // 기본 세션 정보 먼저 설정 (토큰 기반)
@@ -209,9 +181,9 @@ export const authOptions = {
         session.user.name = token.channelName as string
         session.user.channelImageUrl = token.channelImageUrl as string
         
-        // 캐시된 사용자 정보 가져오기 (선택적 업데이트)
+        // 권한은 매 요청 DB에서 확인한다.
         try {
-          const user = await getCachedUser(token.channelId as string)
+          const user = await getCurrentUser(token.channelId as string)
           
           if (user) {
             // DB에서 가져온 정보로 업데이트 (기존 정보 덮어씀)
@@ -219,8 +191,9 @@ export const authOptions = {
             session.user.name = user.displayName || user.channelName
             session.user.image = user.profileImageUrl || session.user.channelImageUrl
             session.user.channelImageUrl = user.profileImageUrl || session.user.channelImageUrl
+            session.user.adminScopes = user.adminScopes
             session.user.role = user.role // DB에서 가져온 최신 권한 사용
-            session.user.isAdmin = roleToIsAdmin(user.role as any)
+            session.user.isAdmin = roleToIsAdmin(user)
             
             // 선택된 칭호 정보 추가
             const selectedTitle = getSelectedTitleInfo(user)
@@ -229,7 +202,7 @@ export const authOptions = {
           // DB에 사용자가 없으면 기본 정보 그대로 사용
         } catch (error) {
           console.error('세션 콜백에서 사용자 정보 조회 오류:', error)
-          // DB 연결 실패 시 기본 정보(토큰 기반) 그대로 사용
+          // DB 연결 실패 시 관리 권한 없는 기본 상태 유지
           // 별도 처리 불필요 - 이미 위에서 기본값 설정됨
         }
       }

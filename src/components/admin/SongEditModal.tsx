@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import MRVideoPreview from '@/components/MRVideoPreview';
 import { PencilIcon, PlusIcon, StarIcon, TrashIcon } from '@heroicons/react/24/outline'
+import MRSearchPicker from '../MRSearchPicker'
+import { addMRCandidate, compactMRLinks, removeMRLink as removeMRItem } from '@/domains/catalog/mr-search'
 import type { AdminSong, MRLink } from './song-admin-types'
 
 interface SongEditModalProps {
@@ -46,7 +49,6 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
     imageUrl: song?.imageUrl || ''
   })
   const [currentTag, setCurrentTag] = useState('')
-  const [isSearchingMR, setIsSearchingMR] = useState(false)
 
   // 배경 스크롤 방지 (노래책과 동일한 방식)
   useEffect(() => {
@@ -99,12 +101,7 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
 
   const removeMRLink = (index: number) => {
     if (formData.mrLinks.length > 1) {
-      const newLinks = formData.mrLinks.filter((_, i) => i !== index)
-      setFormData(prev => ({
-        ...prev,
-        mrLinks: newLinks,
-        selectedMRIndex: Math.min(prev.selectedMRIndex, newLinks.length - 1)
-      }))
+      setFormData(current => ({ ...current, ...removeMRItem(current.mrLinks, current.selectedMRIndex, index) }))
     }
   }
 
@@ -125,54 +122,6 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
     }))
   }
 
-  // YouTube에서 MR 링크 자동 검색
-  const searchMRFromYouTube = async () => {
-    if (!formData.title.trim() || !formData.artist.trim()) {
-      alert('곡 제목과 아티스트를 먼저 입력해주세요.')
-      return
-    }
-
-    setIsSearchingMR(true)
-    try {
-      const response = await fetch('/api/youtube-search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          title: formData.title.trim(), 
-          artist: formData.artist.trim() 
-        })
-      })
-
-      const result = await response.json()
-      if (result.success && result.selectedResult) {
-        const mrResult = result.selectedResult
-        // 새로운 MR 링크를 목록에 추가
-        setFormData(prev => ({
-          ...prev,
-          mrLinks: [...prev.mrLinks, {
-            url: mrResult.url,
-            skipSeconds: 0,
-            label: `Auto: ${mrResult.title.substring(0, 25)}...`,
-            duration: ''
-          }]
-        }))
-        alert(`MR 링크를 찾았습니다!\n제목: ${mrResult.title}`)
-        
-        // API 키 상태 로깅
-        if (result.keyStats) {
-          console.log(`🔑 API 키 상태: ${result.keyStats.availableKeys}/${result.keyStats.totalKeys} 사용 가능`)
-        }
-      } else {
-        alert(result.error || '검색 결과를 찾을 수 없습니다.')
-      }
-    } catch (error) {
-      console.error('MR 검색 오류:', error)
-      alert('MR 검색 중 오류가 발생했습니다.')
-    } finally {
-      setIsSearchingMR(false)
-    }
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -190,9 +139,9 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
           language: formData.language,
           keyAdjustment: formData.keyAdjustment === '999' ? null : parseInt(formData.keyAdjustment),
           lyrics: formData.lyrics.trim() || undefined,
-          mrLinks: formData.mrLinks.filter(link => link.url.trim()),
+          ...compactMRLinks(formData.mrLinks, formData.selectedMRIndex),
           tags: formData.tags,
-          selectedMRIndex: formData.selectedMRIndex,
+
           imageUrl: formData.imageUrl.trim() || undefined,
         },
         true,
@@ -228,14 +177,14 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
       updateData.lyrics = formData.lyrics.trim()
     }
     
-    const newMrLinks = formData.mrLinks.filter(link => link.url.trim())
+    const { mrLinks: newMrLinks, selectedMRIndex: savedIndex } = compactMRLinks(formData.mrLinks, formData.selectedMRIndex)
     const currentMrLinks = song.mrLinks || []
     if (JSON.stringify(newMrLinks) !== JSON.stringify(currentMrLinks)) {
       updateData.mrLinks = newMrLinks
     }
     
-    if (formData.selectedMRIndex !== (song.selectedMRIndex || 0)) {
-      updateData.selectedMRIndex = formData.selectedMRIndex
+    if (savedIndex !== (song.selectedMRIndex || 0)) {
+      updateData.selectedMRIndex = savedIndex
     }
     
     const newTags = formData.tags
@@ -513,23 +462,6 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={searchMRFromYouTube}
-                  disabled={isSearchingMR}
-                  className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white rounded-lg transition-all duration-200 text-sm flex items-center gap-1"
-                >
-                  {isSearchingMR ? (
-                    <>
-                      <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                      검색중...
-                    </>
-                  ) : (
-                    <>
-                      🔍 자동 검색
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
                   onClick={addMRLink}
                   className="px-3 py-1 bg-light-accent dark:bg-dark-accent text-white rounded-lg hover:opacity-90 transition-opacity text-sm"
                 >
@@ -538,6 +470,7 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
                 </button>
               </div>
             </div>
+            <MRSearchPicker title={formData.title} artist={formData.artist} language={formData.language} links={formData.mrLinks} disabled={loading} onSelect={candidate => setFormData(current => ({ ...current, mrLinks: addMRCandidate(current.mrLinks, candidate) }))} />
             <div className="space-y-3">
               {formData.mrLinks.map((link, index) => (
                 <div key={index} className="p-4 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg border border-light-primary/20 dark:border-dark-primary/20">
@@ -573,6 +506,7 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
                       </button>
                     )}
                   </div>
+          <MRVideoPreview url={link.url} />
                   
                   <div className="space-y-3">
                     <div>
@@ -588,7 +522,7 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
                       />
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">스킵 시간 (초)</label>
                         <input
@@ -611,18 +545,6 @@ export default function SongEditModal({ song, onClose, onSubmit, loading }: Song
                                    bg-white dark:bg-gray-800 text-light-text dark:text-dark-text text-sm
                                    focus:border-light-accent dark:focus:border-dark-accent outline-none"
                           placeholder="예: 남성키"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">길이</label>
-                        <input
-                          type="text"
-                          value={link.duration || ''}
-                          onChange={(e) => updateMRLink(index, 'duration', e.target.value)}
-                          className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                                   bg-white dark:bg-gray-800 text-light-text dark:text-dark-text text-sm
-                                   focus:border-light-accent dark:focus:border-dark-accent outline-none"
-                          placeholder="예: 3:45"
                         />
                       </div>
                     </div>

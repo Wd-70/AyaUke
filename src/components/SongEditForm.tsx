@@ -1,675 +1,92 @@
 'use client';
-
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { Song } from '@/types';
-import { StarIcon, TrashIcon, PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import type { Song } from '@/types';
+import { SongFields, emptySongFields, SONG_LANGUAGES, type SongFieldsValue } from '@/domains/catalog/song-workspace';
+import { compactMRLinks } from '@/domains/catalog/mr-search';
+import SongEditorFields from './song-editor/SongEditorFields';
+import { Notice, primary, secondary, muted } from './song-editor/SongEditorUI';
 import { useToast } from './Toast';
 
-interface SongEditFormProps {
-  song: Song;
-  isVisible: boolean;
-  onSave: (updatedSong: Song) => void;
-  onCancel: () => void;
-  onLyricsChange?: (lyrics: string) => void; // 왼쪽 가사 패널과 동기화용
-  initialLyrics?: string; // 왼쪽 패널의 현재 가사 텍스트
+export interface SongEditFormHandle { requestCancel: () => void }
+interface Props {
+  song: Song; isVisible: boolean;
+  onSave: (song: Song) => void; onCancel: () => void;
 }
-
-interface EditData {
-  title: string;
-  artist: string;
-  titleAlias: string;
-  artistAlias: string;
-  lyrics: string;
-  personalNotes: string;
-  imageUrl: string;
-  keyAdjustment: number | null;
-  language: string;
-  searchTags: string[];
-  mrLinks: Array<{
-    url: string;
-    skipSeconds?: number;
-    label?: string;
-    duration?: string;
-  }>;
-  selectedMRIndex: number;
+const sections = [{ id: 'info', label: '기본 정보' }, { id: 'mr', label: 'MR · 재생' }, { id: 'lyrics', label: '가사 · 메모' }] as const;
+type Section = typeof sections[number]['id'];
+function initialValues(song: Song): SongFieldsValue {
+  return { ...emptySongFields(), titleAlias: song.titleAlias || '', artistAlias: song.artistAlias || '',
+    language: SONG_LANGUAGES.includes(song.language as typeof SONG_LANGUAGES[number]) ? song.language as SongFieldsValue['language'] : '',
+    lyrics: song.lyrics || '', personalNotes: song.personalNotes || '', imageUrl: song.imageUrl || '',
+    searchTags: [...(song.searchTags || [])], keyAdjustment: song.keyAdjustment ?? null,
+    mrLinks: (song.mrLinks || []).map(link => ({ url: link.url, skipSeconds: link.skipSeconds || 0, label: link.label || '', duration: link.duration || '' })),
+    selectedMRIndex: song.selectedMRIndex || 0 };
 }
-
-export default function SongEditForm({ song, isVisible, onSave, onCancel, onLyricsChange, initialLyrics }: SongEditFormProps) {
-  const { showSuccess, showError } = useToast();
-  const [editData, setEditData] = useState<EditData>({
-    title: '',
-    artist: '',
-    titleAlias: '',
-    artistAlias: '',
-    lyrics: '',
-    personalNotes: '',
-    imageUrl: '',
-    keyAdjustment: null,
-    language: '',
-    searchTags: [],
-    mrLinks: [],
-    selectedMRIndex: 0,
-  });
-  const [isSaving, setIsSaving] = useState(false);
-  const [newTag, setNewTag] = useState('');
-  const [keyAdjustmentWidth, setKeyAdjustmentWidth] = useState(0);
-  const keyAdjustmentRef = useRef<HTMLDivElement>(null);
-  const [languageWidth, setLanguageWidth] = useState(0);
-  const languageRef = useRef<HTMLDivElement>(null);
-  const lastSyncedLyricsRef = useRef<string>('');
-
-  // 현재 표시되는 제목과 아티스트 (alias 우선)
-  const displayTitle = song.titleAlias || song.title;
-  const displayArtist = song.artistAlias || song.artist;
-
-  // 편집 데이터 초기화
-  const initializeEditData = useCallback(() => {
-    const mrLinks = song.mrLinks || [];
-    const lyricsValue = initialLyrics || song.lyrics || '';
-    setEditData({
-      title: song.title || '',
-      artist: song.artist || '',
-      titleAlias: displayTitle,
-      artistAlias: displayArtist,
-      lyrics: lyricsValue,
-      personalNotes: song.personalNotes || '',
-      imageUrl: song.imageUrl || '',
-      keyAdjustment: song.keyAdjustment ?? null,
-      language: song.language || '',
-      searchTags: song.searchTags || [],
-      mrLinks: mrLinks.length > 0 ? mrLinks.map(link => ({
-        url: link.url || '',
-        skipSeconds: link.skipSeconds || 0,
-        label: link.label || '',
-        duration: link.duration || '',
-      })) : [{ url: '', skipSeconds: 0, label: '', duration: '' }],
-      selectedMRIndex: song.selectedMRIndex || 0,
-    });
-    // 초기화 시점의 가사를 기록
-    lastSyncedLyricsRef.current = lyricsValue;
-  }, [song, displayTitle, displayArtist]);
-
-  // 컴포넌트가 보여질 때 데이터 초기화
+const SongEditForm = forwardRef<SongEditFormHandle, Props>(function SongEditForm({ song, isVisible, onSave, onCancel }, ref) {
+  const { showSuccess } = useToast();
+  // Snapshot once per edit session, not whenever a background song object changes.
+  const [baseline] = useState(() => initialValues(song));
+  const [values, setValues] = useState(baseline);
+  const [tags, setTags] = useState(baseline.searchTags.join(', '));
+  const [section, setSection] = useState<Section>('info');
+  const [saving, setSaving] = useState(false), [error, setError] = useState('');
+  const saveLock = useRef(false), scrollRef = useRef<HTMLDivElement>(null);
+  const normalized = { ...values, searchTags: tags.split(',').map(tag => tag.trim()).filter(Boolean) };
+  const dirty = JSON.stringify(normalized) !== JSON.stringify(baseline);
+  const requestCancel = () => {
+    if (!saveLock.current && (!dirty || window.confirm('저장하지 않은 변경을 버리고 보기로 돌아갈까요?'))) onCancel();
+  };
+  useImperativeHandle(ref, () => ({ requestCancel }));
   useEffect(() => {
-    if (isVisible) {
-      initializeEditData();
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+  useEffect(() => { scrollRef.current?.scrollTo({ top: 0 }); }, [section]);
+  const save = async () => {
+    if (saveLock.current || !dirty || !song.id) return;
+    const compact = { ...normalized, ...compactMRLinks(normalized.mrLinks, normalized.selectedMRIndex) };
+    const parsed = SongFields.safeParse(compact);
+    if (!parsed.success) {
+      const issue = parsed.error.issues[0], field = String(issue.path[0]);
+      setError(`입력 내용을 확인해주세요: ${issue.message}`);
+      setSection(['mrLinks', 'selectedMRIndex', 'keyAdjustment'].includes(field) ? 'mr' : ['lyrics', 'personalNotes'].includes(field) ? 'lyrics' : 'info');
+      return;
     }
-  }, [isVisible, initializeEditData]);
-
-  // 가사 변경 핸들러 (직접 호출용)
-  const handleLyricsTextChange = useCallback((newLyrics: string) => {
-    setEditData(prev => ({ ...prev, lyrics: newLyrics }));
-    // 왼쪽 패널에 동기화 (useEffect 없이 직접 호출)
-    if (onLyricsChange && newLyrics !== lastSyncedLyricsRef.current) {
-      lastSyncedLyricsRef.current = newLyrics;
-      onLyricsChange(newLyrics);
-    }
-  }, [onLyricsChange]);
-
-  // initialLyrics가 변경되면 editData도 업데이트 (왼쪽 패널에서 직접 수정한 경우)
-  useEffect(() => {
-    if (initialLyrics !== undefined && initialLyrics !== editData.lyrics) {
-      setEditData(prev => ({ ...prev, lyrics: initialLyrics }));
-      lastSyncedLyricsRef.current = initialLyrics;
-    }
-  }, [initialLyrics]);
-
-  // 키 조절 컨테이너 너비 감지
-  useEffect(() => {
-    if (!keyAdjustmentRef.current) return;
-
-    const resizeObserver = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        const { width } = entry.contentRect;
-        setKeyAdjustmentWidth(width);
-      }
-    });
-
-    resizeObserver.observe(keyAdjustmentRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [isVisible]);
-
-  // 언어 선택 컨테이너 너비 감지
-  useEffect(() => {
-    if (!languageRef.current) return;
-
-    const resizeObserver = new ResizeObserver(entries => {
-      for (const entry of entries) {
-        const { width } = entry.contentRect;
-        setLanguageWidth(width);
-      }
-    });
-
-    resizeObserver.observe(languageRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, [isVisible]);
-
-  // 태그 관리 함수들
-  const addTag = () => {
-    if (newTag.trim() && !editData.searchTags.includes(newTag.trim())) {
-      setEditData({
-        ...editData,
-        searchTags: [...editData.searchTags, newTag.trim()]
-      });
-      setNewTag('');
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setEditData({
-      ...editData,
-      searchTags: editData.searchTags.filter(tag => tag !== tagToRemove)
-    });
-  };
-
-  const handleTagKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addTag();
-    }
-  };
-
-  // MR 링크 관리 함수들
-  const addMRLink = () => {
-    setEditData({
-      ...editData,
-      mrLinks: [...editData.mrLinks, { url: '', skipSeconds: 0, label: '', duration: '' }]
-    });
-  };
-
-  const removeMRLink = (index: number) => {
-    if (editData.mrLinks.length > 1) {
-      const newLinks = editData.mrLinks.filter((_, i) => i !== index);
-      setEditData({
-        ...editData,
-        mrLinks: newLinks,
-        selectedMRIndex: Math.min(editData.selectedMRIndex, newLinks.length - 1)
-      });
-    }
-  };
-
-  const updateMRLink = (index: number, field: string, value: string | number) => {
-    const updatedLinks = editData.mrLinks.map((link, i) => 
-      i === index ? { ...link, [field]: value } : link
-    );
-    setEditData({
-      ...editData,
-      mrLinks: updatedLinks
-    });
-  };
-
-  const setMainMRLink = (index: number) => {
-    setEditData({
-      ...editData,
-      selectedMRIndex: index
-    });
-  };
-
-  // 편집 데이터 저장
-  const saveEditData = async () => {
-    if (!song.id) return;
-    
-    setIsSaving(true);
+    saveLock.current = true; setSaving(true); setError('');
     try {
-      // 저장할 데이터 준비 - alias 로직 처리.
-      // title/artist는 수정 불가(구글시트 기준)이므로 페이로드에서 제외한다.
-      const { title: _omitTitle, artist: _omitArtist, ...rest } = editData;
-      const saveData = {
-        ...rest,
-        titleAlias: (!editData.titleAlias.trim() || editData.titleAlias.trim() === song.title.trim()) ? null : editData.titleAlias.trim(),
-        artistAlias: (!editData.artistAlias.trim() || editData.artistAlias.trim() === song.artist.trim()) ? null : editData.artistAlias.trim(),
-        mrLinks: editData.mrLinks.filter(link => link.url.trim() !== ''),
-      };
-
-      console.log('🚀 저장할 데이터:', JSON.stringify(saveData, null, 2));
-
+      // clipDuration is not available in the public Song model: never clear it when editing here.
+      const { clipDuration: _duration, ...editable } = parsed.data;
       const response = await fetch(`/api/songdetails/${song.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(saveData),
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...editable,
+          titleAlias: editable.titleAlias === song.title.trim() ? null : editable.titleAlias || null,
+          artistAlias: editable.artistAlias === song.artist.trim() ? null : editable.artistAlias || null }),
       });
-
-      const result = await response.json();
-
-      if (result.success) {
-        console.log('✅ 저장 성공, 반환된 데이터:', result.data.song);
-        onSave(result.data.song);
-        showSuccess('수정 완료', '곡 정보가 성공적으로 수정되었습니다.');
-      } else {
-        showError('저장 실패', result.error?.message || '저장에 실패했습니다.');
-      }
-    } catch (error) {
-      console.error('저장 오류:', error);
-      showError('저장 오류', '저장 중 오류가 발생했습니다.');
-    } finally {
-      setIsSaving(false);
-    }
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success || !result.data?.song) throw new Error(result?.error?.message || '저장하지 못했습니다. 잠시 후 다시 시도해주세요.');
+      onSave(result.data.song);
+      showSuccess('수정 완료', '변경 내용을 저장했습니다.');
+    } catch (e) { setError((e as Error).message); }
+    finally { saveLock.current = false; setSaving(false); }
   };
-
-  // 편집 취소
-  const handleCancel = () => {
-    onCancel();
-    initializeEditData();
-  };
-
-  const languageColors = {
-    Korean: 'bg-blue-500',
-    English: 'bg-purple-500',
-    Japanese: 'bg-pink-500',
-  };
-
-  // 키 조절 레이아웃 결정: 320px 이상이면 한 줄 레이아웃 사용
-  const useHorizontalLayout = keyAdjustmentWidth >= 320;
-
-  // 언어 선택 레이아웃 결정
-  // 500px 이상: 4개/줄, 250px-500px: 2개/줄, 250px 미만: 1개/줄
-  const getLanguageGridCols = () => {
-    if (languageWidth >= 500) return 4; // 1줄에 4개
-    if (languageWidth >= 250) return 2; // 2줄에 2개씩
-    return 1; // 4줄에 1개씩
-  };
-
   if (!isVisible) return null;
-
-  return (
-    <div className="flex flex-col h-full min-h-0 p-4 md:p-5">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <h3 className="text-xl font-semibold text-light-text dark:text-dark-text">
-          곡 정보 편집
-        </h3>
-        <div className="flex gap-2">
-          <button
-            onClick={handleCancel}
-            className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-          >
-            취소
-          </button>
-          <button
-            onClick={saveEditData}
-            disabled={isSaving}
-            className="px-4 py-2 bg-light-accent dark:bg-dark-accent text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            {isSaving ? '저장 중...' : '저장'}
-          </button>
-        </div>
-      </div>
-
-      {/* 편집 폼 */}
-      <div className="flex-1 min-h-0 overflow-y-auto space-y-6 pr-2 -mr-2">
-        {/* 기본 정보 */}
-        <div className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-xl p-4 space-y-4">
-          
-          {/* 제목과 아티스트 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
-                <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
-                제목
-              </label>
-              <input
-                type="text"
-                value={editData.titleAlias}
-                onChange={(e) => setEditData({...editData, titleAlias: e.target.value})}
-                className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
-                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
-                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
-                         transition-all outline-none backdrop-blur-sm"
-                placeholder="제목을 입력하세요"
-              />
-            </div>
-            
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
-                <div className="w-2 h-2 bg-light-accent dark:bg-dark-accent rounded-full"></div>
-                아티스트
-              </label>
-              <input
-                type="text"
-                value={editData.artistAlias}
-                onChange={(e) => setEditData({...editData, artistAlias: e.target.value})}
-                className="w-full px-4 py-3 border border-light-primary/20 dark:border-dark-primary/20 rounded-xl 
-                         bg-white/80 dark:bg-gray-800/80 text-light-text dark:text-dark-text
-                         focus:border-light-accent dark:focus:border-dark-accent focus:ring-2 focus:ring-light-accent/20 dark:focus:ring-dark-accent/20
-                         transition-all outline-none backdrop-blur-sm"
-                placeholder="아티스트를 입력하세요"
-              />
-            </div>
-          </div>
-
-          {/* 언어와 키 조절 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
-                <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
-                언어
-              </label>
-              <div 
-                ref={languageRef}
-                className={`grid gap-2`}
-                style={{ gridTemplateColumns: `repeat(${getLanguageGridCols()}, 1fr)` }}
-              >
-                {[
-                  { value: 'Korean', label: '🇰🇷 Korean', color: 'bg-blue-500' },
-                  { value: 'English', label: '🇺🇸 English', color: 'bg-purple-500' },
-                  { value: 'Japanese', label: '🇯🇵 Japanese', color: 'bg-pink-500' },
-                  { value: 'Chinese', label: '🇨🇳 Chinese', color: 'bg-red-500' }
-                ].map((lang) => (
-                  <button
-                    key={lang.value}
-                    type="button"
-                    onClick={() => setEditData({...editData, language: editData.language === lang.value ? '' : lang.value})}
-                    className={`w-full px-3 py-2 rounded-lg border transition-all duration-200 text-sm font-medium text-center ${
-                      editData.language === lang.value
-                        ? `${lang.color} text-white border-transparent shadow-md scale-105`
-                        : 'bg-white/80 dark:bg-gray-800/80 text-light-text/70 dark:text-dark-text/70 border-light-primary/20 dark:border-dark-primary/20 hover:border-light-accent dark:hover:border-dark-accent hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'
-                    }`}
-                  >
-                    {lang.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 text-sm font-medium text-light-text/80 dark:text-dark-text/80">
-                <div className="w-2 h-2 bg-light-secondary dark:bg-dark-secondary rounded-full"></div>
-                키 조절
-              </label>
-              <div 
-                ref={keyAdjustmentRef}
-                className={useHorizontalLayout ? "flex items-center gap-2" : "flex flex-col gap-2"}
-              >
-                {/* 키 조절 컨트롤 */}
-                <div className="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 rounded-lg p-2 border border-light-primary/20 dark:border-dark-primary/20 flex-1">
-                  <button
-                    type="button"
-                    onClick={() => setEditData({
-                      ...editData,
-                      keyAdjustment: editData.keyAdjustment === null ? -1 : Math.max(-12, editData.keyAdjustment - 1)
-                    })}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-light-accent/10 dark:bg-dark-accent/10 hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors duration-200 text-light-accent dark:text-dark-accent"
-                    title="키 내리기"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                    </svg>
-                  </button>
-                  
-                  <div className="flex-1 text-center">
-                    <div className="text-xs font-medium text-light-text dark:text-dark-text">
-                      {editData.keyAdjustment === null ? '설정없음' : 
-                       editData.keyAdjustment === 0 ? '원본키' : 
-                       `${editData.keyAdjustment > 0 ? '+' : ''}${editData.keyAdjustment}`}
-                    </div>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => setEditData({
-                      ...editData,
-                      keyAdjustment: editData.keyAdjustment === null ? 1 : Math.min(12, editData.keyAdjustment + 1)
-                    })}
-                    className="w-8 h-8 flex items-center justify-center rounded-full bg-light-accent/10 dark:bg-dark-accent/10 hover:bg-light-accent/20 dark:hover:bg-dark-accent/20 transition-colors duration-200 text-light-accent dark:text-dark-accent"
-                    title="키 올리기"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </button>
-                </div>
-                
-                {/* 프리셋 버튼들 */}
-                <div className={`flex gap-2 flex-shrink-0 ${useHorizontalLayout ? 'justify-end' : 'justify-center'}`}>
-                  <button
-                    type="button"
-                    onClick={() => setEditData({...editData, keyAdjustment: 0})}
-                    className={`px-2 py-1 text-xs rounded transition-colors duration-200 ${
-                      editData.keyAdjustment === 0
-                        ? 'bg-light-accent dark:bg-dark-accent text-white'
-                        : 'bg-light-primary/10 dark:bg-dark-primary/10 text-light-text/70 dark:text-dark-text/70 hover:bg-light-primary/20 dark:hover:bg-dark-primary/20'
-                    }`}
-                    title="원본키"
-                  >
-                    원본
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditData({...editData, keyAdjustment: null})}
-                    className={`px-2 py-1 text-xs rounded transition-colors duration-200 ${
-                      editData.keyAdjustment === null
-                        ? 'bg-gray-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                    title="미설정"
-                  >
-                    미설정
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 검색 태그 */}
-        <div>
-          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-            검색 태그
-          </label>
-          <div className="flex gap-2 mb-2">
-            <input
-              type="text"
-              value={newTag}
-              onChange={(e) => setNewTag(e.target.value)}
-              onKeyPress={handleTagKeyPress}
-              className="flex-1 px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                       bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
-                       focus:border-light-accent dark:focus:border-dark-accent outline-none"
-              placeholder="태그 추가..."
-            />
-            <button
-              onClick={addTag}
-              className="px-4 py-2 bg-light-accent dark:bg-dark-accent text-white rounded-lg hover:opacity-90 transition-opacity"
-            >
-              <PlusIcon className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {editData.searchTags.map((tag, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center gap-1 px-2 py-1 bg-light-primary/20 dark:bg-dark-primary/20 
-                         text-light-text dark:text-dark-text rounded-full text-sm"
-              >
-                {tag}
-                <button
-                  onClick={() => removeTag(tag)}
-                  className="hover:text-red-500 transition-colors"
-                >
-                  <XMarkIcon className="w-3 h-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* 가사 - XL 화면에서는 숨김 (왼쪽에 별도 가사 수정란 있음) */}
-        <div className="xl:hidden">
-          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-            가사
-          </label>
-          <textarea
-            value={editData.lyrics}
-            onChange={(e) => handleLyricsTextChange(e.target.value)}
-            rows={16}
-            className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                     bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
-                     focus:border-light-accent dark:focus:border-dark-accent outline-none resize-none"
-            placeholder="가사를 입력하세요..."
-          />
-        </div>
-
-        {/* MR 링크 */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70">
-              MR 링크
-            </label>
-            <button
-              onClick={addMRLink}
-              className="px-3 py-1 bg-light-accent dark:bg-dark-accent text-white rounded-lg hover:opacity-90 transition-opacity text-sm"
-            >
-              <PlusIcon className="w-4 h-4 inline mr-1" />
-              추가
-            </button>
-          </div>
-          <div className="space-y-3">
-            {editData.mrLinks.map((link, index) => (
-              <div key={index} className="p-4 bg-light-primary/10 dark:bg-dark-primary/10 rounded-lg border border-light-primary/20 dark:border-dark-primary/20">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setMainMRLink(index)}
-                      className={`p-1 rounded-full transition-colors duration-200 ${
-                        editData.selectedMRIndex === index
-                          ? 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400'
-                          : 'bg-gray-500/20 text-gray-600 dark:text-gray-400 hover:bg-gray-500/30'
-                      }`}
-                      title={editData.selectedMRIndex === index ? "메인 MR" : "메인으로 설정"}
-                    >
-                      <StarIcon className="w-4 h-4" />
-                    </button>
-                    <span className="text-sm font-medium text-light-text/70 dark:text-dark-text/70">
-                      MR 링크 {index + 1}
-                      {editData.selectedMRIndex === index && (
-                        <span className="ml-2 text-xs text-yellow-600 dark:text-yellow-400">(메인)</span>
-                      )}
-                    </span>
-                  </div>
-                  {editData.mrLinks.length > 1 && (
-                    <button
-                      onClick={() => removeMRLink(index)}
-                      className="p-1 rounded-full bg-red-500/20 text-red-600 dark:text-red-400 hover:bg-red-500/30 transition-colors duration-200"
-                      title="삭제"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-                
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">URL</label>
-                    <input
-                      type="url"
-                      value={link.url}
-                      onChange={(e) => updateMRLink(index, 'url', e.target.value)}
-                      className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                               bg-white dark:bg-gray-800 text-light-text dark:text-dark-text text-sm
-                               focus:border-light-accent dark:focus:border-dark-accent outline-none"
-                      placeholder="https://www.youtube.com/watch?v=..."
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">스킵 시간 (초)</label>
-                      <input
-                        type="number"
-                        value={link.skipSeconds || 0}
-                        onChange={(e) => updateMRLink(index, 'skipSeconds', parseInt(e.target.value) || 0)}
-                        className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                                 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text text-sm
-                                 focus:border-light-accent dark:focus:border-dark-accent outline-none"
-                        min="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">라벨</label>
-                      <input
-                        type="text"
-                        value={link.label || ''}
-                        onChange={(e) => updateMRLink(index, 'label', e.target.value)}
-                        className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                                 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text text-sm
-                                 focus:border-light-accent dark:focus:border-dark-accent outline-none"
-                        placeholder="예: 남성키"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-light-text/70 dark:text-dark-text/70 mb-1">길이</label>
-                      <input
-                        type="text"
-                        value={link.duration || ''}
-                        onChange={(e) => updateMRLink(index, 'duration', e.target.value)}
-                        className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                                 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text text-sm
-                                 focus:border-light-accent dark:focus:border-dark-accent outline-none"
-                        placeholder="예: 3:45"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 커버 이미지 (노래책 카드 배경) */}
-        <div>
-          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-            커버 이미지 URL
-          </label>
-          <div className="flex items-start gap-3">
-            <input
-              type="url"
-              value={editData.imageUrl}
-              onChange={(e) => setEditData({ ...editData, imageUrl: e.target.value })}
-              className="flex-1 px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg
-                       bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
-                       focus:border-light-accent dark:focus:border-dark-accent outline-none"
-              placeholder="https://... (비우면 카드 배경 미사용)"
-            />
-            {editData.imageUrl.trim() && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={editData.imageUrl}
-                alt="커버 미리보기"
-                className="w-20 h-12 object-cover rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex-shrink-0"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                onLoad={(e) => { (e.currentTarget as HTMLImageElement).style.display = ''; }}
-              />
-            )}
-          </div>
-          <p className="text-xs text-light-text/50 dark:text-dark-text/50 mt-1">
-            노래책 곡 카드의 배경 이미지로 사용됩니다.
-          </p>
-        </div>
-
-        {/* 개인 노트 - 가장 아래쪽으로 이동 */}
-        <div>
-          <label className="block text-sm font-medium text-light-text/70 dark:text-dark-text/70 mb-2">
-            개인 노트
-          </label>
-          <textarea
-            value={editData.personalNotes}
-            onChange={(e) => setEditData({...editData, personalNotes: e.target.value})}
-            rows={4}
-            className="w-full px-3 py-2 border border-light-primary/30 dark:border-dark-primary/30 rounded-lg 
-                     bg-white dark:bg-gray-800 text-light-text dark:text-dark-text
-                     focus:border-light-accent dark:focus:border-dark-accent outline-none resize-none"
-            placeholder="개인적인 노트나 메모를 입력하세요..."
-          />
-        </div>
-      </div>
+  const query = encodeURIComponent(`${values.titleAlias || song.title} ${values.artistAlias || song.artist} 가사`);
+  return <div aria-label="곡 정보 수정" className="flex h-full min-h-0 flex-col text-slate-900 dark:text-slate-100">
+    <nav aria-label="노래책 편집 항목" className="mx-2 mt-2 grid shrink-0 grid-cols-3 gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800 sm:mx-3 sm:mt-2">
+      {sections.map(tab => <button type="button" key={tab.id} autoFocus={tab.id === 'info'} disabled={saving} aria-current={tab.id === section ? 'page' : undefined} onClick={() => setSection(tab.id)}
+        className={`min-h-11 rounded-xl px-2 text-sm font-semibold ${tab.id === section ? 'bg-white text-purple-800 shadow-sm dark:bg-slate-950 dark:text-purple-200' : 'text-slate-600 dark:text-slate-400'}`}>{tab.label}</button>)}
+    </nav>
+    <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-2 sm:p-3">
+      {error && <Notice error>{error}</Notice>}
+      {section === 'lyrics' && <div className="flex flex-wrap items-center justify-between gap-2"><p className={muted}>줄바꿈을 유지해 가사를 입력하세요.</p><a href={`https://www.google.com/search?q=${query}`} target="_blank" rel="noopener noreferrer" className={secondary}>가사 검색 ↗</a></div>}
+      <SongEditorFields section={section} values={values} setValues={setValues} title={song.title} artist={song.artist} setTitle={() => {}} setArtist={() => {}} tags={tags} setTags={setTags} disabled={saving} showDefaultDuration={false} />
     </div>
-  );
-}
+    <footer className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-2 pt-2 pb-[max(.75rem,env(safe-area-inset-bottom))] dark:border-slate-800 dark:bg-slate-900 sm:px-3">
+      <p role="status" className="text-xs text-slate-600 dark:text-slate-400">{saving ? '저장 중…' : dirty ? '저장하지 않은 변경이 있습니다' : '변경한 내용이 없습니다'}</p>
+      <div className="ml-auto flex gap-2"><button type="button" disabled={saving} className={secondary} onClick={requestCancel}>취소</button><button type="button" disabled={saving || !dirty} className={primary} onClick={save}>{saving ? '저장 중…' : '변경 저장'}</button></div>
+    </footer>
+  </div>;
+});
+export default SongEditForm;

@@ -10,7 +10,7 @@ const Query = z.object({
 });
 
 // 관리자: 신고 목록 + 대기 수
-export const GET = withApi({ schema: Query, auth: Permission.SONGS_EDIT }, async ({ input }) => {
+export const GET = withApi({ schema: Query, auth: Permission.CLIPS_MANAGE }, async ({ input }) => {
   const [list, pending] = await Promise.all([
     listClipReports({ status: input.status ?? 'pending', page: input.page ?? 1, limit: input.limit ?? 30 }),
     countPendingReports(),

@@ -140,6 +140,16 @@ afterAll(async () => {
   await server?.stop();
 });
 describe("admin read models", () => {
+  it("separates clip workflow from personal user records", async () => {
+    const clips = await getAdminOverview(false, {}, true);
+    expect(clips.recent.users).toEqual([]);
+    expect(clips.work.timelines).toEqual({ unmatched: 1, matchedUnverified: 1, aiUnverified: 1 });
+    expect(clips.work.videos.length).toBeGreaterThan(0);
+    const users = await getAdminOverview(true, {}, false);
+    expect(users.recent.users.length).toBeGreaterThan(0);
+    expect(users.work.timelines).toBeNull();
+    expect(users.work.videos).toEqual([]);
+  });
   it("counts legacy songs, separate engagement, and eligible timeline work", async () => {
     const data = await getAdminOverview(true, {});
     expect(data.totals).toMatchObject({
@@ -235,5 +245,21 @@ describe("admin read models", () => {
     expect(
       await getAdminUserActivity(String(new mongoose.Types.ObjectId())),
     ).toBeNull();
+  });
+  it("filters multiple scopes, legacy grants and explicit revocation consistently", async () => {
+    const db = mongoose.connection.db!;
+    const docs = [
+      { channelName: "scope-test-delegate", role: "user", adminScopes: ["songs", "clips"] },
+      { channelName: "scope-test-legacy", role: "song_editor" },
+      { channelName: "scope-test-revoked", role: "song_admin", adminScopes: [] },
+    ];
+    const inserted = await db.collection("users").insertMany(docs);
+    const input = { page: 1, limit: 20, search: "scope-test", role: "all", sortBy: "createdAt" as const, sortOrder: "desc" as const };
+    try {
+      expect((await listAdminUsers(input)).overview.admins).toBe(3);
+      expect((await listAdminUsers({ ...input, role: "songs" })).users).toHaveLength(2);
+      expect((await listAdminUsers({ ...input, role: "clips" })).users).toHaveLength(1);
+      expect((await listAdminUsers({ ...input, role: "user" })).users.map(u => u._id)).toEqual([String(inserted.insertedIds[2])]);
+    } finally { await db.collection("users").deleteMany({ _id: { $in: Object.values(inserted.insertedIds) } }); }
   });
 });

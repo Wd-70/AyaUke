@@ -56,10 +56,17 @@ describe('구간 API 접근 제어', () => {
     expect(response.status).toBe(403);
     expect(service.publishOfficial).not.toHaveBeenCalled();
   });
-  it('기존 검증 권한을 가진 관리자만 공식 저장한다', async () => {
-    vi.mocked(getServerSession).mockResolvedValue({ user: { userId: owner, role: 'song_admin' } });
+  it('클립 관리 권한을 가진 관리자만 공식 저장한다', async () => {
+    vi.mocked(getServerSession).mockResolvedValue({ user: { userId: owner, role: 'user', adminScopes: ['clips'] } });
     expect((await POST(request({ ...personal, action: 'publish', baseVersion: 0 }), context)).status).toBe(200);
     expect(service.publishOfficial).toHaveBeenCalledWith(clipId, owner, 0, 0, personal.range, undefined);
+  });
+  it('노래 담당자와 회수된 클립 권한으로는 공식 저장할 수 없다', async () => {
+    for (const user of [{ userId: owner, role: 'song_admin' }, { userId: owner, role: 'user', adminScopes: [] }]) {
+      vi.mocked(getServerSession).mockResolvedValue({ user });
+      expect((await POST(request({ ...personal, action: 'publish', baseVersion: 0 }), context)).status).toBe(403);
+    }
+    expect(service.publishOfficial).not.toHaveBeenCalled();
   });
   it('범위 형식과 평가값, 과도한 일괄 조회를 검증한다', async () => {
     expect((await POST(request({ ...personal, range: { startTime: -1, endTime: 2 } }), context)).status).toBe(400);

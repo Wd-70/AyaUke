@@ -30,7 +30,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useSession } from 'next-auth/react';
 import { useConfirm } from './ConfirmDialog';
-import { UserRole, roleToIsAdmin } from '@/lib/permissions';
+import { UserRole, canManageClips } from '@/lib/permissions';
 
 interface LiveClipEditorProps {
   songId: string;
@@ -86,7 +86,7 @@ export default function LiveClipEditor({
   const [durationInput, setDurationInput] = useState('');
 
   // 권한 확인
-  const isAdmin = session?.user?.isAdmin && roleToIsAdmin(session.user.role as UserRole);
+  const isAdmin = session?.user?.isAdmin && canManageClips(session.user);
   const canEditAllClips = isAdmin;
 
   // YouTube URL에서 시간 파라미터 추출

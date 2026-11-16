@@ -13,8 +13,9 @@ const iso = (value: unknown) =>
       ? value
       : null;
 export async function getAdminOverview(
-  superAdmin: boolean,
+  userAccess: boolean,
   period: { start?: Date; end?: Date },
+  clipAccess = userAccess,
 ): Promise<AdminOverview> {
   const db = await adminDatabase(),
     opts = { maxTimeMS: 15000 };
@@ -83,20 +84,20 @@ export async function getAdminOverview(
     count("cliplikes", periodFilter),
     count("playlists", periodFilter),
     count("clipplaylists", periodFilter),
-    superAdmin
+    clipAccess
       ? count("parsedtimelines", {
           ...eligible,
           "matchedSong.songId": { $in: [null, ""] },
         })
       : 0,
-    superAdmin
+    clipAccess
       ? count("parsedtimelines", {
           ...eligible,
           "matchedSong.songId": { $nin: [null, ""] },
           isTimeVerified: { $ne: true },
         })
       : 0,
-    superAdmin
+    clipAccess
       ? count("parsedtimelines", {
           ...eligible,
           aiTiming: { $ne: null },
@@ -117,7 +118,7 @@ export async function getAdminOverview(
       .sort({ createdAt: -1, _id: -1 })
       .limit(5)
       .toArray(),
-    superAdmin
+    userAccess
       ? db
           .collection("users")
           .find(
@@ -231,7 +232,7 @@ export async function getAdminOverview(
         opts,
       )
       .toArray(),
-    superAdmin
+    clipAccess
       ? db
           .collection("parsedtimelines")
           .aggregate(
@@ -284,7 +285,7 @@ export async function getAdminOverview(
   });
   return {
     generatedAt: new Date().toISOString(),
-    canManageUsers: superAdmin,
+    canManageUsers: userAccess,
     totals: {
       songs,
       mr,
@@ -309,7 +310,7 @@ export async function getAdminOverview(
       unavailable,
       reports,
       proposals,
-      timelines: superAdmin
+      timelines: clipAccess
         ? { unmatched, matchedUnverified, aiUnverified }
         : null,
       videos: videos.map((v) => ({

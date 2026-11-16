@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { z } from "zod";
 import { authOptions } from "@/lib/authOptions";
-import { isSuperAdmin, UserRole } from "@/lib/permissions";
+import { canManageUsers, UserRole } from "@/lib/permissions";
 import {
   listAdminUsers,
   userSortFields,
@@ -14,6 +14,7 @@ const Query = z.object({
   role: z
     .enum([
       "all",
+      "songs", "clips", "users", "system",
       "super_admin",
       "ayauke_admin",
       "song_admin",
@@ -26,7 +27,7 @@ const Query = z.object({
 });
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || !isSuperAdmin(session.user.role as UserRole))
+  if (!session || !canManageUsers(session.user))
     return NextResponse.json({ error: "권한이 없습니다." }, { status: 403 });
   const input = Query.safeParse(
     Object.fromEntries(request.nextUrl.searchParams),
