@@ -31,6 +31,8 @@ import { useClipMemo } from '@/hooks/useClipMemos';
 import { useGlobalClipPlaylists } from '@/hooks/useGlobalClipPlaylists';
 import { useToast } from '@/components/Toast';
 import type { PublicClipDTO, PublicClipSummary } from '@/domains/archive/clip.service';
+import { useOverlayHistory } from '@/shared/motion/useOverlayHistory';
+import { DUR, EASE_IN, SPRING_SHEET } from '@/shared/motion/tokens';
 
 /** 다이얼로그로 열 클립 요약(카드에서 넘어옴). null이면 닫힘. */
 export interface ClipDialogTarget extends PublicClipSummary {}
@@ -55,6 +57,8 @@ export default function ClipDetailDialog({
   onClose: () => void;
 }) {
   const open = !!clip;
+  // 열린 상세는 히스토리 한 칸 — 뒤로가기로 닫힌다.
+  useOverlayHistory(open, onClose);
   const rangeEditor = useClipRangeEditor();
 
   // 배경 스크롤 잠금 (플레이어 전체화면과 동일한 방식 — html·body 둘 다)
@@ -129,8 +133,8 @@ function DialogBody({ clip, onClose }: { clip: ClipDialogTarget; onClose: () => 
         className="app-detail-sheet relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border border-light-primary/20 bg-light-background shadow-2xl dark:border-dark-primary/20 dark:bg-dark-background sm:rounded-3xl"
         initial={{ y: 24, scale: 0.98, opacity: 0 }}
         animate={{ y: 0, scale: 1, opacity: 1 }}
-        exit={{ y: 24, scale: 0.98, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+        exit={{ y: 24, scale: 0.98, opacity: 0, transition: { duration: DUR.exit, ease: EASE_IN } }}
+        transition={SPRING_SHEET}
       >
         {/* 상단 그립/닫기 */}
         <div className="absolute right-3 top-3 z-10">

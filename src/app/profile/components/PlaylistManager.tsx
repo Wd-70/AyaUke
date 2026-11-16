@@ -15,6 +15,7 @@ import {
   ArrowTopRightOnSquareIcon
 } from '@heroicons/react/24/outline'
 import PlaylistEditModal from './PlaylistEditModal'
+import { useConfirm } from '@/components/ConfirmDialog'
 import CreatePlaylistModal from './CreatePlaylistModal'
 
 interface Playlist {
@@ -34,6 +35,7 @@ interface PlaylistsResponse {
 }
 
 export default function PlaylistManager() {
+  const { confirm } = useConfirm()
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -64,9 +66,13 @@ export default function PlaylistManager() {
   }, [])
 
   const handleDelete = async (playlistId: string) => {
-    if (!confirm('정말로 이 플레이리스트를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
-      return
-    }
+    const ok = await confirm({
+      title: '플레이리스트 삭제',
+      message: '이 플레이리스트를 삭제할까요? 되돌릴 수 없어요.',
+      confirmText: '삭제',
+      type: 'danger',
+    })
+    if (!ok) return
 
     try {
       setDeletingPlaylist(playlistId)

@@ -3,7 +3,8 @@ import { hasPermission, Permission } from "@/lib/permissions";
 
 import { useState, useEffect, useCallback, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { DUR, EASE_IN, EASE_OUT } from "@/shared/motion/tokens";
 import { Song, SongVideo } from "@/types";
 import {
   MusicalNoteIcon,
@@ -418,28 +419,30 @@ export default function SongDetailModal({
     );
   };
 
-  if (!isExpanded) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
-    <>
+  // body로 포털 — 카드 그리드(main z-10)의 쌓임 맥락에 갇혀 헤더·하단 탭 아래로 깔리던 문제 방지.
+  // AnimatePresence로 감싸 닫힐 때도 퇴장 애니메이션이 돈다.
+  return createPortal(
+    <AnimatePresence>
+      {isExpanded && (
+    <div key="song-detail">
       {/* 배경 오버레이 */}
       <motion.div
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3 }}
-        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
+        animate={{ opacity: 1, transition: { duration: DUR.fade } }}
+        exit={{ opacity: 0, transition: { duration: DUR.exit } }}
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80]"
         onClick={handleClose}
       />
 
       {/* 확장된 모달 */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.9, x: "-50%", y: "-10%" }}
-        animate={{ opacity: 1, scale: 1, x: "-50%", y: "0%" }}
-        exit={{ opacity: 0, scale: 0.9, x: "-50%", y: "-10%" }}
-        transition={{ duration: 0.3 }}
+        initial={{ opacity: 0, scale: 0.97, x: "-50%", y: 16 }}
+        animate={{ opacity: 1, scale: 1, x: "-50%", y: 0, transition: { duration: DUR.enter, ease: EASE_OUT } }}
+        exit={{ opacity: 0, scale: 0.98, x: "-50%", y: 8, transition: { duration: DUR.exit, ease: EASE_IN } }}
         role="dialog" aria-modal="true" aria-label={isEditMode ? `곡 정보 수정: ${displayTitle}` : displayTitle}
-        className={`fixed top-20 sm:top-20 left-1/2 z-40
+        className={`fixed top-20 sm:top-20 left-1/2 z-[80]
                    ${isEditMode ? "w-[calc(100vw-16px)] rounded-2xl sm:w-[95vw] sm:max-w-[1600px]" : "w-[95vw] max-w-[1600px] rounded-xl"} overflow-hidden
                    bg-white dark:bg-gray-900 backdrop-blur-sm 
                    border border-light-primary/20 dark:border-dark-primary/20
@@ -705,17 +708,16 @@ export default function SongDetailModal({
         </div>
       </motion.div>
 
-      {/* 플레이리스트 메뉴: 모달의 transform 영향을 피하려고 body로 포털 (fixed=뷰포트 기준) */}
-      {typeof document !== "undefined" &&
-        createPortal(
-          <PlaylistContextMenu
-            songId={song.id}
-            isOpen={showPlaylistMenu}
-            onClose={() => setShowPlaylistMenu(false)}
-            position={playlistMenuPos}
-          />,
-          document.body
-        )}
-    </>
+      {/* 플레이리스트 메뉴: 모달의 transform 밖(포털 루트)에 둔다 (fixed=뷰포트 기준) */}
+      <PlaylistContextMenu
+        songId={song.id}
+        isOpen={showPlaylistMenu}
+        onClose={() => setShowPlaylistMenu(false)}
+        position={playlistMenuPos}
+      />
+    </div>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 }

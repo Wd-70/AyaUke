@@ -9,7 +9,7 @@ import type { Session } from 'next-auth';
 import { UserIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 import { canAccessAdminPanel, canManageSongs, UserRole } from '@/lib/permissions';
 import MobileAppNavigation from '@/components/mobile/MobileAppNavigation';
-import { mobileParent, isRouteWithin } from '@/components/mobile/navigation-model';
+import { mobileParent, isRouteWithin, hasMobileTabs } from '@/components/mobile/navigation-model';
 import { ChevronLeftIcon } from '@heroicons/react/24/outline';
 
 interface NavigationProps {
@@ -22,7 +22,7 @@ const NAV_LINKS = [
   { href: '/', label: '홈' },
   { href: '/songbook', label: '노래책' },
   { href: '/clips', label: '클립' },
-  { href: '/player', label: '플레이어' },
+  { href: '/player', label: '보관함' },
 ] as const;
 
 /**
@@ -87,6 +87,8 @@ export default function Navigation({ currentPath }: NavigationProps) {
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
   const parent = mobileParent(activePath);
+  // 하단 탭이 있는 화면은 '더보기' 탭이 메뉴를 맡는다 → 상단 햄버거·시트의 이동 버튼 중복 제거
+  const tabs = hasMobileTabs(activePath);
 
   useEffect(() => { setIsMobileMenuOpen(false); }, [pathname]);
 
@@ -158,8 +160,16 @@ export default function Navigation({ currentPath }: NavigationProps) {
               <AuthControls session={session} status={status} />
             </div>
 
-            {/* Mobile menu button */}
-            <button
+            {/* Mobile: 탭 화면은 계정 버튼만, 그 외(게임 등)는 메뉴 버튼 */}
+            {tabs && (
+              <MobileAccountButton
+                session={session}
+                status={status}
+                open={isMobileMenuOpen}
+                onOpen={() => setIsMobileMenuOpen(true)}
+              />
+            )}
+            {!tabs && <button
               ref={mobileMenuButtonRef}
               className="flex min-h-11 min-w-11 items-center justify-center rounded-full bg-light-primary/20 p-1.5 transition-all duration-300 hover:bg-light-primary/30 dark:bg-dark-primary/20 dark:hover:bg-dark-primary/30 md:hidden sm:p-2"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -175,7 +185,7 @@ export default function Navigation({ currentPath }: NavigationProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 )}
               </svg>
-            </button>
+            </button>}
 
             {/* Theme toggle - Desktop only (a11y: 키보드 포커스 가능한 button) */}
             <button
@@ -199,8 +209,8 @@ export default function Navigation({ currentPath }: NavigationProps) {
                 {/* 1. 사용자 정보 */}
                 <MobileUserProfile session={session} status={status} />
 
-                {/* 2. 기본 내비 링크 */}
-                <div className="grid grid-cols-2 gap-2 py-2" aria-label="바로가기">
+                {/* 2. 기본 내비 링크 — 하단 탭이 없는 화면에서만 */}
+                {!tabs && <div className="grid grid-cols-2 gap-2 py-2" aria-label="바로가기">
                 {NAV_LINKS.map((link) => {
                   const isActive = activePath === link.href;
                   return (
@@ -214,11 +224,11 @@ export default function Navigation({ currentPath }: NavigationProps) {
                       }`}
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
-                      {link.href === '/player' ? '보관함' : link.label}
+                      {link.label}
                     </Link>
                   );
                 })}
-                </div>
+                </div>}
 
                 {/* 3. 권한별 추가 메뉴 */}
                 <MobileAdminMenus session={session} onMenuClose={() => setIsMobileMenuOpen(false)} />
@@ -406,6 +416,54 @@ function AuthControls({
         </div>
       )}
     </div>
+  );
+}
+
+/** 모바일 상단 우측 계정 버튼 — 로그인 전엔 로그인 링크, 후엔 아바타(계정 시트 열기) */
+function MobileAccountButton({
+  session,
+  status,
+  open,
+  onOpen,
+}: {
+  session: Session | null;
+  status: 'authenticated' | 'loading' | 'unauthenticated';
+  open: boolean;
+  onOpen: () => void;
+}) {
+  if (status === 'loading') {
+    return <div aria-hidden className="m-1.5 h-8 w-8 animate-pulse rounded-full bg-light-primary/20 dark:bg-dark-primary/20 md:hidden" />;
+  }
+  if (!session) {
+    return (
+      <Link
+        href="/auth/signin"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-light-accent-deep transition-colors active:bg-light-primary/15 dark:text-dark-accent dark:active:bg-dark-primary/15 md:hidden"
+      >
+        <UserIcon className="h-4 w-4" aria-hidden />
+        로그인
+      </Link>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="내 계정 메뉴 열기"
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-controls={open ? 'mobile-navigation-menu' : undefined}
+      className="flex h-11 w-11 items-center justify-center rounded-full transition-transform active:scale-95 md:hidden"
+    >
+      {session.user.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={session.user.image} alt="" className="h-8 w-8 rounded-full ring-2 ring-light-primary/40 dark:ring-dark-primary/40" />
+      ) : (
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-light-accent to-light-secondary dark:from-dark-accent dark:to-dark-secondary">
+          <UserIcon className="h-4 w-4 text-white" />
+        </span>
+      )}
+    </button>
   );
 }
 

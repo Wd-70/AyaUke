@@ -12,6 +12,7 @@ import { ClipPlayerProvider } from "@/components/clip/player/ClipPlayerProvider"
 import MiniPlayer from "@/components/clip/player/MiniPlayer";
 import PlayerQueueSync from "@/components/clip/player/PlayerQueueSync";
 import { PwaInstallProvider } from "@/components/pwa/usePwaInstall";
+import MotionProvider from "@/shared/motion/MotionProvider";
 
 
 const inter = Inter({
@@ -88,6 +89,7 @@ export default function RootLayout({
         className={`${inter.variable} ${poppins.variable} font-sans antialiased`}
         suppressHydrationWarning
       >
+        <MotionProvider>
         <AuthProvider>
           <QueryProvider>
             <ToastProvider>
@@ -103,6 +105,7 @@ export default function RootLayout({
             </ToastProvider>
           </QueryProvider>
         </AuthProvider>
+        </MotionProvider>
         <ServiceWorkerRegistrar />
         <Analytics />
       </body>

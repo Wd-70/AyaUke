@@ -251,17 +251,11 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
             ? "grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3"
             : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6"}>
             {visibleSongs.map((song, index) => (
-              <motion.div
+              // CSS 등장 애니메이션 — 서버 HTML에서 카드가 opacity:0으로 굳지 않게(하이드레이션 전에도 보임)
+              <div
                 key={song.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "0px 0px -20% 0px" }}
-                transition={{
-                  duration: 0.3,
-                  delay: Math.min(index % 8, 6) * 0.03,
-                  ease: "easeOut"
-                }}
+                className="anim-card"
+                style={{ animationDelay: `${Math.min(index % 24, 8) * 30}ms` }}
               >
                 <SongCard
                   song={song}
@@ -270,7 +264,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
                   compact={viewMode === 'list'}
                   onDialogStateChange={setHasOpenDialog}
                 />
-              </motion.div>
+              </div>
             ))}
             
             {visibleSongs.length < filteredSongs.length && (

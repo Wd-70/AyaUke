@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   PlayIcon,
@@ -15,7 +15,7 @@ import {
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/solid';
 import { Cog6ToothIcon, QueueListIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
-import { useRouter } from 'next/navigation';
+import { useOverlayHistory } from '@/shared/motion/useOverlayHistory';
 import { useClipPlayer } from './ClipPlayerProvider';
 import { clipArtwork, clipDurationSec } from './types';
 import { prefetchChzzkStream } from '../chzzk-stream-cache';
@@ -109,7 +109,6 @@ export default function MiniPlayer() {
     reportPlaying,
   } = useClipPlayer();
 
-  const router = useRouter();
   const { data: session, status: authStatus } = useSession();
   const rangeClient = useQueryClient();
   const rangeOwner = session?.user.userId || 'guest';
@@ -120,10 +119,13 @@ export default function MiniPlayer() {
     return () => controller.abort();
   }, [rangeClient, rangeOwner, authStatus, upcomingClips]);
   // 현재 재생 중인 플레이리스트 페이지로 이동 (소유=관리 / 비소유=보기). 공유ID 없으면 버튼 숨김.
+  // 펼친 플레이어는 히스토리 한 칸 — 뒤로가기로 접힌다.
+  const collapse = useCallback(() => setExpanded(false), [setExpanded]);
+  const leaveTo = useOverlayHistory(isExpanded, collapse);
   const goToPlaylistPage = () => {
     if (!currentSourceShareId) return;
-    setExpanded(false); // 아래로 최소화 (재생은 루트 레이아웃 상주라 안 끊김)
-    router.push(`/clip-playlist/${currentSourceShareId}`);
+    // 아래로 최소화하며 이동 (재생은 루트 레이아웃 상주라 안 끊김)
+    leaveTo(`/clip-playlist/${currentSourceShareId}`);
   };
 
   const stageRef = useRef<HTMLDivElement>(null);

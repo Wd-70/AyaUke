@@ -8,6 +8,7 @@ import { HomeIcon, Music2, PlaySquare, Library, MoreHorizontal, X, Download, Wif
 import { hasMobileTabs, mobileSection, MOBILE_TABS } from './navigation-model';
 import { usePwaInstall } from '@/components/pwa/usePwaInstall';
 import { shouldDismissSheet } from './sheet-gesture';
+import { useOverlayHistory } from '@/shared/motion/useOverlayHistory';
 
 const icons = [HomeIcon, Music2, PlaySquare, Library];
 
@@ -29,6 +30,8 @@ export default function MobileAppNavigation({ path, open, onOpen, onClose, child
   const pwa = usePwaInstall();
   const enabled = hasMobileTabs(path);
   const section = mobileSection(path);
+  // 열린 시트는 히스토리 한 칸 — 안드로이드 뒤로가기로 닫힌다.
+  useOverlayHistory(open, onClose);
 
   const resetPull = () => {
     gesture.current = null;

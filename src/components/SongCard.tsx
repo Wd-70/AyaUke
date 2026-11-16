@@ -16,6 +16,7 @@ import { useSongPlaylists } from "@/hooks/useGlobalPlaylists";
 import { useSongVideos, prefetchSongVideos } from "@/hooks/useSongVideos";
 import PlaylistContextMenu from "./PlaylistContextMenu";
 import SongDetailModal from "./SongDetailModal";
+import { useOverlayHistory } from "@/shared/motion/useOverlayHistory";
 import { useClipRangeEditor } from './clip/range/ClipRangeProvider';
 import OfficialCornerFold from "./OfficialCornerFold";
 import { isOfficialSong } from "@/shared/utils/song-source";
@@ -61,6 +62,8 @@ export default function SongCard({
   const handleCloseDialog = useCallback(() => {
     setIsExpanded(false);
   }, []);
+  // 열린 상세는 히스토리 한 칸 — 뒤로가기로 닫힌다.
+  useOverlayHistory(isExpanded, handleCloseDialog);
 
   // ESC 키로 닫기
   useEffect(() => {
@@ -238,8 +241,9 @@ export default function SongCard({
   // SongCard 컴포넌트 메인 렌더링
   return (
     <>
-      {/* 리스트(compact) 보기 — 슬림한 한 줄 행 */}
-      {!isExpanded && compact && (
+      {/* 리스트(compact) 보기 — 슬림한 한 줄 행.
+          상세가 열려도 카드는 그대로 둔다(빠지면 뒤 목록이 밀리고, 닫을 때 재등장한다). */}
+      {compact && (
         <div
           onClick={handleCardClick}
           onContextMenu={handleContextMenu}
@@ -279,12 +283,11 @@ export default function SongCard({
       )}
 
       {/* 일반 카드 */}
-      {!isExpanded && !compact && (
+      {!compact && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
           whileHover={{ y: -5 }}
-          transition={{ duration: 0.3 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ duration: 0.2 }}
           onClick={handleCardClick}
           onContextMenu={handleContextMenu}
           onMouseEnter={prefetchClips}

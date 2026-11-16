@@ -178,7 +178,7 @@ export default function PlaylistContextMenu({ songId, isOpen, position, onClose 
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
         transition={{ duration: 0.15 }}
-        className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-light-primary/20 dark:border-dark-primary/20 backdrop-blur-sm"
+        className="fixed z-[90] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-light-primary/20 dark:border-dark-primary/20 backdrop-blur-sm"
         style={{
           left: adjustedPosition.x,
           top: adjustedPosition.y,

@@ -12,11 +12,13 @@ import {
 } from '@heroicons/react/24/outline'
 import { useGlobalClipPlaylists } from '@/hooks/useGlobalClipPlaylists'
 import { useToast } from '@/components/Toast'
+import { useConfirm } from '@/components/ConfirmDialog'
 
 /** /profile 플레이리스트 탭의 '내 클립 플레이리스트' 섹션 */
 export default function ClipPlaylistManager() {
   const { playlists, isLoading, createPlaylist, deletePlaylist, refresh } = useGlobalClipPlaylists()
   const { showSuccess, showError } = useToast()
+  const { confirm } = useConfirm()
   const [isCreating, setIsCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -36,7 +38,13 @@ export default function ClipPlaylistManager() {
   }
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`'${name}' 클립 플레이리스트를 삭제할까요?`)) return
+    const ok0 = await confirm({
+      title: '클립 플레이리스트 삭제',
+      message: `'${name}' 클립 플레이리스트를 삭제할까요? 되돌릴 수 없어요.`,
+      confirmText: '삭제',
+      type: 'danger',
+    })
+    if (!ok0) return
     setDeletingId(id)
     const ok = await deletePlaylist(id)
     setDeletingId(null)

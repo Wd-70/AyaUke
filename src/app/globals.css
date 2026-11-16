@@ -450,3 +450,31 @@ input[aria-invalid="true"]:focus-visible {
   .mobile-tab-icon { transition: none; }
   .mobile-tab:active .mobile-tab-icon { transform: none; }
 }
+
+/* ───────── Motion tokens ─────────
+   docs/ux-motion-plan.md 기준. JS 쪽 값은 src/shared/motion/tokens.ts와 맞춘다.
+   transform/opacity만 움직이고, 퇴장은 진입보다 짧게. */
+:root {
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-spring: cubic-bezier(0.22, 1.25, 0.36, 1);
+  --dur-press: 100ms;
+  --dur-fade: 160ms;
+  --dur-enter: 220ms;
+  --dur-sheet: 320ms;
+}
+
+/* JS 없이 도는 등장 애니메이션 — 서버 HTML이 opacity:0으로 굳지 않게
+   (framer-motion initial은 하이드레이션 전까지 콘텐츠를 숨긴다).
+   fill-mode는 backwards만: 끝난 뒤 hover transform 등을 막지 않도록. */
+@keyframes rise-in { from { opacity: 0; transform: translateY(var(--rise, 16px)); } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes word-up { from { opacity: 0; transform: translateY(110%); } }
+.anim-rise { animation: rise-in 500ms var(--ease-out) backwards; }
+.anim-fade { animation: fade-in 500ms var(--ease-out) backwards; }
+.anim-word { animation: word-up 700ms var(--ease-spring) backwards; }
+.anim-card { --rise: 14px; animation: rise-in 320ms var(--ease-out) backwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise, .anim-word, .anim-card { animation-name: fade-in; animation-duration: 200ms; }
+}

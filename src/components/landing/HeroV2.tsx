@@ -21,19 +21,7 @@ const CHZZK_LIVE = 'https://chzzk.naver.com/live/abe8aa82baf3d3ef54ad8468ee73e7f
 
 const TAGS = ['노래방송', '게임방송', '저스트채팅', 'ISTP'];
 
-const titleContainer = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.08, delayChildren: 0.15 } },
-};
-const titleWord = {
-  hidden: { y: '110%', opacity: 0 },
-  show: {
-    y: '0%',
-    opacity: 1,
-    transition: { type: 'spring' as const, stiffness: 320, damping: 26 },
-  },
-};
-
+// 첫 화면 등장 애니메이션은 CSS(anim-*)로 — 하이드레이션 전에도 보이도록(globals.css).
 /** 마우스 위치(−0.5~0.5)를 레이어별 배율로 매핑한 패럴랙스 X/Y */
 function useParallax(mx: MotionValue<number>, my: MotionValue<number>, amount: number) {
   const x = useSpring(useTransform(mx, (v) => v * amount), { stiffness: 120, damping: 20 });
@@ -43,10 +31,6 @@ function useParallax(mx: MotionValue<number>, my: MotionValue<number>, amount: n
 
 export default function HeroV2() {
   const reduce = useReducedMotion();
-  // reduced-motion이면 타이틀 단어가 슬라이드업하지 않고 페이드만
-  const wordVariants = reduce
-    ? { hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.01 } } }
-    : titleWord;
   const sectionRef = useRef<HTMLElement>(null);
   const { data: live } = useLiveStatus();
   const isLive = !!live?.isLive;
@@ -177,39 +161,30 @@ export default function HeroV2() {
         </div>
 
         {/* 키네틱 타이틀 */}
-        <motion.h1
-          variants={titleContainer}
-          initial="hidden"
-          animate="show"
-          className="font-display break-keep text-5xl font-extrabold leading-[1.05] sm:text-7xl"
-        >
+        <h1 className="font-display break-keep text-5xl font-extrabold leading-[1.05] sm:text-7xl">
           <span className="inline-block overflow-hidden align-bottom">
-            <motion.span variants={wordVariants} className="inline-block bg-gradient-to-r from-light-title-1 via-light-title-2 to-light-title-3 bg-clip-text text-transparent dark:from-dark-accent dark:via-dark-secondary dark:to-dark-primary">
+            <span style={{ animationDelay: '150ms' }} className="anim-word inline-block bg-gradient-to-r from-light-title-1 via-light-title-2 to-light-title-3 bg-clip-text text-transparent dark:from-dark-accent dark:via-dark-secondary dark:to-dark-primary">
               아야
-            </motion.span>
+            </span>
           </span>{' '}
           <span className="inline-block overflow-hidden align-bottom">
-            <motion.span variants={wordVariants} className="inline-block text-light-text dark:text-dark-text">
+            <span style={{ animationDelay: '230ms' }} className="anim-word inline-block text-light-text dark:text-dark-text">
               AyaUke
-            </motion.span>
+            </span>
           </span>
-        </motion.h1>
+        </h1>
 
-        <motion.p
-          initial={{ opacity: 0, y: reduce ? 0 : 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: reduce ? 0 : 0.5 }}
-          className="mobile-hero-description mt-5 max-w-2xl break-keep text-lg text-light-text/70 dark:text-dark-text/70 sm:text-xl"
+        <p
+          style={{ animationDelay: '450ms' }}
+          className="anim-rise mobile-hero-description mt-5 max-w-2xl break-keep text-lg text-light-text/70 dark:text-dark-text/70 sm:text-xl"
         >
           허니즈의 메인보컬, 생활애교가 흘러넘치는 치지직의 분내담당
-        </motion.p>
+        </p>
 
         {/* 태그 칩 */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: reduce ? 0 : 0.65 }}
-          className="mobile-hero-tags mt-6 flex flex-wrap justify-center gap-2"
+        <div
+          style={{ animationDelay: '580ms' }}
+          className="anim-fade mobile-hero-tags mt-6 flex flex-wrap justify-center gap-2"
         >
           {TAGS.map((t) => (
             <span
@@ -219,14 +194,12 @@ export default function HeroV2() {
               {t}
             </span>
           ))}
-        </motion.div>
+        </div>
 
         {/* 듀얼 CTA (라이브 상태에 따라 1순위 변경) */}
-        <motion.div
-          initial={{ opacity: 0, y: reduce ? 0 : 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: reduce ? 0 : 0.8 }}
-          className="mobile-hero-actions mt-10 flex flex-col items-center gap-4 sm:flex-row"
+        <div
+          style={{ animationDelay: '700ms' }}
+          className="anim-rise mobile-hero-actions mt-10 flex flex-col items-center gap-4 sm:flex-row"
         >
           {isLive ? (
             <>
@@ -270,7 +243,7 @@ export default function HeroV2() {
               </a>
             </>
           )}
-        </motion.div>
+        </div>
       </motion.div>
 
       {/* 스크롤 유도 */}

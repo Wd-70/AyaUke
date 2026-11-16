@@ -1,26 +1,29 @@
 'use client'
 
+import Link from "next/link"
 import { signIn } from "next-auth/react"
 import { useState } from "react"
-import { motion } from "framer-motion"
+import { ChevronLeftIcon } from "@heroicons/react/24/outline"
+import { useToast } from "@/components/Toast"
 
 export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false)
+  const { showError } = useToast()
 
   const handleSignIn = async () => {
     setIsLoading(true)
     try {
-      const result = await signIn('chzzk', { 
+      const result = await signIn('chzzk', {
         callbackUrl: '/',
-        redirect: false 
+        redirect: false
       })
-      
+
       if (result?.error) {
         console.error('Login error:', result.error)
         if (result.error.includes('승인')) {
-          alert('치지직 API 승인이 필요합니다. 개발자 콘솔에서 승인 상태를 확인하세요.')
+          showError('치지직 API 승인이 필요해요', '개발자 콘솔에서 승인 상태를 확인해 주세요.')
         } else {
-          alert('로그인에 실패했습니다. 다시 시도해주세요.')
+          showError('로그인에 실패했어요', '잠시 후 다시 시도해 주세요.')
         }
         setIsLoading(false)
       } else if (result?.url) {
@@ -28,180 +31,98 @@ export default function SignIn() {
       }
     } catch (error) {
       console.error('Login error:', error)
-      alert('로그인에 실패했습니다. 다시 시도해주세요.')
+      showError('로그인에 실패했어요', '잠시 후 다시 시도해 주세요.')
       setIsLoading(false)
     }
   }
 
+  // 등장 애니메이션은 CSS(anim-*) — 하이드레이션 전에도 카드가 보이도록.
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 via-purple-50 to-pink-50 dark:bg-gradient-to-br dark:from-gray-900 dark:via-purple-900 dark:to-pink-900">
-      
-      {/* 라이트모드 배경 애니메이션 요소 */}
-      <div className="absolute inset-0 dark:hidden">
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-light-primary/30 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-light-secondary/40 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-light-accent/30 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-gray-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-950 dark:to-gray-950">
+      {/* 배경 블롭 */}
+      <div aria-hidden className="absolute inset-0 dark:hidden">
+        <div className="animate-blob absolute -left-4 top-0 h-72 w-72 rounded-full bg-light-primary/30 opacity-70 mix-blend-multiply blur-xl" />
+        <div className="animate-blob animation-delay-2000 absolute -right-4 top-0 h-72 w-72 rounded-full bg-light-secondary/40 opacity-70 mix-blend-multiply blur-xl" />
+        <div className="animate-blob animation-delay-4000 absolute -bottom-8 left-20 h-72 w-72 rounded-full bg-light-accent/30 opacity-70 mix-blend-multiply blur-xl" />
+      </div>
+      <div aria-hidden className="absolute inset-0 hidden dark:block">
+        <div className="animate-blob absolute -left-4 top-0 h-72 w-72 rounded-full bg-dark-primary/20 opacity-60 mix-blend-screen blur-xl" />
+        <div className="animate-blob animation-delay-2000 absolute -right-4 top-0 h-72 w-72 rounded-full bg-dark-secondary/20 opacity-60 mix-blend-screen blur-xl" />
+        <div className="animate-blob animation-delay-4000 absolute -bottom-8 left-20 h-72 w-72 rounded-full bg-dark-accent/20 opacity-60 mix-blend-screen blur-xl" />
       </div>
 
-      {/* 다크모드 배경 애니메이션 요소 */}
-      <div className="absolute inset-0 hidden dark:block">
-        <div className="absolute top-0 -left-4 w-72 h-72 bg-dark-primary/20 rounded-full mix-blend-screen filter blur-xl opacity-60 animate-blob"></div>
-        <div className="absolute top-0 -right-4 w-72 h-72 bg-dark-secondary/20 rounded-full mix-blend-screen filter blur-xl opacity-60 animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-dark-accent/20 rounded-full mix-blend-screen filter blur-xl opacity-60 animate-blob animation-delay-4000"></div>
-      </div>
+      {/* 로그인 화면에는 내비가 없으므로 돌아갈 길을 준다 */}
+      <Link
+        href="/"
+        className="absolute left-3 top-[max(12px,env(safe-area-inset-top))] z-20 inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-white/50 hover:text-light-accent-deep dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-dark-accent"
+      >
+        <ChevronLeftIcon className="h-4 w-4" aria-hidden />
+        홈으로
+      </Link>
 
-      {/* 메인 컨텐츠 */}
-      <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="w-full max-w-md"
-        >
-          {/* 로고 및 제목 섹션 */}
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-center mb-8"
-          >
-            <div className="mb-6">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center shadow-2xl bg-gradient-to-r from-light-primary to-light-accent dark:bg-gradient-to-r dark:from-dark-primary dark:to-dark-accent"
-              >
-                <span className="text-2xl">🎵</span>
-              </motion.div>
+      <main className="relative z-10 flex min-h-screen items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="anim-rise mb-8 text-center" style={{ animationDelay: '60ms' }}>
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-light-accent to-light-purple shadow-2xl dark:from-dark-primary dark:to-dark-secondary">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/honeyz.png" alt="" className="h-12 w-12 object-contain" />
             </div>
-            
-            <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-light-primary via-light-accent to-light-purple bg-clip-text text-transparent dark:bg-gradient-to-r dark:from-dark-primary dark:via-dark-accent dark:to-dark-secondary dark:bg-clip-text dark:text-transparent">
+            <h1 className="mb-2 bg-gradient-to-r from-light-title-1 via-light-title-2 to-light-title-3 bg-clip-text text-4xl font-bold text-transparent dark:from-dark-accent dark:via-dark-secondary dark:to-dark-primary">
               아야의 노래책
             </h1>
-            <p className="text-lg font-medium mb-2 text-gray-700 dark:text-gray-300">
-              Welcome to AyaUke
-            </p>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              치지직으로 간편하게 로그인하세요
+              치지직 계정으로 간편하게 로그인하세요
             </p>
-          </motion.div>
+          </div>
 
-          {/* 로그인 카드 */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="backdrop-blur-xl rounded-3xl p-8 shadow-2xl border bg-white/70 border-gray-200/50 dark:bg-gray-800/30 dark:border-gray-700/50"
+          <div
+            className="anim-rise rounded-3xl border border-gray-200/50 bg-white/70 p-8 shadow-2xl backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-800/30"
+            style={{ animationDelay: '160ms' }}
           >
-            <motion.button
-              whileHover={{ scale: 1.02, y: -2 }}
-              whileTap={{ scale: 0.98 }}
+            <button
+              type="button"
               onClick={handleSignIn}
               disabled={isLoading}
-              className="w-full relative overflow-hidden font-bold py-4 px-8 rounded-2xl transition-all duration-300 shadow-lg hover:shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed group bg-gradient-to-r from-light-primary via-light-accent to-light-purple text-white hover:from-light-purple hover:via-light-accent hover:to-light-primary dark:bg-gradient-to-r dark:from-dark-primary dark:via-dark-accent dark:to-dark-secondary dark:text-white dark:hover:from-dark-secondary dark:hover:via-dark-accent dark:hover:to-dark-primary"
+              className="group relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-light-cta-accent to-light-cta-purple px-8 py-4 font-bold text-white shadow-lg transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-2xl active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 dark:from-dark-primary dark:to-dark-secondary"
             >
-              {/* 버튼 배경 효과 */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-              
-              <div className="relative flex items-center justify-center space-x-3">
+              <span aria-hidden className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-1000 group-hover:translate-x-full" />
+              <span className="relative flex items-center justify-center gap-3">
                 {isLoading ? (
                   <>
-                    <motion.div 
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full"
-                    />
-                    <span className="text-lg">로그인 중...</span>
+                    <span aria-hidden className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    <span className="text-lg">로그인 중…</span>
                   </>
                 ) : (
                   <>
-                    <motion.div
-                      initial={{ scale: 0.8 }}
-                      animate={{ scale: 1 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-8l3-3 3 3-3 3-3-3z"/>
-                      </svg>
-                    </motion.div>
                     <span className="text-lg">치지직으로 로그인</span>
-                    <motion.div
-                      animate={{ x: [0, 4, 0] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                    >
-                      →
-                    </motion.div>
+                    <span aria-hidden className="transition-transform duration-200 group-hover:translate-x-1">→</span>
                   </>
                 )}
-              </div>
-            </motion.button>
+              </span>
+            </button>
 
-            {/* 부가 설명 */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.8 }}
-              className="mt-6 text-center"
-            >
+            <div className="mt-6 text-center">
               <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
-                치지직 계정으로 로그인하여<br />
-                개인화된 노래책 서비스를 이용하세요
+                로그인하면 좋아요, 플레이리스트, 보관함을<br />
+                어느 기기에서나 이어서 쓸 수 있어요
               </p>
-              <div className="flex items-center justify-center mt-4 space-x-2 text-xs text-gray-500 dark:text-gray-400">
-                <span>🔒</span>
-                <span>안전한 OAuth 2.0 인증</span>
-              </div>
-            </motion.div>
-          </motion.div>
+              <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">🔒 안전한 OAuth 2.0 인증</p>
+            </div>
+          </div>
 
-          {/* 하단 링크 */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 1.0 }}
-            className="text-center mt-8"
-          >
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              계정이 없으신가요?{" "}
-              <a 
-                href="https://chzzk.naver.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="underline transition-colors text-light-accent hover:text-light-purple dark:text-dark-primary dark:hover:text-dark-accent"
-              >
-                치지직에서 가입하기
-              </a>
-            </p>
-          </motion.div>
-        </motion.div>
-      </div>
-
-      {/* 추가 CSS for blob animation */}
-      <style jsx>{`
-        @keyframes blob {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          33% {
-            transform: translate(30px, -50px) scale(1.1);
-          }
-          66% {
-            transform: translate(-20px, 20px) scale(0.9);
-          }
-          100% {
-            transform: translate(0px, 0px) scale(1);
-          }
-        }
-        .animate-blob {
-          animation: blob 7s infinite;
-        }
-        .animation-delay-2000 {
-          animation-delay: 2s;
-        }
-        .animation-delay-4000 {
-          animation-delay: 4s;
-        }
-      `}</style>
+          <p className="anim-fade mt-8 text-center text-sm text-gray-500 dark:text-gray-400" style={{ animationDelay: '300ms' }}>
+            계정이 없으신가요?{" "}
+            <a
+              href="https://chzzk.naver.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-light-accent-deep underline transition-colors hover:text-light-purple dark:text-dark-accent dark:hover:text-dark-primary"
+            >
+              치지직에서 가입하기
+            </a>
+          </p>
+        </div>
+      </main>
     </div>
   )
 }
