@@ -608,7 +608,7 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
     fillBg(c, '#06060b');
     const k = lerp(0.22, 1, span01(t, f.span.start, tSok - 0.15));
     const tipI = Math.min(CRACK.length - 1, Math.floor((CRACK.length - 1) * k));
-    const camX = clamp(CRACK[tipI][0] - 260, 640, 1500) + Math.max(0, t - tSok) * 14;
+    const camX = clamp(CRACK[tipI][0] - 260, 640, 1500) + Math.max(0, t - tSok) * 46;
     const heal = span01(t, tSok + 0.25, tSok + 1.5);
     c.save();
     shake(c, 5 * (1 - heal) * (t < tSok ? 1 : 0.4), t);
@@ -995,7 +995,8 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
     const tZep = ct(42, 1);
     const tZet = ct(42, 2);
     fillBg(c);
-    const up = easeInCubic(span01(t, tZet, tZet + 0.75));
+    // 끝까지 날아가는 중이게(컷 직전에 화면이 비어 멈추지 않도록)
+    const up = easeInCubic(span01(t, tZet, f.span.end + 0.25));
     const thrust = easeOutCubic(span01(t, tZep, tZep + 0.13));
     const grow = easeOutCubic(span01(t, f.span.start, tZep));
     c.save();
@@ -1018,7 +1019,7 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
       for (let i = 0; i < n; i++) {
         const x = 40 + i * 120;
         const mid = Math.abs(i - 5);
-        const rise = up * (1500 + hash(i * 7) * 700);
+        const rise = up * (1300 + hash(i * 7) * 900);
         // 윗니: 사람 머리 위까지 내려온다
         const topTip = lerp(lerp(-60, 170 + (i % 2) * 40, grow), 300 + (i % 3) * 22 - (mid < 1 ? 40 : 0), thrust);
         tooth(x, -80 - rise, topTip - rise, 64, 0.9);
@@ -1116,8 +1117,8 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
     const { t } = f;
     const tAtsu = ct(44, 1);
     fillBg(c);
-    const zoom = lerp(1, 0.46, smooth(f.k));
-    cam(c, zoom, 640, lerp(360, 520, smooth(f.k)), () => {
+    const zoom = lerp(1, 0.46, f.k);
+    cam(c, zoom, 640, lerp(360, 520, f.k), () => {
       // 옆 건물들
       c.fillStyle = '#0b0915';
       for (const [x, w, h] of [[-900, 520, 900], [-330, 260, 600], [1350, 300, 760], [1700, 520, 520], [-1500, 500, 500], [2280, 400, 880]] as const) {

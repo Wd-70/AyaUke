@@ -210,9 +210,19 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
           const k = easeOutBack(span01(t, tDo + 0.1, tDo + 0.32));
           c.save();
           c.translate(W / 2, 372);
-          c.scale(0.6 + 0.4 * k + (t - tDo) * 0.03, 0.6 + 0.4 * k + (t - tDo) * 0.03);
+          c.scale(0.6 + 0.4 * k + (t - tDo) * 0.06, 0.6 + 0.4 * k + (t - tDo) * 0.06);
           neonText(c, 'どうぞ', 0, 0, 250, fonts.display, NEON.white, clamp(k) * (0.82 + 0.18 * pulse(t)));
           c.restore();
+          // 「어서」 — 오른쪽으로 달리는 화살표
+          for (let i = 0; i < 9; i++) {
+            const x = (((t - tDo) * 520 + i * 170) % 1530) - 120;
+            neon(c, NEON.white, 5, () => {
+              c.beginPath();
+              c.moveTo(x - 22, 560);
+              c.lineTo(x + 6, 590);
+              c.lineTo(x - 22, 620);
+            }, clamp(k) * (0.35 + 0.65 * pulse(t - i * 0.03)));
+          }
         }
       }
     });
