@@ -42,7 +42,7 @@ export default function ClipGalleryCard({
 }) {
   const isChzzk = clip.platform === 'chzzk';
   return (
-    <article className="group relative flex flex-col overflow-hidden rounded-2xl border border-light-primary/15 bg-white/60 shadow-sm transition-all duration-300 active:scale-[0.98] active:duration-100 hover:-translate-y-1.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/15 dark:bg-gray-800/50 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow">
+    <article data-clip-card={clip.id} className="group relative flex flex-col overflow-hidden rounded-2xl border border-light-primary/15 bg-white/60 shadow-sm transition-all duration-300 active:scale-[0.98] active:duration-100 hover:-translate-y-1.5 hover:border-light-accent/40 hover:shadow-purple-glow dark:border-dark-primary/15 dark:bg-gray-800/50 dark:hover:border-dark-accent/40 dark:hover:shadow-pink-glow">
       {/* 카드 전체 링크 (오버레이). 일반 클릭은 다이얼로그로, 새 탭/수정키 클릭은 페이지 이동 유지(SEO/크롤). */}
       <Link
         href={`/clip/${clip.shareId || clip.id}`}

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { DialogTitle } from '@headlessui/react';
+import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import Sheet from '@/shared/motion/Sheet';
 
 interface ConfirmOptions {
   title: string;
@@ -107,76 +108,36 @@ export const ConfirmProvider: React.FC<ConfirmProviderProps> = ({ children }) =>
     <ConfirmContext.Provider value={{ confirm }}>
       {children}
       
-      <AnimatePresence>
-        {confirmState.isOpen && (
-          <>
-            {/* 백드롭 */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
-              onClick={handleCancel}
-            />
-            
-            {/* 다이얼로그 */}
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                transition={{ 
-                  type: "spring",
-                  damping: 25,
-                  stiffness: 500
-                }}
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* 헤더 */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center gap-3">
-                    <ExclamationTriangleIcon className={`w-6 h-6 ${colors.icon}`} />
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                      {confirmState.title}
-                    </h3>
-                  </div>
-                  <button
-                    onClick={handleCancel}
-                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    <XMarkIcon className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                  </button>
-                </div>
-                
-                {/* 내용 */}
-                <div className="p-6">
-                  <p className="text-gray-600 dark:text-gray-300 leading-relaxed whitespace-pre-line">
-                    {confirmState.message}
-                  </p>
-                </div>
-                
-                {/* 버튼 */}
-                <div className="flex gap-3 p-6 pt-0">
-                  <button
-                    onClick={handleCancel}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${colors.cancelButton}`}
-                  >
-                    {confirmState.cancelText}
-                  </button>
-                  <button
-                    onClick={handleConfirm}
-                    className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${colors.confirmButton} shadow-sm hover:shadow-md`}
-                  >
-                    {confirmState.confirmText}
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          </>
-        )}
-      </AnimatePresence>
+      {/* 공용 시트: 모바일은 아래에서, 데스크톱은 가운데. 곡 상세(z-80) 등 다른 오버레이 위에 뜬다. */}
+      <Sheet open={confirmState.isOpen} onClose={handleCancel} size="md" layer="z-[160]">
+        <div className="flex items-start gap-3 px-6 pb-2 pt-2 sm:pt-6">
+          <ExclamationTriangleIcon className={`mt-0.5 h-6 w-6 shrink-0 ${colors.icon}`} aria-hidden />
+          <div className="min-w-0">
+            <DialogTitle className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {confirmState.title}
+            </DialogTitle>
+            <p className="mt-2 whitespace-pre-line leading-relaxed text-gray-600 dark:text-gray-300">
+              {confirmState.message}
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3 p-6 pt-4">
+          <button
+            type="button"
+            onClick={handleCancel}
+            className={`min-h-11 flex-1 rounded-xl px-4 py-2.5 font-medium transition-[background-color,transform] duration-200 active:scale-[0.98] ${colors.cancelButton}`}
+          >
+            {confirmState.cancelText}
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            className={`min-h-11 flex-1 rounded-xl px-4 py-2.5 font-medium shadow-sm transition-[background-color,transform,box-shadow] duration-200 hover:shadow-md active:scale-[0.98] ${colors.confirmButton}`}
+          >
+            {confirmState.confirmText}
+          </button>
+        </div>
+      </Sheet>
     </ConfirmContext.Provider>
   );
 };

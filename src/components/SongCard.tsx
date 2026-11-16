@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import { Song } from "@/types";
 import {
@@ -18,6 +18,7 @@ import { useSongVideos, prefetchSongVideos } from "@/hooks/useSongVideos";
 import PlaylistContextMenu from "./PlaylistContextMenu";
 import SongDetailModal from "./SongDetailModal";
 import { useOverlayHistory } from "@/shared/motion/useOverlayHistory";
+import { canMorph, morph } from "@/shared/motion/morph";
 import { useClipRangeEditor } from './clip/range/ClipRangeProvider';
 import OfficialCornerFold from "./OfficialCornerFold";
 import { isOfficialSong } from "@/shared/utils/song-source";
@@ -59,10 +60,20 @@ export default function SongCard({
     [queryClient, song.id]
   );
 
-  // 다이얼로그 닫기
+  // 카드 → 상세 모핑(View Transitions). 지원 여부는 하이드레이션 뒤에 정한다(서버엔 document가 없다).
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [morphable, setMorphable] = useState(false);
+  useEffect(() => setMorphable(canMorph()), []);
+  const openDialog = useCallback(() => {
+    if (!morphable) return setIsExpanded(true);
+    morph('song-morph', cardRef.current, () => setIsExpanded(true), () => document.querySelector('[data-song-sheet]'));
+  }, [morphable]);
+
+  // 다이얼로그 닫기 — 열린 상세가 카드 자리로 돌아가며 줄어든다
   const handleCloseDialog = useCallback(() => {
-    setIsExpanded(false);
-  }, []);
+    if (!morphable) return setIsExpanded(false);
+    morph('song-morph', document.querySelector('[data-song-sheet]'), () => setIsExpanded(false), () => cardRef.current);
+  }, [morphable]);
   // 열린 상세는 히스토리 한 칸 — 뒤로가기로 닫힌다.
   useOverlayHistory(isExpanded, handleCloseDialog);
 
@@ -236,7 +247,7 @@ export default function SongCard({
     if (isExpanded) {
       handleCloseDialog();
     } else {
-      setIsExpanded(true);
+      openDialog();
     }
   };
 
@@ -248,6 +259,7 @@ export default function SongCard({
           상세가 열려도 카드는 그대로 둔다(빠지면 뒤 목록이 밀리고, 닫을 때 재등장한다). */}
       {compact && (
         <div
+          ref={cardRef}
           onClick={handleCardClick}
           onContextMenu={handleContextMenu}
           onMouseEnter={prefetchClips}
@@ -288,6 +300,7 @@ export default function SongCard({
       {/* 일반 카드 */}
       {!compact && (
         <motion.div
+          ref={cardRef}
           whileHover={{ y: -5 }}
           whileTap={{ scale: 0.98 }}
           transition={{ duration: 0.2 }}
@@ -665,7 +678,8 @@ export default function SongCard({
         onSongUpdated={setSong}
         song={song}
         isExpanded={isExpanded}
-        onClose={() => setIsExpanded(false)}
+        onClose={handleCloseDialog}
+        instant={morphable}
         isMobileScreen={typeof window !== 'undefined' ? window.innerWidth < 768 : false}
         songVideos={songVideos}
         setSongVideos={setSongVideos}

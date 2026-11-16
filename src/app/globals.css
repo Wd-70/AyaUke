@@ -533,3 +533,24 @@ html[data-theme-vt]::view-transition-new(root) { animation: none; mix-blend-mode
 }
 .like-pop { animation: like-pop 380ms var(--ease-spring); }
 @media (prefers-reduced-motion: reduce) { .like-pop { animation: none; } }
+
+/* ───────── Card → detail morph (src/shared/motion/morph.ts) ─────────
+   모핑 중에는 헤더·탭 등 고정 조각도 본문 스냅숏에 포함시켜, 배경이 함께 어두워지게 한다. */
+html[data-morph] :is([data-app-header], [data-mobile-tabs], .mini-player-bar, .player-stage, .mobile-tab-pill, .nav-underline) {
+  view-transition-name: none !important;
+}
+html[data-morph]::view-transition-old(root) { animation: vt-fade-out 260ms var(--ease-out) both; }
+html[data-morph]::view-transition-new(root) { animation: fade-in 260ms var(--ease-out) both; }
+::view-transition-group(song-morph),
+::view-transition-group(clip-morph) {
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  overflow: clip;
+  border-radius: 20px;
+}
+/* 카드와 상세의 비율이 크게 달라도 폭에 맞춰 위에서부터 보이게(찌그러지지 않게) */
+::view-transition-old(song-morph), ::view-transition-new(song-morph),
+::view-transition-old(clip-morph), ::view-transition-new(clip-morph) {
+  height: auto;
+  animation-duration: 240ms;
+}

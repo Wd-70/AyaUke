@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
+import Sheet from '@/shared/motion/Sheet';
 import { useSession } from 'next-auth/react';
 import { FlagIcon } from '@heroicons/react/24/outline';
 import { useToast } from '@/components/Toast';
@@ -79,75 +79,59 @@ export default function ClipReportButton({ clipId, size = 'sm', className = '' }
         {lg && <span>신고</span>}
       </button>
 
-      {open &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(false);
-            }}
-          >
-            <div
-              className="w-full max-w-sm rounded-2xl border border-light-primary/20 bg-white p-5 shadow-2xl dark:border-dark-primary/20 dark:bg-gray-800"
-              onClick={(e) => e.stopPropagation()}
+      {/* 공용 시트 — 클립 상세(z-80) 위에 뜬다. 포털이어도 React 이벤트는 부모로 전파되므로 막아 둔다. */}
+      <Sheet open={open} onClose={() => setOpen(false)} size="sm" layer="z-[200]" title="클립 문제 신고" description="어떤 문제가 있나요?">
+        <div className="px-5 pb-5 pt-3" onClick={(e) => e.stopPropagation()}>
+          <div className="space-y-1.5">
+            {REASONS.map((r) => (
+              <label
+                key={r.key}
+                className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  reason === r.key
+                    ? 'border-light-accent/50 bg-light-accent/10 text-light-text dark:border-dark-accent/50 dark:bg-dark-accent/10 dark:text-dark-text'
+                    : 'border-light-primary/20 text-light-text/70 hover:bg-light-primary/5 dark:border-dark-primary/20 dark:text-dark-text/70 dark:hover:bg-dark-primary/5'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="report-reason"
+                  checked={reason === r.key}
+                  onChange={() => setReason(r.key)}
+                  className="accent-light-accent dark:accent-dark-accent"
+                />
+                {r.label}
+              </label>
+            ))}
+          </div>
+
+          <textarea
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+            maxLength={500}
+            rows={2}
+            placeholder="자세한 내용(선택)"
+            className="mt-3 w-full resize-none rounded-lg border border-light-primary/20 bg-white px-3 py-2 text-sm text-light-text placeholder:text-light-text/40 focus:border-light-accent/50 focus:outline-none dark:border-dark-primary/20 dark:bg-gray-900 dark:text-dark-text dark:placeholder:text-dark-text/40"
+          />
+
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-light-text/60 transition-colors hover:bg-light-primary/10 dark:text-dark-text/60 dark:hover:bg-dark-primary/10"
             >
-              <h3 className="mb-1 text-base font-bold text-light-text dark:text-dark-text">클립 문제 신고</h3>
-              <p className="mb-4 text-xs text-light-text/55 dark:text-dark-text/55">어떤 문제가 있나요?</p>
-
-              <div className="space-y-1.5">
-                {REASONS.map((r) => (
-                  <label
-                    key={r.key}
-                    className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition-colors ${
-                      reason === r.key
-                        ? 'border-light-accent/50 bg-light-accent/10 text-light-text dark:border-dark-accent/50 dark:bg-dark-accent/10 dark:text-dark-text'
-                        : 'border-light-primary/20 text-light-text/70 hover:bg-light-primary/5 dark:border-dark-primary/20 dark:text-dark-text/70 dark:hover:bg-dark-primary/5'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="report-reason"
-                      checked={reason === r.key}
-                      onChange={() => setReason(r.key)}
-                      className="accent-light-accent dark:accent-dark-accent"
-                    />
-                    {r.label}
-                  </label>
-                ))}
-              </div>
-
-              <textarea
-                value={detail}
-                onChange={(e) => setDetail(e.target.value)}
-                maxLength={500}
-                rows={2}
-                placeholder="자세한 내용(선택)"
-                className="mt-3 w-full resize-none rounded-lg border border-light-primary/20 bg-white px-3 py-2 text-sm text-light-text placeholder:text-light-text/40 focus:border-light-accent/50 focus:outline-none dark:border-dark-primary/20 dark:bg-gray-900 dark:text-dark-text dark:placeholder:text-dark-text/40"
-              />
-
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="rounded-lg px-4 py-2 text-sm font-medium text-light-text/60 transition-colors hover:bg-light-primary/10 dark:text-dark-text/60 dark:hover:bg-dark-primary/10"
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={submit}
-                  disabled={submitting}
-                  className="rounded-lg bg-gradient-to-r from-light-accent to-light-purple px-4 py-2 text-sm font-bold text-white shadow transition-all hover:shadow-lg disabled:opacity-60 dark:from-dark-primary dark:to-dark-secondary"
-                >
-                  {submitting ? '접수 중…' : '신고하기'}
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )}
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={submitting}
+              className="rounded-lg bg-gradient-to-r from-light-accent to-light-purple px-4 py-2 text-sm font-bold text-white shadow transition-all hover:shadow-lg disabled:opacity-60 dark:from-dark-primary dark:to-dark-secondary"
+            >
+              {submitting ? '접수 중…' : '신고하기'}
+            </button>
+          </div>
+        </div>
+      </Sheet>
     </>
   );
 }

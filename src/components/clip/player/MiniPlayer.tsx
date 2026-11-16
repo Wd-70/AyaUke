@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   PlayIcon,
   PauseIcon,
@@ -15,8 +14,9 @@ import {
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/solid';
 import { Cog6ToothIcon, QueueListIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion, useDragControls, useMotionValue, animate, type PanInfo } from 'framer-motion';
 import { useOverlayHistory } from '@/shared/motion/useOverlayHistory';
+import Sheet from '@/shared/motion/Sheet';
 import { DUR, EASE_IN, SPRING_SHEET } from '@/shared/motion/tokens';
 import { useClipPlayer } from './ClipPlayerProvider';
 import { clipArtwork, clipDurationSec } from './types';
@@ -125,6 +125,16 @@ export default function MiniPlayer() {
   const collapse = useCallback(() => setExpanded(false), [setExpanded]);
   const leaveTo = useOverlayHistory(isExpanded, collapse);
   const reduceMotion = useReducedMotion();
+  // 끌어내려 접기: 상단 바를 잡고 내리면 오버레이가 손가락을 따라오고, 영상 스테이지도 같은 거리만큼 함께 내려간다.
+  // (스테이지는 레이아웃 애니메이션 중이므로 오버레이와 별도의 y 값을 쓴다 — 오버레이 퇴장 애니메이션이 스테이지에 번지지 않게)
+  const dragControls = useDragControls();
+  const stageY = useMotionValue(0);
+  const onPlayerDragEnd = (_: unknown, info: PanInfo) => {
+    document.documentElement.style.userSelect = '';
+    const dismiss = info.offset.y > 120 || info.velocity.y > 600;
+    animate(stageY, 0, SPRING_SHEET);
+    if (dismiss) collapse();
+  };
   const goToPlaylistPage = () => {
     if (!currentSourceShareId) return;
     // 아래로 최소화하며 이동 (재생은 루트 레이아웃 상주라 안 끊김)
@@ -282,6 +292,15 @@ export default function MiniPlayer() {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0, transition: SPRING_SHEET }}
           exit={{ opacity: 0, y: 40, transition: { duration: DUR.exit, ease: EASE_IN } }}
+          drag="y"
+          dragControls={dragControls}
+          dragListener={false}
+          dragConstraints={{ top: 0, bottom: 0 }}
+          dragElastic={{ top: 0, bottom: 0.9 }}
+          // 마우스로 끌 때 아래 목록 글자가 선택되지 않게
+          onDragStart={() => { document.documentElement.style.userSelect = 'none'; }}
+          onDrag={(_, info) => stageY.set(Math.max(0, info.offset.y * 0.9))}
+          onDragEnd={onPlayerDragEnd}
         >
           {/* 불투명 배경 (아래 페이지가 비치지 않도록 솔리드) + 은은한 블러 아트워크 틴트 */}
           <div className="pointer-events-none fixed inset-0 -z-10 bg-light-background dark:bg-dark-background">
@@ -294,7 +313,18 @@ export default function MiniPlayer() {
 
           {/* 상단 바: (좌) 접기 · 영상크기  —  (우) 닫기.
               영상 크기 토글은 '보기' 조작이라 접기와 묶고, 닫기와는 떨어뜨려 혼동을 줄인다. */}
-          <div className="player-expanded-toolbar flex h-12 shrink-0 items-center justify-between px-3">
+          {/* 모바일 손잡이 — 상단 바와 함께 잡고 끌어내리면 접힌다 */}
+          <div
+            aria-hidden
+            className="flex h-4 shrink-0 touch-none cursor-grab items-end justify-center pt-1 md:hidden"
+            onPointerDown={(e) => dragControls.start(e)}
+          >
+            <span className="h-1 w-9 rounded-full bg-light-text/20 dark:bg-dark-text/25" />
+          </div>
+          <div
+            className="player-expanded-toolbar flex h-12 shrink-0 touch-none items-center justify-between px-3 md:touch-auto"
+            onPointerDown={(e) => { if (!reduceMotion) dragControls.start(e); }}
+          >
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setExpanded(false)}
@@ -493,7 +523,7 @@ export default function MiniPlayer() {
       <motion.div
         ref={stageRef}
         className={stageClass}
-        style={isExpanded ? { width: stage.w } : undefined}
+        style={isExpanded ? { width: stage.w, y: stageY } : { y: stageY }}
         layout={!reduceMotion}
         layoutDependency={`${isExpanded}|${stage.w}|${videoCompact}|${radioOn}`}
         transition={SPRING_SHEET}
@@ -574,57 +604,46 @@ export default function MiniPlayer() {
       )}
       </AnimatePresence>
 
-      {/* 유튜브 백그라운드 재생 상세 안내 — 포털로 body에 렌더(스테이지 z-70/영상 합성 레이어 위) */}
-      {ytInfoOpen && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[95] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="유튜브 백그라운드 안내">
-          <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setYtInfoOpen(false)} />
-          <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-light-primary/20 bg-light-background shadow-2xl dark:border-dark-primary/20 dark:bg-dark-background">
-            <div className="flex items-center gap-2 border-b border-light-primary/10 px-5 py-4 dark:border-dark-primary/10">
-              <InformationCircleIcon className="h-6 w-6 shrink-0 text-amber-500" />
-              <h3 className="flex-1 text-base font-bold text-light-text dark:text-dark-text">유튜브 클립과 백그라운드 재생</h3>
-              <button
-                onClick={() => setYtInfoOpen(false)}
-                aria-label="닫기"
-                className="rounded-full p-1 text-light-text/50 hover:bg-light-primary/10 dark:text-dark-text/50 dark:hover:bg-dark-primary/10"
-              >
-                <XMarkIcon className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="space-y-3 px-5 py-4 text-sm leading-relaxed text-light-text/75 dark:text-dark-text/75">
-              <p>
-                <b className="text-light-text dark:text-dark-text">왜 멈추나요?</b>
-                <br />
-                유튜브 클립은 유튜브 iframe 플레이어로 재생돼요. 유튜브 정책상 화면을 끄거나 앱을 백그라운드로
-                보내면 iframe 재생이 자동으로 멈춥니다. 이는 플랫폼 제약이라 우회할 수 없어요.
-              </p>
-              <p>
-                <b className="text-light-text dark:text-dark-text">백그라운드에서는 어떻게 되나요?</b>
-                <br />
-                이어듣기가 끊기지 않도록, 백그라운드에서는 유튜브 클립을 <b className="text-light-text dark:text-dark-text">자동으로 건너뛰고</b> 다음
-                치지직 클립부터 이어서 재생해요. 재생목록에서 삭제되는 게 아니라 그 순간만 건너뛰는 거예요.
-              </p>
-              <p>
-                <b className="text-light-text dark:text-dark-text">치지직 클립은요?</b>
-                <br />
-                치지직 클립은 브라우저 기본 영상으로 재생돼서 화면을 꺼도 소리가 이어지고, 잠금화면·알림에서
-                재생/정지·다음곡 컨트롤도 됩니다.
-              </p>
-              <p className="rounded-xl bg-amber-400/10 px-3 py-2 text-[13px] text-amber-700 dark:text-amber-300">
-                유튜브 클립을 처음부터 끝까지 보려면 앱을 켠 채로 화면을 유지하세요. 앱으로 돌아오면 다시 정상 재생돼요.
-              </p>
-            </div>
-            <div className="px-5 pb-5">
-              <button
-                onClick={() => setYtInfoOpen(false)}
-                className="w-full rounded-xl bg-gradient-to-r from-light-accent to-light-purple py-2.5 text-sm font-semibold text-white dark:from-dark-accent dark:to-dark-purple"
-              >
-                확인
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
+      {/* 유튜브 백그라운드 재생 상세 안내 — 공용 시트(스테이지 z-70 위) */}
+      <Sheet
+        open={ytInfoOpen}
+        onClose={() => setYtInfoOpen(false)}
+        size="sm"
+        layer="z-[95]"
+        title={<span className="flex items-center gap-2"><InformationCircleIcon className="h-6 w-6 shrink-0 text-amber-500" aria-hidden />유튜브 클립과 백그라운드 재생</span>}
+      >
+        <div className="space-y-3 px-5 py-4 text-sm leading-relaxed text-light-text/75 dark:text-dark-text/75">
+          <p>
+            <b className="text-light-text dark:text-dark-text">왜 멈추나요?</b>
+            <br />
+            유튜브 클립은 유튜브 iframe 플레이어로 재생돼요. 유튜브 정책상 화면을 끄거나 앱을 백그라운드로
+            보내면 iframe 재생이 자동으로 멈춥니다. 이는 플랫폼 제약이라 우회할 수 없어요.
+          </p>
+          <p>
+            <b className="text-light-text dark:text-dark-text">백그라운드에서는 어떻게 되나요?</b>
+            <br />
+            이어듣기가 끊기지 않도록, 백그라운드에서는 유튜브 클립을 <b className="text-light-text dark:text-dark-text">자동으로 건너뛰고</b> 다음
+            치지직 클립부터 이어서 재생해요. 재생목록에서 삭제되는 게 아니라 그 순간만 건너뛰는 거예요.
+          </p>
+          <p>
+            <b className="text-light-text dark:text-dark-text">치지직 클립은요?</b>
+            <br />
+            치지직 클립은 브라우저 기본 영상으로 재생돼서 화면을 꺼도 소리가 이어지고, 잠금화면·알림에서
+            재생/정지·다음곡 컨트롤도 됩니다.
+          </p>
+          <p className="rounded-xl bg-amber-400/10 px-3 py-2 text-[13px] text-amber-700 dark:text-amber-300">
+            유튜브 클립을 처음부터 끝까지 보려면 앱을 켠 채로 화면을 유지하세요. 앱으로 돌아오면 다시 정상 재생돼요.
+          </p>
+        </div>
+        <div className="px-5 pb-5">
+          <button
+            onClick={() => setYtInfoOpen(false)}
+            className="w-full rounded-xl bg-gradient-to-r from-light-accent to-light-purple py-2.5 text-sm font-semibold text-white dark:from-dark-accent dark:to-dark-purple"
+          >
+            확인
+          </button>
+        </div>
+      </Sheet>
     </>
   );
 }

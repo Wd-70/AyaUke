@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
+import Sheet from "@/shared/motion/Sheet";
 import {
   SparklesIcon,
   CheckCircleIcon,
@@ -353,33 +354,15 @@ export default function TitleManager({}: TitleManagerProps) {
       </div>
 
       {/* 타이틀 변경 확인 모달 */}
-      <AnimatePresence>
-        {confirmModal.isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* 배경 오버레이 */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={() =>
-                !isUpdating &&
-                setConfirmModal({
-                  isOpen: false,
-                  title: null,
-                  action: "select",
-                })
-              }
-            />
-
-            {/* 모달 콘텐츠 */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 max-w-md w-full mx-4"
-            >
+      {/* 공용 시트 — 모바일 바텀시트 / 데스크톱 다이얼로그, 뒤로가기로 닫힘 */}
+      <Sheet
+        open={confirmModal.isOpen}
+        onClose={() => {
+          if (!isUpdating) setConfirmModal({ isOpen: false, title: null, action: "select" });
+        }}
+        size="md"
+      >
+            <div className="relative p-6 pt-2 sm:pt-6">
               {/* 배경 장식 */}
               <div className="absolute inset-0 bg-gradient-to-br from-light-accent/5 to-light-purple/5 dark:from-dark-accent/5 dark:to-dark-purple/5 rounded-2xl" />
 
@@ -505,10 +488,8 @@ export default function TitleManager({}: TitleManagerProps) {
                   </button>
                 </div>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            </div>
+      </Sheet>
     </div>
   );
 }

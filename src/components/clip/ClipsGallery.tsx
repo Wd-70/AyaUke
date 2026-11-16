@@ -8,6 +8,7 @@ import { HeartIcon } from '@heroicons/react/24/solid';
 import { useSession } from 'next-auth/react';
 import ClipGalleryCard from './ClipGalleryCard';
 import ClipDetailDialog, { type ClipDialogTarget } from './ClipDetailDialog';
+import { canMorph, morph } from '@/shared/motion/morph';
 import { usePublicClips, useAllClips, type ClipsFilters } from '@/hooks/usePublicClips';
 import { useBulkClipLikes } from '@/hooks/useClipLikes';
 import { useBulkClipMemos } from '@/hooks/useClipMemos';
@@ -129,6 +130,19 @@ export default function ClipsGallery() {
 
   // 상세 다이얼로그 대상 (카드 일반 클릭 시 열림)
   const [dialogClip, setDialogClip] = useState<ClipDialogTarget | null>(null);
+  // 카드 → 상세 모핑(View Transitions). 지원 여부는 하이드레이션 뒤에 정한다.
+  const [morphable, setMorphable] = useState(false);
+  useEffect(() => setMorphable(canMorph()), []);
+  const cardEl = (id: string) => document.querySelector(`[data-clip-card="${CSS.escape(id)}"]`);
+  const openClip = (clip: ClipDialogTarget) => {
+    if (!morphable) return setDialogClip(clip);
+    morph('clip-morph', cardEl(clip.id), () => setDialogClip(clip), () => document.querySelector('[data-clip-sheet]'));
+  };
+  const closeClip = () => {
+    const id = dialogClip?.id;
+    if (!morphable || !id) return setDialogClip(null);
+    morph('clip-morph', document.querySelector('[data-clip-sheet]'), () => setDialogClip(null), () => cardEl(id));
+  };
   const total = searching ? searchResults.length : browse.total;
   const isLoading = searching ? allLoading : browse.isLoading;
   const isError = searching ? allError : browse.isError;
@@ -273,7 +287,7 @@ export default function ClipsGallery() {
                 <ClipGalleryCard
                   key={clip.id}
                   clip={clip}
-                  onOpen={setDialogClip}
+                  onOpen={openClip}
                   hasMemo={!!memoFlags[clip.id]}
                 />
               ))}
@@ -295,7 +309,7 @@ export default function ClipsGallery() {
       </div>
 
       {/* 상세 다이얼로그 — 페이지 이동 없이 빠르게 재생·좋아요·플레이리스트·개인 메모 */}
-      <ClipDetailDialog clip={dialogClip} onClose={() => setDialogClip(null)} />
+      <ClipDetailDialog clip={dialogClip} onClose={closeClip} instant={morphable} />
     </main>
   );
 }

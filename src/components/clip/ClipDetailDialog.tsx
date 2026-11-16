@@ -52,9 +52,12 @@ async function fetchClipDetail(id: string): Promise<PublicClipDTO> {
 export default function ClipDetailDialog({
   clip,
   onClose,
+  instant = false,
 }: {
   clip: ClipDialogTarget | null;
   onClose: () => void;
+  /** 카드에서 모핑으로 여닫을 때 — framer 진입/퇴장 없이 즉시 렌더(View Transition이 움직임을 맡음) */
+  instant?: boolean;
 }) {
   const open = !!clip;
   // 열린 상세는 히스토리 한 칸 — 뒤로가기로 닫힌다.
@@ -90,15 +93,11 @@ export default function ClipDetailDialog({
 
   if (typeof document === 'undefined') return null;
 
-  return createPortal(
-    <AnimatePresence>
-      {clip && <DialogBody key={clip.id} clip={clip} onClose={onClose} />}
-    </AnimatePresence>,
-    document.body,
-  );
+  const body = clip && <DialogBody key={clip.id} clip={clip} onClose={onClose} instant={instant} />;
+  return createPortal(instant ? body : <AnimatePresence>{body}</AnimatePresence>, document.body);
 }
 
-function DialogBody({ clip, onClose }: { clip: ClipDialogTarget; onClose: () => void }) {
+function DialogBody({ clip, onClose, instant }: { clip: ClipDialogTarget; onClose: () => void; instant: boolean }) {
   const isChzzk = clip.platform === 'chzzk';
   const rangeSessionId = useId();
 
@@ -110,10 +109,19 @@ function DialogBody({ clip, onClose }: { clip: ClipDialogTarget; onClose: () => 
 
   const sourceUrl = detail ? buildSourceUrl(detail.platform, detail.videoId, detail.startTime) : undefined;
 
+  // 모핑으로 열 때는 영상 플레이어(iframe/video)를 전환이 끝난 뒤 붙인다.
+  // 새 화면 캡처 때 브라우저가 iframe 첫 프레임을 기다려 전환 시작이 ~1초 늦어지기 때문(그동안은 썸네일).
+  const [playerReady, setPlayerReady] = useState(!instant);
+  useEffect(() => {
+    if (playerReady) return;
+    const t = window.setTimeout(() => setPlayerReady(true), 420);
+    return () => window.clearTimeout(t);
+  }, [playerReady]);
+
   return (
     <motion.div
       className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center"
-      initial={{ opacity: 0 }}
+      initial={instant ? false : { opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.18 }}
@@ -127,11 +135,12 @@ function DialogBody({ clip, onClose }: { clip: ClipDialogTarget; onClose: () => 
 
       {/* 패널 */}
       <motion.div
+        data-clip-sheet
         role="dialog"
         aria-modal="true"
         aria-label={`${clip.title} 상세`}
         className="app-detail-sheet relative flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl border border-light-primary/20 bg-light-background shadow-2xl dark:border-dark-primary/20 dark:bg-dark-background sm:rounded-3xl"
-        initial={{ y: 24, scale: 0.98, opacity: 0 }}
+        initial={instant ? false : { y: 24, scale: 0.98, opacity: 0 }}
         animate={{ y: 0, scale: 1, opacity: 1 }}
         exit={{ y: 24, scale: 0.98, opacity: 0, transition: { duration: DUR.exit, ease: EASE_IN } }}
         transition={SPRING_SHEET}
@@ -150,8 +159,8 @@ function DialogBody({ clip, onClose }: { clip: ClipDialogTarget; onClose: () => 
         {/* 스크롤 본문 */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {/* 플레이어 */}
-          <div className={`relative w-full bg-black ${detail ? '' : 'aspect-video'}`}>
-            {detail ? (
+          <div className={`relative w-full bg-black ${detail && playerReady ? '' : 'aspect-video'}`}>
+            {detail && playerReady ? (
               <ClipPlayer
                 rangeSessionId={rangeSessionId}
                 platform={detail.platform}

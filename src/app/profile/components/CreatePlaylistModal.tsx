@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Sheet from '@/shared/motion/Sheet'
 import { 
   XMarkIcon,
   CheckIcon,
@@ -73,25 +74,8 @@ export default function CreatePlaylistModal({ isOpen, onClose, onSuccess }: Crea
   }
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* 배경 오버레이 */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={handleClose}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-          />
-          
-          {/* 모달 */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="relative w-full max-w-md bg-white/95 dark:bg-gray-800/95 backdrop-blur-md rounded-2xl border border-gray-200/60 dark:border-gray-700/60 shadow-2xl"
-          >
+    // 공용 시트: 모바일은 아래에서 올라오고 끌어내려 닫힌다, 데스크톱은 가운데 다이얼로그. 뒤로가기로도 닫힘.
+    <Sheet open={isOpen} onClose={handleClose} size="md">
             {/* 헤더 */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200/60 dark:border-gray-700/60">
               <div className="flex items-center gap-3">
@@ -274,9 +258,6 @@ export default function CreatePlaylistModal({ isOpen, onClose, onSuccess }: Crea
                 </button>
               </div>
             </form>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+    </Sheet>
   )
 }

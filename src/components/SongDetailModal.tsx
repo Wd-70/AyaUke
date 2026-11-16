@@ -49,6 +49,8 @@ interface SongDetailModalProps {
   setSongVideos: Dispatch<SetStateAction<SongVideo[]>>;
   videosLoading: boolean;
   loadSongVideos: () => Promise<void>;
+  /** 카드에서 모핑으로 여닫을 때 — framer 진입/퇴장 없이 즉시 렌더(View Transition이 움직임을 맡음) */
+  instant?: boolean;
 }
 
 export default function SongDetailModal({
@@ -61,6 +63,7 @@ export default function SongDetailModal({
   setSongVideos,
   videosLoading,
   loadSongVideos,
+  instant = false,
 }: SongDetailModalProps) {
   const { data: session } = useSession();
   const rangeEditor = useClipRangeEditor();
@@ -424,13 +427,11 @@ export default function SongDetailModal({
 
   // body로 포털 — 카드 그리드(main z-10)의 쌓임 맥락에 갇혀 헤더·하단 탭 아래로 깔리던 문제 방지.
   // AnimatePresence로 감싸 닫힐 때도 퇴장 애니메이션이 돈다.
-  return createPortal(
-    <AnimatePresence>
-      {isExpanded && (
+  const body = isExpanded && (
     <div key="song-detail">
       {/* 배경 오버레이 */}
       <motion.div
-        initial={{ opacity: 0 }}
+        initial={instant ? false : { opacity: 0 }}
         animate={{ opacity: 1, transition: { duration: DUR.fade } }}
         exit={{ opacity: 0, transition: { duration: DUR.exit } }}
         className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80]"
@@ -440,13 +441,14 @@ export default function SongDetailModal({
       {/* 확장된 모달 */}
       <motion.div
         // 모바일: 아래에서 올라오는 시트(클립 상세와 같은 문법) / 데스크톱: 가운데 다이얼로그
-        initial={isMobileScreen && !isEditMode ? { x: "-50%", y: "100%" } : { opacity: 0, scale: 0.97, x: "-50%", y: 16 }}
+        initial={instant ? false : isMobileScreen && !isEditMode ? { x: "-50%", y: "100%" } : { opacity: 0, scale: 0.97, x: "-50%", y: 16 }}
         animate={isMobileScreen && !isEditMode
           ? { x: "-50%", y: 0, transition: SPRING_SHEET }
           : { opacity: 1, scale: 1, x: "-50%", y: 0, transition: { duration: DUR.enter, ease: EASE_OUT } }}
         exit={isMobileScreen && !isEditMode
           ? { x: "-50%", y: "100%", transition: { duration: 0.2, ease: EASE_IN } }
           : { opacity: 0, scale: 0.98, x: "-50%", y: 8, transition: { duration: DUR.exit, ease: EASE_IN } }}
+        data-song-sheet
         role="dialog" aria-modal="true" aria-label={isEditMode ? `곡 정보 수정: ${displayTitle}` : displayTitle}
         className={`fixed top-20 sm:top-20 left-1/2 z-[80]
                    ${isEditMode ? "w-[calc(100vw-16px)] rounded-2xl sm:w-[95vw] sm:max-w-[1600px]" : isMobileScreen ? "w-full rounded-t-3xl pb-[env(safe-area-inset-bottom)]" : "w-[95vw] max-w-[1600px] rounded-xl"} overflow-hidden
@@ -732,8 +734,11 @@ export default function SongDetailModal({
         position={playlistMenuPos}
       />
     </div>
-      )}
-    </AnimatePresence>,
+  );
+
+  // 모핑 모드는 즉시 붙였다 떼고(전환 콜백 안에서 DOM이 바로 바뀌어야 함), 아니면 퇴장 애니메이션을 돌린다.
+  return createPortal(
+    instant ? body : <AnimatePresence>{body}</AnimatePresence>,
     document.body
   );
 }
