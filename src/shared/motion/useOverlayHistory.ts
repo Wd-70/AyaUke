@@ -8,6 +8,11 @@ const MARK = '__overlay';
 const stack: string[] = [];
 let seq = 0;
 
+/** 오버레이가 하나라도 열려 있는지 — 페이지 전환(PageTransitions)이 양보할 때 쓴다 */
+export function overlayOpen(): boolean {
+  return stack.length > 0;
+}
+
 function currentMark(): string | undefined {
   const state = window.history.state as Record<string, unknown> | null;
   return typeof state?.[MARK] === 'string' ? (state[MARK] as string) : undefined;

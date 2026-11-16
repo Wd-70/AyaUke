@@ -15,7 +15,9 @@ import {
   ArrowsPointingOutIcon,
 } from '@heroicons/react/24/solid';
 import { Cog6ToothIcon, QueueListIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useOverlayHistory } from '@/shared/motion/useOverlayHistory';
+import { DUR, EASE_IN, SPRING_SHEET } from '@/shared/motion/tokens';
 import { useClipPlayer } from './ClipPlayerProvider';
 import { clipArtwork, clipDurationSec } from './types';
 import { prefetchChzzkStream } from '../chzzk-stream-cache';
@@ -122,6 +124,7 @@ export default function MiniPlayer() {
   // 펼친 플레이어는 히스토리 한 칸 — 뒤로가기로 접힌다.
   const collapse = useCallback(() => setExpanded(false), [setExpanded]);
   const leaveTo = useOverlayHistory(isExpanded, collapse);
+  const reduceMotion = useReducedMotion();
   const goToPlaylistPage = () => {
     if (!currentSourceShareId) return;
     // 아래로 최소화하며 이동 (재생은 루트 레이아웃 상주라 안 끊김)
@@ -257,9 +260,10 @@ export default function MiniPlayer() {
     }
   };
 
+  // 가운데 정렬은 transform 대신 inset-x-0 + mx-auto — 스테이지의 레이아웃 애니메이션(transform)과 충돌하지 않게.
   const stageClass = isExpanded
-    ? 'mini-player-stage--expanded fixed z-[70] top-12 left-1/2 -translate-x-1/2'
-    : 'mini-player-stage--compact fixed z-[70] bottom-[7px] left-2 w-[88px]';
+    ? 'player-stage mini-player-stage--expanded fixed z-[70] top-12 inset-x-0 mx-auto'
+    : 'player-stage mini-player-stage--compact fixed z-[70] bottom-[7px] left-2 w-[88px]';
 
   const ctrlBtn =
     'flex items-center justify-center rounded-full transition-colors disabled:opacity-30';
@@ -268,8 +272,17 @@ export default function MiniPlayer() {
     <>
       {/* 펼침 오버레이 (블러 아트워크 배경 + 컨트롤 + 큐) — 스테이지(z-70)보다 아래.
           루트는 스크롤하지 않고(flex 컬럼), 큐 영역만 스크롤 → 고정된 영상 위로 큐가 겹치지 않음 */}
+      <AnimatePresence>
       {isExpanded && (
-        <div className="player-expanded fixed inset-0 z-[55] flex flex-col" role="dialog" aria-label="플레이어">
+        <motion.div
+          key="player-expanded"
+          className="player-expanded fixed inset-0 z-[55] flex flex-col"
+          role="dialog"
+          aria-label="플레이어"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0, transition: SPRING_SHEET }}
+          exit={{ opacity: 0, y: 40, transition: { duration: DUR.exit, ease: EASE_IN } }}
+        >
           {/* 불투명 배경 (아래 페이지가 비치지 않도록 솔리드) + 은은한 블러 아트워크 틴트 */}
           <div className="pointer-events-none fixed inset-0 -z-10 bg-light-background dark:bg-dark-background">
             {bgArtwork && (
@@ -471,11 +484,20 @@ export default function MiniPlayer() {
             })}
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
-      {/* 영속 플레이어 스테이지 — 한 번만 마운트, 위치/크기만 토글. 곡/재생 nonce 변경 시에만 remount */}
-      <div ref={stageRef} className={stageClass} style={isExpanded ? { width: stage.w } : undefined}>
+      {/* 영속 플레이어 스테이지 — 한 번만 마운트, 위치/크기만 토글. 곡/재생 nonce 변경 시에만 remount.
+          layout 애니메이션: 접힘 바의 작은 영상 자리 ↔ 펼침 상단 큰 자리를 끊김 없이 이어서 움직인다. */}
+      <motion.div
+        ref={stageRef}
+        className={stageClass}
+        style={isExpanded ? { width: stage.w } : undefined}
+        layout={!reduceMotion}
+        layoutDependency={`${isExpanded}|${stage.w}|${videoCompact}|${radioOn}`}
+        transition={SPRING_SHEET}
+      >
         <Suspense fallback={<div className="aspect-video w-full rounded-xl bg-black/80" />}>
           <ClipPlayer
             rangeSessionId="global-player"
@@ -504,11 +526,17 @@ export default function MiniPlayer() {
             className="w-full shadow-lg"
           />
         </Suspense>
-      </div>
+      </motion.div>
 
       {/* 접힘 바 chrome — 좌측 소형 영상(위 스테이지) 공간 확보 후 정보/컨트롤 */}
+      <AnimatePresence initial={false}>
       {!isExpanded && (
-        <div className="mini-player-bar fixed inset-x-0 bottom-0 z-[60] flex h-[64px] items-center gap-1.5 border-t border-light-primary/20 bg-white/95 pl-[104px] pr-2 backdrop-blur dark:border-dark-primary/20 dark:bg-gray-900/95" role="region" aria-label="현재 재생 중">
+        <motion.div
+          key="mini-bar"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0, transition: { ...SPRING_SHEET, delay: 0.06 } }}
+          exit={{ opacity: 0, transition: { duration: 0.1 } }}
+          className="mini-player-bar fixed inset-x-0 bottom-0 z-[60] flex h-[64px] items-center gap-1.5 border-t border-light-primary/20 bg-white/95 pl-[104px] pr-2 backdrop-blur dark:border-dark-primary/20 dark:bg-gray-900/95" role="region" aria-label="현재 재생 중">
           <button onClick={() => setExpanded(true)} className="min-w-0 flex-1 text-left" aria-label="플레이어 펼치기">
             <div className="truncate text-sm font-semibold text-light-text dark:text-dark-text">{current.title}</div>
             <div className="truncate text-xs text-light-text/55 dark:text-dark-text/55">{current.artist}</div>
@@ -542,8 +570,9 @@ export default function MiniPlayer() {
           <button onClick={close} aria-label="닫기" className="p-1.5 text-light-text/60 dark:text-dark-text/60">
             <XMarkIcon className="h-5 w-5" />
           </button>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* 유튜브 백그라운드 재생 상세 안내 — 포털로 body에 렌더(스테이지 z-70/영상 합성 레이어 위) */}
       {ytInfoOpen && typeof document !== 'undefined' && createPortal(

@@ -13,6 +13,7 @@ import MiniPlayer from "@/components/clip/player/MiniPlayer";
 import PlayerQueueSync from "@/components/clip/player/PlayerQueueSync";
 import { PwaInstallProvider } from "@/components/pwa/usePwaInstall";
 import MotionProvider from "@/shared/motion/MotionProvider";
+import PageTransitions from "@/shared/motion/PageTransitions";
 
 
 const inter = Inter({
@@ -106,6 +107,7 @@ export default function RootLayout({
           </QueryProvider>
         </AuthProvider>
         </MotionProvider>
+        <PageTransitions />
         <ServiceWorkerRegistrar />
         <Analytics />
       </body>

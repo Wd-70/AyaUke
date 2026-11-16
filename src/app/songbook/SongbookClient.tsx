@@ -8,13 +8,17 @@ import SongCard from '@/components/SongCard';
 import Footer from '@/components/Footer';
 import SongbookHeader from '@/components/SongbookHeader';
 import { MusicalNoteIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { useBulkLikes } from '@/hooks/useLikes';
 import { useSongFilters } from '@/hooks/useSongFilters';
 import { useScrollNav } from '@/hooks/useScrollNav';
 import { prefetchSongVideos } from '@/hooks/useSongVideos';
 import { useQueryClient } from '@tanstack/react-query';
 import { useActivity } from '@/hooks/useActivity';
+
+const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+// v2: 예전 키('songbookViewMode')는 고르지 않아도 'grid'가 자동 저장돼 사용자의 선택과 구분되지 않는다.
+const VIEW_MODE_KEY = 'songbookViewMode.v2';
 
 function useChunkedRender(items: Song[], chunkSize: number = 20) {
   const [visibleCount, setVisibleCount] = useState(chunkSize);
@@ -58,17 +62,20 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showNumbers, setShowNumbers] = useState(false); // 번호 표시 상태
-  // 보기 모드: grid(카드) | list(compact). 브라우저에 저장
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = window.localStorage.getItem('songbookViewMode');
-      if (saved === 'grid' || saved === 'list') return saved;
-    }
-    return 'grid';
-  });
-  useEffect(() => {
-    if (typeof window !== 'undefined') window.localStorage.setItem('songbookViewMode', viewMode);
-  }, [viewMode]);
+  // 보기 모드: grid(카드) | list(compact). 사용자가 고른 값만 브라우저에 저장.
+  // 서버 HTML은 항상 grid → 저장값·모바일 기본값은 하이드레이션 직후(그리기 전) 적용해 불일치를 피한다.
+  const [viewMode, setViewModeState] = useState<'grid' | 'list'>('grid');
+  useIsoLayoutEffect(() => {
+    let saved: string | null = null;
+    try { saved = window.localStorage.getItem(VIEW_MODE_KEY); } catch { /* 저장소 차단 */ }
+    if (saved === 'grid' || saved === 'list') setViewModeState(saved);
+    // 모바일 첫 방문은 리스트 — 카드 보기는 한 화면에 한두 곡뿐이라 훑어보기 어렵다
+    else if (window.matchMedia('(max-width: 767px)').matches) setViewModeState('list');
+  }, []);
+  const setViewMode = (mode: 'grid' | 'list') => {
+    setViewModeState(mode);
+    try { window.localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* 저장소 차단 */ }
+  };
   const [isLoading, setIsLoading] = useState(!initialSongs || initialSongs.length === 0); // 로딩 상태
   const [hasOpenDialog, setHasOpenDialog] = useState(false); // 다이얼로그 열림 상태
   const { loadLikes } = useBulkLikes();

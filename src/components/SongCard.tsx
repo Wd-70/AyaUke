@@ -9,7 +9,8 @@ import {
   ArrowTopRightOnSquareIcon,
   QueueListIcon,
 } from "@heroicons/react/24/outline";
-import { HeartIcon, MicrophoneIcon } from "@heroicons/react/24/solid";
+import { MicrophoneIcon } from "@heroicons/react/24/solid";
+import LikeHeart from "./LikeHeart";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLike } from "@/hooks/useLikes";
 import { useSongPlaylists } from "@/hooks/useGlobalPlaylists";
@@ -173,8 +174,10 @@ export default function SongCard({
     );
   };
 
+  const [likePop, setLikePop] = useState(0);
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!liked) setLikePop((p) => p + 1);
     await toggleLike();
   };
 
@@ -277,7 +280,7 @@ export default function SongCard({
             className="shrink-0 p-1 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/15 disabled:opacity-50"
             title={liked ? "좋아요 취소" : "좋아요"}
           >
-            <HeartIcon className={`w-4 h-4 ${liked ? "text-red-500" : "text-light-text/40 dark:text-dark-text/40"}`} />
+            <LikeHeart liked={liked} popKey={likePop} className={`w-4 h-4 ${liked ? "text-red-500" : "text-light-text/40 dark:text-dark-text/40"}`} />
           </button>
         </div>
       )}
@@ -363,7 +366,7 @@ export default function SongCard({
                                  border border-white/20 dark:border-gray-700/50"
                       title={liked ? "좋아요 취소" : "좋아요"}
                     >
-                      <HeartIcon
+                      <LikeHeart liked={liked} popKey={likePop}
                         className={`w-4 h-4 transition-all duration-200 
                                    ${
                                      likeLoading
@@ -533,7 +536,7 @@ export default function SongCard({
                                  border border-white/20 dark:border-gray-700/50"
                       title={liked ? "좋아요 취소" : "좋아요"}
                     >
-                      <HeartIcon
+                      <LikeHeart liked={liked} popKey={likePop}
                         className={`w-4 h-4 transition-all duration-200 
                                    ${
                                      likeLoading

@@ -114,7 +114,7 @@ export default function Navigation({ currentPath }: NavigationProps) {
         <div className="flex h-12 items-center sm:h-16">
           {/* Left side - Logo */}
           <div className="flex flex-1 items-center">
-            {parent && <Link href={parent.href} aria-label={`${parent.label}으로 돌아가기`} className="-ml-2 mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full md:hidden"><ChevronLeftIcon className="h-5 w-5" /></Link>}
+            {parent && <Link href={parent.href} data-nav="back" aria-label={`${parent.label}으로 돌아가기`} className="-ml-2 mr-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full md:hidden"><ChevronLeftIcon className="h-5 w-5" /></Link>}
             <Link href="/" className="group inline-flex cursor-pointer items-center space-x-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-light-accent to-light-purple p-1 transition-transform duration-200 group-hover:scale-105 dark:from-dark-primary dark:to-dark-secondary sm:h-10 sm:w-10">
                 <img src="/honeyz.png" alt="HONEYZ Logo" className="h-full w-full object-contain" />
@@ -126,7 +126,7 @@ export default function Navigation({ currentPath }: NavigationProps) {
           </div>
 
           {/* Center - Desktop Navigation */}
-          <div className="hidden flex-1 items-center justify-center space-x-8 md:flex">
+          <div data-nav-links className="hidden flex-1 items-center justify-center space-x-8 md:flex">
             {NAV_LINKS.map((link) => {
               const isActive = isRouteWithin(activePath, link.href);
               return (
@@ -144,7 +144,7 @@ export default function Navigation({ currentPath }: NavigationProps) {
                   {isActive && (
                     <motion.span
                       layoutId="nav-active-underline"
-                      className="absolute -bottom-1 left-2 right-2 h-0.5 rounded-full bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary"
+                      className="nav-underline absolute -bottom-1 left-2 right-2 h-0.5 rounded-full bg-gradient-to-r from-light-accent to-light-purple dark:from-dark-primary dark:to-dark-secondary"
                       transition={{ type: 'spring', stiffness: 380, damping: 30, duration: reduce ? 0 : undefined }}
                     />
                   )}
@@ -245,8 +245,13 @@ export default function Navigation({ currentPath }: NavigationProps) {
                     onClick={(event) => {
                       // DialogPanel stops bubbling before ThemeScript's document listener.
                       event.stopPropagation();
-                      const dark = document.documentElement.classList.toggle('dark');
-                      try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch { /* storage may be disabled */ }
+                      const b = event.currentTarget.getBoundingClientRect();
+                      const toggle = (window as Window & { __toggleTheme?: (x?: number, y?: number) => void }).__toggleTheme;
+                      if (toggle) toggle(b.left + 24, b.top + b.height / 2);
+                      else {
+                        const dark = document.documentElement.classList.toggle('dark');
+                        try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch { /* storage may be disabled */ }
+                      }
                     }}
                     className="flex min-h-11 w-full items-center rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-light-primary/5 hover:text-light-accent dark:text-gray-300 dark:hover:bg-dark-primary/5 dark:hover:text-dark-primary"
                   >

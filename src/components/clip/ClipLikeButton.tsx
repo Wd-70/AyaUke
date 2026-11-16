@@ -1,8 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { HeartIcon as HeartOutline } from '@heroicons/react/24/outline';
-import { HeartIcon as HeartSolid } from '@heroicons/react/24/solid';
+import LikeHeart from '@/components/LikeHeart';
 import { useClipLike } from '@/hooks/useClipLikes';
 import { useToast } from '@/components/Toast';
 
@@ -24,6 +24,7 @@ export default function ClipLikeButton({
   const { data: session } = useSession();
   const { liked, likeCount, isLoading, toggle } = useClipLike(clipId, initialCount);
   const { showInfo } = useToast();
+  const [pop, setPop] = useState(0);
 
   const lg = size === 'lg';
 
@@ -37,6 +38,7 @@ export default function ClipLikeButton({
           showInfo('로그인이 필요해요', '좋아요는 로그인 후 이용할 수 있어요.');
           return;
         }
+        if (!liked) setPop((p) => p + 1);
         void toggle();
       }}
       disabled={isLoading}
@@ -48,11 +50,7 @@ export default function ClipLikeButton({
           : 'px-1.5 py-0.5 text-xs'
       } ${liked ? 'text-rose-500' : 'text-light-text/55 hover:text-rose-500 dark:text-dark-text/55'} ${className}`}
     >
-      {liked ? (
-        <HeartSolid className={lg ? 'h-5 w-5' : 'h-4 w-4'} />
-      ) : (
-        <HeartOutline className={lg ? 'h-5 w-5' : 'h-4 w-4'} />
-      )}
+      <LikeHeart liked={liked} popKey={pop} className={lg ? 'h-5 w-5' : 'h-4 w-4'} />
       {likeCount > 0 && <span className="tabular-nums">{likeCount.toLocaleString()}</span>}
     </button>
   );

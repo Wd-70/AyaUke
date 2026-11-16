@@ -12,6 +12,10 @@ import { useOverlayHistory } from '@/shared/motion/useOverlayHistory';
 
 const icons = [HomeIcon, Music2, PlaySquare, Library];
 
+/** 첫 하이드레이션 이후엔 true — 페이지 이동으로 다시 마운트될 때 탭 바를 첫 렌더부터 그린다.
+ *  (한 박자 늦게 그리면 페이지 전환 스냅숏에서 탭 바가 빠져 깜빡인다) */
+let hydrated = false;
+
 export default function MobileAppNavigation({ path, open, onOpen, onClose, children }: {
   path: string;
   open: boolean;
@@ -19,7 +23,7 @@ export default function MobileAppNavigation({ path, open, onOpen, onClose, child
   onClose: () => void;
   children: ReactNode;
 }) {
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = useState(hydrated);
   const [offline, setOffline] = useState(false);
   const tabBarRef = useRef<HTMLElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -54,6 +58,7 @@ export default function MobileAppNavigation({ path, open, onOpen, onClose, child
   }, [open, mounted]);
 
   useEffect(() => {
+    hydrated = true;
     setMounted(true);
     const update = () => setOffline(!navigator.onLine);
     update();
@@ -83,7 +88,11 @@ export default function MobileAppNavigation({ path, open, onOpen, onClose, child
           const active = section === tab.section;
           return <Link key={tab.href} href={tab.href} aria-current={active ? 'page' : undefined}
             className={`mobile-tab ${active ? 'is-active' : ''}`}>
-            <span className="mobile-tab-icon"><Icon size={21} strokeWidth={active ? 2.2 : 1.7} aria-hidden /></span>
+            <span className="mobile-tab-icon">
+              {/* 활성 배경 — 페이지 전환 때 탭 사이를 미끄러져 이동(view-transition-name) */}
+              {active && <span aria-hidden className="mobile-tab-pill" />}
+              <Icon size={21} strokeWidth={active ? 2.2 : 1.7} aria-hidden />
+            </span>
             <span>{tab.label}</span>
           </Link>;
         })}

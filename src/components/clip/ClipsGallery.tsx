@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { SPRING_SNAPPY } from '@/shared/motion/tokens';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon, FilmIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { HeartIcon } from '@heroicons/react/24/solid';
@@ -34,6 +35,8 @@ function Segmented<T extends string>({
   options: { key: T; label: string }[];
   onChange: (v: T) => void;
 }) {
+  // 선택 배경이 옵션 사이를 미끄러져 이동 (그룹마다 고유 layoutId)
+  const group = useId();
   return (
     <div className="flex items-center rounded-xl bg-light-primary/10 p-1 text-sm dark:bg-dark-primary/10">
       {options.map((o) => (
@@ -41,13 +44,21 @@ function Segmented<T extends string>({
           key={o.key}
           onClick={() => onChange(o.key)}
           aria-pressed={value === o.key}
-          className={`min-h-11 rounded-lg px-3 py-1.5 font-medium transition-colors ${
+          className={`relative min-h-11 rounded-lg px-3 py-1.5 font-medium transition-colors active:scale-[0.97] ${
             value === o.key
-              ? 'bg-white text-light-accent-deep shadow-sm dark:bg-gray-700 dark:text-dark-accent'
+              ? 'text-light-accent-deep dark:text-dark-accent'
               : 'text-light-text/65 hover:text-light-accent dark:text-dark-text/55 dark:hover:text-dark-accent'
           }`}
         >
-          {o.label}
+          {value === o.key && (
+            <motion.span
+              layoutId={`seg-${group}`}
+              transition={SPRING_SNAPPY}
+              aria-hidden
+              className="absolute inset-0 rounded-lg bg-white shadow-sm dark:bg-gray-700"
+            />
+          )}
+          <span className="relative">{o.label}</span>
         </button>
       ))}
     </div>

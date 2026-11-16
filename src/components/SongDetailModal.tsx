@@ -4,7 +4,7 @@ import { hasPermission, Permission } from "@/lib/permissions";
 import { useState, useEffect, useCallback, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { DUR, EASE_IN, EASE_OUT } from "@/shared/motion/tokens";
+import { DUR, EASE_IN, EASE_OUT, SPRING_SHEET, SPRING_SNAPPY } from "@/shared/motion/tokens";
 import { Song, SongVideo } from "@/types";
 import {
   MusicalNoteIcon,
@@ -19,7 +19,7 @@ import {
   ClockIcon,
   UserPlusIcon,
 } from "@heroicons/react/24/outline";
-import { HeartIcon } from "@heroicons/react/24/solid";
+import LikeHeart from "./LikeHeart";
 import YouTube from "react-youtube";
 import { useLike } from "@/hooks/useLikes";
 import { useSongPlaylists } from "@/hooks/useGlobalPlaylists";
@@ -66,6 +66,7 @@ export default function SongDetailModal({
   const rangeEditor = useClipRangeEditor();
   const { showSuccess, showError } = useToast();
   const { liked, isLoading: likeLoading, toggleLike } = useLike(song.id);
+  const [likePop, setLikePop] = useState(0);
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isEditMode, setIsEditMode] = useState(false);
   const editFormRef = useRef<SongEditFormHandle>(null);
@@ -333,12 +334,12 @@ export default function SongDetailModal({
       <>
         {/* 좋아요 */}
         <button
-          onClick={toggleLike}
+          onClick={() => { if (!liked) setLikePop((p) => p + 1); void toggleLike(); }}
           disabled={likeLoading}
           className={`${iconBtn} ${liked ? '!text-red-500' : ''}`}
           title={liked ? '좋아요 취소' : '좋아요'}
         >
-          <HeartIcon className={`w-5 h-5 ${liked ? 'text-red-500' : 'text-current'}`} />
+          <LikeHeart liked={liked} popKey={likePop} className={`w-5 h-5 ${liked ? 'text-red-500' : 'text-current'}`} />
           {(song.likeCount ?? 0) > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 flex items-center justify-center text-[10px] font-medium rounded-full bg-red-500 text-white">
               {song.likeCount}
@@ -438,19 +439,26 @@ export default function SongDetailModal({
 
       {/* 확장된 모달 */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.97, x: "-50%", y: 16 }}
-        animate={{ opacity: 1, scale: 1, x: "-50%", y: 0, transition: { duration: DUR.enter, ease: EASE_OUT } }}
-        exit={{ opacity: 0, scale: 0.98, x: "-50%", y: 8, transition: { duration: DUR.exit, ease: EASE_IN } }}
+        // 모바일: 아래에서 올라오는 시트(클립 상세와 같은 문법) / 데스크톱: 가운데 다이얼로그
+        initial={isMobileScreen && !isEditMode ? { x: "-50%", y: "100%" } : { opacity: 0, scale: 0.97, x: "-50%", y: 16 }}
+        animate={isMobileScreen && !isEditMode
+          ? { x: "-50%", y: 0, transition: SPRING_SHEET }
+          : { opacity: 1, scale: 1, x: "-50%", y: 0, transition: { duration: DUR.enter, ease: EASE_OUT } }}
+        exit={isMobileScreen && !isEditMode
+          ? { x: "-50%", y: "100%", transition: { duration: 0.2, ease: EASE_IN } }
+          : { opacity: 0, scale: 0.98, x: "-50%", y: 8, transition: { duration: DUR.exit, ease: EASE_IN } }}
         role="dialog" aria-modal="true" aria-label={isEditMode ? `곡 정보 수정: ${displayTitle}` : displayTitle}
         className={`fixed top-20 sm:top-20 left-1/2 z-[80]
-                   ${isEditMode ? "w-[calc(100vw-16px)] rounded-2xl sm:w-[95vw] sm:max-w-[1600px]" : "w-[95vw] max-w-[1600px] rounded-xl"} overflow-hidden
+                   ${isEditMode ? "w-[calc(100vw-16px)] rounded-2xl sm:w-[95vw] sm:max-w-[1600px]" : isMobileScreen ? "w-full rounded-t-3xl pb-[env(safe-area-inset-bottom)]" : "w-[95vw] max-w-[1600px] rounded-xl"} overflow-hidden
                    bg-white dark:bg-gray-900 backdrop-blur-sm 
                    border border-light-primary/20 dark:border-dark-primary/20
                    shadow-2xl transform -translate-x-1/2`}
         style={{
-          top: isEditMode && isMobileScreen ? 8 : isMobileScreen ? "4.5rem" : "5rem",
+          // 모바일 보기: 화면 아래에 붙은 시트(위쪽 3rem은 뒤 화면이 살짝 보이게)
+          top: isEditMode && isMobileScreen ? 8 : isMobileScreen ? "auto" : "5rem",
+          bottom: isMobileScreen && !isEditMode ? 0 : undefined,
           height: isEditMode && isMobileScreen ? (editorViewportHeight ? `${Math.max(0, editorViewportHeight - 16)}px` : "calc(100dvh - 16px)") : isMobileScreen
-            ? "calc(var(--vh, 1vh) * 100 - 5rem)"
+            ? "calc(var(--vh, 1vh) * 100 - 3rem)"
             : "calc(var(--vh, 1vh) * 100 - 6rem)",
         }}
       >
@@ -569,23 +577,31 @@ export default function SongDetailModal({
                   <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20">
                     <button
                       onClick={() => setActiveTab('mr')}
-                      className={`px-4 py-3 font-medium transition-colors duration-200 ${
+                      className={`relative px-4 py-3 font-medium transition-colors duration-200 ${
                         activeTab === 'mr'
-                          ? 'text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent'
+                          ? 'text-light-accent dark:text-dark-accent'
                           : 'text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text'
                       }`}
                     >
                       MR 영상
+                      {activeTab === 'mr' && (
+                        <motion.span layoutId="song-detail-tab" transition={SPRING_SNAPPY} aria-hidden
+                          className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-light-accent dark:bg-dark-accent" />
+                      )}
                     </button>
                     <button
                       onClick={() => setActiveTab('clips')}
-                      className={`px-4 py-3 font-medium transition-colors duration-200 ${
+                      className={`relative px-4 py-3 font-medium transition-colors duration-200 ${
                         activeTab === 'clips'
-                          ? 'text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent'
+                          ? 'text-light-accent dark:text-dark-accent'
                           : 'text-light-text/70 dark:text-dark-text/70 hover:text-light-text dark:hover:text-dark-text'
                       }`}
                     >
                       라이브클립 ({song.sungCount || 0})
+                      {activeTab === 'clips' && (
+                        <motion.span layoutId="song-detail-tab" transition={SPRING_SNAPPY} aria-hidden
+                          className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-light-accent dark:bg-dark-accent" />
+                      )}
                     </button>
                   </div>
 

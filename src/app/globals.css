@@ -303,7 +303,8 @@ input[aria-invalid="true"]:focus-visible {
     transition: background-color .15s, transform .15s;
   }
   .mobile-tab.is-active { color: var(--mobile-accent); }
-  .mobile-tab.is-active .mobile-tab-icon { background: color-mix(in srgb, var(--mobile-accent) 11%, transparent); }
+  .mobile-tab-icon { position: relative; }
+  .mobile-tab-pill { position: absolute; inset: 0; z-index: -1; border-radius: 12px; background: color-mix(in srgb, var(--mobile-accent) 11%, transparent); }
   .mobile-tab:active .mobile-tab-icon { transform: scale(.92); }
   .mobile-offline-notice {
     position: fixed;
@@ -478,3 +479,57 @@ input[aria-invalid="true"]:focus-visible {
 @media (prefers-reduced-motion: reduce) {
   .anim-rise, .anim-word, .anim-card { animation-name: fade-in; animation-duration: 200ms; }
 }
+
+/* ───────── Page transitions (View Transitions API, src/shared/motion/PageTransitions.tsx) ─────────
+   헤더·하단 탭·미니 플레이어는 이름을 줘서 페이지 스냅숏에서 분리 → 제자리에 머문다.
+   본문(root)만 방향(<html data-nav>)에 따라 움직인다. 미지원 브라우저는 그냥 즉시 전환. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-app-header] { view-transition-name: app-header; }
+  [data-mobile-tabs] { view-transition-name: tab-bar; }
+  .mini-player-bar { view-transition-name: mini-bar; }
+  .player-stage { view-transition-name: player-stage; }
+  .mobile-tab-pill { view-transition-name: tab-pill; }
+  .nav-underline { view-transition-name: nav-underline; }
+}
+
+::view-transition-group(app-header),
+::view-transition-group(tab-bar),
+::view-transition-group(mini-bar) { animation-duration: 180ms; }
+/* 재생 중 영상은 멈춘 스냅숏 대신 살아 있는 화면만 보여 준다 */
+::view-transition-group(player-stage) { animation: none; }
+::view-transition-old(player-stage) { display: none; }
+::view-transition-new(player-stage) { animation: none; }
+/* 탭 활성 표시·밑줄은 이전 탭 자리에서 새 탭 자리로 미끄러진다 */
+::view-transition-group(tab-pill),
+::view-transition-group(nav-underline) { animation-duration: 300ms; animation-timing-function: var(--ease-spring); }
+
+@keyframes vt-fade-out { to { opacity: 0; } }
+@keyframes vt-rise-in { from { opacity: 0; transform: translateY(8px); } }
+@keyframes vt-in-from-right { from { opacity: 0; transform: translateX(28px); } }
+@keyframes vt-out-to-left { to { opacity: 0; transform: translateX(-14px); } }
+@keyframes vt-in-from-left { from { opacity: 0; transform: translateX(-28px); } }
+@keyframes vt-out-to-right { to { opacity: 0; transform: translateX(14px); } }
+
+/* 탭 간 이동: 페이드 스루 (탭은 동등한 관계라 좌우로 밀지 않는다) */
+html[data-nav="tab"]::view-transition-old(root) { animation: vt-fade-out 90ms var(--ease-in) both; }
+html[data-nav="tab"]::view-transition-new(root) { animation: vt-rise-in 210ms var(--ease-out) 60ms both; }
+/* 들어가기: 새 화면이 오른쪽에서 */
+html[data-nav="forward"]::view-transition-old(root) { animation: vt-out-to-left 160ms var(--ease-in) both; }
+html[data-nav="forward"]::view-transition-new(root) { animation: vt-in-from-right 260ms var(--ease-out) 40ms both; }
+/* 나오기(상단 뒤로 화살표): 반대 방향 */
+html[data-nav="back"]::view-transition-old(root) { animation: vt-out-to-right 160ms var(--ease-in) both; }
+html[data-nav="back"]::view-transition-new(root) { animation: vt-in-from-left 260ms var(--ease-out) 40ms both; }
+
+/* 테마 전환(ThemeScript __toggleTheme): 화면 전체를 한 장으로 — 이름 붙은 조각도 같이 원 안에서 바뀌게 */
+html[data-theme-vt] * { view-transition-name: none !important; }
+html[data-theme-vt]::view-transition-old(root),
+html[data-theme-vt]::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
+/* 좋아요 팝 (LikeHeart) */
+@keyframes like-pop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.32); }
+  100% { transform: scale(1); }
+}
+.like-pop { animation: like-pop 380ms var(--ease-spring); }
+@media (prefers-reduced-motion: reduce) { .like-pop { animation: none; } }

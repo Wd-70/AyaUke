@@ -136,6 +136,16 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     }
   };
 
+  // 모바일(화면 폭 전체 토스트)은 위에서 내려오고 위로 밀어 닫는다. 데스크톱은 오른쪽에서 살짝.
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   return (
     <ToastContext.Provider value={{ 
       showToast, 
@@ -153,13 +163,17 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
         {toast && (
           <motion.div
             key={toast.id}
-            initial={{ opacity: 0, x: 300, scale: 0.3 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 300, scale: 0.5, transition: { duration: 0.2 } }}
-            transition={{ 
-              type: "spring",
-              damping: 25,
-              stiffness: 500
+            initial={isMobile ? { opacity: 0, y: -24, scale: 0.97 } : { opacity: 0, x: 48, scale: 0.96 }}
+            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+            exit={isMobile
+              ? { opacity: 0, y: -20, transition: { duration: 0.16 } }
+              : { opacity: 0, x: 48, transition: { duration: 0.16 } }}
+            transition={{ type: "spring", damping: 30, stiffness: 420 }}
+            drag={isMobile ? 'y' : false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0.6, bottom: 0.1 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y < -32 || info.velocity.y < -400) removeToast();
             }}
             className={`
               app-toast fixed top-20 right-4 z-[120] max-w-sm w-full
