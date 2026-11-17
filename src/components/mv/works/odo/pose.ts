@@ -182,9 +182,11 @@ export function climbPose(k: number, side: 1 | -1): Pose {
 export interface FigureOpts {
   skin?: 'picto' | 'aya';
   color: string;
-  /** 아야 머리카락 색 — 주면 머리와 몸이 두 색으로 나뉜다(밝게 비춘 아야). 없으면 한 색 실루엣 */
+  /** 아야 머리카락 색 — 주면 살·옷·머리가 제 색으로 나뉜다(밝게 비춘 아야, color는 옷 색). 없으면 한 색 실루엣 */
   hair?: string;
-  /** 아야 꽃 머리핀 색 — 없으면 실루엣에 붙은 꽃 모양만 */
+  /** 아야 살색(hair를 줄 때) — 없으면 옷 색과 같다 */
+  skinColor?: string;
+  /** 아야 꽃 머리핀·허리끈 색(hair를 줄 때) */
   accent?: string;
   /** 윤곽에 번지는 빛 */
   rim?: string;
@@ -200,8 +202,8 @@ export interface FigureOpts {
   holdColor?: string;
 }
 
-/** 밝게 비춘 아야의 두 색 — 흰 몸에 라벤더 머리, 분홍 꽃핀. `figure(..., { skin: 'aya', color: NEON.white, ...AYA_LIT })` */
-export const AYA_LIT = { hair: '#b99cf7', accent: '#ff4f9a' } as const;
+/** 밝게 비춘 아야의 색 — 흰 원피스에 라벤더 머리, 분홍 꽃핀·허리끈. `figure(..., { skin: 'aya', color: NEON.white, ...AYA_LIT })` */
+export const AYA_LIT = { hair: '#b99cf7', skinColor: '#ffe4d8', accent: '#ff4f9a' } as const;
 
 type Pt = [number, number];
 
@@ -301,8 +303,9 @@ export function joints(p: Pose, aya = false): Joints {
   const neck: Pt = [hip[0] + up[0] * torso, hip[1] + up[1] * torso];
   const headUp = (aya ? 0.1 : 0.122) * (1 - 0.5 * p.fold);
   const head: Pt = [neck[0] + Math.sin(p.lean + p.head) * headUp + 0.02 * face, neck[1] - Math.cos(p.lean + p.head) * headUp + 0.05 * p.fold];
-  const ls: Pt = [neck[0] - side[0] * shW, neck[1] - side[1] * shW + 0.02];
-  const rs: Pt = [neck[0] + side[0] * shW, neck[1] + side[1] * shW + 0.02];
+  const shDrop = aya ? 0.034 : 0.02;
+  const ls: Pt = [neck[0] - side[0] * shW, neck[1] - side[1] * shW + shDrop];
+  const rs: Pt = [neck[0] + side[0] * shW, neck[1] + side[1] * shW + shDrop];
   const le0 = dir(p.la[0], upper);
   const lh0 = dir(p.la[1], fore);
   const re0 = dir(p.ra[0], upper);
@@ -478,18 +481,34 @@ export function figure(c: Ctx, x: number, ground: number, h: number, pose: Pose,
     shape(c, pts);
   };
 
-  const ayaBody = () => {
-    // 다리·구두
-    for (const [hp, k, f, t] of [[j.lhip, j.lk, j.lf, j.lt], [j.rhip, j.rk, j.rf, j.rt]] as const) {
+  // 몸은 겹치는 순서대로 조각을 나눠 둔다 — 한 색 실루엣이면 한꺼번에, 밝게 비출 땐 살·옷·머리를 제 색으로 칠한다.
+  const limbs = [[j.lhip, j.lk, j.lf, j.lt], [j.rhip, j.rk, j.rf, j.rt]] as const;
+  const armsOf = [[j.ls, j.le, j.lh, j.lhand], [j.rs, j.re, j.rh, j.rhand]] as const;
+
+  const legs = () => {
+    for (const [hp, k, f] of limbs) {
       cap(c, hp, k, 0.036, 0.027);
       cap(c, k, f, 0.027, 0.019);
-      cap(c, f, t, 0.022, 0.015);
     }
-    // 몸판 — 어깨선에서 잘록한 허리로
-    shape(c, [[j.ls[0] - sd[0] * 0.016, j.ls[1] - sd[1] * 0.016], [j.rs[0] + sd[0] * 0.016, j.rs[1] + sd[1] * 0.016], wr, wl], false);
-    cap(c, j.ls, j.rs, 0.026, 0.026);
+  };
+  const shoes = () => {
+    for (const [, , f, t] of limbs) cap(c, f, t, 0.022, 0.015);
+  };
+  /** 목에서 어깨로 흘러내리는 선과 가슴 — 어깨가 네모나지 않게 */
+  const chest = () => {
+    const nb: Pt = [j.neck[0] + up[0] * 0.004, j.neck[1] + up[1] * 0.004];
+    cap(c, nb, j.ls, 0.017, 0.023);
+    cap(c, nb, j.rs, 0.017, 0.023);
+    shape(c, [nb, j.rs, wr, wl, j.ls], false);
+  };
+  /** 오프숄더 원피스 — 가슴선에서 잘록한 허리, 종 모양 치마 */
+  const dress = () => {
+    const bl: Pt = [lerp(j.ls[0], wl[0], 0.3) - sd[0] * 0.012, lerp(j.ls[1], wl[1], 0.3) - sd[1] * 0.012];
+    const br: Pt = [lerp(j.rs[0], wr[0], 0.3) + sd[0] * 0.012, lerp(j.rs[1], wr[1], 0.3) + sd[1] * 0.012];
+    shape(c, [bl, br, wr, wl], false);
+    cap(c, bl, br, 0.013, 0.013);
     cap(c, wl, wr, 0.012, 0.012);
-    // 치마 — 허리에서 종 모양으로 퍼지고, 다리를 벌리거나 몸을 낮추면 더 퍼진다. 자락이 늦게 따라온다
+    // 치마 — 다리를 벌리거나 몸을 낮추면 더 퍼지고, 자락이 늦게 따라온다
     const hem = j.hip[1] + 0.185;
     const sw = swing * 0.05 - pose.lean * 0.09 - face * 0.02;
     const flare = (pose.dip ?? 0) * 1.4 + Math.abs(swing) * 0.02;
@@ -508,34 +527,52 @@ export function figure(c: Ctx, x: number, ground: number, h: number, pose: Pose,
     }
     pts.push([j.hip[0] - 0.1 - flare * 0.5, j.hip[1] + 0.02]);
     shape(c, pts);
-    // 팔 — 어깨 아래 소매 주름, 가는 팔, 손
-    for (const [s, e, w, hd] of [[j.ls, j.le, j.lh, j.lhand], [j.rs, j.re, j.rh, j.rhand]] as const) {
-      cap(c, s, [lerp(s[0], e[0], 0.42), lerp(s[1], e[1], 0.42)], 0.03, 0.036);
-      cap(c, s, e, 0.026, 0.021);
-      cap(c, e, w, 0.021, 0.016);
+  };
+  const arms = () => {
+    for (const [s, e, w, hd] of armsOf) {
+      cap(c, s, e, 0.024, 0.02);
+      cap(c, e, w, 0.02, 0.016);
       dot(c, hd, 0.021);
     }
-    // 목·얼굴(턱이 갸름하게)
-    cap(c, j.neck, j.head, 0.02, 0.02);
-    cap(c, j.head, [hx + face * 0.025, hy + 0.044], 0.068, 0.034);
+  };
+  /** 팔뚝을 두르는 소매 주름 */
+  const sleeves = () => {
+    for (const [s, e] of armsOf) {
+      cap(c, [lerp(s[0], e[0], 0.2), lerp(s[1], e[1], 0.2)], [lerp(s[0], e[0], 0.55), lerp(s[1], e[1], 0.55)], 0.03, 0.035);
+    }
+  };
+  /** 목과 얼굴 — 동그란 얼굴에 턱만 살짝 */
+  const headNeck = () => {
+    cap(c, j.neck, j.head, 0.015, 0.015);
+    cap(c, j.head, [hx + face * 0.025, hy + 0.03], 0.066, 0.046);
+  };
+  const whole = () => {
+    legs();
+    shoes();
+    chest();
+    dress();
+    arms();
+    sleeves();
+    headNeck();
     mic();
   };
 
   const hairFront = () => {
-    // 정수리에서 이마까지 덮는 머리 — 앞머리 끝이 지그재그
+    // 정수리에서 이마까지 덮는 머리. 앞머리는 둥근 가닥 셋이 내려오고 그 사이만 뾰족하게 갈라진다
+    // (끝을 뾰족하게 내리면 얼굴이 톱니 모양으로 잘려 보인다)
     const b = (dx: number, dy: number): Pt => [hx + dx, hy + dy];
     shape(c, [
-      b(-0.084, 0.03), b(-0.09, -0.035), b(-0.058, -0.088), b(0, -0.1), b(0.058, -0.088), b(0.09, -0.035), b(0.084, 0.03),
-      b(0.07, 0.004), b(0.07, 0.004), b(0.052, -0.03), b(0.03, 0), b(0.03, 0), b(0.004, -0.034), b(-0.022, 0), b(-0.022, 0),
-      b(-0.05, -0.03), b(-0.07, 0.004), b(-0.07, 0.004),
+      b(-0.086, 0.035), b(-0.092, -0.035), b(-0.06, -0.09), b(0, -0.102), b(0.06, -0.09), b(0.092, -0.035), b(0.086, 0.035),
+      b(0.07, 0.012), b(0.07, 0.012), b(0.05, 0.022), b(0.03, -0.016), b(0.03, -0.016), b(0.004, 0.024), b(-0.022, -0.016), b(-0.022, -0.016),
+      b(-0.046, 0.022), b(-0.07, 0.012), b(-0.07, 0.012),
     ]);
-    // 옆머리 — 얼굴 옆에서 가슴 앞으로 흘러내림
+    // 옆머리 — 얼굴 바깥을 따라 가슴 앞으로 흘러내림(뺨을 가리지 않는다). 끝만 움직임을 따라간다
     for (const s of [-1, 1]) {
       const k = s * sideK;
-      const tip: Pt = [hx + k * 0.082 + lag * 0.55, hy + 0.3];
+      const tip: Pt = [hx + k * 0.088 + lag * 0.5, hy + 0.3];
       shape(c, [
-        [hx + k * 0.066, hy - 0.02], [hx + k * 0.1, hy + 0.05], [hx + k * 0.096 + lag * 0.3, hy + 0.19], tip, tip,
-        [hx + k * 0.072 + lag * 0.3, hy + 0.2], [hx + k * 0.068, hy + 0.06],
+        [hx + k * 0.07, hy - 0.01], [hx + k * 0.104, hy + 0.05], [hx + k * 0.1 + lag * 0.25, hy + 0.19], tip, tip,
+        [hx + k * 0.076 + lag * 0.25, hy + 0.2], [hx + k * 0.07, hy + 0.06],
       ]);
     }
     // 더듬이 머리 — 정수리에서 휘어 올라가는 한 가닥
@@ -559,7 +596,8 @@ export function figure(c: Ctx, x: number, ground: number, h: number, pose: Pose,
   };
 
   const flowerAt: Pt = [hx + 0.074 * sideK, hy - 0.05];
-  const flower = (r: number) => {
+  const flower = () => {
+    const r = 0.017;
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * TAU - Math.PI / 2;
       dot(c, [flowerAt[0] + Math.cos(a) * r * 1.15, flowerAt[1] + Math.sin(a) * r * 1.15], r);
@@ -567,10 +605,12 @@ export function figure(c: Ctx, x: number, ground: number, h: number, pose: Pose,
   };
 
   /**
-   * tint: 어두운 실루엣일 때 머리카락에 윤곽 빛 색을 옅게 덧입힌다 — 머리와 몸이 한 덩어리로 뭉치지 않게.
-   * hair를 주면(밝게 비춘 아야) 머리·몸·꽃이 제 색으로 나뉘고 눈과 허리끈이 생긴다.
+   * 세 가지 칠:
+   * - 한 색(잔상·색 그림자): 전부 한 path로 — 반투명에서도 겹친 자리가 진해지지 않는다.
+   * - 어두운 실루엣(tint = 윤곽 빛 색): 머리카락에 그 색을 옅게 덧입혀 몸과 한 덩어리로 뭉치지 않게.
+   * - 밝게 비춘 아야(lit): 살·옷·머리·꽃을 제 색으로. 얼굴에 눈·입은 그리지 않는다(넣어 보니 어색했다, 2026-11-17).
    */
-  const paint = (body: string, hair: string | undefined, accent: string | undefined, tint: string | undefined) => {
+  const paint = (body: string, lit: { hair: string; skin: string; accent: string } | null, tint: string | undefined) => {
     c.fillStyle = body;
     if (!aya) {
       picto();
@@ -582,48 +622,54 @@ export function figure(c: Ctx, x: number, ground: number, h: number, pose: Pose,
       part();
       c.fill();
     };
+    if (lit) {
+      fillPart(lit.hair, hairBack);
+      fillPart(lit.skin, () => {
+        legs();
+        chest();
+      });
+      fillPart(body, () => {
+        shoes();
+        dress();
+      });
+      fillPart(lit.skin, () => {
+        arms();
+        headNeck();
+      });
+      fillPart(body, () => {
+        sleeves();
+        mic();
+      });
+      fillPart(lit.accent, () => cap(c, wl, wr, 0.013, 0.013));
+      fillPart(lit.hair, hairFront);
+      fillPart(lit.accent, flower);
+      fillPart('#ffffff', () => dot(c, flowerAt, 0.009));
+      return;
+    }
+    if (!tint) {
+      fillPart(body, () => {
+        hairBack();
+        whole();
+        hairFront();
+        flower();
+      });
+      return;
+    }
     const tinted = (part: () => void, a: number) => {
-      if (!tint) return;
       c.save();
       c.globalAlpha *= a;
       fillPart(tint, part);
       c.restore();
     };
-    if (!hair && !tint) {
-      // 한 색 실루엣: 전부 한 path로(반투명 잔상에서도 겹친 자리가 진해지지 않게)
-      fillPart(body, () => {
-        hairBack();
-        ayaBody();
-        hairFront();
-        flower(0.017);
-      });
-    } else {
-      fillPart(hair ?? body, hairBack);
-      tinted(hairBack, 0.2);
-      fillPart(body, ayaBody);
-      fillPart(hair ?? body, () => {
-        hairFront();
-        if (!accent) flower(0.017);
-      });
-      tinted(hairFront, 0.2);
-      if (!accent) tinted(() => flower(0.017), 0.75);
-    }
-    if (hair) {
-      // 눈 — 점 두 개. 허리끈
-      fillPart('#4a3a86', () => {
-        for (const sx of [-1, 1]) {
-          const ex = hx + sx * 0.03 * sideK + face * 0.03;
-          c.moveTo(ex + 0.009, hy + 0.027);
-          c.ellipse(ex, hy + 0.027, 0.009, 0.014, 0, 0, TAU);
-          c.closePath();
-        }
-      });
-      fillPart(accent ?? hair, () => cap(c, wl, wr, 0.013, 0.013));
-    }
-    if (accent) {
-      fillPart(accent, () => flower(0.017));
-      fillPart('#ffffff', () => dot(c, flowerAt, 0.009));
-    }
+    fillPart(body, hairBack);
+    tinted(hairBack, 0.2);
+    fillPart(body, whole);
+    fillPart(body, () => {
+      hairFront();
+      flower();
+    });
+    tinted(hairFront, 0.2);
+    tinted(flower, 0.75);
   };
 
   if (o.rim) {
@@ -631,10 +677,11 @@ export function figure(c: Ctx, x: number, ground: number, h: number, pose: Pose,
     c.save();
     c.shadowColor = o.rim;
     c.shadowBlur = o.rimBlur ?? 16;
-    paint(o.rim, undefined, undefined, undefined);
+    paint(o.rim, null, undefined);
     c.restore();
   }
-  paint(o.color, o.hair, o.accent, o.hair ? undefined : o.rim);
+  const lit = o.hair ? { hair: o.hair, skin: o.skinColor ?? o.color, accent: o.accent ?? o.hair } : null;
+  paint(o.color, lit, lit ? undefined : o.rim);
   c.restore();
 
   if (o.hold === 'light' && o.holdColor) {
