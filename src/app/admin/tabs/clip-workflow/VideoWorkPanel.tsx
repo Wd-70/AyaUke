@@ -17,6 +17,12 @@ import { fmt } from "./itemUtils";
 import { saveWorkflowItem, workflowRequest } from './workflow-client';
 import type { Platform, WorkflowVideo, WorkflowItem, WorkflowSong, WorkflowComment, VideoDetail } from "./types";
 
+/** '매칭 없는 항목 숨기기' 선택 — 이 브라우저에서만 기억 */
+const HIDE_UNMATCHED_KEY = "clipWorkflowHideUnmatched";
+function readHideUnmatched(): boolean {
+  try { return localStorage.getItem(HIDE_UNMATCHED_KEY) === "1"; } catch { return false; }
+}
+
 interface Props {
   platform: Platform;
   video: WorkflowVideo;
@@ -38,7 +44,16 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
   const [result, setResult] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
   const autoMatchedRef = useRef<Set<string>>(new Set()); // 영상별 자동매칭 1회 가드
-  const navigation = useItemNavigation(items, selectedId, setSelectedId);
+  const [hideUnmatched, setHideUnmatched] = useState(readHideUnmatched);
+  const hideUnmatchedRef = useRef(hideUnmatched);
+  hideUnmatchedRef.current = hideUnmatched;
+  // 매칭 없는 항목(미매칭·비곡) 숨기기. 지금 고른 항목은 편집 중 매칭을 풀어도 목록에서 사라지지 않게 남긴다.
+  const visibleItems = useMemo(
+    () => (hideUnmatched ? items.filter((it) => it.matchedSongId || it.id === selectedId) : items),
+    [items, hideUnmatched, selectedId],
+  );
+  const unmatchedCount = useMemo(() => items.filter((it) => !it.matchedSongId).length, [items]);
+  const navigation = useItemNavigation(visibleItems, selectedId, setSelectedId);
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -47,7 +62,8 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
       setComments(res.data.comments);
       setItems(res.data.items);
       setExistingClips(res.data.existingClips || []);
-      setSelectedId((prev) => res.data.items.some((it) => it.id === prev) ? prev : res.data.items[0]?.id ?? null);
+      const first = (hideUnmatchedRef.current && res.data.items.find((it) => it.matchedSongId)) || res.data.items[0];
+      setSelectedId((prev) => res.data.items.some((it) => it.id === prev) ? prev : first?.id ?? null);
     } finally {
       setLoading(false);
     }
@@ -95,6 +111,14 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
   }, [loading, items, songs, video.videoId, onStatusRefresh]);
 
   const selected = items.find((it) => it.id === selectedId) || null;
+
+  const toggleHideUnmatched = () => {
+    const next = !hideUnmatched;
+    setHideUnmatched(next);
+    try { localStorage.setItem(HIDE_UNMATCHED_KEY, next ? "1" : "0"); } catch { /* 기억만 못 할 뿐 */ }
+    // 숨기는 순간 고른 항목이 매칭 없는 항목이면 첫 매칭 항목으로 옮긴다
+    if (next && selected && !selected.matchedSongId) setSelectedId(items.find((it) => it.matchedSongId)?.id ?? null);
+  };
 
   const parse = async () => {
     setParsing(true);
@@ -281,8 +305,32 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
 
           {/* 좌(목록): 타임라인 — 좁게 */}
           <div className={`${navigation.listClass} border border-light-primary/20 dark:border-dark-primary/20 rounded-lg overflow-hidden flex flex-col lg:order-1 lg:max-h-[78vh]`}>
+            <div className="flex items-center justify-between gap-2 border-b border-light-primary/15 px-2.5 py-1 text-xs dark:border-dark-primary/15">
+              <span className="text-light-text/60 dark:text-dark-text/60 tabular-nums">
+                {hideUnmatched && items.length > visibleItems.length ? `${visibleItems.length}개 표시 · ${items.length - visibleItems.length}개 숨김` : `항목 ${items.length}개`}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={hideUnmatched}
+                onClick={toggleHideUnmatched}
+                title="곡이 매칭되지 않은 항목(미매칭·비곡)을 목록에서 숨깁니다. 클립 생성에는 영향이 없어요."
+                className="inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-light-text/75 hover:text-light-text dark:text-dark-text/75 dark:hover:text-dark-text"
+              >
+                <span aria-hidden className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors ${hideUnmatched ? "bg-light-accent dark:bg-dark-accent" : "bg-light-text/20 dark:bg-dark-text/25"}`}>
+                  <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform ${hideUnmatched ? "translate-x-3.5" : "translate-x-0.5"}`} />
+                </span>
+                매칭 없는 항목 숨기기 <span className="tabular-nums text-light-text/50 dark:text-dark-text/50">({unmatchedCount})</span>
+              </button>
+            </div>
             <div className="lg:overflow-y-auto">
-              {items.map((it) => {
+              {visibleItems.length === 0 && (
+                <div className="p-6 text-center text-xs text-light-text/55 dark:text-dark-text/55">
+                  <p>매칭된 항목이 없어요.</p>
+                  <button type="button" onClick={toggleHideUnmatched} className="mt-2 rounded-lg px-3 py-1.5 font-medium text-light-accent hover:underline dark:text-dark-accent">숨긴 항목 {items.length}개 모두 보기</button>
+                </div>
+              )}
+              {visibleItems.map((it) => {
                 const isSel = it.id === selectedId;
                 const m = it.matchedSongId ? songsById.get(it.matchedSongId) : undefined;
                 const clipped = clippedItemIds.has(it.id);

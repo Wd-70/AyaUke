@@ -182,6 +182,37 @@ describe('mobile clip workflow', () => {
     await page.close();
   }, 30000);
 
+  it('hides items without a matched song and remembers the choice', async () => {
+    const { page, errors } = await fixture(1280, true);
+    const unmatched = page.getByText('미등록 가수 - 미등록 노래', { exact: true });
+    const toggle = page.getByRole('switch', { name: '매칭 없는 항목 숨기기', exact: false });
+    expect(await toggle.getAttribute('aria-checked')).toBe('false');
+    await toggle.click();
+    await unmatched.waitFor({ state: 'detached' });
+    await page.getByText('23개 표시 · 1개 숨김', { exact: true }).waitFor();
+    expect(await page.getByRole('button', { name: '클립 생성 (23곡)', exact: true }).isVisible()).toBe(true);
+    await page.reload();
+    await page.getByRole('button', { name: '모바일 작업 영상', exact: false }).click();
+    await page.getByText('가수 - 곡 2', { exact: true }).first().waitFor();
+    expect(await page.getByRole('switch', { name: '매칭 없는 항목 숨기기', exact: false }).getAttribute('aria-checked')).toBe('true');
+    expect(await unmatched.count()).toBe(0);
+    await page.getByRole('switch', { name: '매칭 없는 항목 숨기기', exact: false }).click();
+    await unmatched.waitFor();
+    expect(errors).toEqual([]);
+    await page.close();
+  }, 30000);
+
+  it('skips hidden items when moving between items on mobile', async () => {
+    const { page, errors } = await fixture(390, true);
+    await page.getByRole('switch', { name: '매칭 없는 항목 숨기기', exact: false }).click();
+    await page.getByRole('button', { name: '미등록 가수 - 미등록 노래 편집', exact: true }).waitFor({ state: 'detached' });
+    await page.getByRole('button', { name: '가수 - 곡 2 편집', exact: true }).click();
+    await page.getByText('1 / 23', { exact: true }).waitFor();
+    expect(await page.getByRole('button', { name: '← 이전 항목', exact: true }).isDisabled()).toBe(true);
+    expect(errors).toEqual([]);
+    await page.close();
+  }, 30000);
+
   it('opens song and unmatched editors without stacked lists', async () => {
     const { page, errors } = await fixture(430);
     await page.getByRole('button', { name: '← 영상 목록', exact: true }).click();
