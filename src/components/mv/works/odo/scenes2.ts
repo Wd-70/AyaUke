@@ -1602,7 +1602,7 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
         const d = Math.abs(i - 3);
         const x = 640 + (i - 3) * 172;
         const pose = danceAt(DANCE2, bp - d, 0.2);
-        if (i === 3) figure(c, x, 620, 380, pose, { skin: 'aya', color: NEON.white, ...AYA_LIT, rim: NEON.pink, rimBlur: 20, swing: Math.sin(bp * Math.PI) });
+        if (i === 3) figure(c, x, 620, 380, pose, { skin: 'aya', color: NEON.white, lit: AYA_LIT, rim: NEON.pink, rimBlur: 20, swing: Math.sin(bp * Math.PI) });
         else figure(c, x, 620, 270 - d * 14, pose, { color: PARTY[(i + 1) % 4], flip: i > 3 });
       }
       confetti(c, t, 90, 43, PARTY, 240);
