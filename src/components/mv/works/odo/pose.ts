@@ -184,6 +184,8 @@ export interface FigureOpts {
   color: string;
   /** 밝게 비춘 아야의 색(AYA_LIT) — 주면 살·옷·머리가 제 색으로 나뉜다(color는 옷 색). 없으면 한 색 실루엣 */
   lit?: AyaColors;
+  /** lit일 때 무대 조명이 옷·머리에 물드는 정도(0~1) — 조명 색은 rim. 기본 0.45 */
+  wash?: number;
   /** 윤곽에 번지는 빛 */
   rim?: string;
   rimBlur?: number;
@@ -213,6 +215,29 @@ export interface AyaColors {
 export const AYA_LIT: AyaColors = { hair: '#b99cf7', skinColor: '#ffe4d8', accent: '#ffd23f', tie: '#8a68d8', flower: '#f1e8ff' };
 
 type Pt = [number, number];
+
+/** '#rrggbb' → [r, g, b], 아니면 null */
+function hexRgb(c: string): [number, number, number] | null {
+  const m = /^#([0-9a-f]{6})$/i.exec(c);
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/**
+ * 조명 색이 물든 색 — 바탕색에 조명 색을 곱한 것(색 있는 빛을 받은 물체)과 원래 색을 k만큼 섞는다.
+ * 흰 옷은 조명 색으로, 노란 장식은 분홍 조명 아래 주홍으로, 라벤더 머리는 더 붉은 보라로 간다.
+ */
+function washed(base: string, light: string, k: number): string {
+  const b = hexRgb(base);
+  const l = hexRgb(light);
+  if (!b || !l || k <= 0) return base;
+  const ch = (i: number) => {
+    const lit = (b[i] * (0.35 + 0.65 * (l[i] / 255)));
+    return Math.round(b[i] + (lit - b[i]) * k);
+  };
+  return `rgb(${ch(0)},${ch(1)},${ch(2)})`;
+}
 
 interface Joints {
   hip: Pt;
@@ -773,7 +798,6 @@ export function figure(c: Ctx, x: number, ground: number, h: number, pose: Pose,
     });
     tinted(tint, hairFront, 0.2);
     tinted(tint, flower, 0.75);
-    tinted(AYA_LIT.accent, ahoge, 0.85);
   };
 
   if (o.rim) {
@@ -784,7 +808,13 @@ export function figure(c: Ctx, x: number, ground: number, h: number, pose: Pose,
     paint(o.rim, null, undefined);
     c.restore();
   }
-  paint(o.color, o.lit ?? null, o.lit ? undefined : o.rim);
+  // 밝게 비춘 아야는 무대 조명(rim 색)을 받아 옷·머리·살이 그 색으로 물든다 — 공연장 분위기
+  const wash = o.lit && o.rim ? (o.wash ?? 0.45) : 0;
+  const w = (col: string) => (wash > 0 && o.rim ? washed(col, o.rim, wash) : col);
+  const litW: AyaColors | null = o.lit
+    ? { hair: w(o.lit.hair), skinColor: w(o.lit.skinColor), accent: w(o.lit.accent), tie: w(o.lit.tie), flower: w(o.lit.flower) }
+    : null;
+  paint(w(o.color), litW, o.lit ? undefined : o.rim);
   c.restore();
 
   if (o.hold === 'light' && o.holdColor) {
