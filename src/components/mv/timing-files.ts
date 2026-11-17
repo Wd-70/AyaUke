@@ -9,4 +9,8 @@ export const TIMING_FILES: Record<string, { lyrics: string; cues?: string }> = {
     lyrics: 'src/components/mv/works/katappo/lyrics.json',
     cues: 'src/components/mv/works/katappo/cues.json',
   },
+  '68610d4c042fb27d045427ac': {
+    lyrics: 'src/components/mv/works/odo/lyrics.json',
+    cues: 'src/components/mv/works/odo/cues.json',
+  },
 };
