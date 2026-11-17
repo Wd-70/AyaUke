@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { useOverlayHistory } from "@/shared/motion/useOverlayHistory";
 
 export function useWorkflowMobile() {
   const [mobile, setMobile] = useState(false);
@@ -33,6 +34,9 @@ function updateInert() {
 export function useWorkflowOverlay(active: boolean, host: HTMLElement | null, dialog: RefObject<HTMLElement>, onClose: () => void) {
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  // 안드로이드 뒤로가기·브라우저 뒤로가 관리자 페이지를 떠나는 대신 이 작업 화면만 닫도록.
+  // onClose는 저장 안 한 변경을 확인하느라 거절될 수 있어 guarded 모드로 둔다.
+  useOverlayHistory(active && !!host, () => closeRef.current(), { guarded: true });
   useEffect(() => {
     if (!active || !host || !dialog.current) return;
     const previousFocus = document.activeElement as HTMLElement | null;

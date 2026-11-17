@@ -31,18 +31,32 @@ function useDebounce<T>(value: T, delay: number): T {
  * 상태를 소유하고 useEffect로 부모 state를 갱신해 무한 렌더 루프의 무대가 되었다.)
  * 검색/필터/정렬 순수 로직은 domains/catalog/song-filter에 위임한다.
  */
-export function useSongFilters(songs: Song[]) {
-  const [searchTerm, setSearchTerm] = useState('');
+/** 뒤로가기로 돌아왔을 때 되살릴 필터 상태(직렬화 가능한 형태) */
+export type SongFilterSnapshot = {
+  searchTerm: string;
+  includeLyrics: boolean;
+  filterMode: FilterMode;
+  activeLanguages: string[];
+  showLikedOnly: boolean;
+  activePlaylists: string[];
+  selectedSingleFilter: string | null;
+  sortBy: SortBy;
+  sortOrder: SortOrder;
+  randomSeed: number;
+};
+
+export function useSongFilters(songs: Song[], initial?: SongFilterSnapshot | null) {
+  const [searchTerm, setSearchTerm] = useState(initial?.searchTerm ?? '');
   const [isFilterOpen, setIsFilterOpen] = useState(true); // 기본 열림
-  const [includeLyrics, setIncludeLyrics] = useState(false);
-  const [filterMode, setFilterMode] = useState<FilterMode>('individual');
-  const [activeLanguages, setActiveLanguages] = useState<Set<string>>(new Set());
-  const [showLikedOnly, setShowLikedOnly] = useState(false);
-  const [activePlaylists, setActivePlaylists] = useState<Set<string>>(new Set());
-  const [selectedSingleFilter, setSelectedSingleFilter] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortBy>('default');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [randomSeed, setRandomSeed] = useState(0); // 랜덤 재섞기 트리거
+  const [includeLyrics, setIncludeLyrics] = useState(initial?.includeLyrics ?? false);
+  const [filterMode, setFilterMode] = useState<FilterMode>(initial?.filterMode ?? 'individual');
+  const [activeLanguages, setActiveLanguages] = useState<Set<string>>(() => new Set(initial?.activeLanguages ?? []));
+  const [showLikedOnly, setShowLikedOnly] = useState(initial?.showLikedOnly ?? false);
+  const [activePlaylists, setActivePlaylists] = useState<Set<string>>(() => new Set(initial?.activePlaylists ?? []));
+  const [selectedSingleFilter, setSelectedSingleFilter] = useState<string | null>(initial?.selectedSingleFilter ?? null);
+  const [sortBy, setSortBy] = useState<SortBy>(initial?.sortBy ?? 'default');
+  const [sortOrder, setSortOrder] = useState<SortOrder>(initial?.sortOrder ?? 'desc');
+  const [randomSeed, setRandomSeed] = useState(initial?.randomSeed ?? 0); // 랜덤 재섞기 트리거
 
   const { playlists } = useGlobalPlaylists();
   const { getLikedSongIds } = useLikes();
@@ -195,8 +209,22 @@ export function useSongFilters(songs: Song[]) {
       ? selectedSingleFilter !== null
       : showLikedOnly || activePlaylists.size > 0);
 
+  const snapshot = (): SongFilterSnapshot => ({
+    searchTerm,
+    includeLyrics,
+    filterMode,
+    activeLanguages: [...activeLanguages],
+    showLikedOnly,
+    activePlaylists: [...activePlaylists],
+    selectedSingleFilter,
+    sortBy,
+    sortOrder,
+    randomSeed,
+  });
+
   return {
     songs,
+    snapshot,
     // 파생 결과 (단일 진실원)
     filteredSongs,
     languages,

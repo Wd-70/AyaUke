@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import type { ClipRangeDTO } from '@/domains/archive/clip-range.policy';
+import { useOverlayHistory } from '@/shared/motion/useOverlayHistory';
 import { loadDetail, rangeKey } from './range-client';
 const ClipRangeEditor = lazy(() => import('./ClipRangeEditor'));
 
@@ -96,6 +97,7 @@ export function ClipRangeProvider({ children, beforeOpen }: { children: React.Re
 }
 
 function RangeRequestDialog({ error, onClose, onRetry }: { error?: string; onClose: () => void; onRetry?: () => void }) {
+  useOverlayHistory(true, onClose);
   return <Dialog open onClose={onClose} className="relative z-[200]">
         <div className="fixed inset-0 bg-black/60" aria-hidden="true" />
         <div className="fixed inset-0 flex items-center justify-center p-4">

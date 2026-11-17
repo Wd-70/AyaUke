@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { SPRING_SNAPPY } from '@/shared/motion/tokens';
+import { useHistoryRestore } from '@/shared/motion/historyRestore';
 import { motion } from 'framer-motion';
 import { MagnifyingGlassIcon, FilmIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { HeartIcon } from '@heroicons/react/24/solid';
@@ -66,16 +67,28 @@ function Segmented<T extends string>({
   );
 }
 
+type ClipsRestore = {
+  sort: ClipsFilters['sort'];
+  platform: ClipsFilters['platform'];
+  verified: boolean;
+  liked: boolean;
+  search: string;
+  visibleCount: number;
+};
+
 export default function ClipsGallery() {
   const { reveal } = useReveal();
   const { data: session } = useSession();
   const { showInfo } = useToast();
-  const [sort, setSort] = useState<ClipsFilters['sort']>('popular');
-  const [platform, setPlatform] = useState<ClipsFilters['platform']>('all');
-  const [verified, setVerified] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const [search, setSearch] = useState('');
-  const [q, setQ] = useState('');
+  // 뒤로가기로 돌아오면 정렬·필터·검색어·불러온 양·스크롤을 되살린다(무한스크롤 페이지는 쿼리 캐시에 남아 있다)
+  const leaving = useRef<ClipsRestore | null>(null);
+  const restored = useHistoryRestore<ClipsRestore>('clips', () => leaving.current!);
+  const [sort, setSort] = useState<ClipsFilters['sort']>(restored?.sort ?? 'popular');
+  const [platform, setPlatform] = useState<ClipsFilters['platform']>(restored?.platform ?? 'all');
+  const [verified, setVerified] = useState(restored?.verified ?? false);
+  const [liked, setLiked] = useState(restored?.liked ?? false);
+  const [search, setSearch] = useState(restored?.search ?? '');
+  const [q, setQ] = useState(restored?.search.trim() ?? '');
 
   // 검색 디바운스 (짧게 — 클라이언트 필터라 즉시성 좋음)
   useEffect(() => {
@@ -96,10 +109,13 @@ export default function ClipsGallery() {
   }, [searching, allClips, q]);
 
   // 검색 결과 클라이언트 페이지네이션
-  const [visibleCount, setVisibleCount] = useState(24);
+  const [visibleCount, setVisibleCount] = useState(restored?.visibleCount ?? 24);
+  const keepCount = useRef(!!restored);
   useEffect(() => {
+    if (keepCount.current) { keepCount.current = false; return; }
     setVisibleCount(24);
   }, [q, sort, platform, verified, liked]);
+  leaving.current = { sort, platform, verified, liked, search, visibleCount };
 
   // 좋아요 필터 토글 (로그인 필요)
   const toggleLiked = () => {

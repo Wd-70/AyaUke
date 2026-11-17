@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useContext, useEffect, useRef } from 'react';
+import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 
 const MARK = '__overlay';
+const fallbackRouter = { push: (href: string) => window.location.assign(href) };
 /** 열린 오버레이 id — 맨 위 것만 링크 클릭을 가로챈다 */
 const stack: string[] = [];
 let seq = 0;
@@ -32,9 +33,16 @@ function currentMark(): string | undefined {
  *
  * 반환값 `leaveTo(href)`: 오버레이 안에서 코드로 페이지를 옮길 때 router.push 대신 쓴다.
  * (닫기 + router.push를 따로 부르면 항목을 걷어내는 back()과 이동이 경합한다)
+ *
+ * `guarded`: 닫기가 거절될 수 있는 오버레이(저장 안 한 편집 확인 등). 뒤로가기가 오면
+ * 항목을 곧바로 다시 올린 뒤 닫기를 '요청'한다 → 거절되면 열린 채로 다음 뒤로가기도 받고,
+ * 실제로 닫히면 정리 단계에서 다시 올린 항목을 걷어낸다. 링크 가로채기는 하지 않는다.
  */
-export function useOverlayHistory(open: boolean, onClose: () => void) {
-  const router = useRouter();
+export function useOverlayHistory(open: boolean, onClose: () => void, { guarded = false }: { guarded?: boolean } = {}) {
+  // useRouter()는 앱 라우터 밖(컴포넌트 단독 테스트 등)에서 예외를 던져 화면 전체가 그려지지 않는다.
+  // 컨텍스트를 직접 읽고, 없으면 일반 페이지 이동으로 대신한다.
+  const appRouter = useContext(AppRouterContext);
+  const router = appRouter ?? fallbackRouter;
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const leaveRef = useRef<((href: string) => void) | null>(null);
@@ -42,8 +50,14 @@ export function useOverlayHistory(open: boolean, onClose: () => void) {
   useEffect(() => {
     if (!open) return;
     const id = `overlay-${++seq}`;
+    // 방금 닫힌 오버레이의 항목이 아직 맨 위에 남아 있으면(같은 순간 A→B로 바뀐 경우,
+    // 또는 새로고침 뒤 남은 표식) 새로 쌓지 않고 그 칸을 물려받는다.
+    const top = currentMark();
+    const stale = !!top && !stack.includes(top);
     stack.push(id);
-    window.history.pushState({ ...(window.history.state ?? {}), [MARK]: id }, '');
+    const next = { ...(window.history.state ?? {}), [MARK]: id };
+    if (stale) window.history.replaceState(next, '');
+    else window.history.pushState(next, '');
 
     let popped = false;
     let pendingHref: string | null = null;
@@ -51,6 +65,13 @@ export function useOverlayHistory(open: boolean, onClose: () => void) {
     const onPop = () => {
       // 위에 쌓인 다른 오버레이가 닫히며 우리 항목으로 돌아온 경우는 무시
       if (currentMark() === id) return;
+      if (guarded) {
+        // 우리 항목이 빠졌을 때만(그 아래로 내려간 경우) 다시 올리고 닫기를 요청한다
+        if (stack[stack.length - 1] !== id) return;
+        window.history.pushState({ ...(window.history.state ?? {}), [MARK]: id }, '');
+        closeRef.current();
+        return;
+      }
       popped = true;
       const href = pendingHref;
       pendingHref = null;
@@ -69,6 +90,7 @@ export function useOverlayHistory(open: boolean, onClose: () => void) {
     };
 
     const onClick = (e: MouseEvent) => {
+      if (guarded) return;
       if (stack[stack.length - 1] !== id || currentMark() !== id) return;
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = (e.target as Element | null)?.closest?.('a[href]') as HTMLAnchorElement | null;
@@ -93,9 +115,10 @@ export function useOverlayHistory(open: boolean, onClose: () => void) {
       if (i >= 0) stack.splice(i, 1);
       // 뒤로가기가 아닌 방법으로 닫힘 → 우리가 올린 항목이 맨 위에 있으면 걷어낸다.
       // (그 사이 다른 페이지로 이동했다면 맨 위가 아니므로 건드리지 않는다)
-      if (!popped && currentMark() === id) window.history.back();
+      // 같은 커밋에서 다음 오버레이가 이 칸을 물려받을 수 있으니 커밋이 끝난 뒤 확인한다.
+      if (!popped) queueMicrotask(() => { if (currentMark() === id) window.history.back(); });
     };
-  }, [open, router]);
+  }, [open, router, guarded]);
 
   return useCallback(
     (href: string) => {

@@ -11,6 +11,7 @@ import { changeRange, loadDetail } from './range-client';
 import { planRangeSave, sameRange } from './editor-policy';
 import { clearLocalDraft, readLocalDraft, writeLocalDraft } from './local-draft';
 import RangeTimeline from './RangeTimeline';
+import { useOverlayHistory } from '@/shared/motion/useOverlayHistory';
 import { boundaryPreview, describeRangeChanges, type PreviewSegment } from './editor-experience';
 
 export default function ClipRangeEditor({ initial, owner, loggedIn, onClose, onApply }: {
@@ -47,6 +48,12 @@ export default function ClipRangeEditor({ initial, owner, loggedIn, onClose, onA
   const [currentTime, setCurrentTime] = useState(initial.effective.startTime);
   const savedPersonal = useRef<ClipRangeDTO | null>(null);
   const close = () => savedPersonal.current ? onApply(savedPersonal.current) : onClose();
+  // 뒤로가기 = 닫기 버튼과 같게(저장 중이면 거절 → guarded). 확인 창이 떠 있으면 그것부터 닫는다.
+  useOverlayHistory(true, () => {
+    if (sourceChanged) onApply(sourceChanged);
+    else if (!busy && !pendingSave) close();
+  }, { guarded: true });
+  useOverlayHistory(!!pendingSave, () => setPendingSave(null));
 
   useEffect(() => {
     const local = readLocalDraft(owner, initial);

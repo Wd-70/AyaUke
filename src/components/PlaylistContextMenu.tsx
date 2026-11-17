@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGlobalPlaylists, useSongPlaylists } from '@/hooks/useGlobalPlaylists';
 import { useSession } from 'next-auth/react';
+import { useOverlayHistory } from '@/shared/motion/useOverlayHistory';
 import { PlusIcon, CheckIcon, ListBulletIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 
 interface PlaylistContextMenuProps {
@@ -14,6 +15,8 @@ interface PlaylistContextMenuProps {
 }
 
 export default function PlaylistContextMenu({ songId, isOpen, position, onClose }: PlaylistContextMenuProps) {
+  // 메뉴가 떠 있을 때 뒤로가기는 메뉴만 닫는다(아래 곡 상세 시트는 그대로)
+  useOverlayHistory(isOpen, onClose);
   const { data: session } = useSession();
   const { playlists: allPlaylists, isLoading: playlistsLoading, createPlaylist, addSongToPlaylist, removeSongFromPlaylist, refresh, isSongOperating } = useGlobalPlaylists();
   const { playlists: songPlaylists } = useSongPlaylists(songId);

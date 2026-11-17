@@ -8,9 +8,10 @@ import SongCard from '@/components/SongCard';
 import Footer from '@/components/Footer';
 import SongbookHeader from '@/components/SongbookHeader';
 import { MusicalNoteIcon, Squares2X2Icon, ListBulletIcon } from '@heroicons/react/24/outline';
-import { useState, useEffect, useLayoutEffect } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useBulkLikes } from '@/hooks/useLikes';
-import { useSongFilters } from '@/hooks/useSongFilters';
+import { useSongFilters, type SongFilterSnapshot } from '@/hooks/useSongFilters';
+import { useHistoryRestore } from '@/shared/motion/historyRestore';
 import { useScrollNav } from '@/hooks/useScrollNav';
 import { prefetchSongVideos } from '@/hooks/useSongVideos';
 import { useQueryClient } from '@tanstack/react-query';
@@ -20,10 +21,15 @@ const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : use
 // v2: 예전 키('songbookViewMode')는 고르지 않아도 'grid'가 자동 저장돼 사용자의 선택과 구분되지 않는다.
 const VIEW_MODE_KEY = 'songbookViewMode.v2';
 
-function useChunkedRender(items: Song[], chunkSize: number = 20) {
-  const [visibleCount, setVisibleCount] = useState(chunkSize);
+type SongbookRestore = { filters: SongFilterSnapshot; count: number };
+
+function useChunkedRender(items: Song[], chunkSize: number = 20, initialCount?: number) {
+  // 뒤로가기로 돌아왔으면 떠날 때 불러와 있던 만큼 바로 그린다(스크롤 위치를 되돌릴 수 있게)
+  const [visibleCount, setVisibleCount] = useState(initialCount ?? chunkSize);
+  const keepInitial = useRef(!!initialCount);
   
   useEffect(() => {
+    if (keepInitial.current) { keepInitial.current = false; return; }
     if (items.length <= chunkSize) {
       setVisibleCount(items.length);
     } else {
@@ -105,14 +111,18 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
   const queryClient = useQueryClient();
   // 필터/정렬 상태와 파생 결과를 부모가 소유(단일 진실원). SongSearch는 이걸 받아 렌더만.
   // (useSongFilters 내부에서 useGlobalPlaylists를 호출하므로 플레이리스트 프리페치도 포함)
-  const filters = useSongFilters(initialSongs || []);
+  // 뒤로가기로 돌아오면 검색어·필터·불러온 곡 수·스크롤을 되살린다(탭·링크로 새로 열면 처음부터)
+  const leaving = useRef<SongbookRestore | null>(null);
+  const restored = useHistoryRestore<SongbookRestore>('songbook', () => leaving.current!);
+  const filters = useSongFilters(initialSongs || [], restored?.filters);
   const filteredSongs = filters.filteredSongs;
   // 스크롤 연동 네비/스티키 바 (songbook 한정). CSS 변수(--nav-shift/--nav-height)를
   // 갱신하면 네비·검색바가 이를 CSS로 읽어 함께 움직인다(props 불필요).
   // 검색 바 셀렉터를 넘겨, 필터 접힘 앵커링 보정 + 바 고정(stuck) 동기 계산.
   const barStuck = useScrollNav('[data-sticky-bar]');
 
-  const visibleSongs = useChunkedRender(filteredSongs, 24);
+  const visibleSongs = useChunkedRender(filteredSongs, 24, restored?.count);
+  leaving.current = { filters: filters.snapshot(), count: visibleSongs.length };
 
   // initialSongs가 도착하면 로딩 해제 (filteredSongs는 useSongFilters에서 파생)
   useEffect(() => {

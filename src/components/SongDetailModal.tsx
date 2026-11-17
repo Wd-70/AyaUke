@@ -31,6 +31,7 @@ import OfficialBadge from "./OfficialBadge";
 import { isOfficialSong } from "@/shared/utils/song-source";
 import { useToast } from "./Toast";
 import { useSession } from "next-auth/react";
+import { useOverlayHistory } from "@/shared/motion/useOverlayHistory";
 
 // YouTube 플레이어 타입 정의
 interface YouTubePlayer {
@@ -73,6 +74,9 @@ export default function SongDetailModal({
   const { playlists: songPlaylists } = useSongPlaylists(song.id);
   const [isEditMode, setIsEditMode] = useState(false);
   const editFormRef = useRef<SongEditFormHandle>(null);
+  // 편집 모드는 시트 위 한 단계 — 뒤로가기는 시트를 닫지 않고 편집 취소를 요청한다
+  // (변경이 있으면 확인 → 거절될 수 있어 guarded). 그냥 닫히면 편집 내용이 말없이 사라졌다.
+  useOverlayHistory(isEditMode, () => editFormRef.current?.requestCancel(), { guarded: true });
   const editButtonRef = useRef<HTMLButtonElement>(null);
   const [editorViewportHeight, setEditorViewportHeight] = useState<number>();
   useEffect(() => {

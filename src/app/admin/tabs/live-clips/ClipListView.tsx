@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { useOverlayHistory } from "@/shared/motion/useOverlayHistory";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import Image from "next/image";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
@@ -33,6 +34,8 @@ export default function ClipListView() {
   // 선택 클립은 id만 보관하고 실제 데이터는 쿼리 결과에서 파생한다.
   // (객체를 복사해 두면 편집 저장 후 목록만 refetch되어 선택 클립이 옛 값으로 남음)
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
+  // 열린 상세 패널은 뒤로가기로 닫힌다(관리자 페이지를 떠나지 않게)
+  useOverlayHistory(!!selectedClipId, () => setSelectedClipId(null));
 
   const debouncedSearch = useDebounce(search, 300);
 

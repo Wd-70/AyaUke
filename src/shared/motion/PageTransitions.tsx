@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { overlayOpen } from './useOverlayHistory';
+// 뒤로가기 감지(popstate 기록)를 앱 시작 때 등록 — 목록 화면 되살리기용
+import './historyRestore';
 
 /**
  * 내부 링크 이동을 View Transitions API로 감싼다 (docs/ux-motion-plan.md S2).
@@ -32,6 +34,11 @@ export default function PageTransitions() {
   const router = useRouter();
   const pathname = usePathname();
   const pending = useRef<{ path: string; resolve: () => void } | null>(null);
+  // 직전 화면 경로 — '← 상위' 링크가 바로 전 화면을 가리키면 새로 쌓지 않고 뒤로 간다
+  const paths = useRef<{ prev: string | null; cur: string | null }>({ prev: null, cur: null });
+  useEffect(() => {
+    if (paths.current.cur !== pathname) paths.current = { prev: paths.current.cur, cur: pathname };
+  }, [pathname]);
 
   // 경로가 바뀌어 새 화면이 커밋되면 전환의 '새 상태' 캡처를 진행시킨다.
   useEffect(() => {
@@ -48,15 +55,30 @@ export default function PageTransitions() {
     const doc = document as Document & {
       startViewTransition?: (cb: () => Promise<void> | void) => { finished: Promise<void> };
     };
-    if (typeof doc.startViewTransition !== 'function') return;
+    const canTransition = typeof doc.startViewTransition === 'function';
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
 
     const onClick = (e: MouseEvent) => {
-      if (e.defaultPrevented || reduce.matches || overlayOpen()) return;
+      if (e.defaultPrevented || overlayOpen()) return;
       if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const target = e.target as Element | null;
       const a = target?.closest?.('a[href]') as HTMLAnchorElement | null;
       if (!a || (a.target && a.target !== '_self') || a.hasAttribute('download')) return;
+
+      // '← 상위' 링크가 바로 전 화면으로 가는 거라면 히스토리를 쌓지 않고 뒤로 간다
+      // → 그 화면의 검색어·필터·스크롤이 되살아나고(historyRestore), 뒤로가기를 두 번 누를 일도 없다.
+      const goBack =
+        a.dataset.nav === 'back' &&
+        paths.current.prev !== null &&
+        new URL(a.href, window.location.href).pathname === paths.current.prev &&
+        new URL(a.href, window.location.href).search === '';
+      if (!canTransition || reduce.matches) {
+        if (goBack) {
+          e.preventDefault();
+          window.history.back();
+        }
+        return;
+      }
       if (a.dataset.transition === 'off') return;
       // 링크 안의 버튼 등(좋아요·메뉴)은 자기 동작을 하도록 둔다
       const control = target?.closest?.('button, input, select, textarea, [role="button"]');
@@ -88,7 +110,8 @@ export default function PageTransitions() {
                 resolve();
               },
             };
-            router.push(href);
+            if (goBack) window.history.back();
+            else router.push(href);
           }),
       );
       transition.finished.finally(() => {

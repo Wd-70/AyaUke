@@ -5,7 +5,8 @@
  * 곡 선택 시 SongClipPanel로 전환.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useOverlayHistory } from "@/shared/motion/useOverlayHistory";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import Image from "next/image";
 import { MagnifyingGlassIcon, ClockIcon, MusicalNoteIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
@@ -19,6 +20,23 @@ export default function SongClipBrowser() {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState<"recent" | "clipCount" | "title">("recent");
   const [selectedSongId, setSelectedSongId] = useState<string | null>(null);
+
+  // 곡 패널은 목록 위 한 단계 — 뒤로가기로 목록에 돌아오고, 보던 스크롤 위치도 되살린다.
+  const listScroll = useRef(0);
+  const openSong = (id: string) => {
+    listScroll.current = window.scrollY;
+    setSelectedSongId(id);
+    // 패널은 목록 자리(위쪽)에 그려지므로, 아래에서 열었으면 패널 머리로 올려 준다
+    window.scrollTo({ top: 0 });
+  };
+  const closeSong = () => setSelectedSongId(null);
+  useOverlayHistory(!!selectedSongId, closeSong);
+  useEffect(() => {
+    if (!selectedSongId && listScroll.current) {
+      const y = listScroll.current;
+      requestAnimationFrame(() => window.scrollTo(0, y));
+    }
+  }, [selectedSongId]);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -41,7 +59,7 @@ export default function SongClipBrowser() {
   });
 
   if (selectedSongId) {
-    return <SongClipPanel songId={selectedSongId} onClose={() => setSelectedSongId(null)} />;
+    return <SongClipPanel songId={selectedSongId} onClose={closeSong} />;
   }
 
   return (
@@ -90,7 +108,7 @@ export default function SongClipBrowser() {
             {data.songs.map((song) => (
               <button
                 key={song.songId}
-                onClick={() => setSelectedSongId(song.songId)}
+                onClick={() => openSong(song.songId)}
                 className="group flex gap-3 p-3 rounded-xl border border-light-primary/15 dark:border-dark-primary/15 bg-white/40 dark:bg-gray-900/40 backdrop-blur-sm hover:border-light-accent/40 dark:hover:border-dark-accent/40 hover:shadow-md transition-all text-left"
               >
                 <div className="relative w-24 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700">

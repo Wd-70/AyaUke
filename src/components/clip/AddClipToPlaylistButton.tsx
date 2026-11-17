@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { PlusIcon, CheckIcon, ListBulletIcon, ArrowTopRightOnSquareIcon, QueueListIcon } from '@heroicons/react/24/outline';
 import { useGlobalClipPlaylists } from '@/hooks/useGlobalClipPlaylists';
 import { useToast } from '@/components/Toast';
+import { useOverlayHistory } from '@/shared/motion/useOverlayHistory';
 
 interface AddClipToPlaylistButtonProps {
   clipId: string;
@@ -68,6 +69,8 @@ interface MenuProps {
 }
 
 function ClipPlaylistMenu({ clipId, position, onClose }: MenuProps) {
+  // 뒤로가기는 메뉴만 닫는다(아래 클립 상세·곡 상세는 그대로)
+  useOverlayHistory(true, onClose);
   const {
     playlists,
     isLoading,
