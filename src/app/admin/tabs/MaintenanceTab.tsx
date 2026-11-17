@@ -16,6 +16,7 @@ import {
   PencilSquareIcon,
 } from "@heroicons/react/24/outline";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 interface CollectionInfo {
   name: string;
@@ -49,6 +50,7 @@ function formatBackupName(name: string): string {
 export default function MaintenanceTab() {
   const { data: session } = useSession();
   const { showSuccess, showError } = useToast();
+  const { confirm } = useConfirm();
   const [collections, setCollections] = useState<CollectionInfo[]>([]);
   const [collectionsLoading, setCollectionsLoading] = useState(true);
   const [recalcTarget, setRecalcTarget] = useState<string | null>(null);
@@ -125,7 +127,13 @@ export default function MaintenanceTab() {
 
   const deleteBackup = async (name: string) => {
     if (busyBackup) return;
-    if (!confirm(`${formatBackupName(name)} 백업을 삭제하시겠습니까?`)) return;
+    const yes = await confirm({
+      title: "백업 삭제",
+      message: `${formatBackupName(name)} 백업을 디스크에서 삭제합니다. 되돌릴 수 없어요.`,
+      confirmText: "삭제",
+      type: "danger",
+    });
+    if (!yes) return;
 
     setBusyBackup(name);
     try {
@@ -225,7 +233,13 @@ export default function MaintenanceTab() {
 
   const runRecalculate = async (target: "likeCount" | "songStats", label: string) => {
     if (recalcTarget) return;
-    if (!confirm(`${label}을(를) 실행하시겠습니까?\n모든 곡의 카운트를 실제 데이터 기준으로 다시 계산합니다.`)) return;
+    const yes = await confirm({
+      title: label,
+      message: "모든 곡의 카운트를 실제 데이터 기준으로 다시 계산합니다.",
+      confirmText: "실행",
+      type: "warning",
+    });
+    if (!yes) return;
 
     setRecalcTarget(target);
     try {
