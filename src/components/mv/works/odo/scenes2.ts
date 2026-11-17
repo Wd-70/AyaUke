@@ -5,7 +5,7 @@ import {
   BG, type Ctx, H, type Kit, NEON, PARTY, type SceneFn, W, cam, chunkT, cone, confetti, dead, fillBg, fit, flicker, glow, hit, led,
   ledMask, neon, neonText, noFootage, ring, rr, shake, span01, zoomAt,
 } from './kit';
-import { DANCE, DANCE2, POSE, danceAt, fan, figure, mixPose, walkPose } from './pose';
+import { AYA_LIT, DANCE, DANCE2, danceAt, fan, figure, mixPose, POSE, walkPose } from './pose';
 
 /** 편 손(손가락이 위) 윤곽 — 원점이 손바닥 가운데 */
 function handPath(c: Ctx, s = 1) {
@@ -1602,7 +1602,7 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
         const d = Math.abs(i - 3);
         const x = 640 + (i - 3) * 172;
         const pose = danceAt(DANCE2, bp - d, 0.2);
-        if (i === 3) figure(c, x, 620, 380, pose, { skin: 'aya', color: NEON.white, rim: NEON.pink, rimBlur: 20, swing: Math.sin(bp * Math.PI) });
+        if (i === 3) figure(c, x, 620, 380, pose, { skin: 'aya', color: NEON.white, ...AYA_LIT, rim: NEON.pink, rimBlur: 20, swing: Math.sin(bp * Math.PI) });
         else figure(c, x, 620, 270 - d * 14, pose, { color: PARTY[(i + 1) % 4], flip: i > 3 });
       }
       confetti(c, t, 90, 43, PARTY, 240);

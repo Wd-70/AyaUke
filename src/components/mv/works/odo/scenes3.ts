@@ -5,7 +5,7 @@ import {
   BG, type Ctx, H, type Kit, NEON, PARTY, type SceneFn, W, cam, chunkT, cone, confetti, dead, fillBg, flicker, glow, hit, led, ledMask,
   neon, neonText, noFootage, ring, rr, shake, span01, zoomAt,
 } from './kit';
-import { DANCE, DANCE2, POSE, byePose, danceAt, fan, figure, mixPose } from './pose';
+import { AYA_LIT, byePose, DANCE, DANCE2, danceAt, fan, figure, mixPose, POSE } from './pose';
 import { exitSign, seats } from './scenes1';
 import { crowdRows, drawSign, rig } from './scenes2';
 
@@ -203,7 +203,7 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
         figure(c, x, y, 250 - k * 8, pose, { color: col, flip: side > 0 });
       }
       figure(c, 640, 612, 420, dancing ? danceAt(DANCE, b.pos(t) - first, 0.16) : raise, {
-        skin: 'aya', color: NEON.white, rim: dancing ? colNow : NEON.violet, rimBlur: 22, swing: dancing ? Math.sin(b.pos(t) * Math.PI) : Math.sin(t * 2) * 0.3,
+        skin: 'aya', color: NEON.white, ...AYA_LIT, rim: dancing ? colNow : NEON.violet, rimBlur: 22, swing: dancing ? Math.sin(b.pos(t) * Math.PI) : Math.sin(t * 2) * 0.3,
       });
       if (dancing) confetti(c, t, 80, 48, PARTY, 230);
     });
@@ -321,7 +321,7 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
       for (let i = 0; i < 7; i++) {
         const x = 250 + i * 130;
         const pose = danceAt(DANCE2, bp - (i % 3), 0.2);
-        if (i === 3) figure(c, x, 660, 190, danceAt(DANCE, bp, 0.18), { skin: 'aya', color: NEON.white, rim: NEON.pink, rimBlur: 14, swing: Math.sin(bp * Math.PI) });
+        if (i === 3) figure(c, x, 660, 190, danceAt(DANCE, bp, 0.18), { skin: 'aya', color: NEON.white, ...AYA_LIT, rim: NEON.pink, rimBlur: 14, swing: Math.sin(bp * Math.PI) });
         else figure(c, x, 650 - (i % 2) * 20, 150, pose, { color: PARTY[i % 4], flip: i > 3 });
       }
       // 뒤집혀 보이는 간판과 그 뼈대
@@ -368,7 +368,7 @@ export function scenes3(kit: Kit): Record<string, SceneFn> {
         const x = 640 + (i - 3) * 150;
         const pose = mixPose(mixPose(POSE.stand, POSE.linked, up), POSE.bow, clamp(bow));
         const h = i === 3 ? 360 : 270;
-        if (i === 3) figure(c, x, 600, h, pose, { skin: 'aya', color: NEON.white, rim: NEON.yellow, rimBlur: 18 });
+        if (i === 3) figure(c, x, 600, h, pose, { skin: 'aya', color: NEON.white, ...AYA_LIT, rim: NEON.yellow, rimBlur: 18 });
         else figure(c, x, 600, h, pose, { color: PARTY[(i + (i > 3 ? 3 : 0)) % 4] });
         hands.push([x, 600 - h * lerp(0.6, 0.98, up) * (1 - 0.4 * clamp(bow))]);
       }
