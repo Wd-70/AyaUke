@@ -441,63 +441,73 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
     c.restore();
   };
 
-  // ── 27. 드롭 1 — 원본 영상 모자이크 ────────────────────
+  // ── 27. 드롭 1 — 원본 영상 모니터 벽 ───────────────────
+  // 열두 대의 모니터가 지금 화면 하나를 나눠 크게 비춘다(끊김 없이). 박마다 몇 대가 얼굴 가까이·좌우 반전으로
+  // 바뀌고, 마디 넷째 박에는 열두 대가 모두 따로 아야를 비춘다. 지난 화면 되풀이는 끊겨 보여서 버림(2026-11-17).
   const mosaic: SceneFn = (c, f) => {
     const { t } = f;
     fillBg(c);
     const b = kit.beat();
     const idx = b.index(t);
-    const fr = b.frac(t);
     const p = pulse(t, 6);
     const cols = 4;
     const rows = 3;
     const gap = 12;
-    const tw = (W - 60 - gap * (cols - 1)) / cols;
-    const th = (H - 44 - gap * (rows - 1)) / rows;
-    const mode = ((idx % 4) + 4) % 4;
+    const gx = 30;
+    const gy = 22;
+    const gw = W - 60;
+    const gh = H - 44;
+    const tw = (gw - gap * (cols - 1)) / cols;
+    const th = (gh - gap * (rows - 1)) / rows;
+    const beatInBar = ((idx % 4) + 4) % 4;
     zoomAt(c, 1 + f.k * 0.06, 640, 360, () => {
       for (let r = 0; r < rows; r++) {
         for (let q = 0; q < cols; q++) {
           const i = r * cols + q;
-          const lit = mode === 0 ? (q + r) % 2 === 0 : mode === 1 ? (q + r) % 2 === 1 : mode === 2 ? hash(i * 7 + idx * 13) > 0.45 : true;
+          const x = gx + q * (tw + gap);
+          const y = gy + r * (th + gap);
+          // 이 박에 따로 노는 모니터: 넷째 박은 전부, 나머지 박은 서너 대
+          const solo = beatInBar === 3 || hash(i * 7 + idx * 13) > 0.72;
           const col = (q + r) % 2 ? NEON.pink : NEON.cyan;
-          const x = 30 + q * (tw + gap);
-          const y = 22 + r * (th + gap);
-          const s = lit ? 1 + 0.045 * p : 0.97;
           c.save();
-          c.translate(x + tw / 2, y + th / 2);
-          c.scale(s, s);
-          c.translate(-tw / 2, -th / 2);
           c.beginPath();
-          rr(c, 0, 0, tw, th, 12);
-          c.save();
+          rr(c, x, y, tw, th, 12);
           c.clip();
-          // 반 박 길이를 박마다 두 번 되풀이 — 칸마다 다른 순간
-          const half = b.period / 2;
-          const d = 0.12 + (i % 4) * 0.2 + (r * 0.11);
-          const delay = fr * b.period + d + half - ((fr * b.period) % half);
-          if (!kit.footage(c, f.video, 0, 0, tw, th, delay)) noFootage(c, 0, 0, tw, th, t - delay + i);
+          let ok: boolean;
+          if (solo) {
+            const s = 1 + 0.05 * p;
+            c.translate(x + tw / 2, y + th / 2);
+            c.scale(s, s);
+            c.translate(-(x + tw / 2), -(y + th / 2));
+            ok = kit.footage(c, f.video, x, y, tw, th, beatInBar === 3 ? { mirror: i % 2 === 1 } : { zoom: 2.1, cy: 0.47, mirror: i % 2 === 1 });
+          } else {
+            ok = kit.footage(c, f.video, gx, gy, gw, gh);
+          }
+          if (!ok) noFootage(c, x, y, tw, th, t + i);
           c.globalCompositeOperation = 'multiply';
-          c.fillStyle = lit ? rgba(col, 0.35) : '#1d1830';
-          c.fillRect(0, 0, tw, th);
+          c.fillStyle = solo ? rgba(col, 0.55) : 'rgba(150,140,190,1)';
+          c.fillRect(x - 20, y - 20, tw + 40, th + 40);
           c.globalCompositeOperation = 'lighter';
-          c.fillStyle = rgba(col, lit ? 0.16 + 0.2 * p : 0.03);
-          c.fillRect(0, 0, tw, th);
+          c.fillStyle = rgba(col, solo ? 0.1 + 0.18 * p : 0.02);
+          c.fillRect(x - 20, y - 20, tw + 40, th + 40);
           c.restore();
-          if (lit) {
+          if (solo) {
             neon(c, col, 3.5, () => {
               c.beginPath();
-              rr(c, 0, 0, tw, th, 12);
+              rr(c, x, y, tw, th, 12);
             });
           } else {
             dead(c, 2, () => {
               c.beginPath();
-              rr(c, 0, 0, tw, th, 12);
-            }, 0.35);
+              rr(c, x, y, tw, th, 12);
+            }, 0.5);
           }
-          c.restore();
         }
       }
+      // 박마다 위에서 아래로 훑는 주사선 한 줄
+      const sy = gy + gh * b.frac(t);
+      c.fillStyle = `rgba(255,255,255,${0.12 * (1 - b.frac(t))})`;
+      c.fillRect(gx, sy - 2, gw, 4);
     });
   };
 
@@ -1180,7 +1190,18 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
   const parade: SceneFn = (c, f) => {
     const { t } = f;
     fillBg(c, '#05030b');
-    const camX = f.age * 250;
+    // 카메라가 행렬과 같이 오른쪽으로 간다(배경이 왼쪽으로 흐름). 행렬은 화면에서 아주 조금 앞서 나간다 —
+    // 오른쪽을 보는 사람이 화면 왼쪽으로 밀리면 뒤로 걷는 것처럼 보인다(2026-11-17 사용자 지적).
+    const camX = f.age * 170;
+    const drift = f.age * 26;
+    // 행렬 가운데를 크게 보다가 물러나며 맨 앞의 아야를 드러낸다
+    const reveal = smooth(span01(f.k, 0.3, 0.8));
+    c.save();
+    zoomAt(c, lerp(1.45, 1, reveal), lerp(380, 640, reveal), lerp(470, 360, reveal), () => paradeBody(c, f, t, camX, drift));
+    c.restore();
+  };
+
+  const paradeBody = (c: Ctx, f: Parameters<SceneFn>[1], t: number, camX: number, drift: number) => {
     // 먼 건물
     for (let i = 0; i < 12; i++) {
       const x = ((i * 260 - camX * 0.15) % 3120 + 3120) % 3120 - 300;
@@ -1206,29 +1227,46 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
       neonText(c, signs[i % signs.length], x + 65, 238 + (i % 2) * 70, 104, fonts.display, col, a, { fill: 0, tube: 0.04 });
       glow(c, x + 65, 240 + (i % 2) * 70, 220, col, 0.16 * a);
     }
-    // 바닥
+    // 바닥 — 보도 이음매가 카메라 속도로 흐른다
     c.fillStyle = '#04030a';
-    c.fillRect(0, 590, W, 200);
+    c.fillRect(-400, 590, W + 800, 300);
     neon(c, NEON.violet, 3, () => {
       c.beginPath();
-      c.moveTo(-20, 590);
-      c.lineTo(W + 20, 590);
+      c.moveTo(-400, 590);
+      c.lineTo(W + 400, 590);
     }, 0.6);
-    // 걷는 사람들 — 한 박에 한 걸음
-    const phase = pos(t) * Math.PI;
-    const N = 22;
-    const gap = 124;
-    for (let i = 0; i < N; i++) {
-      const x = ((i * gap - f.age * 160) % (N * gap) + N * gap) % (N * gap) - 240;
-      const h = 190 + hash(i * 3) * 60;
-      const col = [NEON.yellow, NEON.pink, NEON.violet, NEON.cyan][i % 4];
-      glow(c, x, 610, 90, col, 0.2, 18);
-      figure(c, x, 590, h, walkPose(phase + i * 1.3), { color: '#0d0a1a', rim: rgba(col, 0.55), rimBlur: 8, hold: 'light', holdColor: col });
+    c.strokeStyle = rgba(NEON.violet, 0.22);
+    c.lineWidth = 2;
+    c.beginPath();
+    for (let i = 0; i < 16; i++) {
+      const x = ((i * 150 - camX) % 2400 + 2400) % 2400 - 500;
+      c.moveTo(x, 600);
+      c.lineTo(x - 90, 720);
     }
-    // 행렬 맨 앞 — 아야
-    const lead = lerp(W + 260, 930, easeOutCubic(span01(f.k, 0.45, 1)));
-    figure(c, lead, 590, 290, walkPose(phase), { skin: 'aya', color: '#07060b', rim: NEON.pink, rimBlur: 18, hold: 'mic', swing: Math.sin(phase) * 0.5 });
-    glow(c, lead, 420, 260, NEON.pink, 0.25);
+    c.stroke();
+    // 걷는 사람들 — 한 박에 한 걸음, 모두 오른쪽(앞)으로. 뒷줄은 작고 어둡게
+    const phase = pos(t) * Math.PI;
+    const lead = 900 + drift;
+    const cols = [NEON.yellow, NEON.pink, NEON.violet, NEON.cyan];
+    for (let row = 1; row >= 0; row--) {
+      const scale = row ? 0.72 : 1;
+      const ground = row ? 568 : 590;
+      for (let i = 0; i < 11; i++) {
+        const x = lead - 150 - i * 118 - row * 59 + (hash(i * 7 + row * 31) - 0.5) * 36;
+        if (x < -260) continue;
+        const h = (190 + hash(i * 3 + row * 11) * 60) * scale;
+        const col = cols[(i + row * 2) % 4];
+        glow(c, x, ground + 20, 90 * scale, col, row ? 0.12 : 0.2, 18);
+        figure(c, x, ground, h, walkPose(phase + i * 1.3 + row * 0.7), {
+          color: row ? '#08060f' : '#0d0a1a', rim: rgba(col, row ? 0.3 : 0.55), rimBlur: 8, hold: 'light', holdColor: col,
+        });
+      }
+    }
+    // 행렬 맨 앞 — 아야. 물러나며 드러날 때 분홍 조명이 켜진다
+    const lit = span01(f.k, 0.55, 0.75);
+    if (lit > 0) cone(c, lead + 40, -40, lead, 590, 220, NEON.pink, 0.5 * lit, 16);
+    figure(c, lead, 590, 290, walkPose(phase), { skin: 'aya', color: '#07060b', rim: rgba(NEON.pink, 0.35 + 0.65 * lit), rimBlur: 18, hold: 'mic', swing: Math.sin(phase) * 0.5 });
+    glow(c, lead, 420, 260, NEON.pink, 0.1 + 0.2 * lit);
   };
 
   // ── 39. 鳴いていこう — 길게 끄는 소리, 백색으로 ─────────
@@ -1404,34 +1442,130 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
     c.restore();
   };
 
-  // ── 42. 드롭 2 — 세로 띠마다 시간차 ─────────────────────
-  const slitScan: SceneFn = (c, f) => {
+  // ── 42. 드롭 2 — 무대 전광판에 비친 아야 ───────────────
+  // 원본 화면을 160×90 점으로 줄여 LED 판처럼 크게 비춘다. 박마다 색이 바뀌며 위에서 아래로 새로 고침,
+  // 마디마다 온몸 ↔ 얼굴 가까이. 처음엔 띠마다 시간차(슬릿 스캔)였으나 깨진 화면처럼 보여 바꿈(2026-11-17).
+  const LW = 160;
+  const LH = 90;
+  const SX = 150;
+  const SY = 34;
+  const SW = 980;
+  const SH = (SW * LH) / LW;
+  let ledSrc: HTMLCanvasElement | null = null;
+  let ledBloom: HTMLCanvasElement | null = null;
+  let ledDots: HTMLCanvasElement | null = null;
+  const ledCanvases = () => {
+    if (!ledSrc || !ledBloom || !ledDots) {
+      ledSrc = document.createElement('canvas');
+      ledSrc.width = LW;
+      ledSrc.height = LH;
+      ledBloom = document.createElement('canvas');
+      ledBloom.width = 28;
+      ledBloom.height = 16;
+      // 점 사이를 막는 검은 판 — 점 자리만 둥글게 뚫는다
+      ledDots = document.createElement('canvas');
+      ledDots.width = Math.ceil(SW);
+      ledDots.height = Math.ceil(SH);
+      const d = ledDots.getContext('2d')!;
+      d.fillStyle = '#040308';
+      d.fillRect(0, 0, ledDots.width, ledDots.height);
+      d.globalCompositeOperation = 'destination-out';
+      const pitch = SW / LW;
+      d.beginPath();
+      for (let y = 0; y < LH; y++) {
+        for (let x = 0; x < LW; x++) {
+          const cx = (x + 0.5) * pitch;
+          const cy = (y + 0.5) * pitch;
+          d.moveTo(cx + pitch * 0.4, cy);
+          d.arc(cx, cy, pitch * 0.4, 0, TAU);
+        }
+      }
+      d.fill();
+    }
+    return { src: ledSrc, bloom: ledBloom, dots: ledDots };
+  };
+
+  const ledWall: SceneFn = (c, f) => {
     const { t } = f;
     fillBg(c);
+    const b = kit.beat();
+    const idx = b.index(t);
+    const fr = b.frac(t);
     const p = pulse(t, 5);
-    const n = 32;
-    const sw = W / n;
-    const bp = pos(t);
-    zoomAt(c, 1.06 + f.k * 0.06, 640, 360, () => {
-      for (let i = 0; i < n; i++) {
-        const delay = 0.75 + 0.7 * Math.sin(i * 0.3 - t * 3.2);
-        const dy = Math.sin(i * 0.45 + bp * Math.PI) * 30 * (0.4 + 0.6 * p);
-        c.save();
+    const bar = Math.floor(idx / 4);
+    const tint = [null, NEON.pink, null, NEON.cyan][((idx % 4) + 4) % 4];
+    const edge = tint ?? NEON.violet;
+    const { src, bloom, dots } = ledCanvases();
+
+    // 1) 원본을 점 개수만큼 작게 — 아바타 부분(거의 정사각)을 가운데에, 양옆엔 좌우 반전한 어두운 사본.
+    //    마디마다 상반신 ↔ 얼굴 가까이, 두 마디마다 가운데도 좌우 반전
+    const s = src.getContext('2d')!;
+    s.globalCompositeOperation = 'source-over';
+    s.globalAlpha = 1;
+    s.fillStyle = '#000';
+    s.fillRect(0, 0, LW, LH);
+    const flip = Math.floor(bar / 2) % 2 === 1;
+    const zoom = bar % 2 ? 1.6 : 1;
+    const sq = LH;
+    const x0 = (LW - sq) / 2;
+    if (!kit.footage(s, f.video, x0, 0, sq, sq, { zoom, cy: zoom > 1 ? 0.47 : undefined, mirror: flip })) noFootage(s, x0, 0, sq, sq, t);
+    s.globalAlpha = 0.4;
+    kit.footage(s, f.video, x0 - sq, 0, sq, sq, { zoom, cy: zoom > 1 ? 0.47 : undefined, mirror: !flip });
+    kit.footage(s, f.video, x0 + sq, 0, sq, sq, { zoom, cy: zoom > 1 ? 0.47 : undefined, mirror: !flip });
+    s.globalAlpha = 1;
+    if (tint) {
+      s.globalCompositeOperation = 'multiply';
+      s.fillStyle = tint;
+      s.fillRect(0, 0, LW, LH);
+      s.globalCompositeOperation = 'lighter';
+      s.fillStyle = rgba(tint, 0.18);
+      s.fillRect(0, 0, LW, LH);
+    }
+    // 새로 고침: 박이 떨어지면 아래쪽은 아직 지난 색 — 위에서부터 밝은 줄이 내려가며 바뀐다
+    const wipe = clamp(fr / 0.22);
+    s.globalCompositeOperation = 'source-over';
+    if (wipe < 1) {
+      const wy = Math.floor(LH * wipe);
+      s.fillStyle = 'rgba(0,0,0,0.55)';
+      s.fillRect(0, wy, LW, LH - wy);
+      s.fillStyle = 'rgba(255,255,255,0.85)';
+      s.fillRect(0, wy - 1, LW, 2);
+    }
+    const bc = bloom.getContext('2d')!;
+    bc.clearRect(0, 0, bloom.width, bloom.height);
+    bc.drawImage(src, 0, 0, bloom.width, bloom.height);
+
+    zoomAt(c, 1.02 + f.k * 0.05 + 0.012 * p, 640, 330, () => {
+      // 전광판 뒤 무대 빛
+      glow(c, 640, SY + SH / 2, 820, edge, 0.18 + 0.12 * p, 200);
+      // 2) LED 판: 점 하나하나가 또렷하게(부드럽게 늘이지 않음) → 점 사이 검은 판 → 빛 번짐
+      c.save();
+      c.imageSmoothingEnabled = false;
+      c.drawImage(src, SX, SY, SW, SH);
+      c.imageSmoothingEnabled = true;
+      c.drawImage(dots, SX, SY, SW, SH);
+      c.globalCompositeOperation = 'lighter';
+      c.globalAlpha = 0.2 + 0.1 * p;
+      c.drawImage(bloom, SX - 60, SY - 50, SW + 120, SH + 100);
+      c.restore();
+      // 판 테두리와 받침
+      c.strokeStyle = '#1c1828';
+      c.lineWidth = 14;
+      c.strokeRect(SX - 7, SY - 7, SW + 14, SH + 14);
+      neon(c, edge, 3, () => {
         c.beginPath();
-        c.rect(i * sw, -40, sw + 0.6, H + 80);
-        c.clip();
-        if (!kit.footage(c, f.video, -30, dy - 30, W + 60, H + 60, delay)) noFootage(c, -30, dy - 30, W + 60, H + 60, t - delay);
-        c.globalCompositeOperation = 'lighter';
-        c.fillStyle = rgba(i % 2 ? NEON.pink : NEON.cyan, 0.1 + 0.14 * p);
-        c.fillRect(i * sw, -40, sw, H + 80);
-        c.restore();
-        neon(c, i % 2 ? NEON.pink : NEON.cyan, 1.5, () => {
-          c.beginPath();
-          c.moveTo(i * sw, -40);
-          c.lineTo(i * sw, H + 40);
-        }, 0.3 + 0.4 * p);
-      }
+        c.rect(SX - 14, SY - 14, SW + 28, SH + 28);
+      }, 0.55 + 0.35 * p);
+      // 바닥에 비친 전광판 빛
+      glow(c, 640, SY + SH + 70, 700, edge, 0.2 + 0.1 * p, 60);
     });
+
+    // 3) 객석 뒤통수 한 줄 — 박에 맞춰 불빛을 든다
+    for (let i = 0; i < 10; i++) {
+      const x = 40 + i * 136 + (i % 2 ? 22 : 0);
+      const hop = Math.pow(Math.sin(clamp(b.frac(t - hash(i) * 0.05)) * Math.PI), 0.9);
+      fan(c, x, 760 - hop * 14, 1.55, { color: '#050309', rim: rgba(edge, 0.3), raise: 0.75 + 0.25 * hop, sway: Math.sin(t * 5 + i), light: PARTY[i % 4] });
+    }
   };
 
   // ── 43. 드롭 2 — 군무(캐논), 그리고 전원 차단 ───────────
@@ -1485,6 +1619,6 @@ export function scenes2(kit: Kit): Record<string, SceneFn> {
   void fit;
   return {
     blackoutSign, strobeDancer, fullHouse, hands, letGo, eqCity, mosaic, trio, laserTunnel, crack, boxPress, upDown, burst,
-    chatGray, spikes, ring: ringScene, ringAll, parade, scream, jumpCrowd, odoCuts, slitScan, canon,
+    chatGray, spikes, ring: ringScene, ringAll, parade, scream, jumpCrowd, odoCuts, ledWall, canon,
   };
 }

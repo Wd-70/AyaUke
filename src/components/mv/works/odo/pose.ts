@@ -105,34 +105,56 @@ export function danceAt(seq: Pose[], pos: number, snap = 0.3): Pose {
   return mixPose(seq[(((i - 1) % n) + n) % n], cur, easeOutCubic(f / snap));
 }
 
+// 달리기·걷기: 허벅지 각도가 sin(phase)라서 다리가 앞으로 나가는 때는 cos > 0(왼다리) / cos < 0(오른다리).
+// 무릎은 다리가 앞으로 나갈 때(공중) 접히고, 뒤로 밀 때(땅을 디딤) 펴져야 앞으로 가는 걸음이 된다 —
+// 반대로 두면 뒤로 걷는 것처럼 보인다(2026-11-17 사용자 지적).
+
 /** 달리기(옆모습, 오른쪽으로) — phase 한 바퀴에 두 걸음 */
 export function runPose(phase: number): Pose {
   const s = Math.sin(phase);
   const c = Math.cos(phase);
   return {
     lean: 0.3,
-    air: 0.03 * Math.abs(c),
+    air: 0.03 * Math.abs(s),
     la: [-s * 1.0 + 0.1, -s * 1.0 + 1.5],
     ra: [s * 1.0 + 0.1, s * 1.0 + 1.5],
-    ll: [s * 0.95, s * 0.95 - 0.25 - Math.max(0, -c) * 1.5],
-    rl: [-s * 0.95, -s * 0.95 - 0.25 - Math.max(0, c) * 1.5],
+    ll: [s * 0.95, s * 0.95 - 0.2 - Math.max(0, c) * 1.6],
+    rl: [-s * 0.95, -s * 0.95 - 0.2 - Math.max(0, -c) * 1.6],
     head: 0.1,
     fold: 0,
   };
 }
 
-/** 걷기(옆모습) */
+/** 걷기(옆모습, 오른쪽으로) */
 export function walkPose(phase: number): Pose {
   const s = Math.sin(phase);
   const c = Math.cos(phase);
   return {
     lean: 0.06,
-    air: 0.008 * Math.abs(c),
+    air: 0.008 * Math.abs(s),
     la: [-s * 0.45, -s * 0.45 + 0.25],
     ra: [s * 0.45, s * 0.45 + 0.25],
-    ll: [s * 0.42, s * 0.42 - 0.1 - Math.max(0, -c) * 0.5],
-    rl: [-s * 0.42, -s * 0.42 - 0.1 - Math.max(0, c) * 0.5],
+    ll: [s * 0.42, s * 0.42 - 0.08 - Math.max(0, c) * 0.6],
+    rl: [-s * 0.42, -s * 0.42 - 0.08 - Math.max(0, -c) * 0.6],
     head: 0,
+    fold: 0,
+  };
+}
+
+/** 계단 한 칸 뛰어오르기(옆모습, 오른쪽 위로) — k: 0 디딤 → 1 다음 칸 디딤, side로 앞발을 번갈아 */
+export function climbPose(k: number, side: 1 | -1): Pose {
+  const up = Math.sin(clamp(k) * Math.PI);
+  // 앞다리: 무릎을 높이 들었다가 다음 칸을 디딤 / 뒷다리: 아래 칸을 차고 뒤로 뻗음
+  const lead: [number, number] = [lerp(0.35, 1.25, up), lerp(-0.15, 0.05, up)];
+  const back: [number, number] = [lerp(-0.25, -0.55, up), lerp(-0.35, -1.25, up)];
+  return {
+    lean: 0.32 + 0.08 * up,
+    air: 0.02 * up,
+    la: side > 0 ? [-0.9 * up - 0.2, -0.3 * up + 0.9] : [0.9 * up + 0.2, 0.9 * up + 1.7],
+    ra: side > 0 ? [0.9 * up + 0.2, 0.9 * up + 1.7] : [-0.9 * up - 0.2, -0.3 * up + 0.9],
+    ll: side > 0 ? lead : back,
+    rl: side > 0 ? back : lead,
+    head: 0.05,
     fold: 0,
   };
 }

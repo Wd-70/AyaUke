@@ -14,8 +14,6 @@ export { W, H };
 
 /** 가사를 장면이 직접 크게 그리는 곳 — 일본어 자막은 숨기고 번역만 */
 const OWN_JA = new Set(['halfKO', 'ledKO', 'chatGray', 'odoCuts']);
-/** 원본 영상의 지난 화면을 쓰는 장면 — 이 근처에서만 기억해 둔다 */
-const FOOTAGE = new Set(['mosaic', 'slitScan']);
 
 export interface SceneFonts {
   /** 일본어 가사 자막 (Zen Kaku Gothic New 900) */
@@ -42,51 +40,6 @@ export function createOdoRenderer(clip: MvClipContext, fonts: SceneFonts): MvRen
 
   const footageReady = (v: HTMLVideoElement | null): v is HTMLVideoElement => !!v && v.readyState >= 2 && v.videoWidth > 0;
 
-  // ── 원본 화면 기억 ──────────────────────────────────
-  // 박에 맞춰 같은 순간을 되풀이하거나(모자이크) 띠마다 시간차를 두려고(슬릿), 원본 장면 근처에서
-  // 지난 HISTORY_SEC초의 아바타 부분을 작게 찍어 둔다. 넘기기(시각이 튐)하면 비운다.
-  const HISTORY_SEC = 3.4;
-  const HISTORY_FPS = 15;
-  const HISTORY_W = 320;
-  const history: { t: number; canvas: HTMLCanvasElement }[] = [];
-  let spare: HTMLCanvasElement[] = [];
-  let lastT = -Infinity;
-  let nowT = 0;
-  const avatarRect = (vw: number) => [vw * 0.285, vw * 0.555] as const;
-
-  function remember(video: HTMLVideoElement | null, t: number) {
-    nowT = t;
-    if (t < lastT - 0.1 || t > lastT + 1) {
-      spare.push(...history.map((h) => h.canvas));
-      history.length = 0;
-    }
-    lastT = t;
-    const near = FOOTAGE.has(sceneAt(t).id) || FOOTAGE.has(sceneAt(t + HISTORY_SEC).id);
-    if (!near) {
-      if (history.length) history.length = 0;
-      if (spare.length) spare = [];
-      return;
-    }
-    if (!footageReady(video)) return;
-    const last = history[history.length - 1];
-    if (last && t - last.t < 1 / HISTORY_FPS) return;
-    const [rx, rw] = avatarRect(video.videoWidth);
-    const old = history.length >= HISTORY_SEC * HISTORY_FPS ? history.shift()!.canvas : null;
-    const cv = old ?? spare.pop() ?? document.createElement('canvas');
-    cv.width = HISTORY_W;
-    cv.height = Math.round((HISTORY_W * video.videoHeight) / rw);
-    cv.getContext('2d')!.drawImage(video, rx, 0, rw, video.videoHeight, 0, 0, cv.width, cv.height);
-    history.push({ t, canvas: cv });
-  }
-
-  /** at초 무렵의 기억 — 그보다 앞선 것 중 가장 늦은 것, 기억이 거기까지 안 닿으면 null */
-  function recalled(at: number) {
-    if (!history.length || history[0].t > at) return null;
-    let i = history.length - 1;
-    while (i > 0 && history[i].t > at) i--;
-    return history[i].canvas;
-  }
-
   const kit: Kit = {
     fonts,
     dateLabel: clip.sungDateLabel,
@@ -95,20 +48,33 @@ export function createOdoRenderer(clip: MvClipContext, fonts: SceneFonts): MvRen
     beat: () => beat,
     bar: (n) => barTime(n, C),
     env: (ch, t) => rawEnv(ch, t),
-    footage(c, video, x, y, w, h, delay = 0) {
+    footage(c, video, x, y, w, h, crop) {
       if (!footageReady(video)) return false;
       // 방송 화면에서 아바타 부분(왼쪽 채팅 제외, x 0.285~0.84)만, 얼굴이 가운데 오도록
-      const past = delay > 0 ? recalled(nowT - delay) : null;
-      const src: CanvasImageSource = past ?? video;
-      const [rx, rw] = past ? [0, past.width] : avatarRect(video.videoWidth);
-      const vh = past ? past.height : video.videoHeight;
+      const rx = video.videoWidth * 0.285;
+      const rw = video.videoWidth * 0.555;
+      const vh = video.videoHeight;
+      const zoom = Math.max(1, crop?.zoom ?? 1);
       let sw = rw;
       let sh = rw / (w / h);
       if (sh > vh) {
         sh = vh;
         sw = vh * (w / h);
       }
-      c.drawImage(src, rx + (rw - sw) / 2, Math.max(0, (vh - sh) * 0.3), sw, sh, x, y, w, h);
+      sw /= zoom;
+      sh /= zoom;
+      const cx = rx + rw * (crop?.cx ?? 0.5);
+      const sx = clamp(cx - sw / 2, rx, rx + rw - sw);
+      const sy = crop?.cy === undefined ? Math.max(0, (vh - sh) * 0.3) : clamp(vh * crop.cy - sh / 2, 0, vh - sh);
+      if (crop?.mirror) {
+        c.save();
+        c.translate(x * 2 + w, 0);
+        c.scale(-1, 1);
+        c.drawImage(video, sx, sy, sw, sh, x, y, w, h);
+        c.restore();
+      } else {
+        c.drawImage(video, sx, sy, sw, sh, x, y, w, h);
+      }
       return true;
     },
   };
@@ -272,7 +238,6 @@ export function createOdoRenderer(clip: MvClipContext, fonts: SceneFonts): MvRen
         return;
       }
       const video = footageReady(frame.footage) ? frame.footage : null;
-      remember(video, t);
       const span = sceneAt(t);
       main.save();
       main.beginPath();

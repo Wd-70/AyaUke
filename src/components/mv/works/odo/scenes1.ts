@@ -1,12 +1,12 @@
 // 踊 장면 0~20 — 훅 1(개연 준비, 흰빛만) · 절 1(혼자, 보라) · 프리(늘어남, +시안·노랑) · 훅 2(암전 직전까지).
 // 번호·내용은 PLAN.md 표와 같다. 컷은 가사 덩어리 시각, 박 연출은 kit.beat().
-import { TAU, clamp, easeInCubic, easeOutBack, easeOutCubic, hash, lerp, setFont } from '../../engine';
+import { TAU, clamp, easeInCubic, easeOutBack, easeOutCubic, hash, lerp, setFont, smooth } from '../../engine';
 import { rgba } from '../../paint';
 import {
   BG, type Ctx, H, type Kit, NEON, type SceneFn, W, cam, chunkT, cone, dead, fillBg, fit, flicker, glow, hit, led, ledMask,
   neon, neonText, noFootage, ring, rr, shake, span01, zoomAt,
 } from './kit';
-import { DANCE, POSE, type Pose, danceAt, figure, mixPose, runPose } from './pose';
+import { DANCE, POSE, type Pose, climbPose, danceAt, figure, mixPose, runPose } from './pose';
 
 /** 꺾은선의 앞 k만큼만(그려지는 선) */
 function partial(c: Ctx, pts: [number, number][], k: number) {
@@ -848,8 +848,10 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
     const hop = (t - f.span.start) / (per() / 2);
     const i0 = Math.floor(hop);
     const fr = hop - i0;
-    const fx = lerp(barX(i0), barX(i0 + 1), fr) + 38;
-    const fy = lerp(top(i0), top(i0 + 1), fr) - Math.sin(fr * Math.PI) * 74;
+    // 옆모습으로 한 칸씩 뛰어오른다 — 몸이 먼저 앞으로 기울고, 무릎을 들어 다음 칸을 디딘다
+    const fk = smooth(fr);
+    const fx = lerp(barX(i0), barX(i0 + 1), fk) + 30;
+    const fy = lerp(top(i0), top(i0 + 1), fk) - Math.sin(fr * Math.PI) * 34;
     c.save();
     c.translate(520 - (barX(hop) + 38), 430 + hop * 46);
     glow(c, fx, fy - 60, 380, NEON.violet, 0.16);
@@ -868,7 +870,16 @@ export function scenes1(kit: Kit): Record<string, SceneFn> {
       }, passed ? 1 : 0.45);
       if (i === i0) glow(c, x + 38, y, 110, NEON.white, 0.6 * (1 - fr));
     }
-    figure(c, fx, fy, 150, mixPose(POSE.low, POSE.jump, Math.sin(fr * Math.PI)), { color: NEON.white, rim: NEON.violet, rimBlur: 16 });
+    // 지나온 칸에 남는 잔상 두 개
+    for (let g = 2; g >= 1; g--) {
+      const h0 = hop - g * 0.35;
+      const j0 = Math.floor(h0);
+      const k0 = smooth(h0 - j0);
+      const gx = lerp(barX(j0), barX(j0 + 1), k0) + 30;
+      const gy = lerp(top(j0), top(j0 + 1), k0) - Math.sin((h0 - j0) * Math.PI) * 34;
+      figure(c, gx, gy, 150, climbPose(h0 - j0, j0 % 2 ? -1 : 1), { color: rgba(NEON.violet, 0.22 / g) });
+    }
+    figure(c, fx, fy, 150, climbPose(fr, i0 % 2 ? -1 : 1), { color: NEON.white, rim: NEON.violet, rimBlur: 16 });
     c.restore();
   };
 

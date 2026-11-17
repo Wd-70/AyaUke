@@ -54,9 +54,17 @@ export interface Kit {
   env(ch: 'onset' | 'rms' | 'low' | 'high', t: number): number;
   /**
    * 원본 방송 화면의 아바타 부분을 (x,y,w,h)에 꽉 채워 그린다. 영상이 없으면 false.
-   * delay(초)를 주면 그만큼 전의 화면(재생하며 지난 몇 초를 기억해 둔 것 — 기억이 없으면 지금 화면)
+   * 늘 지금 화면 — 지난 화면을 되풀이하는 방식은 끊겨 보여서 쓰지 않는다(2026-11-17 사용자 지적).
    */
-  footage(c: Ctx, video: HTMLVideoElement | null, x: number, y: number, w: number, h: number, delay?: number): boolean;
+  footage(c: Ctx, video: HTMLVideoElement | null, x: number, y: number, w: number, h: number, crop?: FootageCrop): boolean;
+}
+
+/** 원본 화면 일부만 크게 — zoom 배율, (cx, cy)는 아바타 부분 안 비율 위치(얼굴은 0.5, 0.47 무렵) */
+export interface FootageCrop {
+  zoom?: number;
+  cx?: number;
+  cy?: number;
+  mirror?: boolean;
 }
 
 /** 줄 번호(1부터)의 n번째 덩어리 시각 */

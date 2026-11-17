@@ -110,7 +110,7 @@ export const SCENES: SceneDef[] = [
   { id: 'letGo', at: [34, 0], what: '역광 속 손 흔드는 관객 뒷모습 · 「Let go」에 불빛을 던짐', shot: '객석 뒤에서 무대를', tech: ['실루엣', '빛'], glow: ['pink', 'violet', 'cyan'] },
   // 드롭 1
   { id: 'eqCity', at: 48, what: '이퀄라이저 막대가 스카이라인처럼 화면 가득', shot: '막대 숲 사이로 전진', tech: ['미터'], glow: ['violet', 'cyan'] },
-  { id: 'mosaic', at: 50, what: '원본 영상 12칸 모자이크 — 칸마다 다른 순간이 끊겨 반복', shot: '정면 격자', tech: ['영상', '분할'], glow: ['pink', 'cyan'] },
+  { id: 'mosaic', at: 50, what: '모니터 12대 벽 — 지금 화면 하나를 나눠 비추다 박마다 몇 대가 얼굴 가까이로', shot: '정면 격자', tech: ['영상', '분할'], glow: ['pink', 'cyan'] },
   { id: 'trio', at: 52, what: '댄서 세 명, 색 다른 그림자가 어긋나 겹침', shot: '옆으로 미끄러지는 카메라', tech: ['댄서'], glow: ['cyan', 'pink', 'yellow'] },
   { id: 'laserTunnel', at: 54, what: '레이저 격자 터널 전진, 마디마다 문을 통과', shot: '정면 원근', tech: ['빛'], glow: ['violet', 'cyan'] },
   // 절 2 — 랩 (글자가 주인공)
@@ -127,7 +127,7 @@ export const SCENES: SceneDef[] = [
   // 드롭 2 — 만원
   { id: 'jumpCrowd', at: 76, what: '흰 바탕에 검은 군중이 박마다 뛰어오름 — 객석이 가득', shot: '객석 뒤에서', tech: ['실루엣', '빛'], glow: ['white'] },
   { id: 'odoCuts', at: 78, what: '(반주 + 애드리브) 「踊」 한 글자가 박마다 다른 서체·자리·색으로 여덟 컷', shot: '매 컷 다른 배치', tech: ['타이포'], glow: ALL },
-  { id: 'slitScan', at: 80, what: '원본 영상을 세로 띠로 잘라 띠마다 시간차', shot: '화면 가득', tech: ['영상'], glow: ['pink', 'cyan'] },
+  { id: 'ledWall', at: 80, what: '무대 대형 전광판에 비친 아야(원본 영상을 LED 점으로) — 박마다 색이 바뀌며 새로 고침, 아래엔 객석', shot: '객석 뒤에서 전광판 정면', tech: ['영상', '전광판'], glow: ['pink', 'cyan'] },
   { id: 'canon', at: 82, what: '댄서 군무(한 박씩 늦게 같은 동작), 색종이 · 끝 박에 전원 뚝', shot: '정면 와이드', tech: ['댄서', '입자'], glow: ALL },
   // 암전 — 정점
   { id: 'oneLight', at: 84, what: '완전한 어둠, 객석에서 작은 불빛 하나', shot: '와이드 검정, 점 하나', tech: ['빛'], glow: ['white'] },
