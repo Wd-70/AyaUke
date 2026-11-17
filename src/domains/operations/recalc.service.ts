@@ -1,6 +1,7 @@
 import Like from '@/domains/engagement/like.schema';
 import SongDetail from '@/domains/catalog/song.schema';
 import SongVideo from '@/domains/archive/schemas/song-video.schema';
+import { toKstDateString } from '@/shared/utils/stream-date';
 
 /**
  * 비정규화 카운트 재계산 잡.
@@ -81,7 +82,8 @@ export async function recalculateSongStats(songId?: string): Promise<RecalcResul
           videos.length > 0
             ? {
                 sungCount: videos.length,
-                lastSungDate: videos[0].sungDate.toISOString().split('T')[0],
+                // 한국 날짜(부른 날짜는 KST 자정으로 저장됨 — UTC로 자르면 전날이 된다)
+                lastSungDate: toKstDateString(videos[0].sungDate),
               }
             : { sungCount: 0, lastSungDate: null },
       });

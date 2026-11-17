@@ -7,6 +7,7 @@ import SongDetail from '@/domains/catalog/song.schema';
 import { parseVideoUrl } from '@/shared/utils/video-url';
 import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
 import { canManageClips } from '@/lib/permissions';
+import { toKstDateString } from '@/shared/utils/stream-date';
 
 interface BulkClipData {
   songId: string;
@@ -244,12 +245,8 @@ export async function POST(request: NextRequest) {
         };
         
         if (latestClip?.sungDate) {
-          // 로컬 시간 기준으로 날짜 문자열 생성 (UTC 변환 방지)
-          const date = new Date(latestClip.sungDate);
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
-          const sungDateString = `${year}-${month}-${day}`;
+          // 부른 날짜는 한국 날짜로 — 서버 시간대(Vercel=UTC)에 따라 하루씩 밀리지 않게
+          const sungDateString = toKstDateString(new Date(latestClip.sungDate));
           updateData.$set.lastSungDate = sungDateString;
         }
         

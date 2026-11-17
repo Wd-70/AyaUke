@@ -8,6 +8,7 @@ import { SongVideo as SongVideoType } from '@/types';
 import { parseVideoUrl } from '@/shared/utils/video-url';
 import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
 import { resolveUploaderNames } from '@/domains/archive/clip.service';
+import { toKstDateString } from '@/shared/utils/stream-date';
 
 // GET: 특정 곡의 영상 목록 조회
 export async function GET(
@@ -214,11 +215,8 @@ export async function POST(
 
     // 곡 통계 업데이트 (효율적인 하이브리드 방식)
     try {
-      // 로컬 시간 기준으로 날짜 문자열 생성 (UTC 변환 방지)
-      const year = validSungDate.getFullYear();
-      const month = String(validSungDate.getMonth() + 1).padStart(2, '0');
-      const day = String(validSungDate.getDate()).padStart(2, '0');
-      const sungDateString = `${year}-${month}-${day}`; // YYYY-MM-DD 형식
+      // 부른 날짜는 한국 날짜로 — 서버 시간대(Vercel=UTC)에 따라 하루씩 밀리지 않게
+      const sungDateString = toKstDateString(validSungDate); // YYYY-MM-DD
       
       // 요청 헤더에서 배치 업로드 여부 확인
       const isBatchUpload = request.headers.get('x-batch-upload') === 'true';

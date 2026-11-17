@@ -7,6 +7,7 @@ import SongDetail from '@/domains/catalog/song.schema';
 import { canManageClips, UserRole } from '@/lib/permissions';
 import { parseVideoUrl } from '@/shared/utils/video-url';
 import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
+import { toKstDateString } from '@/shared/utils/stream-date';
 
 // GET: 특정 영상 정보 조회
 export async function GET(
@@ -154,12 +155,8 @@ export async function PUT(
         
         // 수정된 클립이 해당 곡의 최신 클립인지 확인
         if (latestClip && latestClip._id.toString() === videoId) {
-          // 로컬 시간 기준으로 날짜 문자열 생성 (UTC 변환 방지)
-          const date = new Date(latestClip.sungDate);
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
-          const sungDateString = `${year}-${month}-${day}`;
+          // 부른 날짜는 한국 날짜로 — 서버 시간대(Vercel=UTC)에 따라 하루씩 밀리지 않게
+          const sungDateString = toKstDateString(new Date(latestClip.sungDate));
           
           // 곡의 lastSungDate 업데이트
           await SongDetail.findByIdAndUpdate(songId, {
