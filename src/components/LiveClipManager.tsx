@@ -1584,9 +1584,9 @@ export default function LiveClipManager({
                           </>
                         ) : null
                       }
-                      selectedFooter={video._id && !editingVideoId ? <div className="mt-2 flex justify-end border-t border-current/10 pt-1">
+                      selectedFooter={video._id && !editingVideoId ? (
                         <ClipRangeButton clipId={video._id} sessionId={rangeSessionId} variant="compact" />
-                      </div> : null}
+                      ) : null}
                     />
                   );
                 })}

@@ -60,8 +60,10 @@ export default function ClipRow({
   selectedFooter,
 }: ClipRowProps) {
   const hasOverlap = showOverlap && overlapInfo.hasOverlap;
-  const hasAlwaysVisibleActions = Boolean(actions);
-  const showSelectedActions = isSelected && (selectedActions || (canEdit && !isDimmed));
+  const showEditTools = canEdit && !isDimmed;
+  // 선택된 행의 도구(원본·담기·공유·신고·수정·삭제 + 구간 조정)는 제목 옆이 아니라 아래 줄에 —
+  // 좁은 화면에서 아이콘 7개가 한 줄에 붙으면 글자 칸이 한 글자 폭으로 찌그러졌다.
+  const showToolbar = isSelected && Boolean(selectedActions || showEditTools || selectedFooter);
 
   const borderTone = hasOverlap
     ? isSelected
@@ -137,18 +139,19 @@ export default function ClipRow({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-0.5">
-          {/* 항상 보이는 액션(좋아요) */}
-          {actions}
+        {/* 항상 보이는 액션(좋아요) */}
+        {actions && <div className="flex shrink-0 items-center">{actions}</div>}
+      </div>
 
-          {/* 선택된 행에서만: 원본·공유·신고 (+ 권한자 수정·삭제) */}
-          {showSelectedActions && (
-            <>
-              {hasAlwaysVisibleActions && (
-                <span className="mx-1 h-4 w-px shrink-0 bg-light-primary/25 dark:bg-dark-primary/25" />
-              )}
+      {/* 선택된 행에서만: 도구 줄 — 원본·담기·공유·신고 (+ 권한자 수정·삭제) · 구간 조정 */}
+      {showToolbar && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="mt-2 flex items-center gap-1 border-t border-light-primary/15 pt-1.5 dark:border-dark-primary/15"
+        >
+          <div className="flex min-w-0 flex-wrap items-center gap-0.5 [&>*]:min-h-9 [&>*]:min-w-9 [&>*]:justify-center">
               {selectedActions}
-              {canEdit && !isDimmed && (
+              {showEditTools && (
                 <>
                   <button
                     onClick={(e) => {
@@ -179,12 +182,10 @@ export default function ClipRow({
                   </button>
                 </>
               )}
-            </>
-          )}
+          </div>
+          {selectedFooter && <div className="ml-auto shrink-0">{selectedFooter}</div>}
         </div>
-      </div>
-
-      {isSelected && selectedFooter}
+      )}
 
       {/* 중복 상세 (권한자) */}
       {overlapExpanded && hasOverlap && (

@@ -76,6 +76,29 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
     setViewModeState(mode);
     try { window.localStorage.setItem(VIEW_MODE_KEY, mode); } catch { /* 저장소 차단 */ }
   };
+  // 보기 모드 토글 (그리드 / 리스트)
+  const viewToggle = (
+    <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/50 dark:bg-gray-800/50">
+      <button
+        onClick={() => setViewMode('grid')}
+        title="카드 보기"
+        aria-label="카드 보기"
+        aria-pressed={viewMode === 'grid'}
+        className={`min-h-11 min-w-11 flex items-center justify-center p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-light-cta-accent dark:bg-dark-accent text-white' : 'text-light-text/60 dark:text-dark-text/60 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'}`}
+      >
+        <Squares2X2Icon className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => setViewMode('list')}
+        title="리스트 보기"
+        aria-label="리스트 보기"
+        aria-pressed={viewMode === 'list'}
+        className={`min-h-11 min-w-11 flex items-center justify-center p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-light-cta-accent dark:bg-dark-accent text-white' : 'text-light-text/60 dark:text-dark-text/60 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'}`}
+      >
+        <ListBulletIcon className="w-4 h-4" />
+      </button>
+    </div>
+  );
   const [isLoading, setIsLoading] = useState(!initialSongs || initialSongs.length === 0); // 로딩 상태
   const [hasOpenDialog, setHasOpenDialog] = useState(false); // 다이얼로그 열림 상태
   const { loadLikes } = useBulkLikes();
@@ -196,7 +219,6 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
         <SongbookHeader 
           totalSongs={initialSongs?.length || 0}
           filteredSongs={filteredSongs.length || 0}
-          visibleSongs={visibleSongs.length}
           isLoading={isLoading}
         />
 
@@ -205,6 +227,7 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
           stuck={barStuck}
           showNumbers={showNumbers}
           onToggleNumbers={handleToggleNumbers}
+          mobileTools={viewToggle}
         />
 
         {isLoading ? (
@@ -231,29 +254,8 @@ export default function SongbookClient({ songs: initialSongs, error: serverError
         ) : initialSongs && initialSongs.length > 0 ? (
           filteredSongs.length > 0 ? (
           <>
-          {/* 보기 모드 토글 (그리드 / 리스트) */}
-          <div className="flex justify-end mb-3">
-            <div className="inline-flex items-center gap-0.5 p-0.5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/50 dark:bg-gray-800/50">
-              <button
-                onClick={() => setViewMode('grid')}
-                title="카드 보기"
-                aria-label="카드 보기"
-                aria-pressed={viewMode === 'grid'}
-                className={`min-h-11 min-w-11 flex items-center justify-center p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-light-cta-accent dark:bg-dark-accent text-white' : 'text-light-text/60 dark:text-dark-text/60 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'}`}
-              >
-                <Squares2X2Icon className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                title="리스트 보기"
-                aria-label="리스트 보기"
-                aria-pressed={viewMode === 'list'}
-                className={`min-h-11 min-w-11 flex items-center justify-center p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-light-cta-accent dark:bg-dark-accent text-white' : 'text-light-text/60 dark:text-dark-text/60 hover:bg-light-primary/10 dark:hover:bg-dark-primary/10'}`}
-              >
-                <ListBulletIcon className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+          {/* 보기 모드 토글 — 데스크톱은 목록 위 오른쪽. 모바일은 검색창 아래 도구 줄에 합쳐 빈 줄을 없앤다 */}
+          <div className="hidden md:flex justify-end mb-3">{viewToggle}</div>
           <div className={viewMode === 'list'
             ? "grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3"
             : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 lg:gap-6"}>

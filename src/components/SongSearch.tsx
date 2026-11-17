@@ -27,6 +27,8 @@ interface SongSearchProps {
   stuck?: boolean;
   showNumbers?: boolean;
   onToggleNumbers?: (show: boolean) => void;
+  /** 모바일 전용 도구(보기 모드 토글 등) — 검색창 아래 도구 줄 왼쪽에 둔다 */
+  mobileTools?: React.ReactNode;
 }
 
 export default function SongSearch({
@@ -34,6 +36,7 @@ export default function SongSearch({
   stuck = false,
   showNumbers = false,
   onToggleNumbers,
+  mobileTools,
 }: SongSearchProps) {
   const {
     songs,
@@ -231,6 +234,10 @@ export default function SongSearch({
                      focus:border-transparent transition-all duration-200"
         />
         <div className="song-search-actions absolute inset-y-0 right-0 pr-2 sm:pr-3 flex items-center gap-1">
+          {/* 모바일: 이 줄은 검색창 아래로 내려오므로(globals.css) 왼쪽 빈자리에 보기 모드 토글 */}
+          {mobileTools && (
+            <div className="mr-auto flex md:hidden [&_button]:!min-h-10 [&_button]:!min-w-10">{mobileTools}</div>
+          )}
           {/* 검색어 지우기 */}
           {searchTerm && (
             <button

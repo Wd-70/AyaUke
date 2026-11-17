@@ -289,8 +289,10 @@ export default function SongCard({
           <button
             onClick={handleLike}
             disabled={likeLoading}
-            className="shrink-0 p-1 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/15 disabled:opacity-50"
+            // 손가락 크기 터치 영역(40px) — 행 높이는 음수 여백으로 그대로. 빗나가면 상세가 열려 버렸다
+            className="shrink-0 -my-2.5 -mr-2 p-3 rounded-full hover:bg-light-primary/10 dark:hover:bg-dark-primary/15 disabled:opacity-50"
             title={liked ? "좋아요 취소" : "좋아요"}
+            aria-label={liked ? "좋아요 취소" : "좋아요"}
           >
             <LikeHeart liked={liked} popKey={likePop} className={`w-4 h-4 ${liked ? "text-red-500" : "text-light-text/40 dark:text-dark-text/40"}`} />
           </button>

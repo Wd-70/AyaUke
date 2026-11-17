@@ -7,14 +7,12 @@ import { MusicalNoteIcon } from "@heroicons/react/24/outline";
 interface SongbookHeaderProps {
   totalSongs?: number;
   filteredSongs?: number;
-  visibleSongs?: number;
   isLoading?: boolean;
 }
 
 export default function SongbookHeader({ 
   totalSongs = 0, 
   filteredSongs = 0, 
-  visibleSongs = 0, 
   isLoading = false 
 }: SongbookHeaderProps) {
   // 클라이언트에서 즉시 헤더를 표시하기 위한 상태
@@ -66,12 +64,7 @@ export default function SongbookHeader({
                   <span>검색됨 {filteredSongs}곡</span>
                 </div>
               )}
-              {(visibleSongs < filteredSongs && filteredSongs > 0) && (
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-light-purple dark:bg-dark-purple rounded-full"></div>
-                  <span>표시 중 {visibleSongs}곡</span>
-                </div>
-              )}
+              {/* '표시 중 N곡'(무한 스크롤로 그려 둔 수)은 내부 사정이라 보여 주지 않는다 */}
             </>
           )}
         </motion.div>

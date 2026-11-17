@@ -1,7 +1,7 @@
 "use client";
 import { hasPermission, Permission } from "@/lib/permissions";
 
-import { useState, useEffect, useCallback, useRef, useMemo, type Dispatch, type SetStateAction } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { DUR, EASE_IN, EASE_OUT, SPRING_SHEET, SPRING_SNAPPY } from "@/shared/motion/tokens";
@@ -327,11 +327,17 @@ export default function SongDetailModal({
         ? 'right-full mr-2 top-0'
         : 'bottom-full mb-2 left-1/2 -translate-x-1/2';
 
-    const iconBtn =
-      'relative p-2.5 rounded-full transition-colors duration-200 ' +
-      'text-light-text/70 dark:text-dark-text/70 ' +
-      'bg-light-primary/5 dark:bg-dark-primary/10 ' +
-      'hover:bg-light-primary/15 dark:hover:bg-dark-primary/20';
+    // 모바일 수평 바는 아이콘만으로는 뜻을 알기 어려워 이름표를 단다(하단 탭과 같은 문법).
+    const horiz = orientation === 'horizontal';
+    const iconBtn = horiz
+      ? 'relative flex min-w-[64px] flex-col items-center gap-0.5 rounded-xl px-3 py-1.5 transition-colors duration-200 ' +
+        'text-light-text/70 dark:text-dark-text/70 active:bg-light-primary/15 dark:active:bg-dark-primary/20'
+      : 'relative p-2.5 rounded-full transition-colors duration-200 ' +
+        'text-light-text/70 dark:text-dark-text/70 ' +
+        'bg-light-primary/5 dark:bg-dark-primary/10 ' +
+        'hover:bg-light-primary/15 dark:hover:bg-dark-primary/20';
+    const label = (text: ReactNode) =>
+      horiz ? <span className="text-[11px] font-medium leading-none tabular-nums">{text}</span> : null;
 
     return (
       <>
@@ -343,7 +349,9 @@ export default function SongDetailModal({
           title={liked ? '좋아요 취소' : '좋아요'}
         >
           <LikeHeart liked={liked} popKey={likePop} className={`w-5 h-5 ${liked ? 'text-red-500' : 'text-current'}`} />
-          {(song.likeCount ?? 0) > 0 && (
+          {/* 수평 바: 빨간 배지는 '알림'처럼 읽혀서 숫자를 이름표에 넣는다 */}
+          {label((song.likeCount ?? 0) > 0 ? `좋아요 ${song.likeCount}` : '좋아요')}
+          {!horiz && (song.likeCount ?? 0) > 0 && (
             <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 flex items-center justify-center text-[10px] font-medium rounded-full bg-red-500 text-white">
               {song.likeCount}
             </span>
@@ -357,8 +365,9 @@ export default function SongDetailModal({
           title="플레이리스트에 추가"
         >
           <ListBulletIcon className="w-5 h-5" />
+          {label('담기')}
           {songPlaylists.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[1rem] h-4 px-1 flex items-center justify-center text-[10px] font-medium rounded-full bg-light-accent dark:bg-dark-accent text-white">
+            <span className={`absolute ${horiz ? 'top-0 right-3' : '-top-0.5 -right-0.5'} min-w-[1rem] h-4 px-1 flex items-center justify-center text-[10px] font-medium rounded-full bg-light-accent dark:bg-dark-accent text-white`}>
               {songPlaylists.length}
             </span>
           )}
@@ -372,6 +381,7 @@ export default function SongDetailModal({
             title="가사 검색"
           >
             <MagnifyingGlassIcon className="w-5 h-5" />
+            {label('가사')}
           </button>
           {showLyricsMenu && (
             <>
@@ -417,6 +427,7 @@ export default function SongDetailModal({
             ) : (
               <ComputerDesktopIcon className="w-5 h-5" />
             )}
+            {label('OBS')}
           </button>
         )}
       </>
@@ -573,7 +584,8 @@ export default function SongDetailModal({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ duration: 0.3, delay: 0.1 }}
-                  className="bg-light-primary/5 dark:bg-dark-primary/5 rounded-lg border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
+                  // 모바일은 시트 자체가 카드라 테두리 상자를 한 겹 덜어 클립 목록 폭을 확보한다
+                  className="md:bg-light-primary/5 md:dark:bg-dark-primary/5 md:rounded-lg md:border border-light-primary/20 dark:border-dark-primary/20 flex flex-col flex-1 min-h-0"
                 >
                   {/* 탭 헤더 */}
                   <div className="flex border-b border-light-primary/20 dark:border-dark-primary/20">
@@ -608,7 +620,7 @@ export default function SongDetailModal({
                   </div>
 
                   {/* 탭 콘텐츠 */}
-                  <div className="flex-1 min-h-0 p-2 sm:p-4 flex flex-col">
+                  <div className="flex-1 min-h-0 pt-1 md:p-4 flex flex-col">
                     {activeTab === 'mr' ? (
                       <div className="flex-1 flex flex-col justify-center min-h-0">
                         {youtubeMR ? (
