@@ -1,8 +1,9 @@
+import { config } from '@/shared/config';
 import { withApi, ok } from '@/shared/api/handler';
 import { fetchChzzkLiveStatus } from '@/domains/archive/chzzk.client';
 
 /** 아야우케 치지직 채널 ID */
-const AYAUKE_CHANNEL_ID = 'abe8aa82baf3d3ef54ad8468ee73e7fc';
+const AYAUKE_CHANNEL_ID = config.chzzkChannelId;
 
 // 치지직 상태는 자주 바뀌므로 짧게 캐시(과도한 외부 호출 방지). 30초.
 export const revalidate = 30;

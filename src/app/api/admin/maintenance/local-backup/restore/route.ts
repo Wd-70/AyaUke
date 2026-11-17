@@ -4,6 +4,10 @@ import { withApi, ok } from '@/shared/api/handler';
 import { ForbiddenError, ValidationError } from '@/shared/api/errors';
 import { isSuperAdmin, UserRole } from '@/lib/permissions';
 import { restoreBackup } from '@/domains/operations/local-backup.service';
+import { logMaintenance } from '@/domains/operations/maintenance-log.service';
+
+const actor = (session: Session | null) =>
+  (session?.user as { displayName?: string; name?: string } | undefined)?.displayName || session?.user?.name || '알 수 없음';
 
 function assertSuperAdmin(session: Session | null) {
   const role = (session?.user as { role?: string } | undefined)?.role as UserRole | undefined;
@@ -24,5 +28,8 @@ export const POST = withApi({ schema: Body, auth: 'user' }, async ({ input, sess
   if (input.confirm !== input.name) {
     throw new ValidationError('확인 입력이 백업 이름과 일치하지 않습니다.');
   }
-  return ok(await restoreBackup(input.name));
+  const restored = await restoreBackup(input.name);
+  // 복원이 기록 컬렉션까지 덮어쓰므로 복원이 끝난 뒤에 남긴다
+  await logMaintenance('backup-restore', '백업으로 복원', actor(session), input.name);
+  return ok(restored);
 });

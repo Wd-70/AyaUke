@@ -13,6 +13,7 @@ import {
   FlagIcon,
   MusicalNoteIcon,
   CircleStackIcon,
+  Cog6ToothIcon,
   ChevronDoubleLeftIcon,
   ChevronDoubleRightIcon,
   ShieldCheckIcon,
@@ -25,8 +26,9 @@ import LiveClipManagementTab from "./tabs/live-clips/LiveClipManagementTab";
 import ClipReportsTab from "./tabs/ClipReportsTab";
 import SongManagementTab from "./tabs/songs/SongManagementTab";
 import ClipWorkflowTab from "./tabs/clip-workflow/ClipWorkflowTab";
+import SystemSettingsTab from "./tabs/SystemSettingsTab";
 
-type TabType = "dashboard" | "songs" | "clips" | "clip-workflow" | "clip-reports" | "users" | "maintenance";
+type TabType = "dashboard" | "songs" | "clips" | "clip-workflow" | "clip-reports" | "users" | "maintenance" | "system";
 
 /** 대시보드는 모든 관리자, 나머지는 각 담당 권한으로 제한한다. */
 type TabAccess = "admin" | "songs" | "clips" | "users" | "system";
@@ -56,7 +58,8 @@ const tabs: Tab[] = [
   { id: "clip-workflow", name: "클립 만들기", icon: ScissorsIcon, description: "치지직/유튜브 댓글 → 클립 생성", access: "clips", group: "content" },
   { id: "clip-reports", name: "클립 신고", icon: FlagIcon, description: "사용자 신고 검토·처리", access: "clips", group: "content" },
   { id: "users", name: "사용자 관리", icon: UsersIcon, description: "권한·활동 관리", access: "users", group: "operations" },
-  { id: "maintenance", name: "데이터 유지보수", icon: CircleStackIcon, description: "백업·재계산·컬렉션 현황", access: "system", group: "operations" },
+  { id: "maintenance", name: "데이터 유지보수", icon: CircleStackIcon, description: "데이터 점검·백업·작업 기록", access: "system", group: "operations" },
+  { id: "system", name: "시스템 설정", icon: Cog6ToothIcon, description: "연동 상태·기능 공개·작업 기본값", access: "system", group: "operations" },
 ];
 
 const GROUP_LABEL: Record<Tab["group"], string | null> = { overview: null, content: "콘텐츠", operations: "운영" };
@@ -144,7 +147,9 @@ export default function AdminClient() {
       case "users":
         return <UserManagementTab />;
       case "maintenance":
-        return <MaintenanceTab />;
+        return <MaintenanceTab onNavigate={(tab) => TAB_IDS.has(tab) && setActiveTab(tab as TabType)} />;
+      case "system":
+        return <SystemSettingsTab />;
       default:
         return null;
     }

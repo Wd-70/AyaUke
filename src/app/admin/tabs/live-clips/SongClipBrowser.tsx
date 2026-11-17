@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useOverlayHistory } from "@/shared/motion/useOverlayHistory";
+import { adminControl } from "@/components/admin/AdminPrimitives";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import Image from "next/image";
 import { MagnifyingGlassIcon, ClockIcon, MusicalNoteIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
@@ -74,8 +75,9 @@ export default function SongClipBrowser() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="곡 제목, 아티스트 검색..."
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/60 dark:bg-gray-900/60 text-light-text dark:text-dark-text placeholder-light-text/40 dark:placeholder-dark-text/40 focus:ring-2 focus:ring-light-accent/40 dark:focus:ring-dark-accent/40 focus:border-transparent"
+            placeholder="곡 제목, 아티스트 검색"
+            aria-label="곡 검색"
+            className={`${adminControl} w-full pl-9`}
           />
         </div>
         <select
@@ -84,7 +86,8 @@ export default function SongClipBrowser() {
             setSortBy(e.target.value as typeof sortBy);
             setPage(1);
           }}
-          className="px-3 py-2 text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/60 dark:bg-gray-900/60 text-light-text dark:text-dark-text"
+          aria-label="정렬"
+          className={adminControl}
         >
           <option value="recent">최근 부른 순</option>
           <option value="clipCount">클립 많은 순</option>
@@ -109,7 +112,7 @@ export default function SongClipBrowser() {
               <button
                 key={song.songId}
                 onClick={() => openSong(song.songId)}
-                className="group flex gap-3 p-3 rounded-xl border border-light-primary/15 dark:border-dark-primary/15 bg-white/40 dark:bg-gray-900/40 backdrop-blur-sm hover:border-light-accent/40 dark:hover:border-dark-accent/40 hover:shadow-md transition-all text-left"
+                className="group flex gap-3 rounded-2xl border border-light-primary/20 bg-white/80 p-3 text-left shadow-sm transition hover:border-purple-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 dark:border-dark-primary/20 dark:bg-gray-900/70 dark:hover:border-purple-700"
               >
                 <div className="relative w-24 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700">
                   <Image

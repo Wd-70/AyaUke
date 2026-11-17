@@ -1,4 +1,5 @@
 'use client';
+import { CHZZK_VIDEOS_URL } from "@/shared/channels";
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
@@ -49,7 +50,7 @@ function Thumbnail({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-const CHZZK_VIDEOS = 'https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc/videos';
+const CHZZK_VIDEOS = CHZZK_VIDEOS_URL;
 const YT_ARCHIVE = 'https://www.youtube.com/@AyaUke_Archive/videos';
 
 function VideoCard({ video, i }: { video: RecentVideo; i: number }) {

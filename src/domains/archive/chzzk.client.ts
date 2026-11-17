@@ -3,7 +3,7 @@ import { NotFoundError } from '@/shared/api/errors';
 
 /** 치지직 비공식 API 클라이언트. HTTP 호출과 응답 정규화만 담당한다. */
 
-const CHZZK_HEADERS = {
+export const CHZZK_HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   Accept: 'application/json, text/plain, */*',

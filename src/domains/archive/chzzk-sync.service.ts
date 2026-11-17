@@ -15,7 +15,7 @@ import { isTimelineComment, extractTimestamps, convertCommentTimestamps } from '
 /** 치지직 다시보기 동기화 + 조회 유스케이스. SSE 등 HTTP 표현은 모른다. */
 
 // 아야우케 채널 (config의 첫 번째 ayauke 관리자 채널)
-const AYAUKE_CHANNEL_ID = config.ayaukeAdminChannelIds[0];
+const AYAUKE_CHANNEL_ID = config.chzzkChannelId;
 
 export type SyncEvent =
   | { type: 'progress'; stage: string; message: string; totalVideos?: number }

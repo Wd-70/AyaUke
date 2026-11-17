@@ -1,9 +1,10 @@
 'use client';
+import { CHZZK_LIVE_URL } from "@/shared/channels";
 
 import { motion } from 'framer-motion';
 import { useLiveStatus } from '@/hooks/useLiveStatus';
 
-const CHZZK_LIVE = 'https://chzzk.naver.com/live/abe8aa82baf3d3ef54ad8468ee73e7fc';
+const CHZZK_LIVE = CHZZK_LIVE_URL;
 
 function relativeTime(openDate: string | null): string | null {
   if (!openDate) return null;

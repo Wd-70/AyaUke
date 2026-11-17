@@ -8,6 +8,8 @@ import {
   NoSymbolIcon,
   ArrowTopRightOnSquareIcon,
 } from '@heroicons/react/24/outline';
+import { AdminBadge, AdminPageHeader, adminButton, adminDangerButton, adminMuted, adminPanel, adminPrimaryButton } from '@/components/admin/AdminPrimitives';
+import { useToast } from '@/components/Toast';
 
 type ReasonKey = 'broken' | 'wrong_song' | 'wrong_time' | 'inappropriate' | 'other';
 type StatusKey = 'pending' | 'resolved' | 'dismissed' | 'all';
@@ -52,6 +54,7 @@ export default function ClipReportsTab() {
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const { showSuccess, showError } = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,142 +82,144 @@ export default function ClipReportsTab() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action }),
       });
-      if (res.ok) await load();
+      if (res.ok) {
+        await load();
+        showSuccess(action === 'dismiss' ? '반려했어요' : action === 'resolve' ? '처리했어요' : '숨기고 처리했어요', '');
+      } else {
+        const json = await res.json().catch(() => null);
+        showError('처리하지 못했어요', json?.error?.message || '잠시 후 다시 시도해 주세요.');
+      }
     } finally {
       setBusyId(null);
     }
   };
 
   return (
-    <div className="rounded-xl border border-light-primary/20 bg-white/30 p-4 backdrop-blur-sm dark:border-dark-primary/20 dark:bg-gray-900/30 xl:p-6">
-      <div className="mb-4 flex items-center gap-2">
-        <FlagIcon className="h-5 w-5 text-amber-500" />
-        <h3 className="text-lg font-semibold text-light-text dark:text-dark-text">클립 신고</h3>
-        {pendingCount > 0 && (
-          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">{pendingCount} 대기</span>
-        )}
-      </div>
+    <div className="space-y-6 text-light-text dark:text-dark-text">
+      <AdminPageHeader
+        eyebrow="WORKSPACE / REPORTS"
+        title="클립 신고"
+        count={pendingCount || null}
+        description="사용자가 문제를 알려 온 클립을 확인하고 처리합니다."
+        actions={
+          <div className="flex rounded-xl bg-light-primary/10 p-1 dark:bg-dark-primary/20" role="group" aria-label="신고 상태">
+            {STATUS_TABS.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setStatus(t.key)}
+                aria-pressed={status === t.key}
+                className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors ${
+                  status === t.key
+                    ? "bg-white text-light-text shadow-sm dark:bg-gray-800 dark:text-dark-text"
+                    : "text-light-text/60 hover:text-light-text dark:text-dark-text/60 dark:hover:text-dark-text"
+                }`}
+              >
+                {t.label}
+                {t.key === "pending" && pendingCount > 0 && <AdminBadge tone="warn">{pendingCount}</AdminBadge>}
+              </button>
+            ))}
+          </div>
+        }
+      />
 
-      {/* 상태 필터 */}
-      <div className="mb-4 flex gap-1 rounded-lg bg-light-primary/10 p-1 text-sm dark:bg-dark-primary/10 w-fit">
-        {STATUS_TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setStatus(t.key)}
-            className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
-              status === t.key
-                ? 'bg-white text-light-accent shadow-sm dark:bg-gray-700 dark:text-dark-accent'
-                : 'text-light-text/55 hover:text-light-accent dark:text-dark-text/55'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {status === "pending" && (
+        <dl className={`${adminPanel} grid gap-3 p-4 text-xs sm:grid-cols-3`}>
+          <div>
+            <dt className="font-semibold">처리 완료</dt>
+            <dd className={adminMuted}>클립 정보·구간을 고쳤을 때. 신고만 닫힙니다.</dd>
+          </div>
+          <div>
+            <dt className="font-semibold">반려</dt>
+            <dd className={adminMuted}>확인해 보니 문제가 없을 때. 신고만 닫힙니다.</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-rose-700 dark:text-rose-300">원본 없음으로 숨기기</dt>
+            <dd className={adminMuted}>원본 다시보기가 사라졌을 때. 클립을 노래책에서 숨기고 신고를 닫습니다.</dd>
+          </div>
+        </dl>
+      )}
 
-      {loading ? (
-        <div className="space-y-2">
+      {loading && reports.length === 0 ? (
+        <div className="space-y-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-lg bg-light-primary/10 dark:bg-dark-primary/10" />
+            <div key={i} className="h-24 animate-pulse rounded-2xl bg-light-primary/10 dark:bg-dark-primary/10" />
           ))}
         </div>
       ) : reports.length === 0 ? (
-        <div className="py-16 text-center text-light-text/50 dark:text-dark-text/50">
-          {status === 'pending' ? '대기 중인 신고가 없습니다.' : '신고가 없습니다.'}
+        <div className={`${adminPanel} p-10 text-center`}>
+          <FlagIcon className="mx-auto h-8 w-8 text-light-text/30 dark:text-dark-text/30" />
+          <p className={`${adminMuted} mt-2`}>
+            {status === "pending" ? "대기 중인 신고가 없어요." : `${STATUS_TABS.find((t) => t.key === status)?.label ?? ""} 신고가 없어요.`}
+          </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <ul className={`${adminPanel} divide-y divide-light-primary/10 overflow-hidden dark:divide-dark-primary/10`}>
           {reports.map((r) => {
             const clip = r.clipId;
+            const busy = busyId === r._id;
             return (
-              <div
-                key={r._id}
-                className="flex flex-col gap-3 rounded-xl border border-light-primary/15 bg-white/50 p-3 dark:border-dark-primary/15 dark:bg-gray-800/40 sm:flex-row sm:items-center"
-              >
-                {/* 썸네일 */}
-                <div className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-md bg-light-primary/10 dark:bg-dark-primary/10">
-                  {clip?.thumbnailUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={clip.thumbnailUrl} alt="" className="h-full w-full object-cover" />
-                  )}
-                  {clip?.sourceUnavailable && (
-                    <span className="absolute bottom-1 left-1 rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">불가</span>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:text-amber-400">
-                      {REASON_LABEL[r.reason]}
-                    </span>
-                    {clip ? (
-                      <span className="truncate text-sm font-semibold text-light-text dark:text-dark-text">
-                        {clip.title} <span className="font-normal text-light-text/50 dark:text-dark-text/50">— {clip.artist}</span>
-                      </span>
-                    ) : (
-                      <span className="text-sm text-light-text/50 dark:text-dark-text/50">삭제된 클립</span>
+              <li key={r._id} className="flex flex-col gap-3 p-4 lg:flex-row lg:items-center">
+                <div className="flex min-w-0 flex-1 gap-3">
+                  <div className="relative aspect-video w-28 shrink-0 overflow-hidden rounded-lg bg-light-primary/10 dark:bg-dark-primary/10">
+                    {clip?.thumbnailUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={clip.thumbnailUrl} alt="" className="h-full w-full object-cover" />
                     )}
-                    {r.status !== 'pending' && (
-                      <span className="rounded-full bg-light-primary/15 px-2 py-0.5 text-[11px] text-light-text/55 dark:bg-dark-primary/15 dark:text-dark-text/55">
-                        {r.status === 'resolved' ? '처리됨' : '반려'}
-                      </span>
+                    {clip?.sourceUnavailable && (
+                      <span className="absolute bottom-1 left-1 rounded bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">숨김</span>
                     )}
                   </div>
-                  {r.detail && <p className="mt-1 line-clamp-2 text-xs text-light-text/65 dark:text-dark-text/65">{r.detail}</p>}
-                  <div className="mt-1 text-[11px] text-light-text/45 dark:text-dark-text/45">
-                    {r.reportedByName || '익명'} · {new Date(r.createdAt).toLocaleString('ko-KR')}
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AdminBadge tone="warn">{REASON_LABEL[r.reason]}</AdminBadge>
+                      {r.status !== "pending" && <AdminBadge tone="neutral">{r.status === "resolved" ? "처리됨" : "반려"}</AdminBadge>}
+                    </div>
+                    <p className="mt-1 truncate text-sm font-semibold">
+                      {clip ? (
+                        <>
+                          {clip.title} <span className="font-normal text-light-text/55 dark:text-dark-text/55">· {clip.artist}</span>
+                        </>
+                      ) : (
+                        <span className="font-normal text-light-text/55 dark:text-dark-text/55">삭제된 클립</span>
+                      )}
+                    </p>
+                    {r.detail && <p className="mt-1 line-clamp-2 text-xs text-light-text/75 dark:text-dark-text/75">“{r.detail}”</p>}
+                    <p className={`${adminMuted} mt-1 text-xs`}>
+                      {r.reportedByName || "익명"} · {new Date(r.createdAt).toLocaleString("ko-KR")}
+                    </p>
                   </div>
                 </div>
 
-                {/* 액션 */}
-                <div className="flex shrink-0 items-center gap-1.5">
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
                   {clip && (
-                    <a
-                      href={`/clip/${clip._id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-lg p-2 text-light-text/50 transition-colors hover:bg-light-primary/10 hover:text-light-accent dark:text-dark-text/50 dark:hover:bg-dark-primary/10"
-                      title="클립 열기"
-                    >
+                    <a href={`/clip/${clip._id}`} target="_blank" rel="noopener noreferrer" className={`${adminButton} !min-h-10`}>
+                      클립 열기
                       <ArrowTopRightOnSquareIcon className="h-4 w-4" />
                     </a>
                   )}
-                  {r.status === 'pending' && (
+                  {r.status === "pending" && (
                     <>
-                      <button
-                        onClick={() => act(r._id, 'mark_unavailable')}
-                        disabled={busyId === r._id}
-                        className="inline-flex items-center gap-1 rounded-lg bg-red-100 px-2.5 py-1.5 text-xs font-medium text-red-600 transition-colors hover:bg-red-200 disabled:opacity-50 dark:bg-red-900/40 dark:text-red-400"
-                        title="원본 불가 표시(노래책 숨김) + 처리"
-                      >
-                        <NoSymbolIcon className="h-3.5 w-3.5" />
-                        숨김
+                      <button onClick={() => act(r._id, "resolve")} disabled={busy} className={`${adminPrimaryButton} !min-h-10`}>
+                        <CheckIcon className="h-4 w-4" />
+                        처리 완료
                       </button>
-                      <button
-                        onClick={() => act(r._id, 'resolve')}
-                        disabled={busyId === r._id}
-                        className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-200 disabled:opacity-50 dark:bg-emerald-900/40 dark:text-emerald-400"
-                        title="처리됨"
-                      >
-                        <CheckIcon className="h-3.5 w-3.5" />
-                        처리
-                      </button>
-                      <button
-                        onClick={() => act(r._id, 'dismiss')}
-                        disabled={busyId === r._id}
-                        className="inline-flex items-center gap-1 rounded-lg bg-light-primary/10 px-2.5 py-1.5 text-xs font-medium text-light-text/55 transition-colors hover:bg-light-primary/20 disabled:opacity-50 dark:bg-dark-primary/10 dark:text-dark-text/55"
-                        title="반려"
-                      >
-                        <XMarkIcon className="h-3.5 w-3.5" />
+                      <button onClick={() => act(r._id, "dismiss")} disabled={busy} className={`${adminButton} !min-h-10`}>
+                        <XMarkIcon className="h-4 w-4" />
                         반려
                       </button>
+                      {clip && !clip.sourceUnavailable && (
+                        <button onClick={() => act(r._id, "mark_unavailable")} disabled={busy} className={`${adminDangerButton} !min-h-10`}>
+                          <NoSymbolIcon className="h-4 w-4" />
+                          원본 없음으로 숨기기
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </div>
   );

@@ -13,6 +13,7 @@ import { PUT as editSong, DELETE as deleteSong } from '@/app/api/songdetails/[id
 import type { AdminScope } from '@/lib/permissions';
 vi.mock('@/domains/operations/backup.service', () => ({ getCollectionSummary: vi.fn().mockResolvedValue([]) }));
 vi.mock('@/domains/operations/local-backup.service', () => ({ restoreBackup: vi.fn() }));
+vi.mock('@/domains/operations/maintenance-log.service', () => ({ logMaintenance: vi.fn() }));
 vi.mock('next-auth/next', () => ({ getServerSession: vi.fn() }));
 vi.mock('@/lib/authOptions', () => ({ authOptions: {} }));
 vi.mock('@/shared/db/mongodb', () => ({ default: vi.fn(), connectDB: vi.fn() }));

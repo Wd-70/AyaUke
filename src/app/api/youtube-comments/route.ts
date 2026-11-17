@@ -1,3 +1,4 @@
+import { config } from '@/shared/config';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
@@ -56,7 +57,7 @@ function extractTimestamps(comment: string): string[] {
 }
 
 // 아야 아카이브 채널 ID (하드코딩)
-const AYAUKE_ARCHIVE_CHANNEL_ID = 'UCsFclToX4FEApNjAsodeGpg';
+const AYAUKE_ARCHIVE_CHANNEL_ID = config.youtubeArchiveChannelId;
 
 // YouTube API에서 채널 정보 가져오기 - 두 단계로 처리
 async function getChannelVideos(channelId: string, publishedAfter?: Date) {

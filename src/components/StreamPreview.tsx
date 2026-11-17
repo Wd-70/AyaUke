@@ -1,4 +1,5 @@
 'use client';
+import { CHZZK_CHANNEL_URL } from "@/shared/channels";
 
 import { motion } from 'framer-motion';
 import { useStreamStatus } from '@/hooks/useStreamStatus';
@@ -109,7 +110,7 @@ export default function StreamPreview() {
                 </div>
                 <h3 className="text-2xl font-bold mb-2">{streamInfo.title}</h3>
                 <a
-                  href="https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc"
+                  href={CHZZK_CHANNEL_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-6 py-3 bg-white/20 

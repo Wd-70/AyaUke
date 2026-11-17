@@ -5,11 +5,12 @@
  * 기본 클립 길이 표시/직접 수정, 기존 클립 일괄 적용(임계초), 클립 목록.
  */
 
+import { useSiteSettings } from "@/hooks/useAdminSiteSettings";
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import {
-  XMarkIcon,
+  ChevronLeftIcon,
   ClockIcon,
   BoltIcon,
   ExclamationTriangleIcon,
@@ -59,7 +60,10 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
   const [selectedClip, setSelectedClip] = useState<ClipData | null>(null);
   const [durationInput, setDurationInput] = useState("");
   const [editingDuration, setEditingDuration] = useState(false);
-  const [threshold, setThreshold] = useState("5");
+  // 허용 오차: 시스템 설정의 기본값으로 시작하고, 여기서 바꾸면 이 작업에만 적용
+  const { data: siteSettings } = useSiteSettings();
+  const [threshold, setThreshold] = useState<string | null>(null);
+  const thresholdValue = threshold ?? String(siteSettings?.clipDefaults.durationTolerance ?? 5);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-clips", "song-clips", songId],
@@ -179,7 +183,7 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
   };
 
   const handleApply = async () => {
-    const t = parseFloat(threshold);
+    const t = parseFloat(thresholdValue);
     if (isNaN(t) || t < 0) {
       showError("입력 오류", "임계값(초)을 올바르게 입력하세요.");
       return;
@@ -204,7 +208,15 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
   return (
     <div className="space-y-4">
       {/* 곡 헤더 + 기본 길이 관리 */}
-      <div className="bg-white/40 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 p-4">
+      <div className="rounded-2xl border border-light-primary/20 bg-white/80 shadow-sm dark:border-dark-primary/20 dark:bg-gray-900/70 p-4">
+        {/* 목록 위 한 단계 — 닫기(X)보다 '돌아가기'가 뜻이 분명하다. 뒤로가기로도 돌아간다 */}
+        <button
+          onClick={onClose}
+          className="-ml-1 mb-2 inline-flex min-h-9 items-center gap-1 rounded-lg px-1 text-sm text-light-text/60 transition-colors hover:text-purple-700 dark:text-dark-text/60 dark:hover:text-purple-300"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+          곡 목록
+        </button>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-lg font-semibold text-light-text dark:text-dark-text truncate">
@@ -220,9 +232,6 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
               )}
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-light-primary/10 dark:hover:bg-dark-primary/20 text-light-text/60 dark:text-dark-text/60 transition-colors">
-            <XMarkIcon className="w-5 h-5" />
-          </button>
         </div>
 
         {/* 기본 클립 길이 */}
@@ -275,7 +284,7 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
               type="number"
               min="0"
               step="0.5"
-              value={threshold}
+              value={thresholdValue}
               onChange={(e) => setThreshold(e.target.value)}
               className="w-16 px-2 py-1 text-sm rounded border border-light-primary/30 dark:border-dark-primary/30 bg-white dark:bg-gray-800 text-light-text dark:text-dark-text font-mono"
             />
@@ -286,7 +295,7 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-amber-500 hover:bg-amber-600 text-white disabled:opacity-40 transition-colors"
               title={
                 clipDuration
-                  ? `기본 길이와 ${threshold}초보다 크게 차이나는 클립만 '시작+기본길이'로 갱신합니다`
+                  ? `기본 길이와 ${thresholdValue}초보다 크게 차이나는 클립만 '시작+기본길이'로 갱신합니다`
                   : "먼저 기본 클립 길이를 설정하세요"
               }
             >
@@ -308,7 +317,7 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
       )}
 
       {/* 클립 목록 */}
-      <div className="bg-white/40 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 overflow-hidden">
+      <div className="rounded-2xl border border-light-primary/20 bg-white/80 shadow-sm dark:border-dark-primary/20 dark:bg-gray-900/70 overflow-hidden">
         {isLoading ? (
           <div className="flex justify-center p-10">
             <div className="w-6 h-6 border-2 border-light-accent/30 dark:border-dark-accent/30 border-t-light-accent dark:border-t-dark-accent rounded-full animate-spin" />
@@ -320,7 +329,7 @@ export default function SongClipPanel({ songId, onClose }: SongClipPanelProps) {
             {clips.map((clip) => {
               const duration = clip.endTime != null ? clip.endTime - (clip.startTime || 0) : null;
               const deviates =
-                clipDuration && duration != null && Math.abs(duration - clipDuration) > parseFloat(threshold || "5");
+                clipDuration && duration != null && Math.abs(duration - clipDuration) > parseFloat(thresholdValue || "5");
               return (
                 <li key={clip._id}>
                   <button

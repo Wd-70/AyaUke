@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+import { requireFeature } from "@/domains/operations/feature-gate";
+
+// 기능 공개 스위치(관리자 → 시스템 설정)를 요청마다 확인한다
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "프로젝트 아이 팬게임 | AyaUke",
@@ -10,10 +14,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default function GameLayout({
+export default async function GameLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  await requireFeature("game");
   return <>{children}</>;
 }

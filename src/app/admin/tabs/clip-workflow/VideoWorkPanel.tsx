@@ -343,7 +343,7 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
       )}
 
       {/* 원본 타임라인 댓글 (맨 아래, 기본 닫힘) */}
-      <div className={`${navigation.listClass} rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/40 dark:bg-gray-900/40`}>
+      <div className={`${navigation.listClass} rounded-2xl border border-light-primary/20 bg-white/80 shadow-sm dark:border-dark-primary/20 dark:bg-gray-900/70`}>
         <button onClick={() => setShowComments((v) => !v)} className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-light-text dark:text-dark-text">
           <span>원본 타임라인 댓글 ({comments.length})</span>
           <span className="text-light-text/50">{showComments ? "▲" : "▼"}</span>

@@ -4,7 +4,8 @@
  * 전체 클립 목록 — 서버 페이지네이션 + 필터(검증/플랫폼/검색/등록자/정렬).
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { adminControl, adminPanel } from "@/components/admin/AdminPrimitives";
 import { useOverlayHistory } from "@/shared/motion/useOverlayHistory";
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import Image from "next/image";
@@ -22,20 +23,31 @@ import {
   thumbnailSrc,
 } from "./clip-types";
 
-const selectClass =
-  "px-3 py-2 text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/60 dark:bg-gray-900/60 text-light-text dark:text-dark-text";
+const selectClass = adminControl;
 
-export default function ClipListView() {
+type FilterBy = "all" | "verified" | "unverified" | "unavailable" | "recommended";
+type Platform = "all" | "youtube" | "chzzk";
+/** 탭 위 숫자 카드에서 들어올 때의 조건 */
+export type ClipListFilter = { filterBy?: FilterBy; platform?: Platform };
+
+export default function ClipListView({ initialFilter }: { initialFilter?: ClipListFilter } = {}) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [filterBy, setFilterBy] = useState<"all" | "verified" | "unverified" | "unavailable" | "recommended">("all");
-  const [platform, setPlatform] = useState<"all" | "youtube" | "chzzk">("all");
+  const [filterBy, setFilterBy] = useState<FilterBy>(initialFilter?.filterBy ?? "all");
+  const [platform, setPlatform] = useState<Platform>(initialFilter?.platform ?? "all");
   const [sortBy, setSortBy] = useState<"recent" | "sungDate" | "songTitle" | "addedBy" | "verified" | "rangeSupport" | "rangeTrim">("recent");
   // 선택 클립은 id만 보관하고 실제 데이터는 쿼리 결과에서 파생한다.
   // (객체를 복사해 두면 편집 저장 후 목록만 refetch되어 선택 클립이 옛 값으로 남음)
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   // 열린 상세 패널은 뒤로가기로 닫힌다(관리자 페이지를 떠나지 않게)
   useOverlayHistory(!!selectedClipId, () => setSelectedClipId(null));
+  // 상세 패널은 목록 위에 열리므로, 아래쪽 클립을 골랐으면 패널로 올려 준다
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!selectedClipId) return;
+    const el = panelRef.current;
+    if (el && el.getBoundingClientRect().top < 0) el.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [selectedClipId]);
 
   const debouncedSearch = useDebounce(search, 300);
 
@@ -86,23 +98,24 @@ export default function ClipListView() {
               setSearch(e.target.value);
               resetPage();
             }}
-            placeholder="곡명, 아티스트, 등록자 검색..."
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-light-primary/20 dark:border-dark-primary/20 bg-white/60 dark:bg-gray-900/60 text-light-text dark:text-dark-text placeholder-light-text/40 dark:placeholder-dark-text/40 focus:ring-2 focus:ring-light-accent/40 dark:focus:ring-dark-accent/40 focus:border-transparent"
+            placeholder="곡명, 아티스트, 등록자 검색"
+            aria-label="클립 검색"
+            className={`${adminControl} w-full pl-9`}
           />
         </div>
-        <select value={filterBy} onChange={(e) => { setFilterBy(e.target.value as typeof filterBy); resetPage(); }} className={selectClass}>
+        <select aria-label="상태" value={filterBy} onChange={(e) => { setFilterBy(e.target.value as typeof filterBy); resetPage(); }} className={selectClass}>
           <option value="all">전체 상태</option>
           <option value="verified">검증됨</option>
           <option value="unverified">미검증</option>
           <option value="recommended">커뮤니티 추천 있음</option>
           <option value="unavailable">재생불가(소스없음)</option>
         </select>
-        <select value={platform} onChange={(e) => { setPlatform(e.target.value as typeof platform); resetPage(); }} className={selectClass}>
+        <select aria-label="플랫폼" value={platform} onChange={(e) => { setPlatform(e.target.value as typeof platform); resetPage(); }} className={selectClass}>
           <option value="all">모든 플랫폼</option>
           <option value="youtube">유튜브</option>
           <option value="chzzk">치지직</option>
         </select>
-        <select value={sortBy} onChange={(e) => { setSortBy(e.target.value as typeof sortBy); resetPage(); }} className={selectClass}>
+        <select aria-label="정렬" value={sortBy} onChange={(e) => { setSortBy(e.target.value as typeof sortBy); resetPage(); }} className={selectClass}>
           <option value="recent">등록 최신순</option>
           <option value="sungDate">부른 날짜순</option>
           <option value="songTitle">곡명순</option>
@@ -115,16 +128,18 @@ export default function ClipListView() {
 
       {/* 클립 상세 (선택 시) */}
       {selectedClip && (
+        <div ref={panelRef} className="scroll-mt-28">
         <ClipDetailPanel
           clip={selectedClip}
           songClipDuration={selectedClip.songDetail?.clipDuration}
           onClose={() => setSelectedClipId(null)}
           onChanged={() => refetch()}
         />
+        </div>
       )}
 
       {/* 목록 */}
-      <div className="bg-white/40 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 overflow-hidden">
+      <div className={`${adminPanel} overflow-hidden`}>
         {isLoading ? (
           <div className="flex justify-center p-12">
             <div className="w-7 h-7 border-2 border-light-accent/30 dark:border-dark-accent/30 border-t-light-accent dark:border-t-dark-accent rounded-full animate-spin" />

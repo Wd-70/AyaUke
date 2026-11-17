@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AYAUKE_CHZZK_CHANNEL_ID, AYAUKE_YOUTUBE_ARCHIVE_ID } from './channels';
 
 /**
  * 앱 전역 설정. 하드코딩되어 있던 값들을 한 곳에 모으고 env로 덮어쓸 수 있게 한다.
@@ -9,6 +10,10 @@ import { z } from 'zod';
  *   SUPER_ADMIN_CHANNEL_IDS         쉼표 구분 치지직 채널 ID 목록
  *   AYAUKE_ADMIN_CHANNEL_IDS        쉼표 구분 치지직 채널 ID 목록
  *   HONEYZ_CHANNEL_IDS              쉼표 구분 치지직 채널 ID 목록 (칭호 자동 부여)
+ *   AYAUKE_CHZZK_CHANNEL_ID         아야 치지직 채널 (방송 상태·팔로워·다시보기 수집)
+ *   AYAUKE_YOUTUBE_ARCHIVE_ID       아야 다시보기 유튜브 채널 (댓글 타임라인·랜딩 통계)
+ *
+ * 관리자 → 시스템 설정 → '채널·외부 소스'에 현재 값이 표시된다.
  */
 
 const csv = (defaults: string[]) =>
@@ -23,6 +28,8 @@ const csv = (defaults: string[]) =>
 
 const ConfigSchema = z.object({
   googleSheetId: z.string().default('1g-hVYnHn20XkS2HLAzOI9UcOnNHNtz1H-1g1MgVXTAc'),
+  chzzkChannelId: z.string().default(AYAUKE_CHZZK_CHANNEL_ID),
+  youtubeArchiveChannelId: z.string().default(AYAUKE_YOUTUBE_ARCHIVE_ID),
   superAdminChannelIds: csv(['d6017f757614569add71b0bc83a81382' /* 개발자 */]),
   ayaukeAdminChannelIds: csv(['abe8aa82baf3d3ef54ad8468ee73e7fc' /* 아야우케 */]),
   honeyzChannelIds: csv([
@@ -38,6 +45,8 @@ const ConfigSchema = z.object({
 
 export const config = ConfigSchema.parse({
   googleSheetId: process.env.GOOGLE_SHEET_ID || undefined,
+  chzzkChannelId: process.env.AYAUKE_CHZZK_CHANNEL_ID || undefined,
+  youtubeArchiveChannelId: process.env.AYAUKE_YOUTUBE_ARCHIVE_ID || undefined,
   superAdminChannelIds: process.env.SUPER_ADMIN_CHANNEL_IDS,
   ayaukeAdminChannelIds: process.env.AYAUKE_ADMIN_CHANNEL_IDS,
   honeyzChannelIds: process.env.HONEYZ_CHANNEL_IDS,

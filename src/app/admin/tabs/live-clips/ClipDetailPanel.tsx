@@ -256,7 +256,7 @@ export default function ClipDetailPanel({ clip, songClipDuration, onClose, onCha
   };
 
   return (
-    <div className="bg-white/40 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl border border-light-primary/20 dark:border-dark-primary/20 overflow-hidden">
+    <div className="rounded-2xl border border-light-primary/20 bg-white/80 shadow-sm dark:border-dark-primary/20 dark:bg-gray-900/70 overflow-hidden">
       {/* 헤더 */}
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-light-primary/15 dark:border-dark-primary/15">
         <div className="min-w-0 flex items-center gap-2">

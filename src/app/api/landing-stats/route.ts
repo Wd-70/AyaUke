@@ -1,3 +1,4 @@
+import { config } from '@/shared/config';
 import { withApi, ok } from '@/shared/api/handler';
 import { connectDB } from '@/shared/db/mongodb';
 import { fetchRawSongsFromSheet } from '@/domains/catalog/sheets.client';
@@ -6,9 +7,9 @@ import SongVideo from '@/domains/archive/schemas/song-video.schema';
 import ChzzkVideo from '@/domains/archive/schemas/chzzk-video.schema';
 import YouTubeVideo from '@/domains/archive/schemas/youtube-video.schema';
 
-const AYAUKE_CHANNEL_ID = 'abe8aa82baf3d3ef54ad8468ee73e7fc';
+const AYAUKE_CHANNEL_ID = config.chzzkChannelId;
 // 다시보기(VOD) 영구 미러 유튜브 채널
-const ARCHIVE_YT_CHANNEL_ID = 'UCsFclToX4FEApNjAsodeGpg';
+const ARCHIVE_YT_CHANNEL_ID = config.youtubeArchiveChannelId;
 
 // 자주 안 바뀌므로 5분 캐시 — 랜딩 "아야의 발자취" 섹션용 (공개).
 export const revalidate = 300;

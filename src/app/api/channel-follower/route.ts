@@ -1,7 +1,8 @@
+import { config } from '@/shared/config';
 import { withApi, ok } from '@/shared/api/handler';
 import { fetchChzzkChannelInfo } from '@/domains/archive/chzzk.client';
 
-const AYAUKE_CHANNEL_ID = 'abe8aa82baf3d3ef54ad8468ee73e7fc';
+const AYAUKE_CHANNEL_ID = config.chzzkChannelId;
 
 // 팔로워 수만 가볍게 — 거의 실시간으로 보여주기 위해 짧은 캐시 (공개).
 export const revalidate = 30;

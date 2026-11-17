@@ -1,4 +1,5 @@
 'use client';
+import { CHZZK_LIVE_URL } from "@/shared/channels";
 
 import { useRef } from 'react';
 import Link from 'next/link';
@@ -17,7 +18,7 @@ import NoteParticles from './NoteParticles';
 import LiveStatusPill from './LiveStatusPill';
 import { useLiveStatus } from '@/hooks/useLiveStatus';
 
-const CHZZK_LIVE = 'https://chzzk.naver.com/live/abe8aa82baf3d3ef54ad8468ee73e7fc';
+const CHZZK_LIVE = CHZZK_LIVE_URL;
 
 const TAGS = ['노래방송', '게임방송', '저스트채팅', 'ISTP'];
 

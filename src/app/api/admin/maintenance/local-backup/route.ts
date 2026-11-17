@@ -10,6 +10,10 @@ import {
   deleteLocalBackup,
   updateBackupNote,
 } from '@/domains/operations/local-backup.service';
+import { logMaintenance } from '@/domains/operations/maintenance-log.service';
+
+const actor = (session: Session | null) =>
+  (session?.user as { displayName?: string; name?: string } | undefined)?.displayName || session?.user?.name || '알 수 없음';
 
 function assertSystemAdmin(session: Session | null) {
   const role = (session?.user as { role?: string } | undefined)?.role as UserRole | undefined;
@@ -28,7 +32,9 @@ export const GET = withApi({ auth: 'user' }, async ({ session }) => {
 /** 로컬 디스크에 새 백업 저장 */
 export const POST = withApi({ auth: 'user' }, async ({ session }) => {
   assertSystemAdmin(session);
-  return ok(await saveBackupToDisk());
+  const saved = await saveBackupToDisk();
+  await logMaintenance('backup-save', '서버 백업 저장', actor(session));
+  return ok(saved);
 });
 
 const NoteBody = z.object({ name: z.string().min(1), note: z.string().max(2000) });
@@ -46,5 +52,6 @@ const DeleteQuery = z.object({ name: z.string().min(1) });
 export const DELETE = withApi({ schema: DeleteQuery, auth: 'user' }, async ({ input, session }) => {
   assertSystemAdmin(session);
   await deleteLocalBackup(input.name);
+  await logMaintenance('backup-delete', '서버 백업 삭제', actor(session), input.name);
   return ok({ deleted: input.name });
 });

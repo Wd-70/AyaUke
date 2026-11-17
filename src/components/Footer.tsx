@@ -1,9 +1,10 @@
+import { CHZZK_CHANNEL_URL } from "@/shared/channels";
 import Link from 'next/link';
 
 const SOCIALS = [
   {
     label: 'Chzzk',
-    href: 'https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc',
+    href: CHZZK_CHANNEL_URL,
     hover: 'hover:border-light-accent hover:bg-light-accent dark:hover:border-dark-primary dark:hover:bg-dark-primary',
     icon: (
       <img
@@ -91,7 +92,7 @@ export default function Footer() {
                 노래책
               </Link>
               <a
-                href="https://chzzk.naver.com/abe8aa82baf3d3ef54ad8468ee73e7fc"
+                href={CHZZK_CHANNEL_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block text-sm text-gray-600 transition-colors duration-200 hover:text-light-accent dark:text-gray-400 dark:hover:text-dark-primary"
