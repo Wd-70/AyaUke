@@ -22,6 +22,7 @@ const segmentClass = (active: boolean) =>
   }`;
 
 type Mode = "video" | "song";
+const HIDE_UNMATCHED_VIDEOS_KEY = "clipWorkflowHideUnmatchedVideos";
 
 export default function ClipWorkflowTab() {
   const [mode, setMode] = useState<Mode>("video");
@@ -33,6 +34,16 @@ export default function ClipWorkflowTab() {
   const [collectMsg, setCollectMsg] = useState<string | null>(null);
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
   const [filterTab, setFilterTab] = useState<"todo" | "done">("todo");
+  const [hideUnmatchedVideos, setHideUnmatchedVideos] = useState(false);
+  useEffect(() => {
+    try { setHideUnmatchedVideos(localStorage.getItem(HIDE_UNMATCHED_VIDEOS_KEY) === "1"); } catch { /* optional preference */ }
+  }, []);
+
+  const toggleHideUnmatchedVideos = () => {
+    const next = !hideUnmatchedVideos;
+    setHideUnmatchedVideos(next);
+    try { localStorage.setItem(HIDE_UNMATCHED_VIDEOS_KEY, next ? "1" : "0"); } catch { /* optional preference */ }
+  };
 
   // 곡 단위
   const [songStatuses, setSongStatuses] = useState<Map<string, { occurrences: number; clips: number }>>(new Map());
@@ -137,19 +148,19 @@ export default function ClipWorkflowTab() {
   };
 
   // 완료 = 매칭된 곡이 모두 클립으로 생성됨. 작업 대상 = 댓글 있고 아직 완료 아님(상호배타)
-  const isDone = (v: WorkflowVideo) => v.matchedCount > 0 && v.clipCount >= v.matchedCount;
-  const counts = useMemo(() => {
-    let todo = 0, done = 0;
+  const { videoGroups, hiddenVideoCount } = useMemo(() => {
+    const groups = { todo: [] as WorkflowVideo[], done: [] as WorkflowVideo[] };
+    let hidden = 0;
     for (const v of videos) {
-      if (isDone(v)) done++;
-      else if (v.timelineCommentCount > 0) todo++;
+      if (v.matchedCount > 0 && v.clipCount >= v.matchedCount) groups.done.push(v);
+      else if (v.timelineCommentCount > 0) {
+        if (hideUnmatchedVideos && v.matchedCount === 0) hidden++;
+        else groups.todo.push(v);
+      }
     }
-    return { todo, done };
-  }, [videos]);
-
-  const visibleVideos = useMemo(() => {
-    return videos.filter((v) => (filterTab === "done" ? isDone(v) : v.timelineCommentCount > 0 && !isDone(v)));
-  }, [videos, filterTab]);
+    return { videoGroups: groups, hiddenVideoCount: hidden };
+  }, [videos, hideUnmatchedVideos]);
+  const visibleVideos = videoGroups[filterTab];
 
   const selectedVideo = videos.find((v) => v.videoId === selectedVideoId) || null;
   const refreshStatus = useCallback(() => loadVideos(platform), [platform, loadVideos]);
@@ -216,17 +227,37 @@ export default function ClipWorkflowTab() {
         {/* 좌: 영상 목록 */}
         <div className="rounded-2xl border border-light-primary/20 bg-white/80 shadow-sm dark:border-dark-primary/20 dark:bg-gray-900/70 overflow-hidden flex flex-col lg:max-h-[80vh]">
           <div className="flex border-b border-light-primary/15 dark:border-dark-primary/15 text-sm">
-            {([["todo", "작업 대상", counts.todo], ["done", "완료", counts.done]] as const).map(([k, label, n]) => (
+            {([["todo", "작업 대상"], ["done", "완료"]] as const).map(([k, label]) => (
               <button key={k} onClick={() => setFilterTab(k)} className={`flex-1 px-2 py-2 transition-colors ${filterTab === k ? "text-light-accent dark:text-dark-accent border-b-2 border-light-accent dark:border-dark-accent font-medium" : "text-light-text/60 dark:text-dark-text/60"}`} title={k === "todo" ? "댓글이 있고 아직 모든 매칭 곡이 클립으로 생성되지 않은 영상" : "매칭된 곡이 모두 클립으로 생성된 영상"}>
-                {label} <span className="text-xs">({n})</span>
+                {label} <span className="text-xs">({videoGroups[k].length})</span>
               </button>
             ))}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-2 border-b border-light-primary/15 px-2.5 py-1 text-xs dark:border-dark-primary/15">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={hideUnmatchedVideos}
+              onClick={toggleHideUnmatchedVideos}
+              title="매칭 수가 0인 영상을 작업 대상 목록에서 숨깁니다."
+              className="inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-light-text/75 hover:text-light-text dark:text-dark-text/75 dark:hover:text-dark-text"
+            >
+              <span aria-hidden className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors ${hideUnmatchedVideos ? "bg-light-accent dark:bg-dark-accent" : "bg-light-text/20 dark:bg-dark-text/25"}`}>
+                <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform ${hideUnmatchedVideos ? "translate-x-3.5" : "translate-x-0.5"}`} />
+              </span>
+              매칭 없는 영상 숨기기
+            </button>
+            {!loading && filterTab === "todo" && hiddenVideoCount > 0 && (
+              <span role="status" className="text-light-text/60 dark:text-dark-text/60 tabular-nums">{hiddenVideoCount}개 숨김</span>
+            )}
           </div>
           <div className="lg:overflow-y-auto">
             {loading ? (
               <p className="p-4 text-center text-xs text-light-text/50">불러오는 중...</p>
             ) : visibleVideos.length === 0 ? (
-              <p className="p-4 text-center text-xs text-light-text/50">항목이 없습니다.</p>
+              <p className="p-4 text-center text-xs text-light-text/60 dark:text-dark-text/60">
+                {filterTab === "todo" && hiddenVideoCount > 0 ? "매칭된 작업 대상 영상이 없습니다. 숨기기를 끄면 모든 작업 대상을 볼 수 있습니다." : "항목이 없습니다."}
+              </p>
             ) : visibleVideos.map((v) => {
               const sel = v.videoId === selectedVideoId;
               return (

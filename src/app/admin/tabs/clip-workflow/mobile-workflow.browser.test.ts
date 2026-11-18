@@ -58,7 +58,7 @@ describe('mobile clip workflow', () => {
   }, 60000);
   afterAll(async () => { await browser?.close(); });
 
-  async function fixture(width = 390, unmatched = false) {
+  async function fixture(width = 390, unmatched: boolean | 'all' = false) {
     const page = await browser.newPage({ viewport: { width, height: 844 } });
     page.setDefaultTimeout(5000);
     const errors: string[] = [];
@@ -67,6 +67,9 @@ describe('mobile clip workflow', () => {
     const items: WorkflowItem[] = Array.from({ length: 24 }, (_, index) => ({ id: `item-${index}`, platform: 'youtube', videoId: 'video', videoUrl: 'https://www.youtube.com/watch?v=video', videoTitle: '모바일 작업 영상', date: '2026-10-09', artist: '가수', songTitle: `곡 ${index + 1}`, startTimeSeconds: 10 + index * 300, endTimeSeconds: 250 + index * 300, matchedSongId: 'song', isRelevant: true, isExcluded: false, isTimeVerified: false, commentAuthor: '작성자' }));
     items[23] = { ...items[23], videoId: 'other-video', videoTitle: '다른 작업 영상', videoUrl: 'https://www.youtube.com/watch?v=other-video' };
     if (unmatched) items[0] = { ...items[0], artist: '미등록 가수', songTitle: '미등록 노래', matchedSongId: undefined };
+    if (unmatched === 'all') {
+      for (const item of items) Object.assign(item, { matchedSongId: undefined, isRelevant: false });
+    }
     const otherCandidates = Array.from({ length: 51 }, (_, index) => ({ ...items[0], id: `candidate-${index}`, videoId: 'envhVMj3mc4', videoTitle: `다른 방송 ${index + 1}` }));
     let clips = [0, 1].map((index) => ({ _id: `clip-${index}`, songId: 'song', platform: 'youtube', videoId: 'video', videoUrl: items[0].videoUrl, title: `클립 ${index + 1}`, artist: '가수', startTime: 10 + index * 300, endTime: 250 + index * 300, description: '', isVerified: false, songDetail: song }));
     const control = { failSave: false, delay: 0, saves: 0, candidateRequests: 0, candidateFail: false, candidateDelay: 0, candidateQuery: '', candidatePage: 0 };
@@ -76,7 +79,7 @@ describe('mobile clip workflow', () => {
       if (url.pathname === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: `<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><div id="root"></div><script type="module">${javascript}</script></body></html>` });
       let data: unknown = {};
       if (url.pathname.endsWith('/songs')) data = { songs: [song] };
-      else if (url.pathname.endsWith('/videos')) data = { videos: Array.from({ length: 30 }, (_, index) => ({ platform: 'youtube', videoId: index ? `video-${index}` : 'video', title: index ? `다른 영상 ${index}` : '모바일 작업 영상', date: '2026-10-09', timelineCommentCount: 1, parsedCount: 24, matchedCount: 24, verifiedCount: 0, clipCount: 2 })) };
+      else if (url.pathname.endsWith('/videos')) data = { videos: Array.from({ length: 30 }, (_, index) => ({ platform: url.searchParams.get('platform'), videoId: index ? `video-${index}` : 'video', title: index ? `다른 영상 ${index}` : '모바일 작업 영상', date: '2026-10-09', timelineCommentCount: 1, parsedCount: index === 28 ? 0 : 24, matchedCount: index === 27 || index === 28 ? 0 : 24, verifiedCount: 0, clipCount: index === 29 ? 24 : 2 })) };
       else if (url.pathname.endsWith('/video')) data = { comments: [], items, existingClips: [] };
       else if (url.pathname.endsWith('/song-statuses')) data = { statuses: [{ songId: 'song', occurrences: 24, clips: 2 }] };
       else if (url.pathname.endsWith('/song-work')) data = { occurrences: items, clips: [], candidates: [] };
@@ -182,22 +185,87 @@ describe('mobile clip workflow', () => {
     await page.close();
   }, 30000);
 
-  it('hides items without a matched song and remembers the choice', async () => {
+  it('remembers hidden timeline items for each platform and video independently', async () => {
     const { page, errors } = await fixture(1280, true);
-    const unmatched = page.getByText('미등록 가수 - 미등록 노래', { exact: true });
+    const unmatched = page.getByText('미등록 가수 - 미등록 노래', { exact: true }).first();
     const toggle = page.getByRole('switch', { name: '매칭 없는 항목 숨기기', exact: false });
     expect(await toggle.getAttribute('aria-checked')).toBe('false');
     await toggle.click();
     await unmatched.waitFor({ state: 'detached' });
     await page.getByText('23개 표시 · 1개 숨김', { exact: true }).waitFor();
     expect(await page.getByRole('button', { name: '클립 생성 (23곡)', exact: true }).isVisible()).toBe(true);
+    await page.evaluate(() => localStorage.setItem('clipWorkflowHideUnmatched', '1'));
+    await page.getByRole('button', { name: /다른 영상 1 댓글/ }).click();
+    await unmatched.waitFor();
+    expect(await toggle.getAttribute('aria-checked')).toBe('false');
+    await page.getByRole('button', { name: '유튜브', exact: true }).click();
+    await page.getByRole('button', { name: /모바일 작업 영상/ }).click();
+    await unmatched.waitFor();
+    expect(await toggle.getAttribute('aria-checked')).toBe('false');
     await page.reload();
     await page.getByRole('button', { name: '모바일 작업 영상', exact: false }).click();
     await page.getByText('가수 - 곡 2', { exact: true }).first().waitFor();
     expect(await page.getByRole('switch', { name: '매칭 없는 항목 숨기기', exact: false }).getAttribute('aria-checked')).toBe('true');
     expect(await unmatched.count()).toBe(0);
-    await page.getByRole('switch', { name: '매칭 없는 항목 숨기기', exact: false }).click();
+    await toggle.click();
     await unmatched.waitFor();
+    await page.getByRole('button', { name: /다른 영상 1 댓글/ }).click();
+    await page.getByRole('button', { name: /모바일 작업 영상/ }).click();
+    await unmatched.waitFor();
+    expect(await toggle.getAttribute('aria-checked')).toBe('false');
+    expect(errors).toEqual([]);
+    await page.close();
+  }, 30000);
+
+  it('keeps an entirely unmatched timeline hidden after reopening', async () => {
+    const { page, errors } = await fixture(1280, 'all');
+    const unmatched = page.getByText('미등록 가수 - 미등록 노래', { exact: true });
+    const showAll = page.getByRole('button', { name: '숨긴 항목 24개 모두 보기' });
+    await page.getByRole('switch', { name: '매칭 없는 항목 숨기기' }).click();
+    await showAll.waitFor();
+    await page.reload();
+    await page.getByRole('button', { name: /모바일 작업 영상/ }).click();
+    await showAll.waitFor();
+    expect(await unmatched.count()).toBe(0);
+    await showAll.click();
+    await unmatched.waitFor();
+    expect(errors).toEqual([]);
+    await page.close();
+  }, 30000);
+
+  it('filters zero-match videos independently of timeline items and remembers the choice', async () => {
+    const { page, errors, control } = await fixture(1280, true);
+    const toggle = page.getByRole('switch', { name: '매칭 없는 영상 숨기기', exact: true });
+    const timelineToggle = page.getByRole('switch', { name: '매칭 없는 항목 숨기기' });
+    const video = (index: number) => page.getByRole('button', { name: new RegExp(`다른 영상 ${index} 댓글`) });
+    expect(await toggle.getAttribute('aria-checked')).toBe('false');
+    await video(27).waitFor();
+    await video(28).waitFor();
+
+    await toggle.click();
+    await video(27).waitFor({ state: 'detached' });
+    expect(await video(28).count()).toBe(0);
+    await page.getByRole('button', { name: '작업 대상 (27)', exact: true }).waitFor();
+    await page.getByText('2개 숨김', { exact: true }).waitFor();
+    expect(await timelineToggle.getAttribute('aria-checked')).toBe('false');
+    expect(await page.getByText('미등록 가수 - 미등록 노래', { exact: true }).count()).toBeGreaterThan(0);
+
+    await page.reload();
+    await page.getByRole('button', { name: '작업 대상 (27)', exact: true }).waitFor();
+    expect(await toggle.getAttribute('aria-checked')).toBe('true');
+    expect(await video(27).count()).toBe(0);
+    await page.getByRole('button', { name: '유튜브', exact: true }).click();
+    await video(26).waitFor();
+    expect(await video(28).count()).toBe(0);
+    await page.getByRole('button', { name: '완료 (1)', exact: true }).click();
+    await video(29).waitFor();
+    expect(await page.getByText('2개 숨김', { exact: true }).count()).toBe(0);
+    await page.getByRole('button', { name: '작업 대상 (27)', exact: true }).click();
+    await toggle.click();
+    await video(27).waitFor();
+    await video(28).waitFor();
+    await page.getByRole('button', { name: '작업 대상 (29)', exact: true }).waitFor();
+    expect(control.saves).toBe(0);
     expect(errors).toEqual([]);
     await page.close();
   }, 30000);

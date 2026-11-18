@@ -17,10 +17,9 @@ import { fmt } from "./itemUtils";
 import { saveWorkflowItem, workflowRequest } from './workflow-client';
 import type { Platform, WorkflowVideo, WorkflowItem, WorkflowSong, WorkflowComment, VideoDetail } from "./types";
 
-/** '매칭 없는 항목 숨기기' 선택 — 이 브라우저에서만 기억 */
-const HIDE_UNMATCHED_KEY = "clipWorkflowHideUnmatched";
-function readHideUnmatched(): boolean {
-  try { return localStorage.getItem(HIDE_UNMATCHED_KEY) === "1"; } catch { return false; }
+/** '매칭 없는 항목 숨기기' 선택 — 브라우저에 영상별로 기억 */
+function readHideUnmatched(key: string): boolean {
+  try { return localStorage.getItem(key) === "1"; } catch { return false; }
 }
 
 interface Props {
@@ -44,7 +43,9 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
   const [result, setResult] = useState<string | null>(null);
   const [showReview, setShowReview] = useState(false);
   const autoMatchedRef = useRef<Set<string>>(new Set()); // 영상별 자동매칭 1회 가드
-  const [hideUnmatched, setHideUnmatched] = useState(readHideUnmatched);
+  // 부모에서 플랫폼·영상 ID를 key로 사용하므로 영상 전환마다 새 설정을 읽는다.
+  const hideUnmatchedKey = `clipWorkflowHideUnmatched:${platform}:${video.videoId}`;
+  const [hideUnmatched, setHideUnmatched] = useState(() => readHideUnmatched(hideUnmatchedKey));
   const hideUnmatchedRef = useRef(hideUnmatched);
   hideUnmatchedRef.current = hideUnmatched;
   // 매칭 없는 항목(미매칭·비곡) 숨기기. 지금 고른 항목은 편집 중 매칭을 풀어도 목록에서 사라지지 않게 남긴다.
@@ -62,7 +63,7 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
       setComments(res.data.comments);
       setItems(res.data.items);
       setExistingClips(res.data.existingClips || []);
-      const first = (hideUnmatchedRef.current && res.data.items.find((it) => it.matchedSongId)) || res.data.items[0];
+      const first = hideUnmatchedRef.current ? res.data.items.find((it) => it.matchedSongId) : res.data.items[0];
       setSelectedId((prev) => res.data.items.some((it) => it.id === prev) ? prev : first?.id ?? null);
     } finally {
       setLoading(false);
@@ -115,7 +116,10 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
   const toggleHideUnmatched = () => {
     const next = !hideUnmatched;
     setHideUnmatched(next);
-    try { localStorage.setItem(HIDE_UNMATCHED_KEY, next ? "1" : "0"); } catch { /* 기억만 못 할 뿐 */ }
+    try {
+      if (next) localStorage.setItem(hideUnmatchedKey, "1");
+      else localStorage.removeItem(hideUnmatchedKey);
+    } catch { /* 기억만 못 할 뿐 */ }
     // 숨기는 순간 고른 항목이 매칭 없는 항목이면 첫 매칭 항목으로 옮긴다
     if (next && selected && !selected.matchedSongId) setSelectedId(items.find((it) => it.matchedSongId)?.id ?? null);
   };
@@ -314,7 +318,7 @@ export default function VideoWorkPanel({ platform, video, songs, songsById, onSt
                 role="switch"
                 aria-checked={hideUnmatched}
                 onClick={toggleHideUnmatched}
-                title="곡이 매칭되지 않은 항목(미매칭·비곡)을 목록에서 숨깁니다. 클립 생성에는 영향이 없어요."
+                title="이 영상에서 곡이 매칭되지 않은 항목(미매칭·비곡)을 숨깁니다. 이 브라우저에 영상별로 저장되며, 클립 생성에는 영향이 없어요."
                 className="inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-light-text/75 hover:text-light-text dark:text-dark-text/75 dark:hover:text-dark-text"
               >
                 <span aria-hidden className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors ${hideUnmatched ? "bg-light-accent dark:bg-dark-accent" : "bg-light-text/20 dark:bg-dark-text/25"}`}>
